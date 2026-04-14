@@ -30,7 +30,6 @@ export default function LoginPage() {
       } else {
         setMessage('Įvyko klaida. Bandyk dar kartą.')
       }
-
       setLoading(false)
       return
     }

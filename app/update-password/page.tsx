@@ -1,41 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 export default function UpdatePasswordPage() {
   const router = useRouter()
   const [password, setPassword] = useState('')
-  const [message, setMessage] = useState('Tikrinama sesija...')
-  const [ready, setReady] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
 
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession()
-
-      if (data.session) {
-        setReady(true)
-        setMessage('')
-      } else {
-        setReady(false)
-        setMessage('Sesija nerasta. Atidaryk naują nuorodą iš el. laiško.')
-      }
-    }
-
-    checkSession()
-  }, [])
-
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    const { data } = await supabase.auth.getSession()
-    if (!data.session) {
-      setMessage('Sesija nerasta. Atidaryk naują nuorodą iš el. laiško.')
-      return
-    }
-
     setLoading(true)
     setMessage('')
 
@@ -44,34 +21,110 @@ export default function UpdatePasswordPage() {
     })
 
     if (error) {
-      setMessage('Klaida: ' + error.message)
+      setMessage('Nepavyko atnaujinti slaptažodžio.')
       setLoading(false)
       return
     }
 
-    router.replace('/login')
+    setMessage('Slaptažodis sėkmingai pakeistas.')
+    setLoading(false)
+
+    setTimeout(() => {
+      router.push('/login')
+    }, 1500)
   }
 
   return (
-    <div style={{ padding: 40, maxWidth: 420 }}>
-      <h1>Naujas slaptažodis</h1>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.background,
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 480,
+          padding: 32,
+          border: `1px solid ${theme.colors.border}`,
+          borderRadius: 20,
+          boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
+          backgroundColor: theme.colors.card,
+        }}
+      >
+        <h1
+          style={{
+            marginBottom: 24,
+            textAlign: 'center',
+            fontSize: 36,
+            fontWeight: 700,
+            color: theme.colors.text,
+          }}
+        >
+          Naujas slaptažodis
+        </h1>
 
-      <form onSubmit={handleUpdate} style={{ display: 'grid', gap: 12 }}>
-        <input
-          type="password"
-          placeholder="Naujas slaptažodis"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          style={{ padding: 12 }}
-        />
+        <form onSubmit={handleUpdatePassword}>
+          <input
+            type="password"
+            placeholder="Naujas slaptažodis"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            style={{
+              display: 'block',
+              width: '100%',
+              marginBottom: 16,
+              padding: 16,
+              borderRadius: 14,
+              border: `1px solid ${theme.colors.border}`,
+              fontSize: 18,
+              boxSizing: 'border-box',
+              outline: 'none',
+              color: theme.colors.text,
+              backgroundColor: theme.colors.card,
+            }}
+          />
 
-        <button type="submit" disabled={!ready || loading} style={{ padding: 12 }}>
-          {loading ? 'Saugoma...' : 'Išsaugoti'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: 16,
+              borderRadius: 14,
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 20,
+              fontWeight: 600,
+              backgroundColor: theme.colors.primary,
+              color: '#ffffff',
+            }}
+          >
+            {loading ? 'Saugoma...' : 'Išsaugoti'}
+          </button>
+        </form>
 
-      {message && <p style={{ marginTop: 16 }}>{message}</p>}
+        {message && (
+          <p
+            style={{
+              marginTop: 14,
+              color: message.includes('sėkmingai')
+                ? theme.colors.success
+                : theme.colors.error,
+              textAlign: 'center',
+              fontSize: 15,
+            }}
+          >
+            {message}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

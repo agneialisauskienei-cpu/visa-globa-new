@@ -1,13 +1,14 @@
 export const theme = {
   colors: {
-    primary: '#111827',
-    primaryHover: '#1f2937',
-    background: '#f7f7f8',
+    primary: '#0f172a',
+    primaryHover: '#1e293b',
+    background: '#f8fafc',
     card: '#ffffff',
-    border: '#e5e7eb',
-    text: '#111827',
-    textSecondary: '#4b5563',
+    border: '#e2e8f0',
+    text: '#0f172a',
+    textSecondary: '#475569',
     error: '#dc2626',
+    success: '#16a34a',
     link: '#2563eb',
   },
 }
