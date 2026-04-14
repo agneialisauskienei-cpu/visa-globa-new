@@ -127,7 +127,13 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}
+          >
             {role === 'super_admin' && (
               <button
                 onClick={() => router.push('/admin')}
@@ -145,6 +151,22 @@ export default function DashboardPage() {
                 Admin panel
               </button>
             )}
+
+            <button
+              onClick={() => router.push('/clients')}
+              style={{
+                padding: '12px 18px',
+                borderRadius: 12,
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: '#0f172a',
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: 16,
+              }}
+            >
+              Klientai
+            </button>
 
             <button
               onClick={handleLogout}
