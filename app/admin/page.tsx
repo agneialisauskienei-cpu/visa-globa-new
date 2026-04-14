@@ -15,7 +15,7 @@ type UserProfile = {
 export default function AdminPage() {
   const router = useRouter()
   const [users, setUsers] = useState<UserProfile[]>([])
-  const [myId, setMyId] = useState('')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [search, setSearch] = useState('')
@@ -35,7 +35,7 @@ export default function AdminPage() {
         return
       }
 
-      setMyId(user.id)
+      setCurrentUserId(user.id)
 
       const { data: me, error: meError } = await supabase
         .from('profiles')
@@ -79,6 +79,11 @@ export default function AdminPage() {
   }, [users, search])
 
   const updateRole = async (id: string, newRole: string) => {
+    if (id === currentUserId) {
+      setMessage('Savo rolės keisti negalima.')
+      return
+    }
+
     setSavingId(id)
     setMessage('')
 
@@ -356,94 +361,116 @@ export default function AdminPage() {
               </p>
             </div>
           ) : (
-            filteredUsers.map((user) => (
-              <div
-                key={user.id}
-                style={{
-                  backgroundColor: theme.colors.card,
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: 18,
-                  padding: 20,
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-                }}
-              >
+            filteredUsers.map((user) => {
+              const isCurrentUser = user.id === currentUserId
+
+              return (
                 <div
+                  key={user.id}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 16,
-                    flexWrap: 'wrap',
+                    backgroundColor: theme.colors.card,
+                    border: `1px solid ${theme.colors.border}`,
+                    borderRadius: 18,
+                    padding: 20,
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
                   }}
                 >
-                  <div>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 18,
-                        fontWeight: 700,
-                        color: theme.colors.text,
-                        wordBreak: 'break-word',
-                      }}
-                    >
-                      {user.email || 'Be el. pašto'}
-                    </p>
-
-                    <p
-                      style={{
-                        marginTop: 8,
-                        marginBottom: 0,
-                        fontSize: 15,
-                        color: theme.colors.textSecondary,
-                      }}
-                    >
-                      Dabartinė rolė: <strong>{user.role || 'user'}</strong>
-                      {user.id === myId ? ' (tu)' : ''}
-                    </p>
-                  </div>
-
                   <div
                     style={{
                       display: 'flex',
+                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      gap: 10,
+                      gap: 16,
                       flexWrap: 'wrap',
                     }}
                   >
-                    <select
-                      value={user.role || 'user'}
-                      onChange={(e) => updateRole(user.id, e.target.value)}
-                      disabled={savingId === user.id}
-                      style={{
-                        minWidth: 190,
-                        padding: '12px 14px',
-                        borderRadius: 12,
-                        border: `1px solid ${theme.colors.border}`,
-                        fontSize: 15,
-                        backgroundColor: '#fff',
-                        color: theme.colors.text,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <option value="user">user</option>
-                      <option value="admin">admin</option>
-                      <option value="super_admin">super_admin</option>
-                    </select>
-
-                    {savingId === user.id && (
-                      <span
+                    <div>
+                      <p
                         style={{
-                          fontSize: 14,
+                          margin: 0,
+                          fontSize: 18,
+                          fontWeight: 700,
+                          color: theme.colors.text,
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {user.email || 'Be el. pašto'}
+                      </p>
+
+                      <p
+                        style={{
+                          marginTop: 8,
+                          marginBottom: 0,
+                          fontSize: 15,
                           color: theme.colors.textSecondary,
                         }}
                       >
-                        Saugoma...
-                      </span>
-                    )}
+                        Dabartinė rolė: <strong>{user.role || 'user'}</strong>
+                        {isCurrentUser ? ' (tu)' : ''}
+                      </p>
+
+                      {isCurrentUser && (
+                        <p
+                          style={{
+                            marginTop: 8,
+                            marginBottom: 0,
+                            fontSize: 14,
+                            color: theme.colors.textSecondary,
+                          }}
+                        >
+                          Savo rolės keisti negalima.
+                        </p>
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <select
+                        value={user.role || 'user'}
+                        onChange={(e) => updateRole(user.id, e.target.value)}
+                        disabled={savingId === user.id || isCurrentUser}
+                        style={{
+                          minWidth: 190,
+                          padding: '12px 14px',
+                          borderRadius: 12,
+                          border: `1px solid ${theme.colors.border}`,
+                          fontSize: 15,
+                          backgroundColor: '#fff',
+                          color: theme.colors.text,
+                          cursor:
+                            savingId === user.id || isCurrentUser
+                              ? 'not-allowed'
+                              : 'pointer',
+                          opacity:
+                            savingId === user.id || isCurrentUser ? 0.6 : 1,
+                        }}
+                      >
+                        <option value="user">user</option>
+                        <option value="admin">admin</option>
+                        <option value="super_admin">super_admin</option>
+                      </select>
+
+                      {savingId === user.id && (
+                        <span
+                          style={{
+                            fontSize: 14,
+                            color: theme.colors.textSecondary,
+                          }}
+                        >
+                          Saugoma...
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </div>
