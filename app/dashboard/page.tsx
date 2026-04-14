@@ -6,39 +6,52 @@ import { supabase } from '@/lib/supabase'
 import { theme } from '@/lib/theme'
 
 type Profile = {
-  email?: string | null
-  role?: string | null
+  id: string
+  email: string | null
+  role: string | null
 }
 
 export default function DashboardPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState('user')
+  const [role, setRole] = useState('')
   const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
     const loadUser = async () => {
+      setLoading(true)
+      setMessage('')
+
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser()
 
-      if (!user) {
+      if (userError || !user) {
         router.push('/login')
         return
       }
 
       setEmail(user.email || '')
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('email, role')
+        .select('id, email, role')
         .eq('id', user.id)
-        .single<Profile>()
+        .single()
 
-      if (profile?.role) {
-        setRole(profile.role)
+      if (profileError) {
+        console.error('Profile fetch error:', profileError)
+        setMessage('Nepavyko užkrauti profilio informacijos.')
+        setRole('nenustatyta')
+        setLoading(false)
+        return
       }
 
+      const typedProfile = profile as Profile
+
+      setRole(typedProfile?.role || 'nenustatyta')
       setLoading(false)
     }
 
@@ -150,6 +163,18 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {message && (
+          <p
+            style={{
+              marginBottom: 18,
+              color: theme.colors.error,
+              fontSize: 15,
+            }}
+          >
+            {message}
+          </p>
+        )}
 
         <div
           style={{
