@@ -46,88 +46,142 @@ export default function LoginPage() {
   return (
     <div
       style={{
-        maxWidth: 420,
-        margin: '60px auto',
-        padding: 24,
-        border: '1px solid #e5e5e5',
-        borderRadius: 12,
-        boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-        backgroundColor: '#fff',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f7f7f8',
+        padding: 20,
       }}
     >
-      <h1 style={{ marginBottom: 20, textAlign: 'center' }}>Prisijungimas</h1>
-
-      <form onSubmit={handleLogin}>
-        <input
-          type="email"
-          placeholder="El. paštas"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 480,
+          padding: 32,
+          border: '1px solid #e5e7eb',
+          borderRadius: 20,
+          boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
+          backgroundColor: '#ffffff',
+        }}
+      >
+        <h1
           style={{
-            display: 'block',
-            width: '100%',
-            marginBottom: 12,
-            padding: 12,
-            borderRadius: 8,
-            border: '1px solid #ccc',
-            fontSize: 16,
-            boxSizing: 'border-box',
-          }}
-        />
-
-        <input
-          type="password"
-          placeholder="Slaptažodis"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          style={{
-            display: 'block',
-            width: '100%',
-            marginBottom: 12,
-            padding: 12,
-            borderRadius: 8,
-            border: '1px solid #ccc',
-            fontSize: 16,
-            boxSizing: 'border-box',
-          }}
-        />
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: 12,
-            borderRadius: 8,
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: 16,
+            marginBottom: 24,
+            textAlign: 'center',
+            fontSize: 42,
+            fontWeight: 700,
           }}
         >
-          {loading ? 'Jungiamasi...' : 'Prisijungti'}
-        </button>
-      </form>
+          Prisijungimas
+        </h1>
 
-      {message && (
-        <p style={{ marginTop: 14, color: 'red', textAlign: 'center' }}>
-          {message}
+        <form onSubmit={handleLogin}>
+          <input
+            type="email"
+            placeholder="El. paštas"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={{
+              display: 'block',
+              width: '100%',
+              marginBottom: 14,
+              padding: 16,
+              borderRadius: 14,
+              border: '1px solid #d1d5db',
+              fontSize: 18,
+              boxSizing: 'border-box',
+              outline: 'none',
+            }}
+          />
+
+          <input
+            type="password"
+            placeholder="Slaptažodis"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            style={{
+              display: 'block',
+              width: '100%',
+              marginBottom: 16,
+              padding: 16,
+              borderRadius: 14,
+              border: '1px solid #d1d5db',
+              fontSize: 18,
+              boxSizing: 'border-box',
+              outline: 'none',
+            }}
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: 16,
+              borderRadius: 14,
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 20,
+              fontWeight: 600,
+              backgroundColor: '#111827',
+              color: '#ffffff',
+            }}
+          >
+            {loading ? 'Jungiamasi...' : 'Prisijungti'}
+          </button>
+        </form>
+
+        {message && (
+          <p
+            style={{
+              marginTop: 14,
+              color: '#dc2626',
+              textAlign: 'center',
+              fontSize: 15,
+            }}
+          >
+            {message}
+          </p>
+        )}
+
+        <p
+          style={{
+            marginTop: 18,
+            fontSize: 15,
+            textAlign: 'center',
+            color: '#4b5563',
+            lineHeight: 1.6,
+          }}
+        >
+          Jei ką tik registravaisi, patikrink savo el. paštą ir patvirtink
+          paskyrą.
         </p>
-      )}
 
-      <p style={{ marginTop: 16, fontSize: 14, textAlign: 'center' }}>
-        Jei ką tik registravaisi, patikrink savo el. paštą ir patvirtink paskyrą.
-      </p>
+        <div
+          style={{
+            marginTop: 22,
+            textAlign: 'center',
+            fontSize: 16,
+            lineHeight: 1.9,
+          }}
+        >
+          <p>
+            Pamiršai slaptažodį?{' '}
+            <a href="/reset-password" style={{ color: '#2563eb' }}>
+              Atkurti
+            </a>
+          </p>
 
-      <div style={{ marginTop: 20, textAlign: 'center' }}>
-        <p>
-          Pamiršai slaptažodį? <a href="/reset-password">Atkurti</a>
-        </p>
-
-        <p style={{ marginTop: 8 }}>
-          Neturi paskyros? <a href="/signup">Registruotis</a>
-        </p>
+          <p>
+            Neturi paskyros?{' '}
+            <a href="/signup" style={{ color: '#2563eb' }}>
+              Registruotis
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   )
