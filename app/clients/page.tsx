@@ -12,6 +12,12 @@ type Client = {
   phone: string | null
   status: string | null
   created_at: string | null
+  organization_id: string | null
+}
+
+type Profile = {
+  id: string
+  organization_id: string | null
 }
 
 export default function ClientsPage() {
@@ -21,6 +27,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -41,9 +48,32 @@ export default function ClientsPage() {
         return
       }
 
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, organization_id')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError || !profile) {
+        setMessage('Nepavyko užkrauti profilio informacijos.')
+        setLoading(false)
+        return
+      }
+
+      const typedProfile = profile as Profile
+
+      if (!typedProfile.organization_id) {
+        setMessage('Tavo paskyra dar nepriskirta jokiai įstaigai.')
+        setLoading(false)
+        return
+      }
+
+      setOrganizationId(typedProfile.organization_id)
+
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, email, phone, status, created_at')
+        .select('id, name, email, phone, status, created_at, organization_id')
+        .eq('organization_id', typedProfile.organization_id)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -52,7 +82,7 @@ export default function ClientsPage() {
         return
       }
 
-      setClients(data || [])
+      setClients((data || []) as Client[])
       setLoading(false)
     }
 
@@ -61,6 +91,7 @@ export default function ClientsPage() {
 
   const filteredClients = useMemo(() => {
     const q = search.trim().toLowerCase()
+
     if (!q) return clients
 
     return clients.filter((client) => {
@@ -91,6 +122,12 @@ export default function ClientsPage() {
       return
     }
 
+    if (!organizationId) {
+      setMessage('Tavo paskyra dar nepriskirta jokiai įstaigai.')
+      setSaving(false)
+      return
+    }
+
     const { data, error } = await supabase
       .from('clients')
       .insert([
@@ -100,9 +137,10 @@ export default function ClientsPage() {
           phone,
           status: 'new',
           created_by: user.id,
+          organization_id: organizationId,
         },
       ])
-      .select()
+      .select('id, name, email, phone, status, created_at, organization_id')
       .single()
 
     if (error) {
@@ -143,7 +181,9 @@ export default function ClientsPage() {
 
   const totalClients = clients.length
   const newClients = clients.filter((c) => c.status === 'new').length
-  const inProgressClients = clients.filter((c) => c.status === 'in_progress').length
+  const inProgressClients = clients.filter(
+    (c) => c.status === 'in_progress'
+  ).length
   const approvedClients = clients.filter((c) => c.status === 'approved').length
 
   if (loading) {
@@ -231,9 +271,11 @@ export default function ClientsPage() {
           <p
             style={{
               marginBottom: 18,
-              color: message.includes('sėkmingai') || message.includes('atnaujintas')
-                ? theme.colors.success
-                : theme.colors.error,
+              color:
+                message.includes('sėkmingai') ||
+                message.includes('atnaujintas')
+                  ? theme.colors.success
+                  : theme.colors.error,
               fontSize: 15,
             }}
           >
