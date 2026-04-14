@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { theme } from '@/lib/theme'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -50,7 +51,7 @@ export default function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#f7f7f8',
+        backgroundColor: theme.colors.background,
         padding: 20,
       }}
     >
@@ -59,10 +60,10 @@ export default function LoginPage() {
           width: '100%',
           maxWidth: 480,
           padding: 32,
-          border: '1px solid #e5e7eb',
+          border: `1px solid ${theme.colors.border}`,
           borderRadius: 20,
           boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
-          backgroundColor: '#ffffff',
+          backgroundColor: theme.colors.card,
         }}
       >
         <h1
@@ -71,6 +72,7 @@ export default function LoginPage() {
             textAlign: 'center',
             fontSize: 42,
             fontWeight: 700,
+            color: theme.colors.text,
           }}
         >
           Prisijungimas
@@ -89,10 +91,12 @@ export default function LoginPage() {
               marginBottom: 14,
               padding: 16,
               borderRadius: 14,
-              border: '1px solid #d1d5db',
+              border: `1px solid ${theme.colors.border}`,
               fontSize: 18,
               boxSizing: 'border-box',
               outline: 'none',
+              color: theme.colors.text,
+              backgroundColor: theme.colors.card,
             }}
           />
 
@@ -108,10 +112,12 @@ export default function LoginPage() {
               marginBottom: 16,
               padding: 16,
               borderRadius: 14,
-              border: '1px solid #d1d5db',
+              border: `1px solid ${theme.colors.border}`,
               fontSize: 18,
               boxSizing: 'border-box',
               outline: 'none',
+              color: theme.colors.text,
+              backgroundColor: theme.colors.card,
             }}
           />
 
@@ -126,7 +132,7 @@ export default function LoginPage() {
               cursor: 'pointer',
               fontSize: 20,
               fontWeight: 600,
-              backgroundColor: '#111827',
+              backgroundColor: theme.colors.primary,
               color: '#ffffff',
             }}
           >
@@ -138,7 +144,7 @@ export default function LoginPage() {
           <p
             style={{
               marginTop: 14,
-              color: '#dc2626',
+              color: theme.colors.error,
               textAlign: 'center',
               fontSize: 15,
             }}
@@ -152,7 +158,7 @@ export default function LoginPage() {
             marginTop: 18,
             fontSize: 15,
             textAlign: 'center',
-            color: '#4b5563',
+            color: theme.colors.textSecondary,
             lineHeight: 1.6,
           }}
         >
@@ -166,18 +172,19 @@ export default function LoginPage() {
             textAlign: 'center',
             fontSize: 16,
             lineHeight: 1.9,
+            color: theme.colors.text,
           }}
         >
           <p>
             Pamiršai slaptažodį?{' '}
-            <a href="/reset-password" style={{ color: '#2563eb' }}>
+            <a href="/reset-password" style={{ color: theme.colors.link }}>
               Atkurti
             </a>
           </p>
 
           <p>
             Neturi paskyros?{' '}
-            <a href="/signup" style={{ color: '#2563eb' }}>
+            <a href="/signup" style={{ color: theme.colors.link }}>
               Registruotis
             </a>
           </p>
