@@ -37,8 +37,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ padding: 40, maxWidth: 420 }}>
-      <h1>Prisijungimas</h1>
+    <div style={{ padding: 40, maxWidth: 400, margin: '0 auto' }}>
+      <h1 style={{ marginBottom: 20 }}>Prisijungimas</h1>
 
       <form onSubmit={handleLogin}>
         <input
@@ -46,7 +46,13 @@ export default function LoginPage() {
           placeholder="El. paštas"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ display: 'block', marginBottom: 12, width: '100%', padding: 8 }}
+          required
+          style={{
+            display: 'block',
+            width: '100%',
+            marginBottom: 12,
+            padding: 10,
+          }}
         />
 
         <input
@@ -54,19 +60,43 @@ export default function LoginPage() {
           placeholder="Slaptažodis"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{ display: 'block', marginBottom: 12, width: '100%', padding: 8 }}
+          required
+          style={{
+            display: 'block',
+            width: '100%',
+            marginBottom: 12,
+            padding: 10,
+          }}
         />
 
-        <button type="submit" disabled={loading}>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: '100%',
+            padding: 10,
+            cursor: 'pointer',
+          }}
+        >
           {loading ? 'Jungiamasi...' : 'Prisijungti'}
         </button>
       </form>
 
-      {message && <p>{message}</p>}
+      {message && (
+        <p style={{ marginTop: 12, color: 'red' }}>{message}</p>
+      )}
 
-      <p>
-        Pamiršai slaptažodį? <a href="/reset-password">Atkurti</a>
-      </p>
+      <div style={{ marginTop: 20, textAlign: 'center' }}>
+        <p>
+          Pamiršai slaptažodį?{' '}
+          <a href="/reset-password">Atkurti</a>
+        </p>
+
+        <p style={{ marginTop: 8 }}>
+          Neturi paskyros?{' '}
+          <a href="/signup">Registruotis</a>
+        </p>
+      </div>
     </div>
   )
 }
