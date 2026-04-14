@@ -78,7 +78,7 @@ export default function DashboardPage() {
     >
       <div
         style={{
-          maxWidth: 900,
+          maxWidth: 1100,
           margin: '0 auto',
         }}
       >
@@ -102,6 +102,7 @@ export default function DashboardPage() {
             >
               Dashboard
             </h1>
+
             <p
               style={{
                 marginTop: 8,
@@ -113,26 +114,47 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: '12px 18px',
-              borderRadius: 12,
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: theme.colors.primary,
-              color: '#fff',
-              fontWeight: 600,
-            }}
-          >
-            Atsijungti
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {role === 'super_admin' && (
+              <button
+                onClick={() => router.push('/admin')}
+                style={{
+                  padding: '12px 18px',
+                  borderRadius: 12,
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: theme.colors.link,
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: 16,
+                }}
+              >
+                Admin panel
+              </button>
+            )}
+
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '12px 18px',
+                borderRadius: 12,
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: theme.colors.primary,
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: 16,
+              }}
+            >
+              Atsijungti
+            </button>
+          </div>
         </div>
 
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             gap: 20,
           }}
         >
@@ -148,6 +170,7 @@ export default function DashboardPage() {
             <h2
               style={{
                 marginTop: 0,
+                marginBottom: 18,
                 color: theme.colors.text,
                 fontSize: 22,
               }}
@@ -176,6 +199,7 @@ export default function DashboardPage() {
             <h2
               style={{
                 marginTop: 0,
+                marginBottom: 18,
                 color: theme.colors.text,
                 fontSize: 22,
               }}
