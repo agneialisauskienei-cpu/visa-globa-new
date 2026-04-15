@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { theme } from '@/lib/theme'
+import { getCurrentOrganization } from '@/lib/organization'
+
+type OrganizationRole = 'owner' | 'admin' | 'employee'
 
 type Client = {
   id: string
@@ -11,28 +14,55 @@ type Client = {
   email: string | null
   phone: string | null
   status: string | null
-  created_at: string | null
-  organization_id: string | null
+  created_at: string
 }
 
-type Profile = {
-  id: string
-  organization_id: string | null
+function getReadableError(error: unknown) {
+  if (!error) return 'Nežinoma klaida.'
+
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'object') {
+    const maybeError = error as {
+      message?: string
+      details?: string
+      hint?: string
+      code?: string
+    }
+
+    if (maybeError.message) return maybeError.message
+    if (maybeError.details) return maybeError.details
+    if (maybeError.hint) return maybeError.hint
+    if (maybeError.code) return `Klaidos kodas: ${maybeError.code}`
+  }
+
+  return 'Nepavyko įvykdyti veiksmo.'
+}
+
+function getRoleLabel(role: OrganizationRole | null) {
+  switch (role) {
+    case 'owner':
+      return 'Savininkas'
+    case 'admin':
+      return 'Administratorius'
+    case 'employee':
+      return 'Darbuotojas'
+    default:
+      return 'Nenustatyta'
+  }
 }
 
 export default function ClientsPage() {
   const router = useRouter()
 
-  const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
-
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [search, setSearch] = useState('')
+  const [organizationId, setOrganizationId] = useState('')
+  const [organizationRole, setOrganizationRole] =
+    useState<OrganizationRole | null>(null)
+  const [clients, setClients] = useState<Client[]>([])
 
   useEffect(() => {
     const loadClients = async () => {
@@ -44,147 +74,47 @@ export default function ClientsPage() {
       } = await supabase.auth.getUser()
 
       if (!user) {
-        router.push('/login')
+        router.replace('/login')
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, organization_id')
-        .eq('id', user.id)
-        .single()
+      try {
+        const membership = await getCurrentOrganization(user.id)
+        const role = membership.role as OrganizationRole
+        const orgId = membership.organization_id
 
-      if (profileError || !profile) {
-        setMessage('Nepavyko užkrauti profilio informacijos.')
-        setLoading(false)
-        return
+        setOrganizationRole(role)
+        setOrganizationId(orgId)
+
+        if (role === 'employee') {
+          router.replace('/dashboard')
+          return
+        }
+
+        const { data, error } = await supabase
+          .from('clients')
+          .select('id, name, email, phone, status, created_at')
+          .eq('organization_id', orgId)
+          .order('created_at', { ascending: false })
+
+        if (error) {
+          console.error('Clients load error:', error)
+          setMessage(getReadableError(error))
+          setLoading(false)
+          return
+        }
+
+        setClients((data as Client[]) || [])
+      } catch (error) {
+        console.error('Clients page error:', error)
+        setMessage(getReadableError(error))
       }
 
-      const typedProfile = profile as Profile
-
-      if (!typedProfile.organization_id) {
-        setMessage('Tavo paskyra dar nepriskirta jokiai įstaigai.')
-        setLoading(false)
-        return
-      }
-
-      setOrganizationId(typedProfile.organization_id)
-
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name, email, phone, status, created_at, organization_id')
-        .eq('organization_id', typedProfile.organization_id)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        setMessage('Nepavyko užkrauti klientų sąrašo.')
-        setLoading(false)
-        return
-      }
-
-      setClients((data || []) as Client[])
       setLoading(false)
     }
 
     loadClients()
   }, [router])
-
-  const filteredClients = useMemo(() => {
-    const q = search.trim().toLowerCase()
-
-    if (!q) return clients
-
-    return clients.filter((client) => {
-      const values = [
-        client.name || '',
-        client.email || '',
-        client.phone || '',
-        client.status || '',
-      ]
-        .join(' ')
-        .toLowerCase()
-
-      return values.includes(q)
-    })
-  }, [clients, search])
-
-  const handleAddClient = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    setMessage('')
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      router.push('/login')
-      return
-    }
-
-    if (!organizationId) {
-      setMessage('Tavo paskyra dar nepriskirta jokiai įstaigai.')
-      setSaving(false)
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('clients')
-      .insert([
-        {
-          name,
-          email,
-          phone,
-          status: 'new',
-          created_by: user.id,
-          organization_id: organizationId,
-        },
-      ])
-      .select('id, name, email, phone, status, created_at, organization_id')
-      .single()
-
-    if (error) {
-      setMessage('Nepavyko pridėti kliento.')
-      setSaving(false)
-      return
-    }
-
-    setClients((prev) => [data as Client, ...prev])
-    setName('')
-    setEmail('')
-    setPhone('')
-    setMessage('Klientas sėkmingai pridėtas.')
-    setSaving(false)
-  }
-
-  const updateStatus = async (id: string, newStatus: string) => {
-    setMessage('')
-
-    const { error } = await supabase
-      .from('clients')
-      .update({ status: newStatus })
-      .eq('id', id)
-
-    if (error) {
-      setMessage('Nepavyko atnaujinti kliento statuso.')
-      return
-    }
-
-    setClients((prev) =>
-      prev.map((client) =>
-        client.id === id ? { ...client, status: newStatus } : client
-      )
-    )
-
-    setMessage('Kliento statusas atnaujintas.')
-  }
-
-  const totalClients = clients.length
-  const newClients = clients.filter((c) => c.status === 'new').length
-  const inProgressClients = clients.filter(
-    (c) => c.status === 'in_progress'
-  ).length
-  const approvedClients = clients.filter((c) => c.status === 'approved').length
 
   if (loading) {
     return (
@@ -214,7 +144,7 @@ export default function ClientsPage() {
     >
       <div
         style={{
-          maxWidth: 1200,
+          maxWidth: 1100,
           margin: '0 auto',
         }}
       >
@@ -222,7 +152,7 @@ export default function ClientsPage() {
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             gap: 16,
             flexWrap: 'wrap',
             marginBottom: 24,
@@ -232,7 +162,7 @@ export default function ClientsPage() {
             <h1
               style={{
                 margin: 0,
-                fontSize: 42,
+                fontSize: 38,
                 color: theme.colors.text,
               }}
             >
@@ -242,40 +172,44 @@ export default function ClientsPage() {
             <p
               style={{
                 marginTop: 8,
-                color: theme.colors.textSecondary,
                 fontSize: 16,
+                color: theme.colors.textSecondary,
               }}
             >
-              Klientų valdymas, būsenos ir kontaktai.
+              Čia rodomi tavo įstaigos klientai.
             </p>
           </div>
 
-          <button
-            onClick={() => router.push('/dashboard')}
+          <div
             style={{
-              padding: '12px 18px',
-              borderRadius: 12,
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: theme.colors.link,
-              color: '#fff',
-              fontWeight: 600,
-              fontSize: 16,
+              display: 'flex',
+              gap: 10,
+              flexWrap: 'wrap',
             }}
           >
-            Grįžti į dashboard
-          </button>
+            <button
+              onClick={() => router.push('/dashboard')}
+              style={{
+                padding: '12px 18px',
+                borderRadius: 12,
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: theme.colors.link,
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: 16,
+              }}
+            >
+              Grįžti į valdymo skydelį
+            </button>
+          </div>
         </div>
 
         {message && (
           <p
             style={{
               marginBottom: 18,
-              color:
-                message.includes('sėkmingai') ||
-                message.includes('atnaujintas')
-                  ? theme.colors.success
-                  : theme.colors.error,
+              color: theme.colors.error,
               fontSize: 15,
             }}
           >
@@ -285,79 +219,36 @@ export default function ClientsPage() {
 
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 16,
+            backgroundColor: theme.colors.card,
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: 20,
+            padding: 24,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
             marginBottom: 24,
           }}
         >
-          <div
+          <h2
             style={{
-              backgroundColor: theme.colors.card,
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: 18,
-              padding: 20,
-              boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
+              marginTop: 0,
+              marginBottom: 18,
+              color: theme.colors.text,
+              fontSize: 22,
             }}
           >
-            <p style={{ margin: 0, color: theme.colors.textSecondary, fontSize: 14 }}>
-              Visi klientai
-            </p>
-            <h2 style={{ margin: '10px 0 0 0', color: theme.colors.text, fontSize: 30 }}>
-              {totalClients}
-            </h2>
-          </div>
+            Informacija
+          </h2>
 
-          <div
-            style={{
-              backgroundColor: theme.colors.card,
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: 18,
-              padding: 20,
-              boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-            }}
-          >
-            <p style={{ margin: 0, color: theme.colors.textSecondary, fontSize: 14 }}>
-              Nauji
-            </p>
-            <h2 style={{ margin: '10px 0 0 0', color: theme.colors.text, fontSize: 30 }}>
-              {newClients}
-            </h2>
-          </div>
+          <p style={{ color: theme.colors.textSecondary, fontSize: 16 }}>
+            <strong>Tavo rolė:</strong> {getRoleLabel(organizationRole)}
+          </p>
 
-          <div
-            style={{
-              backgroundColor: theme.colors.card,
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: 18,
-              padding: 20,
-              boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-            }}
-          >
-            <p style={{ margin: 0, color: theme.colors.textSecondary, fontSize: 14 }}>
-              Procese
-            </p>
-            <h2 style={{ margin: '10px 0 0 0', color: theme.colors.text, fontSize: 30 }}>
-              {inProgressClients}
-            </h2>
-          </div>
+          <p style={{ color: theme.colors.textSecondary, fontSize: 16 }}>
+            <strong>Įstaigos ID:</strong> {organizationId || '-'}
+          </p>
 
-          <div
-            style={{
-              backgroundColor: theme.colors.card,
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: 18,
-              padding: 20,
-              boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-            }}
-          >
-            <p style={{ margin: 0, color: theme.colors.textSecondary, fontSize: 14 }}>
-              Patvirtinti
-            </p>
-            <h2 style={{ margin: '10px 0 0 0', color: theme.colors.text, fontSize: 30 }}>
-              {approvedClients}
-            </h2>
-          </div>
+          <p style={{ color: theme.colors.textSecondary, fontSize: 16 }}>
+            <strong>Klientų kiekis:</strong> {clients.length}
+          </p>
         </div>
 
         <div
@@ -365,9 +256,8 @@ export default function ClientsPage() {
             backgroundColor: theme.colors.card,
             border: `1px solid ${theme.colors.border}`,
             borderRadius: 20,
-            padding: 20,
+            padding: 24,
             boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-            marginBottom: 24,
           }}
         >
           <h2
@@ -378,213 +268,68 @@ export default function ClientsPage() {
               fontSize: 24,
             }}
           >
-            Pridėti naują klientą
+            Klientų sąrašas
           </h2>
 
-          <form
-            onSubmit={handleAddClient}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: 14,
-            }}
-          >
-            <input
-              type="text"
-              placeholder="Vardas ir pavardė"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
+          {clients.length === 0 ? (
+            <p
               style={{
-                padding: 14,
-                borderRadius: 12,
-                border: `1px solid ${theme.colors.border}`,
-                fontSize: 16,
-                boxSizing: 'border-box',
-                color: theme.colors.text,
-                backgroundColor: theme.colors.card,
-              }}
-            />
-
-            <input
-              type="email"
-              placeholder="El. paštas"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              style={{
-                padding: 14,
-                borderRadius: 12,
-                border: `1px solid ${theme.colors.border}`,
-                fontSize: 16,
-                boxSizing: 'border-box',
-                color: theme.colors.text,
-                backgroundColor: theme.colors.card,
-              }}
-            />
-
-            <input
-              type="text"
-              placeholder="Telefono numeris"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              style={{
-                padding: 14,
-                borderRadius: 12,
-                border: `1px solid ${theme.colors.border}`,
-                fontSize: 16,
-                boxSizing: 'border-box',
-                color: theme.colors.text,
-                backgroundColor: theme.colors.card,
-              }}
-            />
-
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                padding: 14,
-                borderRadius: 12,
-                border: 'none',
-                cursor: 'pointer',
-                backgroundColor: theme.colors.primary,
-                color: '#fff',
-                fontWeight: 600,
+                margin: 0,
+                color: theme.colors.textSecondary,
                 fontSize: 16,
               }}
             >
-              {saving ? 'Saugoma...' : 'Pridėti klientą'}
-            </button>
-          </form>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: theme.colors.card,
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: 20,
-            padding: 20,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-            marginBottom: 20,
-          }}
-        >
-          <input
-            type="text"
-            placeholder="Ieškoti pagal vardą, el. paštą, telefoną ar statusą"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              width: '100%',
-              padding: 14,
-              borderRadius: 12,
-              border: `1px solid ${theme.colors.border}`,
-              fontSize: 16,
-              boxSizing: 'border-box',
-              color: theme.colors.text,
-              backgroundColor: theme.colors.card,
-            }}
-          />
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gap: 16,
-          }}
-        >
-          {filteredClients.length === 0 ? (
+              Klientų dar nėra.
+            </p>
+          ) : (
             <div
               style={{
-                backgroundColor: theme.colors.card,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: 18,
-                padding: 24,
-                boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
+                display: 'grid',
+                gap: 16,
               }}
             >
-              <p
-                style={{
-                  margin: 0,
-                  color: theme.colors.textSecondary,
-                  fontSize: 16,
-                }}
-              >
-                Klientų nerasta.
-              </p>
-            </div>
-          ) : (
-            filteredClients.map((client) => (
-              <div
-                key={client.id}
-                style={{
-                  backgroundColor: theme.colors.card,
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: 18,
-                  padding: 20,
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-                }}
-              >
+              {clients.map((client) => (
                 <div
+                  key={client.id}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 16,
-                    flexWrap: 'wrap',
+                    border: `1px solid ${theme.colors.border}`,
+                    borderRadius: 16,
+                    padding: 18,
+                    backgroundColor: theme.colors.background,
                   }}
                 >
-                  <div>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 20,
-                        fontWeight: 700,
-                        color: theme.colors.text,
-                      }}
-                    >
-                      {client.name || 'Be vardo'}
-                    </p>
-
-                    <p
-                      style={{
-                        marginTop: 8,
-                        marginBottom: 0,
-                        fontSize: 15,
-                        color: theme.colors.textSecondary,
-                        lineHeight: 1.7,
-                      }}
-                    >
-                      <strong>El. paštas:</strong> {client.email || '-'}
-                      <br />
-                      <strong>Telefonas:</strong> {client.phone || '-'}
-                      <br />
-                      <strong>Statusas:</strong> {client.status || 'new'}
-                    </p>
-                  </div>
-
-                  <select
-                    value={client.status || 'new'}
-                    onChange={(e) => updateStatus(client.id, e.target.value)}
+                  <p
                     style={{
-                      minWidth: 180,
-                      padding: '12px 14px',
-                      borderRadius: 12,
-                      border: `1px solid ${theme.colors.border}`,
-                      fontSize: 15,
-                      backgroundColor: '#fff',
+                      margin: '0 0 10px 0',
                       color: theme.colors.text,
-                      cursor: 'pointer',
+                      fontSize: 20,
+                      fontWeight: 700,
                     }}
                   >
-                    <option value="new">new</option>
-                    <option value="in_progress">in_progress</option>
-                    <option value="approved">approved</option>
-                    <option value="rejected">rejected</option>
-                  </select>
+                    {client.name || 'Be pavadinimo'}
+                  </p>
+
+                  <p style={{ margin: '0 0 6px 0', color: theme.colors.textSecondary }}>
+                    <strong>El. paštas:</strong> {client.email || '-'}
+                  </p>
+
+                  <p style={{ margin: '0 0 6px 0', color: theme.colors.textSecondary }}>
+                    <strong>Telefonas:</strong> {client.phone || '-'}
+                  </p>
+
+                  <p style={{ margin: '0 0 6px 0', color: theme.colors.textSecondary }}>
+                    <strong>Būsena:</strong> {client.status || '-'}
+                  </p>
+
+                  <p style={{ margin: 0, color: theme.colors.textSecondary }}>
+                    <strong>Sukurta:</strong>{' '}
+                    {client.created_at
+                      ? new Date(client.created_at).toLocaleString('lt-LT')
+                      : '-'}
+                  </p>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </div>
