@@ -1,0 +1,20 @@
+[33m5d0803c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mimport-codex-changes[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{0}: reset: moving to HEAD
+[33m5d0803c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mimport-codex-changes[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{1}: checkout: moving from main to import-codex-changes
+[33m5d0803c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mimport-codex-changes[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m HEAD@{2}: commit: initial employee module + dashboards + mobile nav
+[33m0882edb[m HEAD@{3}: commit: clients filtered by organization
+[33m8905bc1[m HEAD@{4}: commit: pridetas istaigu valdymo puslapis
+[33mc557ef3[m HEAD@{5}: commit: admin fix + clients page
+[33m557fc8e[m HEAD@{6}: commit: gražesnis admin panel
+[33mc1ab979[m HEAD@{7}: commit: fix dashboard role loading
+[33mb5dad0f[m HEAD@{8}: commit: sutvarkytos roles ir admin panel
+[33m591e47c[m HEAD@{9}: commit: dashboard su admin mygtuku
+[33m21597c4[m HEAD@{10}: commit: sutvarkyti visi auth puslapiai
+[33m4c145ff[m HEAD@{11}: commit: login su theme
+[33m228bc31[m HEAD@{12}: commit: patobulintas login dizainas
+[33m6aa97fe[m HEAD@{13}: commit: login puslapis lietuviskai
+[33m7fe28c4[m HEAD@{14}: commit: improve login page UI
+[33mff4afb1[m HEAD@{15}: commit: fix homepage redirect
+[33m0b0d068[m HEAD@{16}: commit: fix app page
+[33m0a0da74[m HEAD@{17}: commit: set login as homepage
+[33m71395f1[m HEAD@{18}: commit: clean version
+[33m039e419[m HEAD@{19}: commit: fix page

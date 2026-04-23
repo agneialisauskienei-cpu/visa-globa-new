@@ -2,116 +2,116 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { Bell, CalendarDays, Home, User, Users } from 'lucide-react'
+import { ROUTES } from '@/lib/routes'
+import { useNotifications } from '@/components/providers/NotificationProvider'
 
-type Props = {
-  notificationsCount?: number
+function isActive(pathname: string, href: string) {
+  return pathname === href
 }
 
-export default function MobileBottomNav({
-  notificationsCount = 0,
-}: Props) {
+export default function MobileBottomNav() {
   const pathname = usePathname()
+  const { unreadCount } = useNotifications()
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  if (!isMobile) return null
 
   const items = [
-    { href: '/employee-dashboard', label: 'Pagr.', icon: '⌂' },
-    { href: '/my-residents', label: 'Gyv.', icon: '👥' },
-    { href: '/my-tasks', label: 'Užd.', icon: '✓' },
-    {
-      href: '/notifications',
-      label: 'Notif.',
-      icon: '🔔',
-      badge: notificationsCount,
-    },
-    { href: '/my-profile', label: 'Profilis', icon: '👤' },
+    { href: ROUTES.employeeDashboard, label: 'Pagr.', icon: Home },
+    { href: ROUTES.myResidents, label: 'Gyvent.', icon: Users },
+    { href: ROUTES.mySchedule, label: 'Grafikas', icon: CalendarDays },
+    { href: ROUTES.notifications, label: 'Praneš.', icon: Bell, badge: unreadCount },
+    { href: ROUTES.myProfile, label: 'Profilis', icon: User },
   ]
 
   return (
-    <nav style={styles.nav}>
-      <div style={styles.inner}>
-        {items.map((item) => {
-          const active = pathname === item.href
+    <nav
+      style={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 50,
+        borderTop: '1px solid #e2e8f0',
+        background: '#ffffff',
+        display: 'grid',
+        gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
+        padding: '8px 8px calc(8px + env(safe-area-inset-bottom))',
+        boxShadow: '0 -6px 20px rgba(15,23,42,0.06)',
+      }}
+    >
+      {items.map((item) => {
+        const active = isActive(pathname, item.href)
+        const Icon = item.icon
 
-          return (
-            <Link key={item.href} href={item.href} style={styles.link}>
-              <div style={styles.item}>
-                <div
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            style={{
+              textDecoration: 'none',
+              color: active ? '#0f766e' : '#64748b',
+              display: 'grid',
+              placeItems: 'center',
+              gap: 4,
+              padding: '8px 4px',
+              position: 'relative',
+              fontSize: 12,
+              fontWeight: active ? 800 : 600,
+            }}
+          >
+            <div style={{ position: 'relative' }}>
+              <Icon size={20} />
+              {item.badge && item.badge > 0 ? (
+                <span
                   style={{
-                    ...styles.icon,
-                    color: active ? '#111827' : '#9ca3af',
+                    position: 'absolute',
+                    top: -6,
+                    right: -10,
+                    minWidth: 18,
+                    height: 18,
+                    borderRadius: 999,
+                    background: '#dc2626',
+                    color: '#fff',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 5px',
                   }}
                 >
-                  {item.icon}
-                </div>
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              ) : null}
+            </div>
 
-                <div
-                  style={{
-                    ...styles.label,
-                    color: active ? '#111827' : '#9ca3af',
-                  }}
-                >
-                  {item.label}
-                </div>
+            <span>{item.label}</span>
 
-                {item.badge > 0 && (
-                  <span style={styles.badge}>
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </span>
-                )}
-              </div>
-            </Link>
-          )
-        })}
-      </div>
+            {active ? (
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  width: 24,
+                  height: 3,
+                  borderRadius: 999,
+                  background: '#0f766e',
+                }}
+              />
+            ) : null}
+          </Link>
+        )
+      })}
     </nav>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  nav: {
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    background: 'rgba(255,255,255,0.95)',
-    borderTop: '1px solid #e5e7eb',
-    backdropFilter: 'blur(10px)',
-    zIndex: 100,
-  },
-  inner: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(5, 1fr)',
-    maxWidth: 600,
-    margin: '0 auto',
-  },
-  link: {
-    textDecoration: 'none',
-  },
-  item: {
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '8px 0 10px',
-  },
-  icon: {
-    fontSize: 20,
-    lineHeight: 1,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: 700,
-    marginTop: 4,
-  },
-  badge: {
-    position: 'absolute',
-    top: 4,
-    right: 18,
-    background: '#ef4444',
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 800,
-    borderRadius: 999,
-    padding: '2px 6px',
-  },
 }

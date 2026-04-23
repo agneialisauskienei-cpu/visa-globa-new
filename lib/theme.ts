@@ -8,7 +8,7 @@ export const theme = {
     text: '#0f172a',
     textSecondary: '#475569',
     error: '#dc2626',
-    success: '#16a34a',
+    success: '#15803d',
     link: '#2563eb',
   },
 }

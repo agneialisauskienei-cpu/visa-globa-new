@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getCurrentOrganizationId } from '@/lib/current-organization'
 
 export type OrganizationMembership = {
   organization_id: string
@@ -44,33 +45,40 @@ function getReadableError(error: unknown) {
 export async function getCurrentOrganization(
   userId: string
 ): Promise<OrganizationMembership> {
+  const activeOrganizationId = await getCurrentOrganizationId()
+
+  if (!activeOrganizationId) {
+    throw new Error('Aktyvi organizacija nepasirinkta.')
+  }
+
   const { data, error } = await supabase
     .from('organization_members')
-    .select('organization_id, role, created_at')
+    .select('organization_id, role')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
-    .limit(1)
+    .eq('organization_id', activeOrganizationId)
+    .eq('is_active', true)
+    .maybeSingle()
 
   if (error) {
     throw new Error(getReadableError(error))
   }
 
-  if (!data || data.length === 0) {
-    throw new Error('Vartotojas nepriskirtas jokiai įstaigai.')
+  if (!data?.organization_id) {
+    throw new Error('Vartotojas nepriskirtas pasirinktai įstaigai.')
   }
 
   return {
-    organization_id: data[0].organization_id,
-    role: data[0].role,
+    organization_id: data.organization_id,
+    role: data.role,
   }
 }
 
 export async function ensureUserOrganization(userId: string, email: string) {
   const { data: existingMemberships, error: membershipError } = await supabase
     .from('organization_members')
-    .select('organization_id, role, created_at')
+    .select('organization_id')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
+    .eq('is_active', true)
     .limit(1)
 
   if (membershipError) {
@@ -107,6 +115,7 @@ export async function ensureUserOrganization(userId: string, email: string) {
       organization_id: organization.id,
       user_id: userId,
       role: 'owner',
+      is_active: true,
     })
 
   if (memberInsertError) {
