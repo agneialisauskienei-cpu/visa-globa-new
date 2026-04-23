@@ -3,9 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { getCurrentOrganizationContext } from '@/lib/current-organization'
-
-type MembershipRole = 'owner' | 'admin' | 'employee' | null
 
 function getReadableError(message: string) {
   if (message === 'Email not confirmed') {
@@ -33,8 +30,10 @@ export default function LoginPage() {
     setMessage('')
 
     try {
+      const normalizedEmail = email.trim().toLowerCase()
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: normalizedEmail,
         password,
       })
 
@@ -50,11 +49,39 @@ export default function LoginPage() {
         return
       }
 
-      const { organizationId, activeMembership } = await getCurrentOrganizationContext()
+      // Super admin
+      if (normalizedEmail === 'info@skaitytaknyga.lt') {
+        router.replace('/organizations')
+        router.refresh()
+        return
+      }
 
-      const role = (activeMembership?.role || null) as MembershipRole
+      // Admin pagal tavo taisyklę
+      if (normalizedEmail === 'miauksena@gmail.com') {
+        router.replace('/admin-dashboard')
+        router.refresh()
+        return
+      }
 
-      if (!organizationId || !activeMembership) {
+      // Membership tikrinam stabiliau: imam pirmą aktyvų įrašą, o ne tik maybeSingle scenarijų
+      const { data: memberships, error: membershipError } = await supabase
+        .from('organization_members')
+        .select('organization_id, role, is_active, created_at')
+        .eq('user_id', data.user.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (membershipError) {
+        setMessage(membershipError.message)
+        setLoading(false)
+        return
+      }
+
+      const membership = memberships?.[0] || null
+      const role = membership?.role || null
+
+      if (!membership?.organization_id) {
         router.replace('/pending-approval')
         router.refresh()
         return
@@ -99,7 +126,7 @@ export default function LoginPage() {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/10 p-5 text-sm text-emerald-50/85">
-              Prisijungus būsi nukreipta į tavo rolę ir aktyvią organizaciją atitinkantį dashboardą.
+              Prisijungus būsi nukreipta į tavo rolę atitinkantį dashboardą.
             </div>
           </div>
 

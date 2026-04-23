@@ -9,6 +9,7 @@ type OrganizationRow = {
   code: string | null
   address: string | null
   created_at: string | null
+  plan?: string | null
 }
 
 type AdminProfile = {
@@ -31,6 +32,7 @@ type EditForm = {
   name: string
   code: string
   address: string
+  plan: string
 }
 
 function getReadableError(error: unknown) {
@@ -70,6 +72,51 @@ function getProfileDisplayName(profile: AdminProfile | null) {
   return profile.email || null
 }
 
+function getPlanLabel(plan: string | null | undefined) {
+  switch ((plan || '').toLowerCase()) {
+    case 'starter':
+      return 'Pradinis'
+    case 'basic':
+      return 'Bazinis'
+    case 'pro':
+      return 'Profesionalus'
+    case 'enterprise':
+      return 'Verslo'
+    default:
+      return plan || 'Bazinis'
+  }
+}
+
+function getPlanBadgeStyle(plan: string | null | undefined): React.CSSProperties {
+  switch ((plan || '').toLowerCase()) {
+    case 'starter':
+      return {
+        background: '#fef3c7',
+        color: '#92400e',
+        border: '1px solid #fcd34d',
+      }
+    case 'pro':
+      return {
+        background: '#dbeafe',
+        color: '#1d4ed8',
+        border: '1px solid #93c5fd',
+      }
+    case 'enterprise':
+      return {
+        background: '#ede9fe',
+        color: '#6d28d9',
+        border: '1px solid #c4b5fd',
+      }
+    case 'basic':
+    default:
+      return {
+        background: '#dcfce7',
+        color: '#166534',
+        border: '1px solid #86efac',
+      }
+  }
+}
+
 export default function OrganizationsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -81,6 +128,7 @@ export default function OrganizationsPage() {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [address, setAddress] = useState('')
+  const [plan, setPlan] = useState('basic')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<EditForm | null>(null)
@@ -98,12 +146,22 @@ export default function OrganizationsPage() {
 
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, code, address, created_at')
+        .select('*')
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      const rows = (data || []) as OrganizationRow[]
+      const rows = ((data || []) as Record<string, unknown>[]).map(
+        (row) =>
+          ({
+            id: String(row.id),
+            name: (row.name as string | null) ?? null,
+            code: (row.code as string | null) ?? null,
+            address: (row.address as string | null) ?? null,
+            created_at: (row.created_at as string | null) ?? null,
+            plan: (row.plan as string | null) ?? 'basic',
+          }) satisfies OrganizationRow
+      )
 
       const enriched = await Promise.all(
         rows.map(async (org) => {
@@ -170,6 +228,7 @@ export default function OrganizationsPage() {
       const cleanName = name.trim()
       const cleanCode = code.trim()
       const cleanAddress = address.trim()
+      const cleanPlan = plan.trim() || 'basic'
 
       if (!cleanName) {
         setMessage('Įstaigos pavadinimas yra privalomas.')
@@ -183,6 +242,7 @@ export default function OrganizationsPage() {
         name: cleanName,
         code: cleanCode || null,
         address: cleanAddress || null,
+        plan: cleanPlan,
       })
 
       if (error) throw error
@@ -190,6 +250,7 @@ export default function OrganizationsPage() {
       setName('')
       setCode('')
       setAddress('')
+      setPlan('basic')
       setMessage('Įstaiga sėkmingai sukurta.')
       await loadOrganizations()
     } catch (error) {
@@ -206,6 +267,7 @@ export default function OrganizationsPage() {
       name: org.name || '',
       code: org.code || '',
       address: org.address || '',
+      plan: org.plan || 'basic',
     })
     setMessage('')
   }
@@ -222,6 +284,7 @@ export default function OrganizationsPage() {
       const cleanName = editForm.name.trim()
       const cleanCode = editForm.code.trim()
       const cleanAddress = editForm.address.trim()
+      const cleanPlan = editForm.plan.trim() || 'basic'
 
       if (!cleanName) {
         setMessage('Įstaigos pavadinimas yra privalomas.')
@@ -237,6 +300,7 @@ export default function OrganizationsPage() {
           name: cleanName,
           code: cleanCode || null,
           address: cleanAddress || null,
+          plan: cleanPlan,
         })
         .eq('id', editForm.id)
 
@@ -323,6 +387,40 @@ export default function OrganizationsPage() {
     }
   }
 
+  async function deleteOrganization(org: OrganizationCard) {
+    const confirmed = window.confirm(
+      `Ar tikrai nori ištrinti įstaigą "${org.name || 'be pavadinimo'}"?`
+    )
+
+    if (!confirmed) return
+
+    try {
+      setSaving(true)
+      setMessage('')
+
+      const { error } = await supabase.from('organizations').delete().eq('id', org.id)
+
+      if (error) throw error
+
+      setMessage('Įstaiga ištrinta.')
+      await loadOrganizations()
+    } catch (error) {
+      const text = getReadableError(error)
+      if (
+        text.toLowerCase().includes('foreign key') ||
+        text.toLowerCase().includes('constraint')
+      ) {
+        setMessage(
+          'Įstaigos nepavyko ištrinti, nes ji dar turi susietų duomenų. Pirmiausia pašalink darbuotojus, gyventojus ar kitus susijusius įrašus.'
+        )
+      } else {
+        setMessage(text)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const filteredOrganizations = useMemo(() => {
     const q = search.trim().toLowerCase()
 
@@ -335,6 +433,7 @@ export default function OrganizationsPage() {
         org.address || '',
         org.admin_name || '',
         org.admin_email || '',
+        org.plan || '',
       ]
         .join(' ')
         .toLowerCase()
@@ -361,7 +460,7 @@ export default function OrganizationsPage() {
           <div>
             <h1 style={styles.title}>Įstaigos</h1>
             <p style={styles.subtitle}>
-              Čia valdai klientus ir matai bendrą platformos vaizdą.
+              Čia valdai klientus, jų planus ir matai bendrą platformos vaizdą.
             </p>
           </div>
         </div>
@@ -418,6 +517,20 @@ export default function OrganizationsPage() {
                 style={styles.input}
               />
             </label>
+
+            <label style={styles.field}>
+              <span style={styles.label}>Planas</span>
+              <select
+                value={plan}
+                onChange={(e) => setPlan(e.target.value)}
+                style={styles.input}
+              >
+                <option value="starter">Pradinis</option>
+                <option value="basic">Bazinis</option>
+                <option value="pro">Profesionalus</option>
+                <option value="enterprise">Verslo</option>
+              </select>
+            </label>
           </div>
 
           <div style={styles.actions}>
@@ -439,7 +552,7 @@ export default function OrganizationsPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Ieškoti pagal pavadinimą, kodą, adresą ar admin"
+              placeholder="Ieškoti pagal pavadinimą, planą, kodą, adresą ar admin"
               style={styles.searchInput}
             />
           </div>
@@ -459,14 +572,27 @@ export default function OrganizationsPage() {
                     </div>
 
                     <div style={styles.orgTopRight}>
-                      <div style={styles.orgBadge}>Klientas</div>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(org)}
-                        style={styles.secondaryButton}
-                      >
-                        Redaguoti
-                      </button>
+                      <div style={{ ...styles.orgBadge, ...getPlanBadgeStyle(org.plan) }}>
+                        {getPlanLabel(org.plan)}
+                      </div>
+
+                      <div style={styles.buttonColumn}>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(org)}
+                          style={styles.secondaryButton}
+                        >
+                          Redaguoti
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void deleteOrganization(org)}
+                          style={styles.deleteButton}
+                        >
+                          Trinti
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -474,6 +600,11 @@ export default function OrganizationsPage() {
                     <div style={styles.infoRow}>
                       <span style={styles.infoLabel}>Adresas</span>
                       <span style={styles.infoValue}>{org.address || '—'}</span>
+                    </div>
+
+                    <div style={styles.infoRow}>
+                      <span style={styles.infoLabel}>Planas</span>
+                      <span style={styles.infoValue}>{getPlanLabel(org.plan)}</span>
                     </div>
 
                     <div style={styles.infoRow}>
@@ -577,6 +708,24 @@ export default function OrganizationsPage() {
                     }
                     style={styles.input}
                   />
+                </label>
+
+                <label style={styles.field}>
+                  <span style={styles.label}>Planas</span>
+                  <select
+                    value={editForm.plan}
+                    onChange={(e) =>
+                      setEditForm((prev) =>
+                        prev ? { ...prev, plan: e.target.value } : prev
+                      )
+                    }
+                    style={styles.input}
+                  >
+                    <option value="starter">Pradinis</option>
+                    <option value="basic">Bazinis</option>
+                    <option value="pro">Profesionalus</option>
+                    <option value="enterprise">Verslo</option>
+                  </select>
                 </label>
               </div>
 
@@ -729,6 +878,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer',
   },
+  deleteButton: {
+    padding: '10px 14px',
+    borderRadius: 10,
+    background: '#fff1f2',
+    color: '#be123c',
+    border: '1px solid #fecdd3',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
   listHeader: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -782,6 +940,11 @@ const styles: Record<string, React.CSSProperties> = {
     justifyItems: 'end',
     flexShrink: 0,
   },
+  buttonColumn: {
+    display: 'grid',
+    gap: 8,
+    justifyItems: 'end',
+  },
   orgName: {
     fontSize: 18,
     fontWeight: 800,
@@ -801,8 +964,6 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     padding: '5px 10px',
     borderRadius: 999,
-    background: '#dcfce7',
-    color: '#166534',
     fontSize: 12,
     fontWeight: 800,
     whiteSpace: 'nowrap',

@@ -3,19 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { getCurrentOrganizationContext } from '@/lib/current-organization'
-
-type MembershipRole = 'owner' | 'admin' | 'employee' | null
 
 export default function PendingApprovalPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [checking, setChecking] = useState(true)
 
   useEffect(() => {
-    let isMounted = true
+    let active = true
 
-    async function load() {
+    async function checkNow() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -25,46 +22,69 @@ export default function PendingApprovalPage() {
         return
       }
 
-      if (isMounted) {
-        setEmail(user.email || '')
-        setLoading(false)
+      if (!active) return
+      setEmail(user.email || '')
+
+      // Super admin
+      if ((user.email || '').toLowerCase() === 'info@skaitytaknyga.lt') {
+        router.replace('/organizations')
+        return
+      }
+
+      // Admin pagal tavo taisyklę
+      if ((user.email || '').toLowerCase() === 'miauksena@gmail.com') {
+        router.replace('/admin-dashboard')
+        return
+      }
+
+      const { data: memberships } = await supabase
+        .from('organization_members')
+        .select('role, organization_id, created_at')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      const membership = memberships?.[0] || null
+
+      if (membership?.role === 'owner' || membership?.role === 'admin') {
+        router.replace('/admin-dashboard')
+        return
+      }
+
+      if (membership?.role === 'employee') {
+        router.replace('/employee-dashboard')
+        return
+      }
+
+      if (active) {
+        setChecking(false)
       }
     }
 
-    void load()
+    void checkNow()
+
+    const interval = setInterval(() => {
+      void checkNow()
+    }, 4000)
 
     return () => {
-      isMounted = false
+      active = false
+      clearInterval(interval)
     }
   }, [router])
 
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) return
-
-      const { organizationId, activeMembership } = await getCurrentOrganizationContext()
-      const role = (activeMembership?.role || null) as MembershipRole
-
-      if (!organizationId || !activeMembership) {
-        return
-      }
-
-      if (role === 'owner' || role === 'admin') {
-        window.location.href = '/admin-dashboard'
-        return
-      }
-
-      if (role === 'employee') {
-        window.location.href = '/employee-dashboard'
-      }
-    }, 4000)
-
-    return () => clearInterval(interval)
-  }, [])
+  if (checking) {
+    return (
+      <main style={styles.page}>
+        <section style={styles.card}>
+          <div style={styles.badge}>Tikrinama</div>
+          <h1 style={styles.title}>Tikrinama paskyros būsena</h1>
+          <p style={styles.subtitle}>Palauk sekundę, tikriname tavo prieigą.</p>
+        </section>
+      </main>
+    )
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -72,73 +92,106 @@ export default function PendingApprovalPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f6f4] px-6 py-10">
-      <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-6xl items-center justify-center">
-        <section className="grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-[0_40px_120px_rgba(0,0,0,0.12)] lg:grid-cols-[1fr_0.95fr]">
-          <div className="hidden bg-gradient-to-br from-[#0a372a] via-[#0f4f3d] to-[#176c43] p-10 text-white lg:flex lg:flex-col lg:justify-between">
-            <div>
-              <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium">
-                Laukiama patvirtinimo
-              </div>
+    <main style={styles.page}>
+      <section style={styles.card}>
+        <div style={styles.badge}>Laukiama patvirtinimo</div>
+        <h1 style={styles.title}>Paskyra dar neaktyvuota</h1>
+        <p style={styles.subtitle}>
+          Administratorius dar turi patvirtinti, kad tikrai esi įstaigos darbuotojas.
+        </p>
 
-              <h1 className="mt-6 text-5xl font-black leading-tight">
-                Paskyra
-                <br />
-                dar neaktyvuota.
-              </h1>
+        <div style={styles.infoBox}>
+          <div style={styles.infoLabel}>Registruotas el. paštas</div>
+          <div style={styles.infoValue}>{email || '—'}</div>
+        </div>
 
-              <p className="mt-5 max-w-md text-base leading-7 text-emerald-50/85">
-                Administratorius dar turi patvirtinti, kad tikrai esi įstaigos darbuotojas.
-                Kai paskyra bus aktyvuota, būsi automatiškai nukreipta į savo darbo aplinką.
-              </p>
-            </div>
+        <div style={styles.note}>
+          Kol paskyra nepatvirtinta, vidinių sistemos puslapių nematysi. Kai administratorius
+          patvirtins paskyrą, būsi automatiškai nukreiptas į savo darbo aplinką.
+        </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/10 p-5 text-sm text-emerald-50/85">
-              Sistema tikrina tavo prieigą automatiškai kas kelias sekundes.
-            </div>
-          </div>
-
-          <div className="p-8 md:p-10">
-            <div className="mx-auto max-w-md">
-              <div className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800">
-                Laukiama patvirtinimo
-              </div>
-
-              <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-900">
-                Paskyra dar neaktyvuota
-              </h1>
-
-              <p className="mt-3 text-sm leading-7 text-slate-500">
-                Kol paskyra nepatvirtinta, vidinių sistemos puslapių nematysi.
-                Kai administratorius patvirtins paskyrą, būsi automatiškai nukreipta
-                į savo darbo aplinką.
-              </p>
-
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-medium text-slate-500">
-                  Registruotas el. paštas
-                </div>
-                <div className="mt-2 text-base font-semibold text-slate-900">
-                  {loading ? 'Kraunama...' : email || '—'}
-                </div>
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Jei jau turėtum būti patvirtinta, pabandyk atsijungti ir prisijungti iš naujo
-                arba susisiek su administratoriumi.
-              </div>
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="mt-6 rounded-2xl bg-[#0f4f3d] px-5 py-4 text-base font-semibold text-white transition hover:bg-[#0c4333]"
-              >
-                Atsijungti
-              </button>
-            </div>
-          </div>
-        </section>
-      </div>
+        <button onClick={handleLogout} style={styles.button}>
+          Atsijungti
+        </button>
+      </section>
     </main>
   )
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#f4f6f4',
+    padding: 24,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 560,
+    background: '#fff',
+    border: '1px solid #dde5de',
+    borderRadius: 28,
+    padding: 28,
+    display: 'grid',
+    gap: 16,
+    boxShadow: '0 12px 28px rgba(48,68,55,0.05)',
+  },
+  badge: {
+    display: 'inline-flex',
+    width: 'fit-content',
+    padding: '7px 12px',
+    borderRadius: 999,
+    background: '#eef4ef',
+    color: '#587561',
+    fontSize: 12,
+    fontWeight: 900,
+  },
+  title: {
+    margin: 0,
+    fontSize: 30,
+    fontWeight: 900,
+    color: '#173120',
+  },
+  subtitle: {
+    margin: 0,
+    fontSize: 15,
+    lineHeight: 1.6,
+    color: '#64756a',
+    fontWeight: 700,
+  },
+  infoBox: {
+    borderRadius: 18,
+    border: '1px solid #e3ebe4',
+    background: '#fafcfb',
+    padding: 16,
+  },
+  infoLabel: {
+    fontSize: 13,
+    fontWeight: 800,
+    color: '#6b7c71',
+    marginBottom: 6,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: 900,
+    color: '#1f3128',
+  },
+  note: {
+    color: '#607066',
+    fontSize: 14,
+    fontWeight: 700,
+    lineHeight: 1.6,
+  },
+  button: {
+    border: 'none',
+    borderRadius: 14,
+    background: '#587561',
+    color: '#fff',
+    padding: '12px 16px',
+    fontWeight: 900,
+    cursor: 'pointer',
+    width: 'fit-content',
+  },
 }
