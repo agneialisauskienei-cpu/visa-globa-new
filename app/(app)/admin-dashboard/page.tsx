@@ -1,116 +1,162 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Building2, ClipboardList, UserRound, Users } from 'lucide-react'
+import { getCurrentAccess, type SystemRole } from '@/lib/app-access'
 import { supabase } from '@/lib/supabase'
-import { getCurrentMembership } from '@/lib/current-membership'
-import { getReadableError } from '@/lib/errors'
-import { ROUTES } from '@/lib/routes'
+
+type DashboardStats = {
+  organizations: number
+  residents: number
+  employees: number
+  requests: number
+}
+
+function getRoleLabel(role: SystemRole | null) {
+  if (role === 'owner') return 'Super Admin'
+  if (role === 'admin') return 'Administratorius'
+  if (role === 'employee') return 'Darbuotojas'
+  return 'Sistema'
+}
+
+async function safeCount(table: string) {
+  try {
+    const { count, error } = await supabase.from(table).select('*', {
+      count: 'exact',
+      head: true,
+    })
+
+    if (error) return 0
+    return count || 0
+  } catch {
+    return 0
+  }
+}
 
 export default function AdminDashboardPage() {
-  const router = useRouter()
-
   const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState('')
+  const [role, setRole] = useState<SystemRole | null>(null)
+  const [stats, setStats] = useState<DashboardStats>({
+    organizations: 0,
+    residents: 0,
+    employees: 0,
+    requests: 0,
+  })
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true)
-        setMessage('')
-
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser()
-
-        if (userError) throw userError
-
-        if (!user) {
-          router.replace(ROUTES.login)
-          return
-        }
-
-        setEmail(user.email || '')
-
-        const membership = await getCurrentMembership(user.id)
-
-        if (!membership) {
-          router.replace(ROUTES.login)
-          return
-        }
-
-        if (membership.role !== 'admin' && membership.role !== 'owner') {
-          router.replace(ROUTES.employeeDashboard)
-          return
-        }
-
-        setRole(membership.role)
-      } catch (error) {
-        setMessage(getReadableError(error))
-      } finally {
-        setLoading(false)
-      }
-    }
-
     void load()
-  }, [router])
+  }, [])
 
-  if (loading) {
-    return (
-      <div style={styles.loadingWrap}>
-        <div style={styles.loadingText}>Kraunama...</div>
-      </div>
-    )
+  async function load() {
+    try {
+      setLoading(true)
+
+      const access = await getCurrentAccess()
+      setEmail(access.email || '')
+      setRole(access.role)
+
+      const [organizations, residents, employees, requests] = await Promise.all([
+        safeCount('organizations'),
+        safeCount('residents'),
+        safeCount('organization_members'),
+        safeCount('requests'),
+      ])
+
+      setStats({
+        organizations,
+        residents,
+        employees,
+        requests,
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Admin dashboard</h1>
+      <div style={styles.header}>
+        <div>
+          <div style={styles.eyebrow}>VisaGloba valdymas</div>
+          <h1 style={styles.title}>Pagrindinis skydelis</h1>
+          <p style={styles.subtitle}>
+            Greita sistemos apžvalga, aktyvūs skaičiai ir pagrindiniai valdymo veiksmai.
+          </p>
+        </div>
 
-        <p style={styles.subtitle}>
-          Dashboard duomenys kraunami pagal aktyvią organizaciją ir tavo rolę.
-        </p>
-
-        {message ? <div style={styles.message}>{message}</div> : null}
-
-        <div style={styles.infoBox}>
-          <div>
+        <div style={styles.userBox}>
+          <div style={styles.userLine}>
             <strong>Email:</strong> {email || '—'}
           </div>
-          <div>
-            <strong>Rolė:</strong> {role || '—'}
+          <div style={styles.userLine}>
+            <strong>Rolė:</strong> {getRoleLabel(role)}
+          </div>
+        </div>
+      </div>
+
+      <section style={styles.statsGrid}>
+        <StatCard icon={Building2} label="Įstaigos" value={stats.organizations} loading={loading} />
+        <StatCard icon={UserRound} label="Gyventojai" value={stats.residents} loading={loading} />
+        <StatCard icon={Users} label="Darbuotojai" value={stats.employees} loading={loading} />
+        <StatCard icon={ClipboardList} label="Užklausos" value={stats.requests} loading={loading} />
+      </section>
+
+      <section style={styles.grid}>
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Greiti veiksmai</h2>
+
+          <div style={styles.actions}>
+            <a href="/organizations" style={styles.actionButton}>Įstaigos</a>
+            <a href="/residents" style={styles.actionButton}>Gyventojai</a>
+            <a href="/employees" style={styles.actionButton}>Darbuotojai</a>
+            <a href="/requests" style={styles.actionButton}>Užklausos</a>
           </div>
         </div>
 
-        <div style={styles.actions}>
-          <button onClick={() => router.push('/residents')} style={styles.button}>
-            Gyventojai
-          </button>
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Sistemos būsena</h2>
 
-          <button onClick={() => router.push('/team')} style={styles.button}>
-            Darbuotojai
-          </button>
-
-          <button onClick={() => router.push('/rooms')} style={styles.button}>
-            Kambariai
-          </button>
-
-          <button onClick={() => router.push('/medications')} style={styles.button}>
-            Sveikatos įrašai
-          </button>
-
-          <button onClick={() => router.push('/inventory')} style={styles.button}>
-            Sandėliai
-          </button>
-
-          <button onClick={() => router.push('/organization')} style={styles.button}>
-            Įmonės info
-          </button>
+          <div style={styles.statusList}>
+            <div style={styles.statusItem}>
+              <span style={styles.statusDot} />
+              Duomenų bazė prijungta
+            </div>
+            <div style={styles.statusItem}>
+              <span style={styles.statusDot} />
+              Serveriniai veiksmai aktyvūs
+            </div>
+            <div style={styles.statusItem}>
+              <span style={styles.statusDot} />
+              Audit log paruoštas
+            </div>
+          </div>
         </div>
+      </section>
+    </div>
+  )
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  loading,
+}: {
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>
+  label: string
+  value: number
+  loading: boolean
+}) {
+  return (
+    <div style={styles.statCard}>
+      <div style={styles.statIcon}>
+        <Icon size={20} strokeWidth={2.2} />
+      </div>
+
+      <div>
+        <div style={styles.statLabel}>{label}</div>
+        <div style={styles.statValue}>{loading ? '...' : value}</div>
       </div>
     </div>
   )
@@ -118,67 +164,143 @@ export default function AdminDashboardPage() {
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
-    padding: 24,
-    display: 'flex',
-    justifyContent: 'center',
+    display: 'grid',
+    gap: 22,
   },
-  loadingWrap: {
-    minHeight: '100vh',
+  header: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 24,
+    padding: 26,
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 18,
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    boxShadow: '0 18px 50px rgba(15, 23, 42, 0.04)',
+  },
+  eyebrow: {
+    fontSize: 13,
+    fontWeight: 800,
+    color: '#047857',
+    marginBottom: 8,
+  },
+  title: {
+    margin: 0,
+    fontSize: 34,
+    lineHeight: 1.05,
+    fontWeight: 950,
+    color: '#0f172a',
+    letterSpacing: '-0.05em',
+  },
+  subtitle: {
+    margin: '12px 0 0',
+    maxWidth: 680,
+    color: '#64748b',
+    fontSize: 15,
+    lineHeight: 1.55,
+    fontWeight: 600,
+  },
+  userBox: {
+    background: '#f8fafc',
+    border: '1px solid #e5e7eb',
+    borderRadius: 18,
+    padding: 16,
+    minWidth: 260,
+    display: 'grid',
+    gap: 8,
+  },
+  userLine: {
+    fontSize: 14,
+    color: '#0f172a',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+    gap: 14,
+  },
+  statCard: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 22,
+    padding: 18,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 14,
+    boxShadow: '0 14px 38px rgba(15, 23, 42, 0.035)',
+  },
+  statIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    background: '#ecfdf5',
+    color: '#047857',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    fontSize: 18,
-    fontWeight: 700,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 900,
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 20,
-    padding: 24,
-    display: 'grid',
-    gap: 20,
-  },
-  title: {
-    margin: 0,
-    fontSize: 28,
+  statLabel: {
+    fontSize: 13,
+    color: '#64748b',
     fontWeight: 800,
   },
-  subtitle: {
-    margin: 0,
-    color: '#6b7280',
+  statValue: {
+    marginTop: 4,
+    fontSize: 28,
+    color: '#0f172a',
+    fontWeight: 950,
+    lineHeight: 1,
   },
-  message: {
-    background: '#fff7ed',
-    border: '1px solid #fed7aa',
-    color: '#9a3412',
-    padding: 14,
-    borderRadius: 14,
-    fontWeight: 700,
-  },
-  infoBox: {
-    background: '#f9fafb',
-    border: '1px solid #e5e7eb',
-    borderRadius: 12,
-    padding: 12,
+  grid: {
     display: 'grid',
-    gap: 6,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+    gap: 16,
+  },
+  card: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 24,
+    padding: 22,
+    boxShadow: '0 16px 44px rgba(15, 23, 42, 0.035)',
+  },
+  cardTitle: {
+    margin: 0,
+    fontSize: 19,
+    fontWeight: 900,
+    color: '#0f172a',
   },
   actions: {
+    marginTop: 16,
     display: 'flex',
     flexWrap: 'wrap',
     gap: 10,
   },
-  button: {
-    border: 'none',
-    borderRadius: 10,
-    padding: '10px 14px',
-    background: '#111827',
-    color: '#fff',
+  actionButton: {
+    padding: '11px 14px',
+    borderRadius: 14,
+    background: '#0f172a',
+    color: '#ffffff',
+    textDecoration: 'none',
+    fontSize: 14,
+    fontWeight: 850,
+  },
+  statusList: {
+    marginTop: 16,
+    display: 'grid',
+    gap: 12,
+  },
+  statusItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    fontSize: 14,
     fontWeight: 700,
-    cursor: 'pointer',
+    color: '#334155',
+  },
+  statusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    background: '#22c55e',
   },
 }

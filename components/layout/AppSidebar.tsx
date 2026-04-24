@@ -2,129 +2,132 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  BarChart3,
-  Bell,
-  BedDouble,
-  Building2,
-  ClipboardList,
-  FileText,
-  HeartPulse,
-  Home,
-  Package,
-  Repeat,
-  Settings,
-  User,
-  Users,
-} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { getCurrentAccess, type SystemRole } from '@/lib/app-access'
+import { getMenuForRole } from '@/lib/app-menu'
+import { Home } from 'lucide-react'
+import { Home } from 'lucide-react'
 
-type MembershipRole = 'owner' | 'admin' | 'employee' | null
-
-type SidebarItem = {
-  href: string
-  label: string
-  icon: React.ReactNode
-  badge?: number
-}
-
-type Props = {
-  notificationsCount?: number
-  role?: MembershipRole
-  organizationId?: string | null
-}
-
-export default function AppSidebar({
-  notificationsCount = 0,
-  role = null,
-}: Props) {
+export default function AppSidebar() {
   const pathname = usePathname()
 
-  const adminItems: SidebarItem[] = [
-    { href: '/admin-dashboard', label: 'Pagrindinis', icon: <Home size={16} /> },
-    { href: '/residents', label: 'Gyventojai', icon: <User size={16} /> },
-    { href: '/team', label: 'Personalas', icon: <Users size={16} /> },
-    { href: '/activities', label: 'Grafikai', icon: <BarChart3 size={16} /> },
-    { href: '/health-records', label: 'Sveikatos įrašai', icon: <HeartPulse size={16} /> },
-    { href: '/documents', label: 'Dokumentai', icon: <FileText size={16} /> },
-    { href: '/notifications', label: 'Pranešimai', icon: <Bell size={16} />, badge: notificationsCount },
-    { href: '/reports', label: 'Ataskaitos', icon: <ClipboardList size={16} /> },
-    { href: '/settings', label: 'Nustatymai', icon: <Settings size={16} /> },
-    { href: '/organization', label: 'Mano įstaiga', icon: <Building2 size={16} /> },
-    { href: '/rooms', label: 'Kambariai', icon: <BedDouble size={16} /> },
-    { href: '/inventory', label: 'Sandėlis', icon: <Package size={16} /> },
-    { href: '/handover', label: 'Perdavimai', icon: <Repeat size={16} /> },
-  ]
+  const [role, setRole] = useState<SystemRole | null>(null)
+  const [email, setEmail] = useState<string>('')
 
-  const employeeItems: SidebarItem[] = [
-    { href: '/employee-dashboard', label: 'Pagrindinis', icon: <Home size={16} /> },
-    { href: '/my-residents', label: 'Gyventojai', icon: <User size={16} /> },
-    { href: '/my-tasks', label: 'Užduotys', icon: <ClipboardList size={16} /> },
-    { href: '/activities', label: 'Grafikai', icon: <BarChart3 size={16} /> },
-    { href: '/notifications', label: 'Pranešimai', icon: <Bell size={16} />, badge: notificationsCount },
-    { href: '/my-profile', label: 'Profilis', icon: <Users size={16} /> },
-  ]
+  useEffect(() => {
+    void load()
+  }, [])
 
-  const items = role === 'owner' || role === 'admin' ? adminItems : employeeItems
+  async function load() {
+    const access = await getCurrentAccess()
+    setRole(access.role)
+    setEmail(access.email || '')
+  }
+
+  const items = getMenuForRole(role)
 
   return (
-    <aside className="sticky top-0 h-screen w-[248px] shrink-0 overflow-y-auto bg-[#062b20] text-white">
-      <div className="flex h-full flex-col px-4 py-5">
-        <div className="mb-5 flex items-center gap-2 px-2">
-          <div className="h-7 w-7 rounded-full bg-emerald-400/20 ring-1 ring-emerald-300/20" />
-          <div className="text-[22px] font-bold tracking-tight">VisaGloba</div>
-        </div>
+    <aside style={styles.sidebar}>
+      {/* LOGO */}
+      <div style={styles.logo}>
+        💚 <span>VisaGloba</span>
+      </div>
 
-        <nav className="space-y-1.5">
-          {items.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== '/' && pathname?.startsWith(item.href))
+      {/* MENU */}
+      <nav style={styles.nav}>
+        {items.map((item) => {
+          const active = pathname === item.href
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
-                  active
-                    ? 'bg-[#0f4f3d] text-white'
-                    : 'text-emerald-50/85 hover:bg-[#0b3b2d] hover:text-white'
-                }`}
-              >
-                <span
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
-                    active
-                      ? 'bg-emerald-500/15 text-emerald-200'
-                      : 'bg-transparent text-emerald-100/80 group-hover:text-emerald-100'
-                  }`}
-                >
-                  {item.icon}
-                </span>
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{
+                ...styles.link,
+                ...(active ? styles.active : {}),
+              }}
+            >
+              {item.label}
+            </Link>
+          )
+        })}
+      </nav>
 
-                <span className="flex-1">{item.label}</span>
+      {/* USER */}
+      <div style={styles.footer}>
+        <div style={styles.userEmail}>{email}</div>
 
-                {item.badge && item.badge > 0 ? (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                      active
-                        ? 'bg-emerald-400/20 text-emerald-100'
-                        : 'bg-white/10 text-emerald-50/90'
-                    }`}
-                  >
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </span>
-                ) : null}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="text-sm font-semibold">Jonas Petraitis</div>
-          <div className="mt-1 text-xs text-emerald-100/65">
-            {role === 'owner' ? 'Savininkas' : role === 'admin' ? 'Administratorius' : 'Darbuotojas'}
-          </div>
-        </div>
+        <button style={styles.logout}>
+          Atsijungti
+        </button>
       </div>
     </aside>
   )
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  sidebar: {
+    width: 260,
+    minHeight: '100vh',
+    padding: 20,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+
+    // 🌿 ŽALIA TEMA
+    background: 'linear-gradient(180deg, #022c22 0%, #064e3b 100%)',
+    color: '#fff',
+  },
+
+  logo: {
+    fontSize: 22,
+    fontWeight: 900,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+
+  nav: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+
+  link: {
+    padding: '12px 14px',
+    borderRadius: 10,
+    color: '#d1fae5',
+    textDecoration: 'none',
+    fontWeight: 600,
+    transition: 'all 0.2s',
+
+    background: 'transparent',
+  },
+
+  active: {
+    background: '#065f46',
+    color: '#fff',
+  },
+
+  footer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+
+  userEmail: {
+    fontSize: 13,
+    color: '#a7f3d0',
+  },
+
+  logout: {
+    padding: '10px',
+    borderRadius: 10,
+    border: 'none',
+    background: '#ef4444',
+    color: '#fff',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
 }

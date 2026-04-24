@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -826,9 +827,11 @@ export default function ResidentsPage() {
                     filteredResidents.map((resident) => (
                       <tr key={resident.id} className="align-top">
                         <Td>
-                          <div className="text-2xl font-semibold text-slate-900">
-                            {normalizeResidentDisplayName(resident)}
-                          </div>
+                          <Link href={`/residents/${resident.id}`} className="inline-block">
+                            <div className="text-2xl font-semibold text-slate-900 transition hover:text-emerald-600">
+                              {normalizeResidentDisplayName(resident)}
+                            </div>
+                          </Link>
                           <div className="mt-3 space-y-1 text-sm text-slate-500">
                             <div>Gimimo data: {resident.birth_date || 'nenurodyta'}</div>
                             <div>Adresas: {resident.address || 'nenurodytas'}</div>

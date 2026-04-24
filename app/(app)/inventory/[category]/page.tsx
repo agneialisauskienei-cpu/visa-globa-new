@@ -1,36 +1,43 @@
 'use client'
 
 import Link from 'next/link'
-import { use, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useParams } from 'next/navigation'
+import {
+  ArrowDownCircle,
+  ArrowLeft,
+  ArrowUpCircle,
+  Download,
+  PackageOpen,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getCurrentOrganizationId } from '@/lib/current-organization'
 
-type InventoryCategory =
-  | 'diapers'
-  | 'bedding'
-  | 'cleaning'
-  | 'medication'
-  | 'other'
+type CategoryKey = 'diapers' | 'bedding' | 'cleaning' | 'medication' | 'uniforms' | 'other'
+type StockFilter = '' | 'ok' | 'low' | 'empty'
+type OperationFilter = '' | 'in' | 'out' | 'adjustment'
 
 type InventoryItem = {
   id: string
   organization_id: string
-  name: string
-  unit: string | null
-  quantity: number | null
+  name: string | null
   category: string | null
   subcategory: string | null
   size: string | null
+  unit: string | null
+  quantity: number | null
   min_quantity: number | null
-  is_active: boolean | null
   created_at: string | null
   updated_at: string | null
 }
 
-type InventoryLog = {
+type InventoryHistory = {
   id: string
   organization_id: string
-  item_id: string
+  item_id: string | null
   item_name: string | null
   category: string | null
   subcategory: string | null
@@ -46,126 +53,272 @@ type InventoryLog = {
   created_at: string | null
 }
 
-type RouteParams = Promise<{
-  category: string
-}>
+const CATEGORY_LABELS: Record<CategoryKey, string> = {
+  diapers: 'Sauskelnės',
+  bedding: 'Patalynė',
+  cleaning: 'Valymo priemonės',
+  medication: 'Vaistai',
+  uniforms: 'Darbuotojų uniformos',
+  other: 'Kita',
+}
 
-type ReportScope = 'stock' | 'history_all' | 'history_filtered'
+const CATEGORY_SUBTITLES: Record<CategoryKey, string> = {
+  diapers: 'Dydžių, likučių ir išdavimų valdymas.',
+  bedding: 'Patalynės, užvalkalų ir komplektų judėjimas.',
+  cleaning: 'Valymo priemonių likučiai ir sunaudojimas.',
+  medication: 'Vaistų likučiai, papildymai ir nurašymai.',
+  uniforms: 'Darbuotojų apranga, dydžiai ir išdavimai.',
+  other: 'Kitos sandėlio prekės ir jų judėjimas.',
+}
 
-const VALID_CATEGORIES: InventoryCategory[] = [
-  'diapers',
-  'bedding',
-  'cleaning',
-  'medication',
-  'other',
-]
+const SUBCATEGORY_LABELS: Record<string, string> = {
+  pants: 'Kelnaitės',
+  tape: 'Juostinės sauskelnės',
+  night: 'Naktinės sauskelnės',
+  insert: 'Įklotai',
+  underpad: 'Paklotai',
+  set: 'Patalynės komplektas',
+  sheet: 'Paklodė',
+  duvet_cover: 'Antklodės užvalkalas',
+  pillowcase: 'Pagalvės užvalkalas',
+  blanket: 'Antklodė',
+  pillow: 'Pagalvė',
+  towel: 'Rankšluostis',
+  spray: 'Purškiklis',
+  liquid: 'Skystis',
+  powder: 'Milteliai',
+  gel: 'Gelis',
+  wipes: 'Servetėlės',
+  disinfectant: 'Dezinfekantas',
+  bags: 'Maišeliai',
+  gloves: 'Pirštinės',
+  tablet: 'Tabletės',
+  capsule: 'Kapsulės',
+  drops: 'Lašai',
+  ointment: 'Tepalas',
+  injection: 'Injekcija',
+  bandage: 'Tvarstis',
+  shirt: 'Marškinėliai',
+  jacket: 'Švarkas / džemperis',
+  robe: 'Chalatas',
+  shoes: 'Avalynė',
+  apron: 'Prijuostė',
+  general: 'Bendra prekė',
+  equipment: 'Įranga',
+  office: 'Kanceliarinės prekės',
+  hygiene: 'Higienos priemonės',
+}
 
-export default function InventoryCategoryPage({
-  params,
-}: {
-  params: RouteParams
-}) {
-  const { category } = use(params)
-
-  const normalizedCategory = VALID_CATEGORIES.includes(category as InventoryCategory)
-    ? (category as InventoryCategory)
-    : null
-
-  const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState('')
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
+export default function InventoryCategoryPage() {
+  const { category } = useParams()
+  const categoryKey = String(category || '') as CategoryKey
 
   const [items, setItems] = useState<InventoryItem[]>([])
-  const [logs, setLogs] = useState<InventoryLog[]>([])
+  const [history, setHistory] = useState<InventoryHistory[]>([])
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const [searchDraft, setSearchDraft] = useState('')
+  const [stockDraft, setStockDraft] = useState<StockFilter>('')
+  const [operationDraft, setOperationDraft] = useState<OperationFilter>('')
+  const [targetDraft, setTargetDraft] = useState('')
+  const [issuerDraft, setIssuerDraft] = useState('')
+  const [sortDraft, setSortDraft] = useState('newest')
 
   const [search, setSearch] = useState('')
-  const [stockFilter, setStockFilter] = useState('')
-  const [employeeFilter, setEmployeeFilter] = useState('')
-  const [residentFilter, setResidentFilter] = useState('')
-  const [sizeFilter, setSizeFilter] = useState('')
-  const [sortBy, setSortBy] = useState('created_desc')
+  const [stockFilter, setStockFilter] = useState<StockFilter>('')
+  const [operationFilter, setOperationFilter] = useState<OperationFilter>('')
+  const [targetFilter, setTargetFilter] = useState('')
+  const [issuerFilter, setIssuerFilter] = useState('')
+  const [sortBy, setSortBy] = useState('newest')
+
+  const [refillItem, setRefillItem] = useState<InventoryItem | null>(null)
+  const [refillQuantity, setRefillQuantity] = useState('1')
+  const [refillNotes, setRefillNotes] = useState('')
+
+  const categoryTitle = CATEGORY_LABELS[categoryKey] || 'Sandėlio kategorija'
+  const categorySubtitle = CATEGORY_SUBTITLES[categoryKey] || ''
 
   useEffect(() => {
-    if (!normalizedCategory) {
-      setLoading(false)
-      setMessage('Neteisinga kategorija.')
-      return
+    void loadData()
+  }, [categoryKey])
+
+  async function loadData() {
+    const { data: itemsData } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .eq('category', categoryKey)
+      .order('created_at', { ascending: false })
+
+    const { data: historyData } = await supabase
+      .from('inventory_issue_history_view')
+      .select('*')
+      .eq('category', categoryKey)
+      .order('created_at', { ascending: false })
+
+    setItems((itemsData || []) as InventoryItem[])
+    setHistory((historyData || []) as InventoryHistory[])
+  }
+
+  function subcategoryLabel(value: string | null) {
+    if (!value) return '—'
+    return SUBCATEGORY_LABELS[value] || value
+  }
+
+  function operationLabel(type: string | null) {
+    if (type === 'out') return 'Nurašymas'
+    if (type === 'in') return 'Papildymas'
+    if (type === 'adjustment') return 'Koregavimas'
+    return '—'
+  }
+
+  function getStockStatus(item: InventoryItem): StockFilter {
+    const quantity = Number(item.quantity || 0)
+    const min = Number(item.min_quantity || 0)
+
+    if (quantity <= 0) return 'empty'
+    if (quantity <= min) return 'low'
+    return 'ok'
+  }
+
+  function getStockLabel(item: InventoryItem) {
+    const status = getStockStatus(item)
+    if (status === 'empty') return 'Pasibaigė'
+    if (status === 'low') return 'Baigiasi'
+    return 'Pakanka'
+  }
+
+  function applyFilters() {
+    setSearch(searchDraft)
+    setStockFilter(stockDraft)
+    setOperationFilter(operationDraft)
+    setTargetFilter(targetDraft)
+    setIssuerFilter(issuerDraft)
+    setSortBy(sortDraft)
+  }
+
+  function clearFilters() {
+    setSearchDraft('')
+    setStockDraft('')
+    setOperationDraft('')
+    setTargetDraft('')
+    setIssuerDraft('')
+    setSortDraft('newest')
+
+    setSearch('')
+    setStockFilter('')
+    setOperationFilter('')
+    setTargetFilter('')
+    setIssuerFilter('')
+    setSortBy('newest')
+  }
+
+  async function getActorName() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user?.id) return { userId: null, name: null }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, full_name, email')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const record = (profile || {}) as Record<string, unknown>
+    const fullName = String(record.full_name || '').trim()
+    const firstName = String(record.first_name || '').trim()
+    const lastName = String(record.last_name || '').trim()
+    const email = String(record.email || user.email || '').trim()
+
+    return {
+      userId: user.id,
+      name: fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || email || null,
     }
+  }
 
-    loadData(normalizedCategory)
-  }, [normalizedCategory])
-
-  async function loadData(currentCategory: InventoryCategory) {
-    setLoading(true)
-    setMessage('')
-
+  async function refillSelectedItem() {
     try {
-      const orgId = await getCurrentOrganizationId()
+      if (!refillItem) return
 
-      if (!orgId) {
-        setOrganizationId(null)
-        setItems([])
-        setLogs([])
-        setMessage('Nepavyko nustatyti įstaigos.')
+      const quantity = Number(refillQuantity || 0)
+      if (Number.isNaN(quantity) || quantity <= 0) {
+        setMessage('Papildomas kiekis turi būti didesnis už 0.')
         return
       }
 
-      setOrganizationId(orgId)
+      setSaving(true)
+      setMessage('')
 
-      const [itemsResult, logsResult] = await Promise.all([
-        supabase
-          .from('inventory_items')
-          .select(
-            'id, organization_id, name, unit, quantity, category, subcategory, size, min_quantity, is_active, created_at, updated_at'
-          )
-          .eq('organization_id', orgId)
-          .eq('category', currentCategory),
-        supabase
-          .from('inventory_issue_history_view')
-          .select(
-            'id, organization_id, item_id, item_name, category, subcategory, size, unit, resident_id, resident_code, employee_user_id, employee_full_name, quantity, type, notes, created_at'
-          )
-          .eq('organization_id', orgId)
-          .eq('category', currentCategory)
-          .order('created_at', { ascending: false })
-          .limit(500),
-      ])
+      const actor = await getActorName()
+      const currentQuantity = Number(refillItem.quantity || 0)
+      const newQuantity = currentQuantity + quantity
 
-      if (itemsResult.error) throw itemsResult.error
-      if (logsResult.error) throw logsResult.error
+      const { error: updateError } = await supabase
+        .from('inventory_items')
+        .update({
+          quantity: newQuantity,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', refillItem.id)
 
-      setItems((itemsResult.data || []) as InventoryItem[])
-      setLogs((logsResult.data || []) as InventoryLog[])
-    } catch (error: any) {
-      setItems([])
-      setLogs([])
-      setMessage(error?.message || 'Nepavyko įkelti kategorijos duomenų.')
+      if (updateError) throw updateError
+
+      const { error: historyError } = await supabase.from('inventory_issue_history').insert({
+        organization_id: refillItem.organization_id,
+        item_id: refillItem.id,
+        item_name: refillItem.name,
+        category: refillItem.category,
+        subcategory: refillItem.subcategory,
+        size: refillItem.size,
+        unit: refillItem.unit,
+        resident_id: null,
+        resident_code: null,
+        employee_user_id: actor.userId,
+        employee_full_name: actor.name,
+        quantity,
+        type: 'in',
+        notes: refillNotes.trim() || null,
+      })
+
+      if (historyError) throw historyError
+
+      setRefillItem(null)
+      setRefillQuantity('1')
+      setRefillNotes('')
+      setMessage('Prekė papildyta.')
+      await loadData()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Nepavyko papildyti prekės.')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  function clearAllFilters() {
-    setSearch('')
-    setStockFilter('')
-    setEmployeeFilter('')
-    setResidentFilter('')
-    setSizeFilter('')
-    setSortBy('created_desc')
-  }
+  const targetOptions = useMemo(() => {
+    const values = new Set<string>()
+    history.forEach((row) => {
+      if (row.resident_code) values.add(row.resident_code)
+    })
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'lt'))
+  }, [history])
+
+  const issuerOptions = useMemo(() => {
+    const values = new Set<string>()
+    history.forEach((row) => {
+      if (row.employee_full_name) values.add(row.employee_full_name)
+    })
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'lt'))
+  }, [history])
 
   const filteredItems = useMemo(() => {
     let result = [...items]
+    const q = search.trim().toLowerCase()
 
-    if (search.trim()) {
-      const q = search.trim().toLowerCase()
+    if (q) {
       result = result.filter((item) =>
-        [
-          item.name || '',
-          getSubcategoryLabel(item.category, item.subcategory),
-          shouldUseSize(item.category) ? item.size || '' : '',
-          item.unit || '',
-        ]
+        [item.name, subcategoryLabel(item.subcategory), item.size, item.unit]
           .join(' ')
           .toLowerCase()
           .includes(q)
@@ -173,51 +326,33 @@ export default function InventoryCategoryPage({
     }
 
     if (stockFilter) {
-      result = result.filter(
-        (item) => getStockStatusCode(item.quantity, item.min_quantity) === stockFilter
-      )
-    }
-
-    if (sizeFilter) {
-      result = result.filter((item) => (item.size || '') === sizeFilter)
+      result = result.filter((item) => getStockStatus(item) === stockFilter)
     }
 
     result.sort((a, b) => {
-      switch (sortBy) {
-        case 'name_asc':
-          return (a.name || '').localeCompare(b.name || '', 'lt')
-        case 'name_desc':
-          return (b.name || '').localeCompare(a.name || '', 'lt')
-        case 'qty_desc':
-          return Number(b.quantity || 0) - Number(a.quantity || 0)
-        case 'qty_asc':
-          return Number(a.quantity || 0) - Number(b.quantity || 0)
-        case 'created_asc':
-          return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
-        case 'created_desc':
-        default:
-          return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
-      }
+      if (sortBy === 'name') return String(a.name || '').localeCompare(String(b.name || ''), 'lt')
+      if (sortBy === 'quantity_asc') return Number(a.quantity || 0) - Number(b.quantity || 0)
+      if (sortBy === 'quantity_desc') return Number(b.quantity || 0) - Number(a.quantity || 0)
+      return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
     })
 
     return result
-  }, [items, search, stockFilter, sizeFilter, sortBy])
+  }, [items, search, stockFilter, sortBy])
 
-  const filteredLogs = useMemo(() => {
-    let result = [...logs]
+  const filteredHistory = useMemo(() => {
+    let result = [...history]
+    const q = search.trim().toLowerCase()
 
-    if (search.trim()) {
-      const q = search.trim().toLowerCase()
-
-      result = result.filter((log) =>
+    if (q) {
+      result = result.filter((row) =>
         [
-          log.item_name || '',
-          getSubcategoryLabel(log.category, log.subcategory),
-          shouldUseSize(log.category) ? log.size || '' : '',
-          log.employee_full_name || '',
-          log.resident_code || '',
-          log.notes || '',
-          getLogTypeLabel(log.type),
+          row.item_name,
+          subcategoryLabel(row.subcategory),
+          row.size,
+          row.resident_code,
+          row.employee_full_name,
+          row.notes,
+          operationLabel(row.type),
         ]
           .join(' ')
           .toLowerCase()
@@ -225,947 +360,700 @@ export default function InventoryCategoryPage({
       )
     }
 
-    if (employeeFilter) {
-      result = result.filter((log) => (log.employee_user_id || '') === employeeFilter)
-    }
-
-    if (residentFilter) {
-      result = result.filter((log) => (log.resident_id || '') === residentFilter)
-    }
-
-    if (sizeFilter) {
-      result = result.filter((log) => (log.size || '') === sizeFilter)
-    }
-
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case 'item_asc':
-          return (a.item_name || '').localeCompare(b.item_name || '', 'lt')
-        case 'item_desc':
-          return (b.item_name || '').localeCompare(a.item_name || '', 'lt')
-        case 'employee_asc':
-          return (a.employee_full_name || '').localeCompare(
-            b.employee_full_name || '',
-            'lt'
-          )
-        case 'employee_desc':
-          return (b.employee_full_name || '').localeCompare(
-            a.employee_full_name || '',
-            'lt'
-          )
-        case 'created_asc':
-          return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
-        case 'created_desc':
-        default:
-          return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
-      }
-    })
+    if (operationFilter) result = result.filter((row) => row.type === operationFilter)
+    if (targetFilter) result = result.filter((row) => row.resident_code === targetFilter)
+    if (issuerFilter) result = result.filter((row) => row.employee_full_name === issuerFilter)
 
     return result
-  }, [logs, search, employeeFilter, residentFilter, sizeFilter, sortBy])
-
-  const employeeOptions = useMemo(() => {
-    const map = new Map<string, string>()
-
-    logs.forEach((log) => {
-      if (log.employee_user_id && log.employee_full_name) {
-        map.set(log.employee_user_id, log.employee_full_name)
-      }
-    })
-
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'lt'))
-  }, [logs])
-
-  const residentOptions = useMemo(() => {
-    const map = new Map<string, string>()
-
-    logs.forEach((log) => {
-      if (log.resident_id && log.resident_code) {
-        map.set(log.resident_id, log.resident_code)
-      }
-    })
-
-    return Array.from(map.entries())
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, 'lt'))
-  }, [logs])
+  }, [history, search, operationFilter, targetFilter, issuerFilter])
 
   const stats = useMemo(() => {
-    const totalItems = items.length
-    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
-    const lowStock = items.filter(
-      (item) => getStockStatusCode(item.quantity, item.min_quantity) === 'low'
-    ).length
-    const emptyStock = items.filter(
-      (item) => getStockStatusCode(item.quantity, item.min_quantity) === 'empty'
-    ).length
-
-    const totalLogs = logs.length
-    const outLogs = logs.filter((log) => log.type === 'out').length
-    const inLogs = logs.filter((log) => log.type === 'in').length
-
     return {
-      totalItems,
-      totalQuantity,
-      lowStock,
-      emptyStock,
-      totalLogs,
-      outLogs,
-      inLogs,
+      items: items.length,
+      quantity: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      low: items.filter((item) => getStockStatus(item) === 'low').length,
+      empty: items.filter((item) => getStockStatus(item) === 'empty').length,
+      movements: history.length,
+      out: history.filter((row) => row.type === 'out').length,
+      in: history.filter((row) => row.type === 'in').length,
     }
-  }, [items, logs])
+  }, [items, history])
 
-  function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {
-    if (!rows.length) {
-      setMessage('Nėra duomenų atsisiuntimui.')
-      return
-    }
+  function exportHistory() {
+    const rows = filteredHistory.map((row) => ({
+      data: row.created_at ? new Date(row.created_at).toLocaleString('lt-LT') : '',
+      preke: row.item_name || '',
+      tipas: subcategoryLabel(row.subcategory),
+      dydis: row.size || '',
+      kiekis: `${row.quantity || 0} ${row.unit || 'vnt.'}`,
+      operacija: operationLabel(row.type),
+      kam: row.resident_code || '',
+      kas_atliko: row.employee_full_name || '',
+      pastaba: row.notes || '',
+    }))
 
-    const headers = Object.keys(rows[0])
-    const escapeValue = (value: unknown) =>
-      `"${String(value ?? '').replace(/"/g, '""')}"`
+    const headers = Object.keys(rows[0] || {})
+    if (!headers.length) return
 
     const csv = [
       headers.join(','),
-      ...rows.map((row) => headers.map((header) => escapeValue(row[header])).join(',')),
+      ...rows.map((row) =>
+        headers.map((header) => `"${String((row as any)[header] || '').replace(/"/g, '""')}"`).join(',')
+      ),
     ].join('\n')
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', filename)
-    document.body.appendChild(link)
+    link.download = `${categoryKey}_istorija.csv`
     link.click()
-    document.body.removeChild(link)
     URL.revokeObjectURL(url)
   }
 
-  function exportReport(scope: ReportScope) {
-    if (!normalizedCategory) return
-
-    if (scope === 'stock') {
-      const rows = filteredItems.map((item) => ({
-        pavadinimas: item.name,
-        tipas: getSubcategoryLabel(item.category, item.subcategory),
-        dydis: shouldUseSize(item.category) ? item.size || '' : '',
-        vienetas: item.unit || '',
-        kiekis: Number(item.quantity || 0),
-        minimalus_kiekis: item.min_quantity ?? '',
-        busena: getStockStatusLabel(item.quantity, item.min_quantity),
-        sukurta: item.created_at ? new Date(item.created_at).toLocaleString('lt-LT') : '',
-        atnaujinta: item.updated_at ? new Date(item.updated_at).toLocaleString('lt-LT') : '',
-      }))
-
-      downloadCsv(`${normalizedCategory}_likuciai.csv`, rows)
-      return
-    }
-
-    const source = scope === 'history_filtered' ? filteredLogs : logs
-
-    const rows = source.map((log) => ({
-      preke: log.item_name || '',
-      tipas: getSubcategoryLabel(log.category, log.subcategory),
-      dydis: shouldUseSize(log.category) ? log.size || '' : '',
-      kiekis: Number(log.quantity || 0),
-      vienetas: log.unit || '',
-      operacija: getLogTypeLabel(log.type),
-      gyventojas: log.resident_code || '',
-      darbuotojas: log.employee_full_name || '',
-      pastabos: log.notes || '',
-      data: log.created_at ? new Date(log.created_at).toLocaleString('lt-LT') : '',
-    }))
-
-    downloadCsv(
-      scope === 'history_filtered'
-        ? `${normalizedCategory}_istorija_filtruota.csv`
-        : `${normalizedCategory}_istorija.csv`,
-      rows
-    )
-  }
-
-  if (!normalizedCategory) {
-    return (
-      <div style={styles.outer}>
-        <div style={styles.page}>
-          <div style={styles.tableCard}>
-            <h1 style={styles.title}>Neteisinga kategorija</h1>
-            <Link href="/inventory" style={styles.backLink}>
-              ← Grįžti į sandėlį
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  const categoryTitle = getCategoryLabel(normalizedCategory)
-  const categoryTone = getCategoryToneStyle(getCategoryTone(normalizedCategory))
-  const showSizeFilter = normalizedCategory === 'diapers'
-
   return (
-    <div style={styles.outer}>
-      <div style={styles.page}>
-        <div style={styles.topBar}>
-          <Link href="/inventory" style={styles.backLink}>
-            ← Grįžti į sandėlį
-          </Link>
+    <div style={styles.page}>
+      <div style={styles.headerTop}>
+        <Link href="/inventory" style={styles.backButton}>
+          <ArrowLeft size={16} />
+          Grįžti į sandėlį
+        </Link>
+      </div>
 
-          <Link href="/dashboard" style={styles.backLink}>
-            ← Grįžti į dashboard
-          </Link>
+      <section style={styles.hero}>
+        <div style={styles.heroIcon}>
+          <PackageOpen size={28} />
         </div>
 
-        <div style={{ ...styles.heroCard, ...categoryTone }}>
-          <div>
-            <h1 style={styles.title}>{categoryTitle}</h1>
-            <p style={styles.subtitle}>
-              Detalus kategorijos vaizdas su likučiais, judėjimo istorija ir ataskaitomis.
-            </p>
+        <div>
+          <div style={styles.eyebrow}>Sandėlio kategorija</div>
+          <h1 style={styles.title}>{categoryTitle}</h1>
+          <p style={styles.subtitle}>{categorySubtitle}</p>
+        </div>
+      </section>
+
+      {message ? <div style={styles.message}>{message}</div> : null}
+
+      <section style={styles.statsGrid}>
+        <button style={styles.statCard} onClick={() => setStockDraft('')}>
+          <strong>{stats.items}</strong>
+          <span>Skirtingų prekių</span>
+        </button>
+
+        <button style={styles.statCard} onClick={() => setStockDraft('')}>
+          <strong>{stats.quantity}</strong>
+          <span>Bendras kiekis</span>
+        </button>
+
+        <button style={{ ...styles.statCard, ...styles.warningStat }} onClick={() => setStockDraft('low')}>
+          <strong>{stats.low}</strong>
+          <span>Baigiasi</span>
+        </button>
+
+        <button style={{ ...styles.statCard, ...styles.dangerStat }} onClick={() => setStockDraft('empty')}>
+          <strong>{stats.empty}</strong>
+          <span>Pasibaigė</span>
+        </button>
+
+        <button style={styles.statCard} onClick={() => setOperationDraft('')}>
+          <strong>{stats.movements}</strong>
+          <span>Judėjimų</span>
+        </button>
+
+        <button style={{ ...styles.statCard, ...styles.greenStat }} onClick={() => setOperationDraft('out')}>
+          <strong>{stats.out}</strong>
+          <span>Nurašymai</span>
+        </button>
+
+        <button style={styles.statCard} onClick={() => setOperationDraft('in')}>
+          <strong>{stats.in}</strong>
+          <span>Papildymai</span>
+        </button>
+      </section>
+
+      <section style={styles.layout}>
+        <aside style={styles.filters}>
+          <div style={styles.filterTitle}>
+            <SlidersHorizontal size={18} />
+            Filtrai
           </div>
 
-          <div style={styles.headerActions}>
-            <button onClick={() => exportReport('stock')} style={styles.secondaryButton}>
-              Atsisiųsti likučius
-            </button>
-            <button onClick={() => exportReport('history_all')} style={styles.secondaryButton}>
-              Atsisiųsti visą istoriją
-            </button>
-            <button
-              onClick={() => exportReport('history_filtered')}
-              style={styles.primaryButton}
-            >
-              Atsisiųsti pagal filtrus
-            </button>
-          </div>
-        </div>
+          <label style={styles.field}>
+            <span>Paieška</span>
+            <div style={styles.searchBox}>
+              <Search size={16} />
+              <input
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value)}
+                placeholder="Prekė, tipas, kam..."
+                style={styles.searchInput}
+              />
+            </div>
+          </label>
 
-        {message ? <div style={styles.message}>{message}</div> : null}
+          <label style={styles.field}>
+            <span>Likutis</span>
+            <select value={stockDraft} onChange={(e) => setStockDraft(e.target.value as StockFilter)} style={styles.input}>
+              <option value="">Visi</option>
+              <option value="ok">Pakanka</option>
+              <option value="low">Baigiasi</option>
+              <option value="empty">Pasibaigė</option>
+            </select>
+          </label>
 
-        <div style={styles.statsRow}>
-          <StatCard label="Skirtingų prekių" value={String(stats.totalItems)} />
-          <StatCard label="Bendras kiekis" value={String(stats.totalQuantity)} />
-          <StatCard label="Baigiasi" value={String(stats.lowStock)} />
-          <StatCard label="Pasibaigė" value={String(stats.emptyStock)} />
-        </div>
+          <label style={styles.field}>
+            <span>Operacija</span>
+            <select value={operationDraft} onChange={(e) => setOperationDraft(e.target.value as OperationFilter)} style={styles.input}>
+              <option value="">Visos</option>
+              <option value="out">Nurašymai</option>
+              <option value="in">Papildymai</option>
+              <option value="adjustment">Koregavimai</option>
+            </select>
+          </label>
 
-        <div style={styles.statsRowSecondary}>
-          <StatCard label="Visi judėjimai" value={String(stats.totalLogs)} />
-          <StatCard label="Nurašymai" value={String(stats.outLogs)} />
-          <StatCard label="Papildymai" value={String(stats.inLogs)} />
-        </div>
+          <label style={styles.field}>
+            <span>Kam</span>
+            <select value={targetDraft} onChange={(e) => setTargetDraft(e.target.value)} style={styles.input}>
+              <option value="">Visi</option>
+              {targetOptions.map((target) => (
+                <option key={target} value={target}>
+                  {target}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <div style={styles.contentGrid}>
-          <aside style={styles.sidebar}>
-            <div style={styles.sidebarCard}>
-              <h2 style={styles.sidebarTitle}>Filtrai</h2>
+          <label style={styles.field}>
+            <span>Kas išdavė</span>
+            <select value={issuerDraft} onChange={(e) => setIssuerDraft(e.target.value)} style={styles.input}>
+              <option value="">Visi</option>
+              {issuerOptions.map((issuer) => (
+                <option key={issuer} value={issuer}>
+                  {issuer}
+                </option>
+              ))}
+            </select>
+          </label>
 
-              <Field label="Paieška">
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Prekė, tipas, pastabos..."
-                  style={styles.input}
-                />
-              </Field>
+          <label style={styles.field}>
+            <span>Rūšiavimas</span>
+            <select value={sortDraft} onChange={(e) => setSortDraft(e.target.value)} style={styles.input}>
+              <option value="newest">Naujausi viršuje</option>
+              <option value="name">Pavadinimas A–Ž</option>
+              <option value="quantity_desc">Daugiausia kiekio</option>
+              <option value="quantity_asc">Mažiausia kiekio</option>
+            </select>
+          </label>
 
-              <Field label="Likutis">
-                <select
-                  value={stockFilter}
-                  onChange={(e) => setStockFilter(e.target.value)}
-                  style={styles.input}
-                >
-                  <option value="">Visi</option>
-                  <option value="ok">Yra sandėlyje</option>
-                  <option value="low">Baigiasi</option>
-                  <option value="empty">Pasibaigė</option>
-                </select>
-              </Field>
+          <button style={styles.filterButton} onClick={applyFilters}>
+            Filtruoti
+          </button>
 
-              {showSizeFilter ? (
-                <Field label="Dydis">
-                  <select
-                    value={sizeFilter}
-                    onChange={(e) => setSizeFilter(e.target.value)}
-                    style={styles.input}
-                  >
-                    <option value="">Visi</option>
-                    {getSizeOptions().map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              ) : null}
+          <button style={styles.clearButton} onClick={clearFilters}>
+            Valyti filtrus
+          </button>
+        </aside>
 
-              <Field label="Darbuotojas">
-                <select
-                  value={employeeFilter}
-                  onChange={(e) => setEmployeeFilter(e.target.value)}
-                  style={styles.input}
-                >
-                  <option value="">Visi</option>
-                  {employeeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+        <main style={styles.content}>
+          <section style={styles.card}>
+            <h2 style={styles.sectionTitle}>Kategorijos likučiai</h2>
+            <p style={styles.meta}>Rodoma prekių: {filteredItems.length}</p>
 
-              <Field label="Gyventojas">
-                <select
-                  value={residentFilter}
-                  onChange={(e) => setResidentFilter(e.target.value)}
-                  style={styles.input}
-                >
-                  <option value="">Visi</option>
-                  {residentOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Pavadinimas</th>
+                  <th style={styles.th}>Tipas</th>
+                  <th style={styles.th}>Dydis / matmuo</th>
+                  <th style={styles.th}>Kiekis</th>
+                  <th style={styles.th}>Min.</th>
+                  <th style={styles.th}>Būsena</th>
+                  <th style={styles.th}>Veiksmai</th>
+                </tr>
+              </thead>
 
-              <Field label="Rūšiavimas">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  style={styles.input}
-                >
-                  <option value="created_desc">Naujausi viršuje</option>
-                  <option value="created_asc">Seniausi viršuje</option>
-                  <option value="name_asc">Prekė A–Ž</option>
-                  <option value="name_desc">Prekė Ž–A</option>
-                  <option value="qty_desc">Daugiausia kiekio</option>
-                  <option value="qty_asc">Mažiausia kiekio</option>
-                  <option value="employee_asc">Darbuotojas A–Ž</option>
-                  <option value="employee_desc">Darbuotojas Ž–A</option>
-                </select>
-              </Field>
+              <tbody>
+                {filteredItems.map((item) => (
+                  <tr key={item.id}>
+                    <td style={styles.tdBold}>{item.name}</td>
+                    <td style={styles.td}>{subcategoryLabel(item.subcategory)}</td>
+                    <td style={styles.td}>{item.size || '—'}</td>
+                    <td style={styles.td}>{item.quantity || 0} {item.unit || 'vnt.'}</td>
+                    <td style={styles.td}>{item.min_quantity ?? '—'}</td>
+                    <td style={styles.td}>
+                      <span style={getStockStatus(item) === 'ok' ? styles.ok : styles.warning}>
+                        {getStockLabel(item)}
+                      </span>
+                    </td>
+                    <td style={styles.td}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRefillItem(item)
+                          setRefillQuantity('1')
+                          setRefillNotes('')
+                        }}
+                        style={getStockStatus(item) === 'low' ? styles.refillUrgentButton : styles.refillButton}
+                      >
+                        <Plus size={14} />
+                        Papildyti
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
 
-              <button
-                onClick={clearAllFilters}
-                style={{ ...styles.secondaryButton, width: '100%' }}
-              >
-                Valyti filtrus
+          <section style={styles.card}>
+            <div style={styles.cardHeader}>
+              <div>
+                <h2 style={styles.sectionTitle}>Judėjimo istorija</h2>
+                <p style={styles.meta}>Rodoma įrašų: {filteredHistory.length}</p>
+              </div>
+
+              <button onClick={exportHistory} style={styles.exportButton}>
+                <Download size={16} />
+                Eksportuoti
               </button>
             </div>
-          </aside>
 
-          <div style={styles.mainContent}>
-            <div style={styles.tableCard}>
-              <div style={styles.cardHeader}>
-                <h2 style={styles.sectionTitle}>Kategorijos likučiai</h2>
-                <div style={styles.smallMeta}>Rodoma prekių: {filteredItems.length}</div>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Prekė</th>
+                  <th style={styles.th}>Kiekis</th>
+                  <th style={styles.th}>Operacija</th>
+                  <th style={styles.th}>Kam</th>
+                  <th style={styles.th}>Kas atliko</th>
+                  <th style={styles.th}>Data</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredHistory.map((row) => (
+                  <tr key={row.id}>
+                    <td style={styles.tdBold}>
+                      {row.item_name}
+                      <div style={styles.sub}>
+                        {subcategoryLabel(row.subcategory)}
+                        {row.size ? ` • ${row.size}` : ''}
+                      </div>
+                    </td>
+
+                    <td style={styles.td}>{row.quantity} {row.unit || 'vnt.'}</td>
+
+                    <td style={styles.td}>
+                      <span style={{ ...styles.badge, ...(row.type === 'out' ? styles.outBadge : styles.inBadge) }}>
+                        {row.type === 'out' ? <ArrowDownCircle size={14} /> : <ArrowUpCircle size={14} />}
+                        {operationLabel(row.type)}
+                      </span>
+                    </td>
+
+                    <td style={styles.td}>{row.resident_code || '—'}</td>
+                    <td style={styles.td}>{row.employee_full_name || '—'}</td>
+                    <td style={styles.td}>{row.created_at ? new Date(row.created_at).toLocaleString('lt-LT') : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        </main>
+      </section>
+
+      {refillItem ? (
+        <div style={styles.modalBackdrop} onClick={() => setRefillItem(null)}>
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div>
+                <h2 style={styles.modalTitle}>Papildyti prekę</h2>
+                <p style={styles.modalSubtitle}>{refillItem.name}</p>
               </div>
 
-              {loading ? (
-                <div style={styles.emptyState}>Kraunami likučiai...</div>
-              ) : filteredItems.length === 0 ? (
-                <div style={styles.emptyState}>Prekių nerasta.</div>
-              ) : (
-                <div style={styles.tableWrap}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr>
-                        <th style={styles.th}>Pavadinimas</th>
-                        <th style={styles.th}>Tipas</th>
-                        <th style={styles.th}>Dydis</th>
-                        <th style={styles.th}>Kiekis</th>
-                        <th style={styles.th}>Min. kiekis</th>
-                        <th style={styles.th}>Būsena</th>
-                        <th style={styles.th}>Atnaujinta</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {filteredItems.map((item) => (
-                        <tr key={item.id} style={styles.tr}>
-                          <td style={styles.tdBold}>{item.name || '—'}</td>
-                          <td style={styles.td}>
-                            {getSubcategoryLabel(item.category, item.subcategory)}
-                          </td>
-                          <td style={styles.td}>
-                            {shouldUseSize(item.category) ? item.size || '—' : '—'}
-                          </td>
-                          <td style={styles.td}>{formatQuantity(item.quantity, item.unit)}</td>
-                          <td style={styles.td}>
-                            {item.min_quantity !== null && item.min_quantity !== undefined
-                              ? formatQuantity(item.min_quantity, item.unit)
-                              : '—'}
-                          </td>
-                          <td style={styles.td}>
-                            <span
-                              style={{
-                                ...styles.statusBadge,
-                                ...stockStatusStyle(item.quantity, item.min_quantity),
-                              }}
-                            >
-                              {getStockStatusLabel(item.quantity, item.min_quantity)}
-                            </span>
-                          </td>
-                          <td style={styles.td}>
-                            {item.updated_at
-                              ? new Date(item.updated_at).toLocaleString('lt-LT')
-                              : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <button type="button" onClick={() => setRefillItem(null)} style={styles.iconButton}>
+                <X size={18} />
+              </button>
             </div>
 
-            <div style={styles.tableCard}>
-              <div style={styles.cardHeader}>
-                <h2 style={styles.sectionTitle}>Kategorijos judėjimo istorija</h2>
-                <div style={styles.smallMeta}>Rodoma įrašų: {filteredLogs.length}</div>
-              </div>
+            <label style={styles.field}>
+              <span>Kiekis</span>
+              <input
+                type="number"
+                min="1"
+                value={refillQuantity}
+                onChange={(e) => setRefillQuantity(e.target.value)}
+                style={styles.input}
+              />
+            </label>
 
-              {loading ? (
-                <div style={styles.emptyState}>Kraunama istorija...</div>
-              ) : filteredLogs.length === 0 ? (
-                <div style={styles.emptyState}>Istorijos įrašų nerasta.</div>
-              ) : (
-                <div style={styles.tableWrap}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr>
-                        <th style={styles.th}>Prekė</th>
-                        <th style={styles.th}>Tipas</th>
-                        <th style={styles.th}>Dydis</th>
-                        <th style={styles.th}>Kiekis</th>
-                        <th style={styles.th}>Operacija</th>
-                        <th style={styles.th}>Gyventojas</th>
-                        <th style={styles.th}>Darbuotojas</th>
-                        <th style={styles.th}>Data</th>
-                      </tr>
-                    </thead>
+            <label style={styles.field}>
+              <span>Pastaba</span>
+              <input
+                value={refillNotes}
+                onChange={(e) => setRefillNotes(e.target.value)}
+                placeholder="Pvz. papildyta iš sandėlio"
+                style={styles.input}
+              />
+            </label>
 
-                    <tbody>
-                      {filteredLogs.map((log) => (
-                        <tr key={log.id} style={styles.tr}>
-                          <td style={styles.tdBold}>{log.item_name || '—'}</td>
-                          <td style={styles.td}>
-                            {getSubcategoryLabel(log.category, log.subcategory)}
-                          </td>
-                          <td style={styles.td}>
-                            {shouldUseSize(log.category) ? log.size || '—' : '—'}
-                          </td>
-                          <td style={styles.td}>{formatQuantity(log.quantity, log.unit)}</td>
-                          <td style={styles.td}>{getLogTypeLabel(log.type)}</td>
-                          <td style={styles.td}>{log.resident_code || '—'}</td>
-                          <td style={styles.td}>{log.employee_full_name || '—'}</td>
-                          <td style={styles.td}>
-                            {log.created_at
-                              ? new Date(log.created_at).toLocaleString('lt-LT')
-                              : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+            <div style={styles.modalActions}>
+              <button type="button" onClick={() => setRefillItem(null)} style={styles.clearButton}>
+                Atšaukti
+              </button>
+              <button type="button" onClick={() => void refillSelectedItem()} disabled={saving} style={styles.filterButton}>
+                {saving ? 'Saugoma...' : 'Papildyti'}
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
-}
-
-function shouldUseSize(category: string | null | undefined) {
-  return category === 'diapers'
-}
-
-function getSizeOptions() {
-  return [
-    { value: 'XS', label: 'XS' },
-    { value: 'S', label: 'S' },
-    { value: 'M', label: 'M' },
-    { value: 'L', label: 'L' },
-    { value: 'XL', label: 'XL' },
-    { value: 'XXL', label: 'XXL' },
-  ]
-}
-
-function getCategoryLabel(category: string | null) {
-  switch (category) {
-    case 'diapers':
-      return 'Sauskelnės'
-    case 'bedding':
-      return 'Patalynė'
-    case 'cleaning':
-      return 'Valymo priemonės'
-    case 'medication':
-      return 'Vaistai'
-    case 'other':
-      return 'Kita'
-    default:
-      return 'Nenurodyta'
-  }
-}
-
-function getCategoryTone(category: InventoryCategory) {
-  switch (category) {
-    case 'diapers':
-      return 'blue'
-    case 'bedding':
-      return 'violet'
-    case 'cleaning':
-      return 'green'
-    case 'medication':
-      return 'red'
-    case 'other':
-    default:
-      return 'gray'
-  }
-}
-
-function getSubcategoryLabel(category: string | null, subcategory: string | null) {
-  if (!subcategory) return '—'
-
-  if (category === 'diapers') {
-    switch (subcategory) {
-      case 'pants':
-        return 'Kelnaitės'
-      case 'tape':
-        return 'Juostinės'
-      case 'night':
-        return 'Naktinės'
-      case 'insert':
-        return 'Įklotai'
-      default:
-        return subcategory
-    }
-  }
-
-  if (category === 'bedding') {
-    switch (subcategory) {
-      case 'set':
-        return 'Komplektas'
-      case 'sheet':
-        return 'Paklodė'
-      case 'cover':
-        return 'Užvalkalas'
-      case 'pillowcase':
-        return 'Pagalvės užvalkalas'
-      case 'blanket':
-        return 'Antklodė'
-      default:
-        return subcategory
-    }
-  }
-
-  if (category === 'cleaning') {
-    switch (subcategory) {
-      case 'spray':
-        return 'Purškalas'
-      case 'liquid':
-        return 'Skystis'
-      case 'powder':
-        return 'Milteliai'
-      case 'gel':
-        return 'Gelis'
-      case 'wipes':
-        return 'Servetėlės'
-      default:
-        return subcategory
-    }
-  }
-
-  if (category === 'medication') {
-    switch (subcategory) {
-      case 'tablet':
-        return 'Tabletės'
-      case 'liquid':
-        return 'Skystis'
-      case 'capsule':
-        return 'Kapsulės'
-      case 'drops':
-        return 'Lašai'
-      case 'ointment':
-        return 'Tepalas'
-      case 'injection':
-        return 'Injekcija'
-      default:
-        return subcategory
-    }
-  }
-
-  return subcategory
-}
-
-function formatQuantity(quantity: number | null, unit: string | null) {
-  const safeQuantity = Number(quantity || 0)
-  const safeUnit = unit?.trim() || 'vnt.'
-  return `${safeQuantity} ${safeUnit}`
-}
-
-function getStockStatusCode(quantity: number | null, minQuantity: number | null) {
-  const q = Number(quantity || 0)
-
-  if (q <= 0) return 'empty'
-  if (minQuantity !== null && minQuantity !== undefined && q <= Number(minQuantity)) {
-    return 'low'
-  }
-  return 'ok'
-}
-
-function getStockStatusLabel(quantity: number | null, minQuantity: number | null) {
-  const code = getStockStatusCode(quantity, minQuantity)
-
-  if (code === 'empty') return 'Pasibaigė'
-  if (code === 'low') return 'Baigiasi'
-  return 'Yra sandėlyje'
-}
-
-function stockStatusStyle(
-  quantity: number | null,
-  minQuantity: number | null
-): React.CSSProperties {
-  const code = getStockStatusCode(quantity, minQuantity)
-
-  if (code === 'empty') {
-    return {
-      background: '#fee2e2',
-      color: '#b91c1c',
-      border: '1px solid #fecaca',
-    }
-  }
-
-  if (code === 'low') {
-    return {
-      background: '#fef3c7',
-      color: '#92400e',
-      border: '1px solid #fde68a',
-    }
-  }
-
-  return {
-    background: '#dcfce7',
-    color: '#166534',
-    border: '1px solid #bbf7d0',
-  }
-}
-
-function getLogTypeLabel(type: string | null) {
-  switch (type) {
-    case 'in':
-      return 'Papildymas'
-    case 'out':
-      return 'Nurašymas'
-    case 'adjustment':
-      return 'Koregavimas'
-    default:
-      return '—'
-  }
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <label style={styles.field}>
-      <span style={styles.label}>{label}</span>
-      {children}
-    </label>
-  )
-}
-
-function StatCard({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statValue}>{value}</div>
-      <div style={styles.statLabel}>{label}</div>
-    </div>
-  )
-}
-
-function getCategoryToneStyle(
-  tone: 'blue' | 'violet' | 'green' | 'red' | 'gray'
-): React.CSSProperties {
-  switch (tone) {
-    case 'blue':
-      return {
-        background: 'linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)',
-        border: '1px solid #bfdbfe',
-      }
-    case 'violet':
-      return {
-        background: 'linear-gradient(180deg, #f5f3ff 0%, #ffffff 100%)',
-        border: '1px solid #ddd6fe',
-      }
-    case 'green':
-      return {
-        background: 'linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%)',
-        border: '1px solid #bbf7d0',
-      }
-    case 'red':
-      return {
-        background: 'linear-gradient(180deg, #fff1f2 0%, #ffffff 100%)',
-        border: '1px solid #fecdd3',
-      }
-    case 'gray':
-    default:
-      return {
-        background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
-        border: '1px solid #e2e8f0',
-      }
-  }
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  outer: {
-    width: '100%',
-    padding: '20px 24px 40px',
-  },
   page: {
-    width: '100%',
-    maxWidth: 1700,
-    margin: '0 auto',
+    padding: 24,
     display: 'grid',
     gap: 18,
   },
-  topBar: {
+  headerTop: {
     display: 'flex',
-    justifyContent: 'space-between',
+  },
+  backButton: {
+    display: 'inline-flex',
     alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  backLink: {
+    gap: 8,
+    padding: '9px 13px',
+    borderRadius: 12,
+    background: '#ecfdf5',
+    color: '#047857',
     textDecoration: 'none',
-    color: '#111827',
-    fontSize: 14,
-    fontWeight: 700,
-    padding: '8px 12px',
-    borderRadius: 10,
-    background: '#f3f4f6',
-    border: '1px solid #e5e7eb',
+    fontSize: 13,
+    fontWeight: 900,
   },
-  heroCard: {
-    borderRadius: 22,
-    padding: 20,
+  hero: {
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 16,
-    flexWrap: 'wrap',
+    background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+    border: '1px solid #e5e7eb',
+    borderRadius: 24,
+    padding: 22,
   },
-  headerActions: {
+  heroIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    background: '#ecfdf5',
+    color: '#047857',
     display: 'flex',
-    gap: 10,
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyebrow: {
+    color: '#047857',
+    fontSize: 12,
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
   },
   title: {
-    margin: 0,
-    fontSize: 40,
-    fontWeight: 800,
-    lineHeight: 1.1,
-    color: '#111827',
+    margin: '4px 0',
+    fontSize: 34,
+    fontWeight: 950,
+    color: '#0f172a',
   },
   subtitle: {
-    margin: '10px 0 0',
-    color: '#6b7280',
-    fontSize: 17,
+    margin: 0,
+    color: '#64748b',
+    fontSize: 15,
+    fontWeight: 650,
   },
   message: {
-    padding: '12px 14px',
-    borderRadius: 14,
-    background: '#f3f4f6',
-    border: '1px solid #e5e7eb',
-    color: '#111827',
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    border: '1px solid #bfdbfe',
+    borderRadius: 16,
+    padding: 13,
+    fontSize: 14,
+    fontWeight: 800,
   },
-  statsRow: {
+  statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-    gap: 12,
-  },
-  statsRowSecondary: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
     gap: 12,
   },
   statCard: {
-    background: '#fff',
     border: '1px solid #e5e7eb',
+    background: '#ffffff',
     borderRadius: 18,
-    padding: 16,
-    minHeight: 110,
+    padding: 15,
+    textAlign: 'left',
+    cursor: 'pointer',
     display: 'grid',
-    alignContent: 'start',
+    gap: 6,
   },
-  statValue: {
-    fontSize: 32,
-    fontWeight: 800,
-    marginBottom: 8,
-    lineHeight: 1,
-    color: '#111827',
+  warningStat: {
+    background: '#fffbeb',
+    borderColor: '#fde68a',
   },
-  statLabel: {
-    color: '#6b7280',
-    fontSize: 14,
-    fontWeight: 600,
+  dangerStat: {
+    background: '#fff1f2',
+    borderColor: '#fecdd3',
   },
-  contentGrid: {
+  greenStat: {
+    background: '#ecfdf5',
+    borderColor: '#a7f3d0',
+  },
+  layout: {
     display: 'grid',
-    gridTemplateColumns: '300px minmax(0, 1fr)',
-    gap: 18,
+    gridTemplateColumns: '280px minmax(0, 1fr)',
+    gap: 16,
     alignItems: 'start',
   },
-  sidebar: {
-    position: 'sticky',
-    top: 20,
-  },
-  sidebarCard: {
-    background: '#f8fafc',
-    border: '1px solid #e2e8f0',
-    borderRadius: 22,
-    padding: 18,
+  filters: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 20,
+    padding: 16,
     display: 'grid',
     gap: 14,
+    position: 'sticky',
+    top: 16,
   },
-  sidebarTitle: {
-    margin: 0,
-    fontSize: 22,
-    fontWeight: 800,
-    color: '#111827',
-  },
-  mainContent: {
-    display: 'grid',
-    gap: 18,
-  },
-  tableCard: {
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 22,
-    padding: 20,
-    display: 'grid',
-    gap: 16,
-  },
-  cardHeader: {
+  filterTitle: {
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  sectionTitle: {
-    margin: 0,
-    fontSize: 24,
-    fontWeight: 800,
-  },
-  smallMeta: {
-    color: '#6b7280',
-    fontSize: 13,
-    fontWeight: 700,
+    gap: 8,
+    color: '#0f172a',
+    fontSize: 18,
+    fontWeight: 950,
   },
   field: {
     display: 'grid',
     gap: 6,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: '#111827',
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: 850,
   },
   input: {
     width: '100%',
     border: '1px solid #d1d5db',
-    borderRadius: 12,
-    padding: '11px 12px',
+    borderRadius: 13,
+    padding: '10px 11px',
     fontSize: 14,
-    outline: 'none',
-    background: '#fff',
   },
-  primaryButton: {
-    border: 'none',
-    borderRadius: 12,
-    padding: '12px 18px',
-    background: '#0f172a',
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  secondaryButton: {
+  searchBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     border: '1px solid #d1d5db',
-    borderRadius: 12,
-    padding: '12px 16px',
-    background: '#fff',
-    color: '#111827',
+    borderRadius: 13,
+    padding: '0 11px',
+  },
+  searchInput: {
+    border: 'none',
+    outline: 'none',
+    width: '100%',
+    padding: '10px 0',
     fontSize: 14,
-    fontWeight: 700,
+  },
+  filterButton: {
+    border: 'none',
+    background: '#047857',
+    color: '#ffffff',
+    borderRadius: 13,
+    padding: '11px 12px',
+    fontSize: 13,
+    fontWeight: 900,
     cursor: 'pointer',
   },
-  emptyState: {
-    padding: 24,
-    textAlign: 'center',
-    color: '#6b7280',
-    border: '1px dashed #d1d5db',
-    borderRadius: 16,
+  clearButton: {
+    border: 'none',
+    background: '#f1f5f9',
+    color: '#0f172a',
+    borderRadius: 13,
+    padding: '11px 12px',
+    fontSize: 13,
+    fontWeight: 900,
+    cursor: 'pointer',
   },
-  tableWrap: {
-    overflowX: 'auto',
+  content: {
+    display: 'grid',
+    gap: 16,
+    minWidth: 0,
+  },
+  card: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 20,
+    padding: 20,
+  },
+  cardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sectionTitle: {
+    margin: 0,
+    fontSize: 22,
+    fontWeight: 950,
+    color: '#0f172a',
+  },
+  meta: {
+    margin: '6px 0 16px',
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: 800,
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    minWidth: 1100,
-    tableLayout: 'fixed',
   },
   th: {
     textAlign: 'left',
     padding: '12px 10px',
     borderBottom: '1px solid #e5e7eb',
-    color: '#6b7280',
-    fontSize: 13,
-    fontWeight: 700,
-    whiteSpace: 'nowrap',
-  },
-  tr: {
-    borderBottom: '1px solid #f1f5f9',
+    fontWeight: 900,
+    color: '#475569',
   },
   td: {
     padding: '14px 10px',
-    color: '#374151',
-    fontSize: 14,
-    fontWeight: 500,
-    verticalAlign: 'middle',
+    borderBottom: '1px solid #f1f5f9',
+    color: '#334155',
+    fontWeight: 650,
   },
   tdBold: {
     padding: '14px 10px',
-    color: '#111827',
-    fontSize: 14,
-    fontWeight: 800,
-    verticalAlign: 'middle',
+    borderBottom: '1px solid #f1f5f9',
+    color: '#0f172a',
+    fontWeight: 900,
   },
-  statusBadge: {
+  sub: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: 650,
+  },
+  badge: {
     display: 'inline-flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: '5px 10px',
+    gap: 5,
+    padding: '5px 11px',
     borderRadius: 999,
     fontSize: 12,
-    fontWeight: 800,
-    whiteSpace: 'nowrap',
+    fontWeight: 900,
+  },
+  outBadge: {
+    background: '#fee2e2',
+    color: '#b91c1c',
+  },
+  inBadge: {
+    background: '#dcfce7',
+    color: '#166534',
+  },
+  warning: {
+    background: '#fef3c7',
+    color: '#92400e',
+    padding: '5px 11px',
+    borderRadius: 999,
+    fontWeight: 850,
+  },
+  ok: {
+    background: '#dcfce7',
+    color: '#166534',
+    padding: '5px 11px',
+    borderRadius: 999,
+    fontWeight: 850,
+  },
+  refillButton: {
+    border: '1px solid #a7f3d0',
+    background: '#ecfdf5',
+    color: '#047857',
+    borderRadius: 12,
+    padding: '8px 10px',
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  refillUrgentButton: {
+    border: '1px solid #fde68a',
+    background: '#fffbeb',
+    color: '#92400e',
+    borderRadius: 12,
+    padding: '8px 10px',
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  exportButton: {
+    border: '1px solid #d1d5db',
+    background: '#ffffff',
+    color: '#0f172a',
+    borderRadius: 13,
+    padding: '10px 12px',
+    fontSize: 13,
+    fontWeight: 900,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 7,
+  },
+  modalBackdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(15, 23, 42, 0.45)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    zIndex: 100,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 460,
+    background: '#ffffff',
+    borderRadius: 22,
+    padding: 20,
+    display: 'grid',
+    gap: 16,
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalTitle: {
+    margin: 0,
+    fontSize: 22,
+    fontWeight: 950,
+    color: '#0f172a',
+  },
+  modalSubtitle: {
+    margin: '4px 0 0',
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: 750,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    border: '1px solid #d1d5db',
+    background: '#ffffff',
+    cursor: 'pointer',
+  },
+  modalActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: 10,
   },
 }

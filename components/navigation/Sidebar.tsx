@@ -4,134 +4,103 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import {
-  BedDouble,
-  Bell,
   Building2,
-  CalendarDays,
-  ClipboardList,
-  FileText,
-  HeartHandshake,
   Home,
   LogOut,
-  Package,
-  Pill,
   Settings,
-  ShieldCheck,
-  User,
+  HeartHandshake,
+  UserRound,
   Users,
+  Inbox,
+  UserPlus,
+  BarChart3,
+  PackageOpen,
+  ClipboardCheck,
+ShieldCheck,
+  ListChecks,
 } from 'lucide-react'
+import { getCurrentAccess, type SystemRole } from '@/lib/app-access'
 import { supabase } from '@/lib/supabase'
-import { ROUTES } from '@/lib/routes'
 
-type UiRole = 'super_admin' | 'admin' | 'employee' | null
-
-type SidebarUser = {
-  fullName: string
-  role: UiRole
-  roleLabel: string
+type MenuItem = {
+  label: string
+  href: string
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>
+  roles: SystemRole[]
 }
 
-function getUiRole(email: string | null | undefined): UiRole {
-  const e = (email || '').toLowerCase()
+const MENU: MenuItem[] = [
+  { label: 'Pagrindinis', href: '/admin-dashboard', icon: Home, roles: ['owner', 'admin', 'employee'] },
+  { label: 'Įstaigos', href: '/organizations', icon: Building2, roles: ['owner'] },
+  { label: 'Darbuotojai', href: '/employees', icon: Users, roles: ['admin'] },
+  { label: 'Užduotys', href: '/tasks', icon: ListChecks, roles: ['admin', 'employee'] },
+  { label: 'Gyventojai', href: '/residents', icon: UserRound, roles: ['admin', 'employee'] },
+  { label: 'Kambariai', href: '/rooms', icon: Home, roles: ['admin', 'employee'] },
+  { label: 'Sandėliai', href: '/inventory', icon: PackageOpen, roles: ['admin', 'employee'] },
+  { label: 'Perdavimo žurnalai', href: '/handover-logs', icon: ClipboardCheck, roles: ['admin', 'employee'] },
+  { label: 'Užklausos', href: '/requests', icon: Inbox, roles: ['admin', 'employee'] },
+  { label: 'Kvietimai', href: '/invites', icon: UserPlus, roles: ['admin'] },
+  { label: 'Ataskaitos', href: '/reports', icon: BarChart3, roles: ['admin'] },
+  { label: 'Auditas', href: '/audit', icon: ShieldCheck, roles: ['admin'] },
+  { label: 'Nustatymai', href: '/settings', icon: Settings, roles: ['owner', 'admin', 'employee'] },
+]
 
-  if (e === 'info@skaitytaknyga.lt') return 'super_admin'
-  if (e === 'miauksena@gmail.com') return 'admin'
-
-  return 'employee'
-}
-
-function getRoleLabel(role: UiRole) {
-  if (role === 'super_admin') return 'Super admin'
-  if (role === 'admin') return 'Admin'
+function getRoleLabel(role: SystemRole | null) {
+  if (role === 'owner') return 'Super Admin'
+  if (role === 'admin') return 'Administratorius'
   if (role === 'employee') return 'Darbuotojas'
-  return 'Naudotojas'
+  return 'Sistema'
+}
+
+function getInitials(email: string) {
+  if (!email) return 'VG'
+  return email.split('@')[0].slice(0, 2).toUpperCase()
 }
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
 
-  const [user, setUser] = useState<SidebarUser | null>(null)
+  const [role, setRole] = useState<SystemRole | null>(null)
+  const [email, setEmail] = useState('')
+  const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
-    loadUser()
+    void loadAccess()
   }, [])
 
-  async function loadUser() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) return
-
-    setUser({
-      fullName: user.email || 'Vartotojas',
-      role: getUiRole(user.email),
-      roleLabel: getRoleLabel(getUiRole(user.email)),
-    })
+  async function loadAccess() {
+    const access = await getCurrentAccess()
+    setRole(access.role)
+    setEmail(access.email || '')
   }
 
   async function logout() {
+    setLoggingOut(true)
     await supabase.auth.signOut()
     router.replace('/login')
+    router.refresh()
   }
 
-  const superAdminLinks = useMemo(
-    () => [
-      { href: '/admin-dashboard', label: 'Pagrindinis', icon: Home },
-      { href: '/organizations', label: 'Įstaigos', icon: Users }, // 🔥 svarbiausias
-      { href: '/admin-join-requests', label: 'Užklausos', icon: FileText },
-      { href: '/notifications', label: 'Pranešimai', icon: Bell },
-      { href: '/system', label: 'Sistema', icon: Settings },
-    ],
-    []
-  )
-
-  const adminLinks = useMemo(
-    () => [
-      { href: '/admin-dashboard', label: 'Pagrindinis', icon: Home },
-      { href: '/residents', label: 'Gyventojai', icon: Users },
-      { href: '/team', label: 'Darbuotojai', icon: ShieldCheck },
-      { href: '/rooms', label: 'Kambariai', icon: BedDouble },
-      { href: '/medications', label: 'Sveikatos įrašai', icon: Pill },
-      { href: '/inventory', label: 'Sandėliai', icon: Package },
-      { href: '/company-info', label: 'Įmonės info', icon: Building2 },
-      { href: '/admin-join-requests', label: 'Patvirtinimai', icon: FileText },
-      { href: '/notifications', label: 'Pranešimai', icon: Bell },
-      { href: '/system', label: 'Sistema', icon: Settings },
-    ],
-    []
-  )
-
-  const employeeLinks = useMemo(
-    () => [
-      { href: '/employee-dashboard', label: 'Pagrindinis', icon: Home },
-      { href: '/my-residents', label: 'Mano gyventojai', icon: Users },
-      { href: '/my-tasks', label: 'Užduotys', icon: ClipboardList },
-      { href: '/my-schedule', label: 'Grafikas', icon: CalendarDays },
-      { href: '/notifications', label: 'Pranešimai', icon: Bell },
-      { href: '/profile', label: 'Profilis', icon: User },
-      { href: '/system', label: 'Sistema', icon: Settings },
-    ],
-    []
-  )
-
-  const links =
-    user?.role === 'super_admin'
-      ? superAdminLinks
-      : user?.role === 'admin'
-      ? adminLinks
-      : employeeLinks
+  const items = useMemo(() => {
+    if (!role) return []
+    return MENU.filter((item) => item.roles.includes(role))
+  }, [role])
 
   return (
     <aside style={styles.sidebar}>
-      <div>
-        <div style={styles.logo}>VisaGloba</div>
+      <div style={styles.top}>
+        <Link href="/admin-dashboard" style={styles.logo}>
+          <HeartHandshake size={24} strokeWidth={2.4} style={styles.logoIcon} />
+          <span>VisaGloba</span>
+        </Link>
 
         <nav style={styles.nav}>
-          {links.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon
-            const active = pathname === item.href
+            const active =
+              pathname === item.href ||
+              (item.href !== '/admin-dashboard' && pathname.startsWith(item.href + '/'))
 
             return (
               <Link
@@ -139,11 +108,11 @@ export default function Sidebar() {
                 href={item.href}
                 style={{
                   ...styles.link,
-                  ...(active ? styles.active : {}),
+                  ...(active ? styles.linkActive : {}),
                 }}
               >
-                <Icon size={16} />
-                {item.label}
+                <Icon size={18} strokeWidth={2.2} />
+                <span>{item.label}</span>
               </Link>
             )
           })}
@@ -151,64 +120,121 @@ export default function Sidebar() {
       </div>
 
       <div style={styles.bottom}>
-        <div>{user?.fullName}</div>
-        <div style={styles.role}>{user?.roleLabel}</div>
+        <div style={styles.userCard}>
+          <div style={styles.avatar}>{getInitials(email)}</div>
 
-        <button onClick={logout} style={styles.logout}>
-          Atsijungti
+          <div>
+            <div style={styles.userName}>Naudotojas</div>
+            <div style={styles.userRole}>{getRoleLabel(role)}</div>
+          </div>
+        </div>
+
+        <button type="button" onClick={() => void logout()} disabled={loggingOut} style={styles.logout}>
+          <LogOut size={17} strokeWidth={2.4} />
+          {loggingOut ? 'Atsijungiama...' : 'Atsijungti'}
         </button>
       </div>
     </aside>
   )
 }
 
-const styles: any = {
+const styles: Record<string, React.CSSProperties> = {
   sidebar: {
-    width: 240,
-    height: '100vh',
-    background: '#0f172a',
-    color: '#fff',
-    padding: 16,
+    width: 270,
+    minHeight: '100vh',
+    padding: '18px',
+    boxSizing: 'border-box',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
+    background:
+      'radial-gradient(circle at top left, rgba(74,222,128,0.12), transparent 34%), linear-gradient(180deg, #021d16 0%, #043326 100%)',
+  },
+  top: {
+    display: 'grid',
+    gap: 18,
   },
   logo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    color: '#fff',
+    textDecoration: 'none',
     fontSize: 20,
-    fontWeight: 800,
-    marginBottom: 20,
+    fontWeight: 900,
+    letterSpacing: '-0.03em',
+  },
+  logoIcon: {
+    color: '#86efac',
   },
   nav: {
     display: 'grid',
-    gap: 8,
+    gap: 4,
   },
   link: {
     display: 'flex',
+    alignItems: 'center',
     gap: 10,
-    padding: 10,
-    borderRadius: 8,
+    padding: '8px 12px',
+    borderRadius: 14,
+    color: '#d8f8e7',
     textDecoration: 'none',
-    color: '#cbd5f5',
+    fontWeight: 700,
+    fontSize: 13,
+    minHeight: 40,
   },
-  active: {
-    background: '#1e293b',
-    color: '#fff',
+  linkActive: {
+    background: 'linear-gradient(180deg, #1c7a3a 0%, #196f34 100%)',
+    color: '#ffffff',
   },
   bottom: {
     display: 'grid',
-    gap: 6,
+    gap: 12,
   },
-  role: {
+  userCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 14,
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.06)',
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    background: '#111827',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 900,
     fontSize: 12,
-    color: '#94a3b8',
+  },
+  userName: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 800,
+  },
+  userRole: {
+    color: '#9ee7b6',
+    fontSize: 11,
+    fontWeight: 700,
   },
   logout: {
-    marginTop: 10,
-    padding: 8,
-    background: '#ef4444',
+    width: '100%',
     border: 'none',
-    borderRadius: 6,
+    borderRadius: 14,
+    padding: '10px',
+    background: 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)',
     color: '#fff',
+    fontSize: 13,
+    fontWeight: 800,
     cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
 }

@@ -4,9 +4,11 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
+import { logAudit } from "@/lib/audit"
 
 type Gender = "male" | "female" | "mixed" | ""
 type RoomType = "single" | "double" | "triple" | "quad" | "other"
+type AssignMode = "active" | "arriving_soon" | "hospital" | "temporary_leave"
 
 type RoomRow = {
   id: string
@@ -28,6 +30,10 @@ type RoomRow = {
   notes: string | null
   is_active: boolean | null
   created_at: string | null
+  occupied_by?: string | null
+  reserved_for?: string | null
+  reserved_until?: string | null
+  room_status?: string | null
 }
 
 type Room = {
@@ -50,7 +56,27 @@ type Room = {
   notes: string
   is_active: boolean
   created_at: string | null
+  occupied_by: string | null
+  reserved_for: string | null
+  reserved_until: string | null
+  room_status: string | null
   occupied: number
+  reserved: number
+}
+
+type Resident = {
+  id: string
+  organization_id: string
+  first_name: string | null
+  last_name: string | null
+  full_name: string | null
+  resident_code: string | null
+  current_room_id: string | null
+  current_status: string | null
+  status: string | null
+  archived_at: string | null
+  room_reserved_until: string | null
+  is_active: boolean | null
 }
 
 type EditForm = {
@@ -87,6 +113,13 @@ type BulkForm = {
   otherCapacity: string
 }
 
+type AssignForm = {
+  roomId: string
+  residentId: string
+  mode: AssignMode
+  reservedUntil: string
+}
+
 const emptyBulkForm: BulkForm = {
   prefix: "",
   startNumber: "101",
@@ -101,8 +134,11 @@ const emptyBulkForm: BulkForm = {
   otherCapacity: "5",
 }
 
-function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ")
+const emptyAssignForm: AssignForm = {
+  roomId: "",
+  residentId: "",
+  mode: "active",
+  reservedUntil: "",
 }
 
 function toInt(value: string, fallback = 0) {
@@ -138,6 +174,35 @@ function formatGender(gender: Gender) {
   }
 }
 
+function statusLabel(status: string | null | undefined) {
+  if (status === "arriving_soon") return "Netrukus atvyks"
+  if (status === "active") return "Gyvena"
+  if (status === "hospital") return "Ligoninėje"
+  if (status === "temporary_leave") return "Laikinai išvykęs"
+  if (status === "deceased") return "Mirė"
+  if (status === "contract_ended") return "Nutraukė sutartį"
+  return "—"
+}
+
+function residentName(resident: Resident | null | undefined) {
+  if (!resident) return "—"
+
+  const fullName = String(resident.full_name || "").trim()
+  const firstName = String(resident.first_name || "").trim()
+  const lastName = String(resident.last_name || "").trim()
+  const combined = [firstName, lastName].filter(Boolean).join(" ").trim()
+  const code = resident.resident_code ? ` (${resident.resident_code})` : ""
+
+  return `${fullName || combined || "Gyventojas"}${code}`
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+  return date.toLocaleDateString("lt-LT")
+}
+
 function downloadCsv(filename: string, rows: string[][]) {
   const csv = rows
     .map((row) =>
@@ -156,9 +221,50 @@ function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
+function getRoomVisual(room: Room) {
+  if (!room.is_active) {
+    return {
+      label: "Neaktyvus",
+      style: styles.roomInactive,
+      badge: styles.statusInactive,
+    }
+  }
+
+  if (room.reserved > 0 || room.room_status === "reserved" || room.reserved_for) {
+    return {
+      label: "Rezervuotas",
+      style: styles.roomReserved,
+      badge: styles.statusReserved,
+    }
+  }
+
+  if (room.occupied >= room.capacity || room.room_status === "occupied" || room.occupied_by) {
+    return {
+      label: "Užimtas",
+      style: styles.roomOccupied,
+      badge: styles.statusOccupied,
+    }
+  }
+
+  if (room.occupied > 0) {
+    return {
+      label: "Iš dalies užimtas",
+      style: styles.roomPartial,
+      badge: styles.statusPartial,
+    }
+  }
+
+  return {
+    label: "Laisvas",
+    style: styles.roomFree,
+    badge: styles.statusFree,
+  }
+}
+
 export default function RoomsPage() {
   const [organizationId, setOrganizationId] = useState<string | null>(null)
   const [rooms, setRooms] = useState<Room[]>([])
+  const [residents, setResidents] = useState<Resident[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -168,12 +274,17 @@ export default function RoomsPage() {
   const [typeFilter, setTypeFilter] = useState<RoomType | "all">("all")
   const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all")
   const [floorFilter, setFloorFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "free" | "partial" | "occupied" | "reserved">("all")
 
   const [bulkOpen, setBulkOpen] = useState(true)
   const [bulkForm, setBulkForm] = useState<BulkForm>(emptyBulkForm)
 
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<EditForm | null>(null)
+
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assignForm, setAssignForm] = useState<AssignForm>(emptyAssignForm)
+  const [releaseRoomId, setReleaseRoomId] = useState<string | null>(null)
 
   useEffect(() => {
     void loadOrganization()
@@ -189,8 +300,11 @@ export default function RoomsPage() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         closeEditModal()
+        closeAssignModal()
+        setReleaseRoomId(null)
       }
     }
+
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [])
@@ -251,7 +365,11 @@ export default function RoomsPage() {
         wheelchair_accessible,
         notes,
         is_active,
-        created_at
+        created_at,
+        occupied_by,
+        reserved_for,
+        reserved_until,
+        room_status
       `)
       .eq("organization_id", orgId)
       .order("sort_order", { ascending: true, nullsFirst: false })
@@ -265,9 +383,22 @@ export default function RoomsPage() {
 
     const { data: residentsRows, error: residentsError } = await supabase
       .from("residents")
-      .select("current_room_id")
+      .select(`
+        id,
+        organization_id,
+        first_name,
+        last_name,
+        full_name,
+        resident_code,
+        current_room_id,
+        current_status,
+        status,
+        archived_at,
+        room_reserved_until,
+        is_active
+      `)
       .eq("organization_id", orgId)
-      .eq("is_active", true)
+      .is("archived_at", null)
 
     if (residentsError) {
       setLoading(false)
@@ -275,11 +406,22 @@ export default function RoomsPage() {
       return
     }
 
+    const residentList = ((residentsRows || []) as Resident[]).filter((resident) => resident.is_active !== false)
+
     const occupiedMap = new Map<string, number>()
-    for (const row of residentsRows || []) {
-      const roomId = row.current_room_id
+    const reservedMap = new Map<string, number>()
+
+    for (const resident of residentList) {
+      const roomId = resident.current_room_id
       if (!roomId) continue
-      occupiedMap.set(roomId, (occupiedMap.get(roomId) || 0) + 1)
+
+      const status = resident.current_status || resident.status
+
+      if (status === "arriving_soon") {
+        reservedMap.set(roomId, (reservedMap.get(roomId) || 0) + 1)
+      } else if (status === "active" || status === "hospital" || status === "temporary_leave") {
+        occupiedMap.set(roomId, (occupiedMap.get(roomId) || 0) + 1)
+      }
     }
 
     const mapped: Room[] = ((roomRows as RoomRow[] | null) || []).map((row) => ({
@@ -302,22 +444,42 @@ export default function RoomsPage() {
       notes: row.notes || "",
       is_active: row.is_active ?? true,
       created_at: row.created_at,
+      occupied_by: row.occupied_by || null,
+      reserved_for: row.reserved_for || null,
+      reserved_until: row.reserved_until || null,
+      room_status: row.room_status || null,
       occupied: occupiedMap.get(row.id) || 0,
+      reserved: reservedMap.get(row.id) || 0,
     }))
 
     setRooms(mapped)
+    setResidents(residentList)
     setLoading(false)
   }
+
+  const residentsByRoom = useMemo(() => {
+    const map = new Map<string, Resident[]>()
+
+    residents.forEach((resident) => {
+      if (!resident.current_room_id) return
+      if (!map.has(resident.current_room_id)) map.set(resident.current_room_id, [])
+      map.get(resident.current_room_id)!.push(resident)
+    })
+
+    return map
+  }, [residents])
 
   const filteredRooms = useMemo(() => {
     return rooms.filter((room) => {
       const search = query.trim().toLowerCase()
+      const roomResidents = residentsByRoom.get(room.id) || []
       const searchOk =
         !search ||
         room.name.toLowerCase().includes(search) ||
         formatType(room.room_type).toLowerCase().includes(search) ||
         formatGender(room.gender).toLowerCase().includes(search) ||
-        room.notes.toLowerCase().includes(search)
+        room.notes.toLowerCase().includes(search) ||
+        roomResidents.some((resident) => residentName(resident).toLowerCase().includes(search))
 
       const typeOk = typeFilter === "all" || room.room_type === typeFilter
 
@@ -329,15 +491,29 @@ export default function RoomsPage() {
         floorFilter === "all" ||
         String(room.floor ?? "") === floorFilter
 
-      return searchOk && typeOk && activeOk && floorOk
+      const roomVisual = getRoomVisual(room)
+      const statusOk =
+        statusFilter === "all" ||
+        (statusFilter === "free" && roomVisual.label === "Laisvas") ||
+        (statusFilter === "partial" && roomVisual.label === "Iš dalies užimtas") ||
+        (statusFilter === "occupied" && roomVisual.label === "Užimtas") ||
+        (statusFilter === "reserved" && roomVisual.label === "Rezervuotas")
+
+      return searchOk && typeOk && activeOk && floorOk && statusOk
     })
-  }, [rooms, query, typeFilter, activeFilter, floorFilter])
+  }, [rooms, residentsByRoom, query, typeFilter, activeFilter, floorFilter, statusFilter])
 
   const stats = useMemo(() => {
     const totalRooms = filteredRooms.length
     const totalPlaces = filteredRooms.reduce((sum, room) => sum + room.capacity, 0)
     const occupiedPlaces = filteredRooms.reduce((sum, room) => sum + room.occupied, 0)
-    const freePlaces = totalPlaces - occupiedPlaces
+    const reservedPlaces = filteredRooms.reduce((sum, room) => sum + room.reserved, 0)
+    const freePlaces = Math.max(totalPlaces - occupiedPlaces - reservedPlaces, 0)
+
+    const freeRooms = filteredRooms.filter((room) => getRoomVisual(room).label === "Laisvas").length
+    const occupiedRooms = filteredRooms.filter((room) => getRoomVisual(room).label === "Užimtas").length
+    const reservedRooms = filteredRooms.filter((room) => getRoomVisual(room).label === "Rezervuotas").length
+    const partialRooms = filteredRooms.filter((room) => getRoomVisual(room).label === "Iš dalies užimtas").length
 
     const byType = filteredRooms.reduce(
       (acc, room) => {
@@ -347,7 +523,18 @@ export default function RoomsPage() {
       { single: 0, double: 0, triple: 0, quad: 0, other: 0 }
     )
 
-    return { totalRooms, totalPlaces, occupiedPlaces, freePlaces, byType }
+    return {
+      totalRooms,
+      totalPlaces,
+      occupiedPlaces,
+      reservedPlaces,
+      freePlaces,
+      freeRooms,
+      occupiedRooms,
+      reservedRooms,
+      partialRooms,
+      byType,
+    }
   }, [filteredRooms])
 
   const floors = useMemo(() => {
@@ -359,6 +546,25 @@ export default function RoomsPage() {
       )
     ).sort((a, b) => a - b)
   }, [rooms])
+
+  const roomsByFloor = useMemo(() => {
+    const map = new Map<string, Room[]>()
+
+    filteredRooms.forEach((room) => {
+      const key = room.floor == null ? "Be aukšto" : `${room.floor} aukštas`
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(room)
+    })
+
+    return Array.from(map.entries())
+  }, [filteredRooms])
+
+  const availableResidents = useMemo(() => {
+    return residents.filter((resident) => {
+      const status = resident.current_status || resident.status
+      return !resident.current_room_id || status === "arriving_soon"
+    })
+  }, [residents])
 
   const bulkPreview = useMemo(() => {
     const single = toInt(bulkForm.singleCount)
@@ -405,6 +611,21 @@ export default function RoomsPage() {
   function closeEditModal() {
     setEditingRoomId(null)
     setEditForm(null)
+  }
+
+  function openAssignModal(room: Room, mode: AssignMode = "active") {
+    setAssignForm({
+      roomId: room.id,
+      residentId: "",
+      mode,
+      reservedUntil: "",
+    })
+    setAssignOpen(true)
+  }
+
+  function closeAssignModal() {
+    setAssignOpen(false)
+    setAssignForm(emptyAssignForm)
   }
 
   async function createRoomsBulk() {
@@ -455,6 +676,7 @@ export default function RoomsPage() {
             wheelchair_accessible: false,
             notes: "",
             is_active: true,
+            room_status: "available",
           })
           currentNumber += 1
           currentSortOrder += 1
@@ -487,13 +709,24 @@ export default function RoomsPage() {
         return
       }
 
-      const { error: insertError } = await supabase.from("rooms").insert(rows)
+      const { data: insertedRooms, error: insertError } = await supabase.from("rooms").insert(rows).select("id, name")
 
       if (insertError) {
         setError(insertError.message)
         setSaving(false)
         return
       }
+
+      await logAudit({
+        organizationId,
+        tableName: "rooms",
+        recordId: insertedRooms?.[0]?.id || null,
+        action: "insert",
+        changes: {
+          created_count: rows.length,
+          rooms: rows.map((row) => row.name),
+        },
+      })
 
       setSuccess(`Sukurta ${rows.length} kambarių.`)
       setBulkForm(emptyBulkForm)
@@ -533,6 +766,8 @@ export default function RoomsPage() {
         return
       }
 
+      const before = rooms.find((room) => room.id === editForm.id) || null
+
       const payload = {
         name,
         room_type: editForm.room_type,
@@ -564,9 +799,220 @@ export default function RoomsPage() {
         return
       }
 
+      await logAudit({
+        organizationId,
+        tableName: "rooms",
+        recordId: editForm.id,
+        action: "update",
+        changes: {
+          before: before
+            ? {
+                name: before.name,
+                room_type: before.room_type,
+                capacity: before.capacity,
+                floor: before.floor,
+                gender: before.gender,
+                area_m2: before.area_m2,
+                sort_order: before.sort_order,
+                is_active: before.is_active,
+              }
+            : null,
+          after: payload,
+        },
+      })
+
       setSuccess("Kambarys atnaujintas.")
       await loadRooms(organizationId)
       closeEditModal()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function assignResidentToRoom() {
+    if (!organizationId) return
+
+    const room = rooms.find((item) => item.id === assignForm.roomId)
+    const resident = residents.find((item) => item.id === assignForm.residentId)
+
+    if (!room) {
+      setError("Pasirinktas kambarys nerastas.")
+      return
+    }
+
+    if (!resident) {
+      setError("Pasirink gyventoją.")
+      return
+    }
+
+    if (assignForm.mode === "arriving_soon" && !assignForm.reservedUntil) {
+      setError("Rezervacijai nurodyk datą iki kada rezervuota.")
+      return
+    }
+
+    resetMessages()
+    setSaving(true)
+
+    try {
+      const status = assignForm.mode
+      const reservedUntil = status === "arriving_soon" ? assignForm.reservedUntil : null
+      const isReservation = status === "arriving_soon"
+
+      const { error: clearRoomsError } = await supabase
+        .from("rooms")
+        .update({
+          occupied_by: null,
+          reserved_for: null,
+          reserved_until: null,
+          room_status: "available",
+        })
+        .or(`occupied_by.eq.${resident.id},reserved_for.eq.${resident.id}`)
+
+      if (clearRoomsError) throw clearRoomsError
+
+      const { error: residentError } = await supabase
+        .from("residents")
+        .update({
+          current_room_id: room.id,
+          current_status: status,
+          room_reserved_until: reservedUntil,
+        })
+        .eq("id", resident.id)
+        .eq("organization_id", organizationId)
+
+      if (residentError) throw residentError
+
+      const { error: roomError } = await supabase
+        .from("rooms")
+        .update({
+          occupied_by: isReservation ? null : resident.id,
+          reserved_for: isReservation ? resident.id : null,
+          reserved_until: reservedUntil,
+          room_status: isReservation ? "reserved" : "occupied",
+        })
+        .eq("id", room.id)
+        .eq("organization_id", organizationId)
+
+      if (roomError) throw roomError
+
+      await logAudit({
+        organizationId,
+        tableName: "rooms",
+        recordId: room.id,
+        action: "update",
+        changes: {
+  Veiksmas: isReservation ? "Kambario rezervacija" : "Gyventojo priskyrimas kambariui",
+  Kambarys: room.name,
+  Gyventojas: residentName(resident),
+  Statusas: statusLabel(status),
+  ...(reservedUntil ? { "Rezervuota iki": reservedUntil } : {}),
+},
+      })
+
+      const residentChanges: Record<string, { from: unknown; to: unknown }> = {}
+
+if ((resident.current_room_id || null) !== room.id) {
+  residentChanges.current_room_id = {
+    from: resident.current_room_id || null,
+    to: room.id,
+  }
+}
+
+if ((resident.current_status || resident.status || null) !== status) {
+  residentChanges.current_status = {
+    from: resident.current_status || resident.status || null,
+    to: status,
+  }
+}
+
+if ((resident.room_reserved_until || null) !== reservedUntil) {
+  residentChanges.room_reserved_until = {
+    from: resident.room_reserved_until || null,
+    to: reservedUntil,
+  }
+}
+
+if (Object.keys(residentChanges).length > 0) {
+  await logAudit({
+    organizationId,
+    tableName: "residents",
+    recordId: resident.id,
+    action: "update",
+    changes: residentChanges,
+  })
+}
+
+      setSuccess(isReservation ? "Kambarys rezervuotas gyventojui." : "Gyventojas priskirtas kambariui.")
+      await loadRooms(organizationId)
+      closeAssignModal()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Nepavyko priskirti gyventojo.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function releaseRoom(roomId: string) {
+    if (!organizationId) return
+
+    const room = rooms.find((item) => item.id === roomId)
+    const roomResidents = residentsByRoom.get(roomId) || []
+
+    if (!room) return
+
+    if (!confirm(`Ar tikrai atlaisvinti kambarį ${room.name}? Gyventojams bus nuimtas kambario priskyrimas.`)) {
+      return
+    }
+
+    resetMessages()
+    setSaving(true)
+
+    try {
+      const residentIds = roomResidents.map((resident) => resident.id)
+
+      if (residentIds.length > 0) {
+        const { error: residentsError } = await supabase
+          .from("residents")
+          .update({
+            current_room_id: null,
+            room_reserved_until: null,
+          })
+          .in("id", residentIds)
+          .eq("organization_id", organizationId)
+
+        if (residentsError) throw residentsError
+      }
+
+      const { error: roomError } = await supabase
+        .from("rooms")
+        .update({
+          occupied_by: null,
+          reserved_for: null,
+          reserved_until: null,
+          room_status: "available",
+        })
+        .eq("id", roomId)
+        .eq("organization_id", organizationId)
+
+      if (roomError) throw roomError
+
+      await logAudit({
+        organizationId,
+        tableName: "rooms",
+        recordId: roomId,
+        action: "update",
+        changes: {
+          action: "Kambarys atlaisvintas",
+          room: room.name,
+          residents: roomResidents.map((resident) => residentName(resident)),
+        },
+      })
+
+      setSuccess("Kambarys atlaisvintas.")
+      await loadRooms(organizationId)
+      setReleaseRoomId(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Nepavyko atlaisvinti kambario.")
     } finally {
       setSaving(false)
     }
@@ -578,7 +1024,12 @@ export default function RoomsPage() {
       ["Kambarių skaičius", String(stats.totalRooms)],
       ["Vietų skaičius", String(stats.totalPlaces)],
       ["Užimta vietų", String(stats.occupiedPlaces)],
+      ["Rezervuota vietų", String(stats.reservedPlaces)],
       ["Laisva vietų", String(stats.freePlaces)],
+      ["Laisvų kambarių", String(stats.freeRooms)],
+      ["Rezervuotų kambarių", String(stats.reservedRooms)],
+      ["Užimtų kambarių", String(stats.occupiedRooms)],
+      ["Iš dalies užimtų kambarių", String(stats.partialRooms)],
       ["Vienviečių", String(stats.byType.single)],
       ["Dviviečių", String(stats.byType.double)],
       ["Triviečių", String(stats.byType.triple)],
@@ -591,35 +1042,46 @@ export default function RoomsPage() {
         "Tipas",
         "Vietos",
         "Užimta",
+        "Rezervuota",
         "Laisva",
         "Aukštas",
         "Lytis",
         "Aktyvus",
+        "Būsena",
+        "Gyventojai",
         "Įranga",
         "Pastabos",
       ],
-      ...filteredRooms.map((room) => [
-        room.name,
-        formatType(room.room_type),
-        String(room.capacity),
-        String(room.occupied),
-        String(Math.max(room.capacity - room.occupied, 0)),
-        room.floor == null ? "" : String(room.floor),
-        formatGender(room.gender),
-        room.is_active ? "Taip" : "Ne",
-        [
-          room.oxygen ? "Deguonis" : "",
-          room.nursing ? "Slauga" : "",
-          room.wc ? "WC" : "",
-          room.shower ? "Dušas" : "",
-          room.sink ? "Kriauklė" : "",
-          room.functional_bed ? "Funkcinė lova" : "",
-          room.wheelchair_accessible ? "Pritaikytas neįgaliesiems" : "",
+      ...filteredRooms.map((room) => {
+        const roomResidents = residentsByRoom.get(room.id) || []
+        const visual = getRoomVisual(room)
+
+        return [
+          room.name,
+          formatType(room.room_type),
+          String(room.capacity),
+          String(room.occupied),
+          String(room.reserved),
+          String(Math.max(room.capacity - room.occupied - room.reserved, 0)),
+          room.floor == null ? "" : String(room.floor),
+          formatGender(room.gender),
+          room.is_active ? "Taip" : "Ne",
+          visual.label,
+          roomResidents.map((resident) => residentName(resident)).join(" | "),
+          [
+            room.oxygen ? "Deguonis" : "",
+            room.nursing ? "Slauga" : "",
+            room.wc ? "WC" : "",
+            room.shower ? "Dušas" : "",
+            room.sink ? "Kriauklė" : "",
+            room.functional_bed ? "Funkcinė lova" : "",
+            room.wheelchair_accessible ? "Pritaikytas neįgaliesiems" : "",
+          ]
+            .filter(Boolean)
+            .join(" | "),
+          room.notes,
         ]
-          .filter(Boolean)
-          .join(" | "),
-        room.notes,
-      ]),
+      }),
     ]
 
     const date = new Date().toISOString().slice(0, 10)
@@ -630,13 +1092,17 @@ export default function RoomsPage() {
     return <div className="p-6 text-sm text-slate-600">Kraunama...</div>
   }
 
+  const selectedAssignRoom = rooms.find((room) => room.id === assignForm.roomId) || null
+  const selectedReleaseRoom = rooms.find((room) => room.id === releaseRoomId) || null
+  const selectedReleaseResidents = releaseRoomId ? residentsByRoom.get(releaseRoomId) || [] : []
+
   return (
     <div style={styles.page}>
       <div style={styles.headerRow}>
         <div>
           <h1 style={styles.title}>Kambariai</h1>
           <p style={styles.subtitle}>
-            Masinis kūrimas, statistika, užimtumas ir redagavimas vienoje vietoje.
+            Masinis kūrimas, statistika, užimtumas, rezervacijos ir gyventojų priskyrimas vienoje vietoje.
           </p>
         </div>
 
@@ -803,30 +1269,30 @@ export default function RoomsPage() {
       ) : null}
 
       <section style={styles.statsGrid}>
-        <div style={styles.statCard}>
+        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("all")}>
           <div style={styles.statLabel}>Kambarių</div>
           <div style={styles.statValue}>{stats.totalRooms}</div>
-        </div>
+        </button>
         <div style={styles.statCard}>
           <div style={styles.statLabel}>Vietų</div>
           <div style={styles.statValue}>{stats.totalPlaces}</div>
         </div>
-        <div style={styles.statCard}>
-          <div style={styles.statLabel}>Užimta</div>
+        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("occupied")}>
+          <div style={styles.statLabel}>Užimta vietų</div>
           <div style={styles.statValue}>{stats.occupiedPlaces}</div>
-        </div>
-        <div style={styles.statCard}>
-          <div style={styles.statLabel}>Laisva</div>
+        </button>
+        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("reserved")}>
+          <div style={styles.statLabel}>Rezervuota vietų</div>
+          <div style={styles.statValue}>{stats.reservedPlaces}</div>
+        </button>
+        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("free")}>
+          <div style={styles.statLabel}>Laisva vietų</div>
           <div style={styles.statValue}>{stats.freePlaces}</div>
-        </div>
-        <div style={styles.statCard}>
-          <div style={styles.statLabel}>Vienviečių</div>
-          <div style={styles.statValue}>{stats.byType.single}</div>
-        </div>
-        <div style={styles.statCard}>
-          <div style={styles.statLabel}>Dviviečių</div>
-          <div style={styles.statValue}>{stats.byType.double}</div>
-        </div>
+        </button>
+        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("partial")}>
+          <div style={styles.statLabel}>Iš dalies užimtų</div>
+          <div style={styles.statValue}>{stats.partialRooms}</div>
+        </button>
       </section>
 
       <section style={styles.panel}>
@@ -837,7 +1303,7 @@ export default function RoomsPage() {
               style={styles.input}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Kambario nr., tipas, lytis..."
+              placeholder="Kambario nr., gyventojas, tipas..."
             />
           </label>
 
@@ -854,6 +1320,21 @@ export default function RoomsPage() {
               <option value="triple">Triviečiai</option>
               <option value="quad">Keturviečiai</option>
               <option value="other">Kiti</option>
+            </select>
+          </label>
+
+          <label style={styles.field}>
+            <span style={styles.label}>Būsena</span>
+            <select
+              style={styles.input}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            >
+              <option value="all">Visi</option>
+              <option value="free">Laisvi</option>
+              <option value="partial">Iš dalies užimti</option>
+              <option value="occupied">Užimti</option>
+              <option value="reserved">Rezervuoti</option>
             </select>
           </label>
 
@@ -887,6 +1368,73 @@ export default function RoomsPage() {
           </label>
         </div>
 
+        <div style={styles.legendRow}>
+          <span style={{ ...styles.legendDot, background: "#dcfce7", borderColor: "#86efac" }} /> Laisvas
+          <span style={{ ...styles.legendDot, background: "#fef9c3", borderColor: "#fde047" }} /> Rezervuotas
+          <span style={{ ...styles.legendDot, background: "#ffedd5", borderColor: "#fdba74" }} /> Iš dalies užimtas
+          <span style={{ ...styles.legendDot, background: "#fee2e2", borderColor: "#fca5a5" }} /> Užimtas
+        </div>
+
+        <div style={styles.floorGridWrap}>
+          {roomsByFloor.map(([floor, floorRooms]) => (
+            <div key={floor} style={styles.floorBlock}>
+              <h3 style={styles.floorTitle}>{floor}</h3>
+
+              <div style={styles.roomGrid}>
+                {floorRooms.map((room) => {
+                  const visual = getRoomVisual(room)
+                  const roomResidents = residentsByRoom.get(room.id) || []
+
+                  return (
+                    <div key={room.id} style={{ ...styles.roomCard, ...visual.style }}>
+                      <div style={styles.roomCardTop}>
+                        <strong>{room.name}</strong>
+                        <span style={visual.badge}>{visual.label}</span>
+                      </div>
+
+                      <div style={styles.roomCardMeta}>
+                        {room.occupied + room.reserved} / {room.capacity} vietos · {formatType(room.room_type)}
+                      </div>
+
+                      <div style={styles.roomResidents}>
+                        {roomResidents.length > 0 ? (
+                          roomResidents.map((resident) => (
+                            <div key={resident.id} style={styles.residentPill}>
+                              {residentName(resident)}
+                              <span>{statusLabel(resident.current_status || resident.status)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <span style={styles.metaText}>Gyventojų nėra</span>
+                        )}
+                      </div>
+
+                      <div style={styles.roomActions}>
+                        <button type="button" style={styles.greenSmallButton} onClick={() => openAssignModal(room, "active")}>
+                          Priskirti
+                        </button>
+                        <button type="button" style={styles.yellowSmallButton} onClick={() => openAssignModal(room, "arriving_soon")}>
+                          Rezervuoti
+                        </button>
+                        <button type="button" style={styles.secondaryButtonSmall} onClick={() => openEditModal(room)}>
+                          Redaguoti
+                        </button>
+                        {(roomResidents.length > 0 || room.occupied_by || room.reserved_for) ? (
+                          <button type="button" style={styles.dangerSmallButton} onClick={() => setReleaseRoomId(room.id)}>
+                            Atlaisvinti
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={styles.panel}>
         <div style={styles.tableWrap}>
           <table style={styles.table}>
             <thead>
@@ -895,6 +1443,7 @@ export default function RoomsPage() {
                 <th style={styles.th}>Tipas</th>
                 <th style={styles.th}>Vietos</th>
                 <th style={styles.th}>Užimtumas</th>
+                <th style={styles.th}>Gyventojai</th>
                 <th style={styles.th}>Aukštas</th>
                 <th style={styles.th}>Lytis</th>
                 <th style={styles.th}>Įranga</th>
@@ -904,7 +1453,9 @@ export default function RoomsPage() {
             </thead>
             <tbody>
               {filteredRooms.map((room) => {
-                const free = Math.max(room.capacity - room.occupied, 0)
+                const roomResidents = residentsByRoom.get(room.id) || []
+                const free = Math.max(room.capacity - room.occupied - room.reserved, 0)
+                const visual = getRoomVisual(room)
                 const tags = [
                   room.oxygen ? "Deguonis" : null,
                   room.nursing ? "Slauga" : null,
@@ -928,8 +1479,23 @@ export default function RoomsPage() {
                     <td style={styles.td}>{formatType(room.room_type)}</td>
                     <td style={styles.td}>{room.capacity}</td>
                     <td style={styles.td}>
-                      {room.occupied} / {room.capacity}
-                      <div style={styles.metaText}>Laisva: {free}</div>
+                      {room.occupied + room.reserved} / {room.capacity}
+                      <div style={styles.metaText}>
+                        Užimta: {room.occupied} · Rezervuota: {room.reserved} · Laisva: {free}
+                      </div>
+                    </td>
+                    <td style={styles.td}>
+                      {roomResidents.length > 0 ? (
+                        <div style={styles.tagWrap}>
+                          {roomResidents.map((resident) => (
+                            <span key={resident.id} style={styles.tag}>
+                              {residentName(resident)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={styles.metaText}>Nėra</span>
+                      )}
                     </td>
                     <td style={styles.td}>{room.floor ?? "—"}</td>
                     <td style={styles.td}>{formatGender(room.gender)}</td>
@@ -941,14 +1507,20 @@ export default function RoomsPage() {
                       </div>
                     </td>
                     <td style={styles.td}>
-                      <span style={room.is_active ? styles.statusActive : styles.statusInactive}>
-                        {room.is_active ? "Aktyvus" : "Neaktyvus"}
-                      </span>
+                      <span style={visual.badge}>{visual.label}</span>
                     </td>
                     <td style={styles.td}>
-                      <button type="button" style={styles.secondaryButtonSmall} onClick={() => openEditModal(room)}>
-                        Redaguoti
-                      </button>
+                      <div style={styles.rowActions}>
+                        <button type="button" style={styles.greenSmallButton} onClick={() => openAssignModal(room, "active")}>
+                          Priskirti
+                        </button>
+                        <button type="button" style={styles.yellowSmallButton} onClick={() => openAssignModal(room, "arriving_soon")}>
+                          Rezervuoti
+                        </button>
+                        <button type="button" style={styles.secondaryButtonSmall} onClick={() => openEditModal(room)}>
+                          Redaguoti
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -956,7 +1528,7 @@ export default function RoomsPage() {
 
               {filteredRooms.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={styles.emptyCell}>
+                  <td colSpan={10} style={styles.emptyCell}>
                     Kambarių pagal pasirinktus filtrus nerasta.
                   </td>
                 </tr>
@@ -965,6 +1537,137 @@ export default function RoomsPage() {
           </table>
         </div>
       </section>
+
+      {assignOpen ? (
+        <div style={styles.modalBackdrop} onClick={closeAssignModal}>
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div>
+                <h3 style={styles.modalTitle}>
+                  {assignForm.mode === "arriving_soon" ? "Rezervuoti kambarį" : "Priskirti gyventoją"}
+                </h3>
+                <p style={styles.panelText}>
+                  {selectedAssignRoom ? `Kambarys: ${selectedAssignRoom.name}` : "Pasirink kambario ir gyventojo duomenis."}
+                </p>
+              </div>
+              <button type="button" style={styles.closeButton} onClick={closeAssignModal}>
+                ×
+              </button>
+            </div>
+
+            <div style={styles.modalGrid}>
+              <label style={styles.field}>
+                <span style={styles.label}>Kambarys</span>
+                <select
+                  style={styles.input}
+                  value={assignForm.roomId}
+                  onChange={(e) => setAssignForm((prev) => ({ ...prev, roomId: e.target.value }))}
+                >
+                  <option value="">Pasirink kambarį</option>
+                  {rooms.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.name} · {room.occupied + room.reserved}/{room.capacity}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Gyventojas</span>
+                <select
+                  style={styles.input}
+                  value={assignForm.residentId}
+                  onChange={(e) => setAssignForm((prev) => ({ ...prev, residentId: e.target.value }))}
+                >
+                  <option value="">Pasirink gyventoją</option>
+                  {availableResidents.map((resident) => (
+                    <option key={resident.id} value={resident.id}>
+                      {residentName(resident)} · {statusLabel(resident.current_status || resident.status)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Veiksmas</span>
+                <select
+                  style={styles.input}
+                  value={assignForm.mode}
+                  onChange={(e) => setAssignForm((prev) => ({ ...prev, mode: e.target.value as AssignMode }))}
+                >
+                  <option value="active">Priskirti kaip gyvenantį</option>
+                  <option value="arriving_soon">Rezervuoti, netrukus atvyks</option>
+                  <option value="hospital">Priskirti, ligoninėje</option>
+                  <option value="temporary_leave">Priskirti, laikinai išvykęs</option>
+                </select>
+              </label>
+
+              {assignForm.mode === "arriving_soon" ? (
+                <label style={styles.field}>
+                  <span style={styles.label}>Rezervuota iki</span>
+                  <input
+                    style={styles.input}
+                    type="date"
+                    value={assignForm.reservedUntil}
+                    onChange={(e) => setAssignForm((prev) => ({ ...prev, reservedUntil: e.target.value }))}
+                  />
+                </label>
+              ) : null}
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button type="button" style={styles.secondaryButton} onClick={closeAssignModal}>
+                Atšaukti
+              </button>
+              <button type="button" style={styles.primaryButton} onClick={assignResidentToRoom} disabled={saving}>
+                {saving ? "Saugoma..." : assignForm.mode === "arriving_soon" ? "Rezervuoti" : "Priskirti"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {releaseRoomId && selectedReleaseRoom ? (
+        <div style={styles.modalBackdrop} onClick={() => setReleaseRoomId(null)}>
+          <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div>
+                <h3 style={styles.modalTitle}>Atlaisvinti kambarį</h3>
+                <p style={styles.panelText}>Kambarys: {selectedReleaseRoom.name}</p>
+              </div>
+              <button type="button" style={styles.closeButton} onClick={() => setReleaseRoomId(null)}>
+                ×
+              </button>
+            </div>
+
+            <div style={styles.warningBox}>
+              Gyventojams bus nuimtas kambario priskyrimas. Jų statusas nebus keičiamas.
+            </div>
+
+            <div style={styles.releaseList}>
+              {selectedReleaseResidents.length > 0 ? (
+                selectedReleaseResidents.map((resident) => (
+                  <div key={resident.id} style={styles.releaseItem}>
+                    <strong>{residentName(resident)}</strong>
+                    <span>{statusLabel(resident.current_status || resident.status)}</span>
+                  </div>
+                ))
+              ) : (
+                <div style={styles.metaText}>Gyventojų nėra, bus tik išvalyta kambario būsena.</div>
+              )}
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button type="button" style={styles.secondaryButton} onClick={() => setReleaseRoomId(null)}>
+                Atšaukti
+              </button>
+              <button type="button" style={styles.dangerButton} onClick={() => releaseRoom(releaseRoomId)} disabled={saving}>
+                {saving ? "Atlaisvinama..." : "Atlaisvinti"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {editForm && editingRoomId ? (
         <div style={styles.modalBackdrop} onClick={closeEditModal}>
@@ -1115,7 +1818,7 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     margin: 0,
     fontSize: 28,
-    fontWeight: 700,
+    fontWeight: 800,
     color: "#0f172a",
   },
   subtitle: {
@@ -1144,7 +1847,7 @@ const styles: Record<string, React.CSSProperties> = {
   panelTitle: {
     margin: 0,
     fontSize: 18,
-    fontWeight: 700,
+    fontWeight: 800,
     color: "#0f172a",
   },
   panelText: {
@@ -1177,7 +1880,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   label: {
     fontSize: 13,
-    fontWeight: 600,
+    fontWeight: 700,
     color: "#334155",
   },
   input: {
@@ -1188,6 +1891,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     color: "#0f172a",
     background: "#fff",
+    boxSizing: "border-box",
   },
   textarea: {
     width: "100%",
@@ -1198,15 +1902,25 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#0f172a",
     background: "#fff",
     resize: "vertical",
+    boxSizing: "border-box",
   },
   previewBox: {
     marginTop: 8,
-    background: "#eff6ff",
-    border: "1px solid #bfdbfe",
-    color: "#1d4ed8",
+    background: "#ecfdf5",
+    border: "1px solid #a7f3d0",
+    color: "#047857",
     padding: 12,
     borderRadius: 12,
     fontSize: 14,
+  },
+  warningBox: {
+    background: "#fff7ed",
+    border: "1px solid #fed7aa",
+    color: "#c2410c",
+    padding: 12,
+    borderRadius: 12,
+    fontSize: 14,
+    fontWeight: 700,
   },
   actionsRow: {
     display: "flex",
@@ -1217,9 +1931,9 @@ const styles: Record<string, React.CSSProperties> = {
     border: "none",
     borderRadius: 12,
     padding: "10px 14px",
-    background: "#2563eb",
+    background: "#047857",
     color: "#ffffff",
-    fontWeight: 700,
+    fontWeight: 800,
     cursor: "pointer",
   },
   secondaryButton: {
@@ -1228,7 +1942,16 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "10px 14px",
     background: "#ffffff",
     color: "#0f172a",
-    fontWeight: 600,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  dangerButton: {
+    border: "none",
+    borderRadius: 12,
+    padding: "10px 14px",
+    background: "#dc2626",
+    color: "#ffffff",
+    fontWeight: 800,
     cursor: "pointer",
   },
   secondaryButtonSmall: {
@@ -1237,7 +1960,37 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "8px 10px",
     background: "#ffffff",
     color: "#0f172a",
-    fontWeight: 600,
+    fontWeight: 700,
+    cursor: "pointer",
+    fontSize: 13,
+  },
+  greenSmallButton: {
+    border: "none",
+    borderRadius: 10,
+    padding: "8px 10px",
+    background: "#047857",
+    color: "#ffffff",
+    fontWeight: 800,
+    cursor: "pointer",
+    fontSize: 13,
+  },
+  yellowSmallButton: {
+    border: "1px solid #fde047",
+    borderRadius: 10,
+    padding: "8px 10px",
+    background: "#fef9c3",
+    color: "#854d0e",
+    fontWeight: 800,
+    cursor: "pointer",
+    fontSize: 13,
+  },
+  dangerSmallButton: {
+    border: "none",
+    borderRadius: 10,
+    padding: "8px 10px",
+    background: "#fee2e2",
+    color: "#b91c1c",
+    fontWeight: 800,
     cursor: "pointer",
     fontSize: 13,
   },
@@ -1252,16 +2005,118 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 16,
     padding: 16,
     boxShadow: "0 8px 24px rgba(15, 23, 42, 0.04)",
+    textAlign: "left",
+    cursor: "pointer",
   },
   statLabel: {
     color: "#64748b",
     fontSize: 13,
     marginBottom: 8,
+    fontWeight: 700,
   },
   statValue: {
     fontSize: 28,
-    fontWeight: 700,
+    fontWeight: 850,
     color: "#0f172a",
+  },
+  legendRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: 700,
+    marginBottom: 14,
+  },
+  legendDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 999,
+    border: "1px solid",
+    display: "inline-block",
+  },
+  floorGridWrap: {
+    display: "grid",
+    gap: 18,
+  },
+  floorBlock: {
+    display: "grid",
+    gap: 10,
+  },
+  floorTitle: {
+    margin: 0,
+    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: 850,
+  },
+  roomGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+    gap: 12,
+  },
+  roomCard: {
+    borderRadius: 16,
+    padding: 14,
+    display: "grid",
+    gap: 10,
+    border: "1px solid #e2e8f0",
+  },
+  roomFree: {
+    background: "#dcfce7",
+    border: "1px solid #86efac",
+  },
+  roomReserved: {
+    background: "#fef9c3",
+    border: "1px solid #fde047",
+  },
+  roomOccupied: {
+    background: "#fee2e2",
+    border: "1px solid #fca5a5",
+  },
+  roomPartial: {
+    background: "#ffedd5",
+    border: "1px solid #fdba74",
+  },
+  roomInactive: {
+    background: "#f1f5f9",
+    border: "1px solid #cbd5e1",
+  },
+  roomCardTop: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  roomCardMeta: {
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: 700,
+  },
+  roomResidents: {
+    display: "grid",
+    gap: 6,
+  },
+  residentPill: {
+    background: "rgba(255,255,255,0.72)",
+    border: "1px solid rgba(15,23,42,0.08)",
+    borderRadius: 12,
+    padding: "7px 9px",
+    display: "grid",
+    gap: 2,
+    color: "#0f172a",
+    fontSize: 12,
+    fontWeight: 800,
+  },
+  roomActions: {
+    display: "flex",
+    gap: 7,
+    flexWrap: "wrap",
+  },
+  rowActions: {
+    display: "flex",
+    gap: 7,
+    flexWrap: "wrap",
   },
   tableWrap: {
     width: "100%",
@@ -1269,7 +2124,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   table: {
     width: "100%",
-    minWidth: 980,
+    minWidth: 1100,
     borderCollapse: "collapse",
   },
   th: {
@@ -1278,7 +2133,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: "1px solid #e2e8f0",
     color: "#475569",
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: 800,
     background: "#f8fafc",
     position: "sticky",
     top: 0,
@@ -1296,7 +2151,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     color: "#0f172a",
     verticalAlign: "top",
-    fontWeight: 700,
+    fontWeight: 800,
   },
   metaText: {
     marginTop: 4,
@@ -1304,8 +2159,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
   },
   link: {
-    color: "#2563eb",
+    color: "#047857",
     textDecoration: "none",
+    fontWeight: 800,
   },
   tagWrap: {
     display: "flex",
@@ -1317,11 +2173,12 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "4px 8px",
     borderRadius: 999,
     fontSize: 12,
-    background: "#eef2ff",
-    color: "#3730a3",
-    border: "1px solid #c7d2fe",
+    background: "#ecfdf5",
+    color: "#047857",
+    border: "1px solid #a7f3d0",
+    fontWeight: 750,
   },
-  statusActive: {
+  statusFree: {
     display: "inline-flex",
     padding: "4px 8px",
     borderRadius: 999,
@@ -1329,8 +2186,19 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#dcfce7",
     color: "#166534",
     border: "1px solid #bbf7d0",
+    fontWeight: 800,
   },
-  statusInactive: {
+  statusReserved: {
+    display: "inline-flex",
+    padding: "4px 8px",
+    borderRadius: 999,
+    fontSize: 12,
+    background: "#fef9c3",
+    color: "#854d0e",
+    border: "1px solid #fde047",
+    fontWeight: 800,
+  },
+  statusOccupied: {
     display: "inline-flex",
     padding: "4px 8px",
     borderRadius: 999,
@@ -1338,6 +2206,27 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fee2e2",
     color: "#b91c1c",
     border: "1px solid #fecaca",
+    fontWeight: 800,
+  },
+  statusPartial: {
+    display: "inline-flex",
+    padding: "4px 8px",
+    borderRadius: 999,
+    fontSize: 12,
+    background: "#ffedd5",
+    color: "#c2410c",
+    border: "1px solid #fdba74",
+    fontWeight: 800,
+  },
+  statusInactive: {
+    display: "inline-flex",
+    padding: "4px 8px",
+    borderRadius: 999,
+    fontSize: 12,
+    background: "#e2e8f0",
+    color: "#475569",
+    border: "1px solid #cbd5e1",
+    fontWeight: 800,
   },
   emptyCell: {
     padding: 22,
@@ -1352,6 +2241,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     padding: 12,
     fontSize: 14,
+    fontWeight: 750,
   },
   successBox: {
     background: "#f0fdf4",
@@ -1360,6 +2250,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     padding: 12,
     fontSize: 14,
+    fontWeight: 750,
   },
   modalBackdrop: {
     position: "fixed",
@@ -1381,6 +2272,16 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 20,
     boxShadow: "0 20px 60px rgba(15, 23, 42, 0.25)",
   },
+  modalCardSmall: {
+    width: "100%",
+    maxWidth: 540,
+    maxHeight: "90vh",
+    overflowY: "auto",
+    background: "#ffffff",
+    borderRadius: 20,
+    padding: 20,
+    boxShadow: "0 20px 60px rgba(15, 23, 42, 0.25)",
+  },
   modalHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -1391,7 +2292,7 @@ const styles: Record<string, React.CSSProperties> = {
   modalTitle: {
     margin: 0,
     fontSize: 22,
-    fontWeight: 700,
+    fontWeight: 800,
     color: "#0f172a",
   },
   closeButton: {
@@ -1427,6 +2328,19 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     fontSize: 14,
     color: "#0f172a",
+  },
+  releaseList: {
+    display: "grid",
+    gap: 8,
+    marginTop: 12,
+  },
+  releaseItem: {
+    border: "1px solid #e2e8f0",
+    background: "#f8fafc",
+    borderRadius: 12,
+    padding: 10,
+    display: "grid",
+    gap: 4,
   },
   modalFooter: {
     position: "sticky",

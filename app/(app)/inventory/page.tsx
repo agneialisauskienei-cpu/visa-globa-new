@@ -1,15 +1,38 @@
 'use client'
 
 import Link from 'next/link'
-import type { CSSProperties, FormEvent, ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import {
+  ArrowDownCircle,
+  ArrowRight,
+  ArrowUpCircle,
+  BedDouble,
+  Boxes,
+  ClipboardList,
+  PackageOpen,
+  Pill,
+  Plus,
+  Search,
+  ShieldCheck,
+  Shirt,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getCurrentOrganizationId } from '@/lib/current-organization'
 
-type InventoryCategory = 'diapers' | 'bedding' | 'cleaning' | 'medication' | 'other'
+type InventoryCategory =
+  | 'diapers'
+  | 'bedding'
+  | 'cleaning'
+  | 'medication'
+  | 'uniforms'
+  | 'other'
+
 type StockFilter = '' | 'ok' | 'low' | 'empty'
-type ActivityFilter = '' | 'in' | 'out'
-type SummaryFilter = 'all' | 'low' | 'empty' | 'logs' | 'out' | 'in'
+type LogTypeFilter = '' | 'in' | 'out' | 'adjustment'
 
 type InventoryItem = {
   id: string
@@ -45,168 +68,1417 @@ type InventoryLog = {
   created_at: string | null
 }
 
-type ResidentOption = {
+type PersonOption = {
   id: string
   label: string
 }
 
-type AddRow = {
+type CategoryMeta = {
+  code: InventoryCategory
+  title: string
+  description: string
+  href: string
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>
+}
+
+type Option = {
+  value: string
+  label: string
+}
+
+type AddForm = {
   name: string
   category: InventoryCategory
   subcategory: string
   size: string
   unit: string
   quantity: string
-  min_quantity: string
+  minQuantity: string
 }
 
-type IssueRow = {
-  item_id: string
+type IssueLine = {
+  itemId: string
+  targetId: string
   quantity: string
   notes: string
 }
 
-const CATEGORY_OPTIONS: { value: InventoryCategory; label: string }[] = [
-  { value: 'diapers', label: 'Sauskelnės' },
-  { value: 'bedding', label: 'Patalynė' },
-  { value: 'cleaning', label: 'Valymo priemonės' },
-  { value: 'medication', label: 'Vaistai' },
-  { value: 'other', label: 'Kita' },
+type RefillLine = {
+  itemId: string
+  quantity: string
+  notes: string
+}
+
+const CATEGORIES: CategoryMeta[] = [
+  {
+    code: 'diapers',
+    title: 'Sauskelnės',
+    description: 'Dydžiai, likučiai ir nurašymai gyventojams.',
+    href: '/inventory/diapers',
+    icon: PackageOpen,
+  },
+  {
+    code: 'bedding',
+    title: 'Patalynė',
+    description: 'Komplektai, paklodės, užvalkalai ir judėjimas.',
+    href: '/inventory/bedding',
+    icon: BedDouble,
+  },
+  {
+    code: 'cleaning',
+    title: 'Valymo priemonės',
+    description: 'Valymo priemonių atsargos ir sunaudojimas.',
+    href: '/inventory/cleaning',
+    icon: Sparkles,
+  },
+  {
+    code: 'medication',
+    title: 'Vaistai',
+    description: 'Vaistų likučiai, papildymai ir nurašymai.',
+    href: '/inventory/medication',
+    icon: Pill,
+  },
+  {
+    code: 'uniforms',
+    title: 'Darbuotojų uniformos',
+    description: 'Darbuotojų apranga, dydžiai ir išdavimai.',
+    href: '/inventory/uniforms',
+    icon: Shirt,
+  },
+  {
+    code: 'other',
+    title: 'Kita',
+    description: 'Kitos sandėlio prekės ir priemonės.',
+    href: '/inventory/other',
+    icon: Boxes,
+  },
 ]
 
-const SUBCATEGORY_OPTIONS: Record<InventoryCategory, { value: string; label: string }[]> = {
+const SUBCATEGORY_OPTIONS: Record<InventoryCategory, Option[]> = {
   diapers: [
     { value: 'pants', label: 'Kelnaitės' },
-    { value: 'tape', label: 'Juostinės' },
-    { value: 'night', label: 'Naktinės' },
+    { value: 'tape', label: 'Juostinės sauskelnės' },
+    { value: 'night', label: 'Naktinės sauskelnės' },
     { value: 'insert', label: 'Įklotai' },
+    { value: 'underpad', label: 'Paklotai' },
   ],
   bedding: [
-    { value: 'set', label: 'Komplektas' },
+    { value: 'set', label: 'Patalynės komplektas' },
     { value: 'sheet', label: 'Paklodė' },
-    { value: 'cover', label: 'Užvalkalas' },
+    { value: 'duvet_cover', label: 'Antklodės užvalkalas' },
     { value: 'pillowcase', label: 'Pagalvės užvalkalas' },
     { value: 'blanket', label: 'Antklodė' },
+    { value: 'pillow', label: 'Pagalvė' },
+    { value: 'towel', label: 'Rankšluostis' },
   ],
   cleaning: [
-    { value: 'spray', label: 'Purškalas' },
+    { value: 'spray', label: 'Purškiklis' },
     { value: 'liquid', label: 'Skystis' },
     { value: 'powder', label: 'Milteliai' },
     { value: 'gel', label: 'Gelis' },
     { value: 'wipes', label: 'Servetėlės' },
+    { value: 'disinfectant', label: 'Dezinfekantas' },
+    { value: 'bags', label: 'Maišeliai' },
+    { value: 'gloves', label: 'Pirštinės' },
   ],
   medication: [
     { value: 'tablet', label: 'Tabletės' },
-    { value: 'liquid', label: 'Skystis' },
     { value: 'capsule', label: 'Kapsulės' },
+    { value: 'liquid', label: 'Skystis' },
     { value: 'drops', label: 'Lašai' },
     { value: 'ointment', label: 'Tepalas' },
     { value: 'injection', label: 'Injekcija' },
+    { value: 'bandage', label: 'Tvarstis' },
   ],
-  other: [],
+  uniforms: [
+    { value: 'shirt', label: 'Marškinėliai' },
+    { value: 'pants', label: 'Kelnės' },
+    { value: 'jacket', label: 'Švarkas / džemperis' },
+    { value: 'robe', label: 'Chalatas' },
+    { value: 'shoes', label: 'Avalynė' },
+    { value: 'apron', label: 'Prijuostė' },
+  ],
+  other: [
+    { value: 'general', label: 'Bendra prekė' },
+    { value: 'equipment', label: 'Įranga' },
+    { value: 'office', label: 'Kanceliarinės prekės' },
+    { value: 'hygiene', label: 'Higienos priemonės' },
+  ],
 }
 
-const UNIT_OPTIONS = ['vnt.', 'pak.', 'but.', 'kg', 'l']
-
-const COLORS = {
-  bg: '#ffffff',
-  page: '#ffffff',
-  surface: '#ffffff',
-  surfaceAlt: '#f8faf8',
-  border: '#e5e7eb',
-  borderSoft: '#eef2ef',
-  borderStrong: '#b7d9c1',
-  text: '#111827',
-  textSoft: '#4b5563',
-  green: '#15803d',
-  greenDark: '#166534',
-  greenSoft: '#e8f5ec',
-  greenSofter: '#f6fbf7',
-  amber: '#b45309',
-  amberSoft: '#fff7ed',
-  red: '#b91c1c',
-  redSoft: '#fef2f2',
-  shadow: '0 10px 28px rgba(17, 24, 39, 0.06)',
-  shadowStrong: '0 18px 40px rgba(17, 24, 39, 0.10)',
+const SIZE_OPTIONS: Partial<Record<InventoryCategory, string[]>> = {
+  diapers: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+  bedding: ['60x120', '80x160', '90x200', '140x200', '160x200', '200x220'],
+  uniforms: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '36', '38', '40', '42', '44', '46'],
 }
 
-function createEmptyAddRow(): AddRow {
-  return {
-    name: '',
-    category: 'diapers',
-    subcategory: SUBCATEGORY_OPTIONS.diapers[0]?.value || '',
-    size: 'M',
-    unit: 'vnt.',
-    quantity: '',
-    min_quantity: '',
+const DEFAULT_ADD_FORM: AddForm = {
+  name: '',
+  category: 'diapers',
+  subcategory: 'pants',
+  size: 'M',
+  unit: 'vnt.',
+  quantity: '0',
+  minQuantity: '0',
+}
+
+const DEFAULT_ISSUE_LINE: IssueLine = {
+  itemId: '',
+  targetId: '',
+  quantity: '1',
+  notes: '',
+}
+
+const DEFAULT_REFILL_LINE: RefillLine = {
+  itemId: '',
+  quantity: '1',
+  notes: '',
+}
+
+function getReadableError(error: unknown) {
+  if (!error) return 'Nepavyko įvykdyti veiksmo.'
+  if (error instanceof Error) return error.message
+
+  if (typeof error === 'object') {
+    const e = error as { message?: string; details?: string; hint?: string; code?: string }
+    if (e.message) return e.message
+    if (e.details) return e.details
+    if (e.hint) return e.hint
+    if (e.code) return `Klaidos kodas: ${e.code}`
   }
+
+  return 'Nepavyko įvykdyti veiksmo.'
 }
 
-function createEmptyIssueRow(itemId = ''): IssueRow {
-  return {
-    item_id: itemId,
-    quantity: '1',
-    notes: '',
-  }
+function shouldShowSize(category: InventoryCategory) {
+  return category === 'diapers' || category === 'bedding' || category === 'uniforms'
 }
 
-function shouldUseSize(category?: string | null) {
-  return category !== 'medication'
+function getSizeLabel(category: InventoryCategory) {
+  if (category === 'bedding') return 'Matmuo'
+  return 'Dydis'
 }
 
-function getCategoryLabel(category?: string | null) {
-  return CATEGORY_OPTIONS.find((option) => option.value === category)?.label || 'Kita'
+function getSizePlaceholder(category: InventoryCategory) {
+  if (category === 'bedding') return 'Pvz. 90x200'
+  if (category === 'uniforms') return 'Pvz. M arba 42'
+  return 'Pvz. M'
 }
 
-function getSubcategoryLabel(category?: string | null, subcategory?: string | null) {
-  if (!category || !subcategory) return ''
-  return (
-    SUBCATEGORY_OPTIONS[category as InventoryCategory]?.find((option) => option.value === subcategory)
-      ?.label || subcategory
-  )
+function getDefaultSubcategory(category: InventoryCategory) {
+  return SUBCATEGORY_OPTIONS[category]?.[0]?.value || ''
 }
 
-function getStockStatus(quantity?: number | null, minQuantity?: number | null): StockFilter | 'none' {
-  const qty = Number(quantity || 0)
-  const min = Number(minQuantity || 0)
-  if (qty <= 0) return 'empty'
-  if (min > 0 && qty <= min) return 'low'
+function getDefaultSize(category: InventoryCategory) {
+  return SIZE_OPTIONS[category]?.[0] || ''
+}
+
+function getStockStatus(quantity: number | null, minQuantity: number | null): StockFilter {
+  const q = Number(quantity || 0)
+  if (q <= 0) return 'empty'
+  if (minQuantity !== null && minQuantity !== undefined && q <= Number(minQuantity)) return 'low'
   return 'ok'
 }
 
-function getLogTypeLabel(type?: string | null) {
-  if (type === 'out') return 'Nurašymas'
-  if (type === 'in') return 'Papildymas'
-  return type || 'Judėjimas'
+function getStockLabel(status: string) {
+  if (status === 'empty') return 'Pasibaigė'
+  if (status === 'low') return 'Baigiasi'
+  return 'Tvarkoje'
+}
+
+function getCategoryTitle(category: string | null) {
+  return CATEGORIES.find((item) => item.code === category)?.title || 'Kita'
+}
+
+function getSubcategoryLabel(category: string | null, subcategory: string | null) {
+  if (!subcategory) return '—'
+  const options = SUBCATEGORY_OPTIONS[(category || 'other') as InventoryCategory] || []
+  return options.find((option) => option.value === subcategory)?.label || subcategory
+}
+
+function formatDate(value: string | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('lt-LT')
+}
+
+function formatQuantity(quantity: number | null, unit: string | null) {
+  return `${Number(quantity || 0)} ${unit || 'vnt.'}`
+}
+
+function isUniformItem(item: InventoryItem | null | undefined) {
+  return item?.category === 'uniforms'
+}
+
+export default function InventoryPage() {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const [organizationId, setOrganizationId] = useState<string | null>(null)
+
+  const [items, setItems] = useState<InventoryItem[]>([])
+  const [logs, setLogs] = useState<InventoryLog[]>([])
+  const [residents, setResidents] = useState<PersonOption[]>([])
+  const [employees, setEmployees] = useState<PersonOption[]>([])
+
+  const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [stockFilter, setStockFilter] = useState<StockFilter>('')
+  const [logTypeFilter, setLogTypeFilter] = useState<LogTypeFilter>('')
+  const [residentHistoryFilter, setResidentHistoryFilter] = useState('')
+
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showIssueModal, setShowIssueModal] = useState(false)
+  const [showRefillModal, setShowRefillModal] = useState(false)
+
+  const [addForms, setAddForms] = useState<AddForm[]>([DEFAULT_ADD_FORM])
+  const [issueLines, setIssueLines] = useState<IssueLine[]>([DEFAULT_ISSUE_LINE])
+  const [refillLines, setRefillLines] = useState<RefillLine[]>([DEFAULT_REFILL_LINE])
+
+  useEffect(() => {
+    void loadInventory()
+  }, [])
+
+  async function loadInventory() {
+    try {
+      setLoading(true)
+      setMessage('')
+
+      const orgId = await getCurrentOrganizationId()
+
+      if (!orgId) {
+        setOrganizationId(null)
+        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
+        setItems([])
+        setLogs([])
+        setResidents([])
+        setEmployees([])
+        return
+      }
+
+      setOrganizationId(orgId)
+
+      const [itemsResult, logsResult, residentsResult, membersResult] = await Promise.all([
+        supabase
+          .from('inventory_items')
+          .select(
+            'id, organization_id, name, unit, quantity, category, subcategory, size, min_quantity, is_active, created_at, updated_at'
+          )
+          .eq('organization_id', orgId)
+          .order('created_at', { ascending: false }),
+
+        supabase
+          .from('inventory_issue_history_view')
+          .select(
+            'id, organization_id, item_id, item_name, category, subcategory, size, unit, resident_id, resident_code, employee_user_id, employee_full_name, quantity, type, notes, created_at'
+          )
+          .eq('organization_id', orgId)
+          .order('created_at', { ascending: false })
+          .limit(200),
+
+        supabase
+          .from('residents')
+          .select('id, first_name, last_name, full_name')
+          .eq('organization_id', orgId)
+          .order('created_at', { ascending: false }),
+
+        supabase
+          .from('organization_members')
+          .select('user_id')
+          .eq('organization_id', orgId)
+          .eq('is_active', true),
+      ])
+
+      if (itemsResult.error) throw itemsResult.error
+      if (logsResult.error) throw logsResult.error
+      if (residentsResult.error) throw residentsResult.error
+      if (membersResult.error) throw membersResult.error
+
+      setItems((itemsResult.data || []) as InventoryItem[])
+      setLogs((logsResult.data || []) as InventoryLog[])
+
+      setResidents(
+        ((residentsResult.data || []) as Record<string, unknown>[]).map((resident) => {
+          const firstName = String(resident.first_name || '').trim()
+          const lastName = String(resident.last_name || '').trim()
+          const fullName = String(resident.full_name || '').trim()
+
+          return {
+            id: String(resident.id),
+            label: fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || String(resident.id),
+          }
+        })
+      )
+
+      const memberUserIds = ((membersResult.data || []) as Record<string, unknown>[])
+        .map((member) => String(member.user_id || '').trim())
+        .filter(Boolean)
+
+      if (memberUserIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, email, first_name, last_name, full_name')
+          .in('id', memberUserIds)
+
+        if (profilesError) throw profilesError
+
+        setEmployees(
+          ((profilesData || []) as Record<string, unknown>[]).map((profile) => {
+            const firstName = String(profile.first_name || '').trim()
+            const lastName = String(profile.last_name || '').trim()
+            const fullName = String(profile.full_name || '').trim()
+            const email = String(profile.email || '').trim()
+
+            return {
+              id: String(profile.id),
+              label: fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || email || String(profile.id),
+            }
+          })
+        )
+      } else {
+        setEmployees([])
+      }
+    } catch (error) {
+      setMessage(getReadableError(error))
+      setItems([])
+      setLogs([])
+      setResidents([])
+      setEmployees([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function openAddModal(category?: InventoryCategory) {
+    const selectedCategory = category || 'diapers'
+    setAddForms([
+      {
+        ...DEFAULT_ADD_FORM,
+        category: selectedCategory,
+        subcategory: getDefaultSubcategory(selectedCategory),
+        size: getDefaultSize(selectedCategory),
+      },
+    ])
+    setShowAddModal(true)
+    setMessage('')
+  }
+
+  function openIssueModal(itemId?: string) {
+    setIssueLines([{ ...DEFAULT_ISSUE_LINE, itemId: itemId || '' }])
+    setShowIssueModal(true)
+    setMessage('')
+  }
+
+  function openRefillModal(itemId?: string) {
+    setRefillLines([{ ...DEFAULT_REFILL_LINE, itemId: itemId || '' }])
+    setShowRefillModal(true)
+    setMessage('')
+  }
+
+  function updateAddForm(index: number, patch: Partial<AddForm>) {
+    setAddForms((prev) =>
+      prev.map((form, currentIndex) => {
+        if (currentIndex !== index) return form
+
+        if (patch.category) {
+          return {
+            ...form,
+            ...patch,
+            subcategory: getDefaultSubcategory(patch.category),
+            size: getDefaultSize(patch.category),
+          }
+        }
+
+        return { ...form, ...patch }
+      })
+    )
+  }
+
+  function updateIssueLine(index: number, patch: Partial<IssueLine>) {
+    setIssueLines((prev) =>
+      prev.map((line, currentIndex) => (currentIndex === index ? { ...line, ...patch } : line))
+    )
+  }
+
+  function updateRefillLine(index: number, patch: Partial<RefillLine>) {
+    setRefillLines((prev) =>
+      prev.map((line, currentIndex) => (currentIndex === index ? { ...line, ...patch } : line))
+    )
+  }
+
+  async function getActorName() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user?.id) return { userId: null, name: null }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, full_name, email')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const profileRecord = (profile || {}) as Record<string, unknown>
+    const fullName = String(profileRecord.full_name || '').trim()
+    const firstName = String(profileRecord.first_name || '').trim()
+    const lastName = String(profileRecord.last_name || '').trim()
+    const email = String(profileRecord.email || user.email || '').trim()
+
+    return {
+      userId: user.id,
+      name: fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || email || null,
+    }
+  }
+
+  async function createItems() {
+    try {
+      if (!organizationId) {
+        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
+        return
+      }
+
+      const rows = addForms.map((form) => {
+        const cleanName = form.name.trim()
+        const cleanUnit = form.unit.trim() || 'vnt.'
+        const cleanSubcategory = form.subcategory.trim()
+        const cleanSize = shouldShowSize(form.category) ? form.size.trim() : ''
+        const quantity = Number(form.quantity || 0)
+        const minQuantity = Number(form.minQuantity || 0)
+
+        if (!cleanName) throw new Error('Visų prekių pavadinimai yra privalomi.')
+        if (Number.isNaN(quantity) || quantity < 0) throw new Error('Kiekis turi būti teigiamas skaičius.')
+        if (Number.isNaN(minQuantity) || minQuantity < 0) {
+          throw new Error('Minimalus kiekis turi būti teigiamas skaičius.')
+        }
+
+        return {
+          organization_id: organizationId,
+          name: cleanName,
+          category: form.category,
+          subcategory: cleanSubcategory || null,
+          size: cleanSize || null,
+          unit: cleanUnit,
+          quantity,
+          min_quantity: minQuantity,
+          is_active: true,
+        }
+      })
+
+      setSaving(true)
+      setMessage('')
+
+      const { error } = await supabase.from('inventory_items').insert(rows)
+      if (error) throw error
+
+      setShowAddModal(false)
+      setAddForms([DEFAULT_ADD_FORM])
+      setMessage(rows.length === 1 ? 'Prekė sėkmingai pridėta.' : 'Prekės sėkmingai pridėtos.')
+      await loadInventory()
+    } catch (error) {
+      setMessage(getReadableError(error))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function issueItems() {
+    try {
+      if (!organizationId) {
+        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
+        return
+      }
+
+      const actor = await getActorName()
+      const updates: Array<{ item: InventoryItem; newQuantity: number }> = []
+      const historyRows: Array<Record<string, unknown>> = []
+
+      for (const line of issueLines) {
+        const item = items.find((currentItem) => currentItem.id === line.itemId)
+        const quantity = Number(line.quantity || 0)
+
+        if (!item) throw new Error('Kiekvienoje eilutėje pasirink prekę.')
+        if (Number.isNaN(quantity) || quantity <= 0) throw new Error('Nurašomas kiekis turi būti didesnis už 0.')
+
+        const currentQuantity = Number(item.quantity || 0)
+        if (quantity > currentQuantity) {
+          throw new Error(`Prekei "${item.name}" sandėlyje yra tik ${formatQuantity(currentQuantity, item.unit)}.`)
+        }
+
+        const targetOptions = isUniformItem(item) ? employees : residents
+        const target = targetOptions.find((option) => option.id === line.targetId)
+
+        if (!target) {
+          throw new Error(isUniformItem(item) ? 'Uniformoms pasirink darbuotoją.' : 'Pasirink gyventoją.')
+        }
+
+        updates.push({
+          item,
+          newQuantity: currentQuantity - quantity,
+        })
+
+        historyRows.push({
+          organization_id: organizationId,
+          item_id: item.id,
+          item_name: item.name,
+          category: item.category,
+          subcategory: item.subcategory,
+          size: item.size,
+          unit: item.unit,
+          resident_id: isUniformItem(item) ? null : target.id,
+          resident_code: isUniformItem(item) ? `Darbuotojas: ${target.label}` : target.label,
+          employee_user_id: actor.userId,
+          employee_full_name: actor.name,
+          quantity,
+          type: 'out',
+          notes: line.notes.trim() || null,
+        })
+      }
+
+      setSaving(true)
+      setMessage('')
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({
+            quantity: update.newQuantity,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', update.item.id)
+
+        if (error) throw error
+      }
+
+      const { error: historyError } = await supabase.from('inventory_issue_history').insert(historyRows)
+      if (historyError) throw historyError
+
+      setShowIssueModal(false)
+      setIssueLines([DEFAULT_ISSUE_LINE])
+      setMessage('Prekės sėkmingai nurašytos.')
+      await loadInventory()
+    } catch (error) {
+      setMessage(getReadableError(error))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function refillItems() {
+    try {
+      if (!organizationId) {
+        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
+        return
+      }
+
+      const actor = await getActorName()
+      const updates: Array<{ item: InventoryItem; newQuantity: number }> = []
+      const historyRows: Array<Record<string, unknown>> = []
+
+      for (const line of refillLines) {
+        const item = items.find((currentItem) => currentItem.id === line.itemId)
+        const quantity = Number(line.quantity || 0)
+
+        if (!item) throw new Error('Kiekvienoje eilutėje pasirink prekę.')
+        if (Number.isNaN(quantity) || quantity <= 0) throw new Error('Papildomas kiekis turi būti didesnis už 0.')
+
+        const currentQuantity = Number(item.quantity || 0)
+
+        updates.push({
+          item,
+          newQuantity: currentQuantity + quantity,
+        })
+
+        historyRows.push({
+          organization_id: organizationId,
+          item_id: item.id,
+          item_name: item.name,
+          category: item.category,
+          subcategory: item.subcategory,
+          size: item.size,
+          unit: item.unit,
+          resident_id: null,
+          resident_code: null,
+          employee_user_id: actor.userId,
+          employee_full_name: actor.name,
+          quantity,
+          type: 'in',
+          notes: line.notes.trim() || null,
+        })
+      }
+
+      setSaving(true)
+      setMessage('')
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({
+            quantity: update.newQuantity,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', update.item.id)
+
+        if (error) throw error
+      }
+
+      const { error: historyError } = await supabase.from('inventory_issue_history').insert(historyRows)
+      if (historyError) throw historyError
+
+      setShowRefillModal(false)
+      setRefillLines([DEFAULT_REFILL_LINE])
+      setMessage('Sandėlis sėkmingai papildytas.')
+      await loadInventory()
+    } catch (error) {
+      setMessage(getReadableError(error))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const filteredCategories = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return CATEGORIES
+
+    return CATEGORIES.filter((category) =>
+      [category.title, category.description, category.code].join(' ').toLowerCase().includes(q)
+    )
+  }, [search])
+
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase()
+
+    return items.filter((item) => {
+      const matchesSearch = q
+        ? [
+            item.name || '',
+            getCategoryTitle(item.category),
+            getSubcategoryLabel(item.category, item.subcategory),
+            item.size || '',
+            item.unit || '',
+          ]
+            .join(' ')
+            .toLowerCase()
+            .includes(q)
+        : true
+
+      const matchesCategory = categoryFilter ? item.category === categoryFilter : true
+      const matchesStock = stockFilter ? getStockStatus(item.quantity, item.min_quantity) === stockFilter : true
+
+      return matchesSearch && matchesCategory && matchesStock
+    })
+  }, [items, search, categoryFilter, stockFilter])
+
+  const filteredLogs = useMemo(() => {
+    const q = search.trim().toLowerCase()
+
+    return logs.filter((log) => {
+      const matchesSearch = q
+        ? [
+            log.item_name || '',
+            getCategoryTitle(log.category),
+            getSubcategoryLabel(log.category, log.subcategory),
+            log.size || '',
+            log.resident_code || '',
+            log.employee_full_name || '',
+            log.notes || '',
+          ]
+            .join(' ')
+            .toLowerCase()
+            .includes(q)
+        : true
+
+      const matchesCategory = categoryFilter ? log.category === categoryFilter : true
+      const matchesType = logTypeFilter ? log.type === logTypeFilter : true
+      const matchesResident = residentHistoryFilter ? log.resident_id === residentHistoryFilter : true
+
+      return matchesSearch && matchesCategory && matchesType && matchesResident
+    })
+  }, [logs, search, categoryFilter, logTypeFilter, residentHistoryFilter])
+
+  const categoryStats = useMemo(() => {
+    return CATEGORIES.reduce(
+      (acc, category) => {
+        const categoryItems = items.filter((item) => item.category === category.code)
+        const totalQuantity = categoryItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+        const low = categoryItems.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'low').length
+        const empty = categoryItems.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'empty').length
+
+        acc[category.code] = {
+          items: categoryItems.length,
+          quantity: totalQuantity,
+          low,
+          empty,
+        }
+
+        return acc
+      },
+      {} as Record<InventoryCategory, { items: number; quantity: number; low: number; empty: number }>
+    )
+  }, [items])
+
+  const globalStats = useMemo(() => {
+    const totalItems = items.length
+    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+    const low = items.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'low').length
+    const empty = items.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'empty').length
+    const movements = logs.length
+    const out = logs.filter((log) => log.type === 'out').length
+    const incoming = logs.filter((log) => log.type === 'in').length
+
+    return {
+      totalItems,
+      totalQuantity,
+      low,
+      empty,
+      movements,
+      out,
+      incoming,
+    }
+  }, [items, logs])
+
+  return (
+    <div style={styles.page}>
+      <section style={styles.hero}>
+        <div>
+          <div style={styles.eyebrow}>Sandėlių valdymas</div>
+          <h1 style={styles.title}>Sandėlis</h1>
+          <p style={styles.subtitle}>
+            Valdyk prekių likučius, stebėk judėjimą ir greitai pasiek kiekvieną kategoriją.
+          </p>
+        </div>
+
+        <div style={styles.heroActions}>
+          <button type="button" onClick={() => openAddModal()} style={styles.secondaryButton}>
+            <Plus size={16} /> Pridėti prekes
+          </button>
+
+          <button type="button" onClick={() => openRefillModal()} style={styles.secondaryButton}>
+            <ArrowUpCircle size={16} /> Papildyti
+          </button>
+
+          <button type="button" onClick={() => openIssueModal()} style={styles.primaryButton}>
+            <Trash2 size={16} /> Nurašyti
+          </button>
+        </div>
+      </section>
+
+      {message ? <div style={styles.message}>{message}</div> : null}
+
+      <section style={styles.statsGrid}>
+        <StatCard label="Skirtingų prekių" value={globalStats.totalItems} onClick={() => setStockFilter('')} active={!stockFilter} />
+        <StatCard label="Bendras kiekis" value={globalStats.totalQuantity} onClick={() => setStockFilter('')} active={!stockFilter} />
+        <StatCard label="Baigiasi" value={globalStats.low} tone="warning" onClick={() => setStockFilter((prev) => (prev === 'low' ? '' : 'low'))} active={stockFilter === 'low'} />
+        <StatCard label="Pasibaigė" value={globalStats.empty} tone="danger" onClick={() => setStockFilter((prev) => (prev === 'empty' ? '' : 'empty'))} active={stockFilter === 'empty'} />
+        <StatCard label="Judėjimų" value={globalStats.movements} onClick={() => setLogTypeFilter('')} active={!logTypeFilter} />
+        <StatCard label="Nurašymų" value={globalStats.out} tone="green" onClick={() => setLogTypeFilter((prev) => (prev === 'out' ? '' : 'out'))} active={logTypeFilter === 'out'} />
+        <StatCard label="Papildymų" value={globalStats.incoming} onClick={() => setLogTypeFilter((prev) => (prev === 'in' ? '' : 'in'))} active={logTypeFilter === 'in'} />
+      </section>
+
+      <section style={styles.toolbar}>
+        <Field label="Paieška">
+          <div style={styles.searchBox}>
+            <Search size={17} />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Prekė, kategorija, gyventojas..."
+              style={styles.searchInput}
+            />
+          </div>
+        </Field>
+
+        <Field label="Kategorija">
+          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} style={styles.input}>
+            <option value="">Visos</option>
+            {CATEGORIES.map((category) => (
+              <option key={category.code} value={category.code}>
+                {category.title}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Likutis">
+          <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value as StockFilter)} style={styles.input}>
+            <option value="">Visi</option>
+            <option value="ok">Tvarkoje</option>
+            <option value="low">Baigiasi</option>
+            <option value="empty">Pasibaigė</option>
+          </select>
+        </Field>
+
+        <Field label="Gyventojas istorijoje">
+          <select
+            value={residentHistoryFilter}
+            onChange={(event) => setResidentHistoryFilter(event.target.value)}
+            style={styles.input}
+          >
+            <option value="">Visi</option>
+            {residents.map((resident) => (
+              <option key={resident.id} value={resident.id}>
+                {resident.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Operacija istorijoje">
+          <select value={logTypeFilter} onChange={(event) => setLogTypeFilter(event.target.value as LogTypeFilter)} style={styles.input}>
+            <option value="">Visos</option>
+            <option value="out">Nurašymai</option>
+            <option value="in">Papildymai</option>
+            <option value="adjustment">Koregavimai</option>
+          </select>
+        </Field>
+
+        <button type="button" onClick={() => void loadInventory()} style={styles.refreshButton}>
+          Atnaujinti
+        </button>
+      </section>
+
+      <section style={styles.categoryGrid}>
+        {filteredCategories.map((category) => {
+          const Icon = category.icon
+          const stats = categoryStats[category.code]
+          const status = stats.empty > 0 ? 'empty' : stats.low > 0 ? 'low' : stats.items > 0 ? 'ok' : 'none'
+
+          return (
+            <article key={category.code} style={styles.categoryCard}>
+              <div style={styles.categoryTop}>
+                <div style={styles.categoryIcon}>
+                  <Icon size={23} strokeWidth={2.2} />
+                </div>
+
+                <span style={{ ...styles.categoryStatus, ...getCategoryStatusStyle(status) }}>
+                  {status === 'none' ? 'Nėra prekių' : getStockLabel(status)}
+                </span>
+              </div>
+
+              <div>
+                <h2 style={styles.categoryTitle}>{category.title}</h2>
+                <p style={styles.categoryDescription}>{category.description}</p>
+              </div>
+
+              <div style={styles.categoryStats}>
+                <div style={styles.categoryStatItem}>
+                  <strong style={styles.categoryStatNumber}>{stats.items}</strong>
+                  <span style={styles.categoryStatLabel}>Prekių</span>
+                </div>
+
+                <div style={styles.categoryStatItem}>
+                  <strong style={styles.categoryStatNumber}>{stats.quantity}</strong>
+                  <span style={styles.categoryStatLabel}>Kiekis</span>
+                </div>
+
+                <div style={styles.categoryStatItem}>
+                  <strong style={styles.categoryStatNumber}>{stats.low + stats.empty}</strong>
+                  <span style={styles.categoryStatLabel}>Rizika</span>
+                </div>
+              </div>
+
+              <div style={styles.categoryActions}>
+                <button type="button" onClick={() => openAddModal(category.code)} style={styles.categoryAddButton}>
+                  <Plus size={15} /> Pridėti
+                </button>
+
+                <Link href={category.href} style={styles.cardFooter}>
+                  Atidaryti <ArrowRight size={16} />
+                </Link>
+              </div>
+            </article>
+          )
+        })}
+      </section>
+
+      <section style={styles.bottomGrid}>
+        <DataCard title="Likučiai" meta={`Rodoma prekių: ${filteredItems.length}`}>
+          {loading ? (
+            <EmptyState text="Kraunama..." />
+          ) : filteredItems.length === 0 ? (
+            <EmptyState text="Prekių nerasta." />
+          ) : (
+            <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Prekė</th>
+                    <th style={styles.th}>Kategorija</th>
+                    <th style={styles.th}>Tipas</th>
+                    <th style={styles.th}>Dydis / matmuo</th>
+                    <th style={styles.th}>Kiekis</th>
+                    <th style={styles.th}>Min.</th>
+                    <th style={styles.th}>Būsena</th>
+                    <th style={styles.th}>Veiksmai</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredItems.map((item) => (
+                    <tr key={item.id} style={styles.tr}>
+                      <td style={styles.tdBold}>{item.name}</td>
+                      <td style={styles.td}>{getCategoryTitle(item.category)}</td>
+                      <td style={styles.td}>{getSubcategoryLabel(item.category, item.subcategory)}</td>
+                      <td style={styles.td}>{item.size || '—'}</td>
+                      <td style={styles.td}>{formatQuantity(item.quantity, item.unit)}</td>
+                      <td style={styles.td}>
+                        {item.min_quantity !== null && item.min_quantity !== undefined
+                          ? formatQuantity(item.min_quantity, item.unit)
+                          : '—'}
+                      </td>
+                      <td style={styles.td}>
+                        <span style={{ ...styles.statusBadge, ...getCategoryStatusStyle(getStockStatus(item.quantity, item.min_quantity)) }}>
+                          {getStockLabel(getStockStatus(item.quantity, item.min_quantity))}
+                        </span>
+                      </td>
+                      <td style={styles.td}>
+                        <div style={styles.inlineActions}>
+                          <button type="button" onClick={() => openRefillModal(item.id)} style={styles.inlineGreenButton}>
+                            Papildyti
+                          </button>
+                          <button type="button" onClick={() => openIssueModal(item.id)} style={styles.inlineDangerButton}>
+                            Nurašyti
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
+
+        <DataCard title="Paskutiniai judėjimai" meta={`Rodoma įrašų: ${filteredLogs.length}`}>
+          {loading ? (
+            <EmptyState text="Kraunama..." />
+          ) : filteredLogs.length === 0 ? (
+            <EmptyState text="Judėjimų nerasta." />
+          ) : (
+            <div style={styles.tableWrap}>
+              <table style={styles.historyTable}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Data</th>
+                    <th style={styles.th}>Prekė</th>
+                    <th style={styles.th}>Operacija</th>
+                    <th style={styles.th}>Kiekis</th>
+                    <th style={styles.th}>Kam</th>
+                    <th style={styles.th}>Darbuotojas</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredLogs.map((log) => (
+                    <tr key={log.id} style={styles.tr}>
+                      <td style={styles.td}>{formatDate(log.created_at)}</td>
+                      <td style={styles.tdBold}>{log.item_name || '—'}</td>
+                      <td style={styles.td}>
+                        <span style={{ ...styles.logBadge, ...(log.type === 'in' ? styles.inBadge : styles.outBadge) }}>
+                          {log.type === 'in' ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
+                          {log.type === 'in' ? 'Papildymas' : log.type === 'out' ? 'Nurašymas' : 'Koregavimas'}
+                        </span>
+                      </td>
+                      <td style={styles.td}>{formatQuantity(log.quantity, log.unit)}</td>
+                      <td style={styles.td}>{log.resident_code || '—'}</td>
+                      <td style={styles.td}>{log.employee_full_name || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
+      </section>
+
+      <section style={styles.card}>
+        <div style={styles.cardHeader}>
+          <div>
+            <h2 style={styles.cardTitle}>Sistemos būsena</h2>
+            <p style={styles.cardSubtitle}>Greita sandėlio modulio patikra.</p>
+          </div>
+
+          <ShieldCheck size={22} color="#047857" />
+        </div>
+
+        <div style={styles.statusList}>
+          <div style={styles.statusItem}>
+            <span style={styles.statusDot} />
+            Likučių apskaita aktyvi
+          </div>
+          <div style={styles.statusItem}>
+            <span style={styles.statusDot} />
+            Judėjimo istorija įjungta
+          </div>
+          <div style={styles.statusItem}>
+            <span style={styles.statusDot} />
+            Multi nurašymas ir papildymas aktyvus
+          </div>
+        </div>
+      </section>
+
+      {showAddModal ? (
+        <MultiAddModal
+          forms={addForms}
+          saving={saving}
+          onClose={() => {
+            if (!saving) setShowAddModal(false)
+          }}
+          onChange={updateAddForm}
+          onAddLine={() =>
+            setAddForms((prev) => [
+              ...prev,
+              {
+                ...DEFAULT_ADD_FORM,
+                subcategory: getDefaultSubcategory(DEFAULT_ADD_FORM.category),
+                size: getDefaultSize(DEFAULT_ADD_FORM.category),
+              },
+            ])
+          }
+          onRemoveLine={(index) => setAddForms((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
+          onSubmit={() => void createItems()}
+        />
+      ) : null}
+
+      {showIssueModal ? (
+        <MultiIssueModal
+          title="Nurašyti"
+          lines={issueLines}
+          items={items}
+          residents={residents}
+          employees={employees}
+          saving={saving}
+          onClose={() => {
+            if (!saving) setShowIssueModal(false)
+          }}
+          onChange={updateIssueLine}
+          onAddLine={() => setIssueLines((prev) => [...prev, DEFAULT_ISSUE_LINE])}
+          onRemoveLine={(index) => setIssueLines((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
+          onSubmit={() => void issueItems()}
+        />
+      ) : null}
+
+      {showRefillModal ? (
+        <MultiRefillModal
+          lines={refillLines}
+          items={items}
+          saving={saving}
+          onClose={() => {
+            if (!saving) setShowRefillModal(false)
+          }}
+          onChange={updateRefillLine}
+          onAddLine={() => setRefillLines((prev) => [...prev, DEFAULT_REFILL_LINE])}
+          onRemoveLine={(index) => setRefillLines((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
+          onSubmit={() => void refillItems()}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function MultiAddModal({
+  forms,
+  saving,
+  onClose,
+  onChange,
+  onAddLine,
+  onRemoveLine,
+  onSubmit,
+}: {
+  forms: AddForm[]
+  saving: boolean
+  onClose: () => void
+  onChange: (index: number, patch: Partial<AddForm>) => void
+  onAddLine: () => void
+  onRemoveLine: (index: number) => void
+  onSubmit: () => void
+}) {
+  return (
+    <Modal title="Pridėti prekes" subtitle="Gali pridėti kelias skirtingas prekes vienu kartu." onClose={onClose}>
+      <div style={styles.multiLines}>
+        {forms.map((form, index) => (
+          <div key={index} style={styles.multiLine}>
+            <Field label="Pavadinimas *">
+              <input
+                value={form.name}
+                onChange={(event) => onChange(index, { name: event.target.value })}
+                placeholder="Pvz. Pampers M"
+                style={styles.input}
+              />
+            </Field>
+
+            <Field label="Kategorija">
+              <select value={form.category} onChange={(event) => onChange(index, { category: event.target.value as InventoryCategory })} style={styles.input}>
+                {CATEGORIES.map((category) => (
+                  <option key={category.code} value={category.code}>
+                    {category.title}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Tipas">
+              <select value={form.subcategory} onChange={(event) => onChange(index, { subcategory: event.target.value })} style={styles.input}>
+                {SUBCATEGORY_OPTIONS[form.category].map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            {shouldShowSize(form.category) ? (
+              <Field label={getSizeLabel(form.category)}>
+                <input
+                  value={form.size}
+                  onChange={(event) => onChange(index, { size: event.target.value })}
+                  placeholder={getSizePlaceholder(form.category)}
+                  list={`size-options-${form.category}-${index}`}
+                  style={styles.input}
+                />
+                <datalist id={`size-options-${form.category}-${index}`}>
+                  {(SIZE_OPTIONS[form.category] || []).map((size) => (
+                    <option key={size} value={size} />
+                  ))}
+                </datalist>
+              </Field>
+            ) : null}
+
+            <Field label="Vienetas">
+              <input value={form.unit} onChange={(event) => onChange(index, { unit: event.target.value })} style={styles.input} />
+            </Field>
+
+            <Field label="Kiekis">
+              <input type="number" min="0" value={form.quantity} onChange={(event) => onChange(index, { quantity: event.target.value })} style={styles.input} />
+            </Field>
+
+            <Field label="Min. kiekis">
+              <input type="number" min="0" value={form.minQuantity} onChange={(event) => onChange(index, { minQuantity: event.target.value })} style={styles.input} />
+            </Field>
+
+            {forms.length > 1 ? (
+              <button type="button" onClick={() => onRemoveLine(index)} style={styles.removeLineButton}>
+                Pašalinti
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <div style={styles.modalActions}>
+        <button type="button" onClick={onAddLine} style={styles.secondaryButton}>
+          <Plus size={16} /> Pridėti eilutę
+        </button>
+        <button type="button" onClick={onClose} style={styles.cancelButton}>
+          Atšaukti
+        </button>
+        <button type="button" onClick={onSubmit} disabled={saving} style={styles.saveButton}>
+          {saving ? 'Saugoma...' : 'Išsaugoti'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+function MultiIssueModal({
+  title,
+  lines,
+  items,
+  residents,
+  employees,
+  saving,
+  onClose,
+  onChange,
+  onAddLine,
+  onRemoveLine,
+  onSubmit,
+}: {
+  title: string
+  lines: IssueLine[]
+  items: InventoryItem[]
+  residents: PersonOption[]
+  employees: PersonOption[]
+  saving: boolean
+  onClose: () => void
+  onChange: (index: number, patch: Partial<IssueLine>) => void
+  onAddLine: () => void
+  onRemoveLine: (index: number) => void
+  onSubmit: () => void
+}) {
+  return (
+    <Modal title={title} subtitle="Gali nurašyti kelias prekes vienu kartu. Uniformos priskiriamos darbuotojams." onClose={onClose}>
+      <div style={styles.multiLines}>
+        {lines.map((line, index) => {
+          const selectedItem = items.find((item) => item.id === line.itemId) || null
+          const targetOptions = isUniformItem(selectedItem) ? employees : residents
+
+          return (
+            <div key={index} style={styles.multiLine}>
+              <Field label="Prekė *">
+                <select value={line.itemId} onChange={(event) => onChange(index, { itemId: event.target.value, targetId: '' })} style={styles.input}>
+                  <option value="">Pasirink prekę</option>
+                  {items
+                    .filter((item) => Number(item.quantity || 0) > 0)
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} — {formatQuantity(item.quantity, item.unit)}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+
+              <Field label={isUniformItem(selectedItem) ? 'Darbuotojas *' : 'Gyventojas *'}>
+                <select value={line.targetId} onChange={(event) => onChange(index, { targetId: event.target.value })} style={styles.input}>
+                  <option value="">Pasirink</option>
+                  {targetOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Kiekis *">
+                <input
+                  type="number"
+                  min="1"
+                  max={selectedItem ? Number(selectedItem.quantity || 0) : undefined}
+                  value={line.quantity}
+                  onChange={(event) => onChange(index, { quantity: event.target.value })}
+                  style={styles.input}
+                />
+              </Field>
+
+              <Field label="Pastaba">
+                <input value={line.notes} onChange={(event) => onChange(index, { notes: event.target.value })} style={styles.input} />
+              </Field>
+
+              {selectedItem ? <div style={styles.issueInfo}>Sandėlyje: <strong>{formatQuantity(selectedItem.quantity, selectedItem.unit)}</strong></div> : null}
+
+              {lines.length > 1 ? (
+                <button type="button" onClick={() => onRemoveLine(index)} style={styles.removeLineButton}>
+                  Pašalinti
+                </button>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={styles.modalActions}>
+        <button type="button" onClick={onAddLine} style={styles.secondaryButton}>
+          <Plus size={16} /> Pridėti eilutę
+        </button>
+        <button type="button" onClick={onClose} style={styles.cancelButton}>
+          Atšaukti
+        </button>
+        <button type="button" onClick={onSubmit} disabled={saving} style={styles.dangerSaveButton}>
+          {saving ? 'Saugoma...' : 'Nurašyti'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+function MultiRefillModal({
+  lines,
+  items,
+  saving,
+  onClose,
+  onChange,
+  onAddLine,
+  onRemoveLine,
+  onSubmit,
+}: {
+  lines: RefillLine[]
+  items: InventoryItem[]
+  saving: boolean
+  onClose: () => void
+  onChange: (index: number, patch: Partial<RefillLine>) => void
+  onAddLine: () => void
+  onRemoveLine: (index: number) => void
+  onSubmit: () => void
+}) {
+  return (
+    <Modal title="Papildyti sandėlį" subtitle="Gali papildyti kelias prekes vienu kartu." onClose={onClose}>
+      <div style={styles.multiLines}>
+        {lines.map((line, index) => {
+          const selectedItem = items.find((item) => item.id === line.itemId) || null
+
+          return (
+            <div key={index} style={styles.multiLine}>
+              <Field label="Prekė *">
+                <select value={line.itemId} onChange={(event) => onChange(index, { itemId: event.target.value })} style={styles.input}>
+                  <option value="">Pasirink prekę</option>
+                  {items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} — {formatQuantity(item.quantity, item.unit)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Kiekis *">
+                <input type="number" min="1" value={line.quantity} onChange={(event) => onChange(index, { quantity: event.target.value })} style={styles.input} />
+              </Field>
+
+              <Field label="Pastaba">
+                <input value={line.notes} onChange={(event) => onChange(index, { notes: event.target.value })} placeholder="Pvz. gauta iš tiekėjo" style={styles.input} />
+              </Field>
+
+              {selectedItem ? <div style={styles.issueInfo}>Dabar: <strong>{formatQuantity(selectedItem.quantity, selectedItem.unit)}</strong></div> : null}
+
+              {lines.length > 1 ? (
+                <button type="button" onClick={() => onRemoveLine(index)} style={styles.removeLineButton}>
+                  Pašalinti
+                </button>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={styles.modalActions}>
+        <button type="button" onClick={onAddLine} style={styles.secondaryButton}>
+          <Plus size={16} /> Pridėti eilutę
+        </button>
+        <button type="button" onClick={onClose} style={styles.cancelButton}>
+          Atšaukti
+        </button>
+        <button type="button" onClick={onSubmit} disabled={saving} style={styles.saveButton}>
+          {saving ? 'Saugoma...' : 'Papildyti'}
+        </button>
+      </div>
+    </Modal>
+  )
 }
 
 function Modal({
-  open,
   title,
   subtitle,
-  onClose,
   children,
+  onClose,
 }: {
-  open: boolean
   title: string
-  subtitle?: string
-  onClose: () => void
+  subtitle: string
   children: ReactNode
+  onClose: () => void
 }) {
-  if (!open) return null
-
   return (
     <div style={styles.modalBackdrop} onClick={onClose}>
-      <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+      <div style={styles.modalCard} onClick={(event) => event.stopPropagation()}>
         <div style={styles.modalHeader}>
           <div>
-            <h3 style={styles.modalTitle}>{title}</h3>
-            {subtitle ? <p style={styles.modalSubtitle}>{subtitle}</p> : null}
+            <h2 style={styles.modalTitle}>{title}</h2>
+            <p style={styles.modalSubtitle}>{subtitle}</p>
           </div>
+
           <button type="button" onClick={onClose} style={styles.iconButton}>
-            ✕
+            <X size={18} />
           </button>
         </div>
+
         {children}
       </div>
     </div>
@@ -216,7 +1488,7 @@ function Modal({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label style={styles.field}>
-      <span style={styles.fieldLabel}>{label}</span>
+      <span style={styles.label}>{label}</span>
       {children}
     </label>
   )
@@ -225,947 +1497,176 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function StatCard({
   label,
   value,
-  active,
+  tone = 'default',
+  active = false,
   onClick,
 }: {
   label: string
-  value: string
+  value: number
+  tone?: 'default' | 'warning' | 'danger' | 'green'
   active?: boolean
-  onClick: () => void
+  onClick?: () => void
 }) {
   return (
-    <button type="button" onClick={onClick} style={active ? styles.statCardActive : styles.statCard}>
-      <span style={active ? { ...styles.statLabel, color: '#ffffff', opacity: 0.9 } : styles.statLabel}>{label}</span>
-      <strong style={active ? { ...styles.statValue, color: '#ffffff' } : styles.statValue}>{value}</strong>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        ...styles.statCard,
+        ...(tone === 'warning' ? styles.warningStat : {}),
+        ...(tone === 'danger' ? styles.dangerStat : {}),
+        ...(tone === 'green' ? styles.greenStat : {}),
+        ...(active ? styles.activeStat : {}),
+      }}
+    >
+      <div style={styles.statValue}>{value}</div>
+      <div style={styles.statLabel}>{label}</div>
     </button>
   )
 }
 
-export default function InventoryDashboardPage() {
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
-
-  const [items, setItems] = useState<InventoryItem[]>([])
-  const [logs, setLogs] = useState<InventoryLog[]>([])
-  const [residents, setResidents] = useState<ResidentOption[]>([])
-
-  const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<InventoryCategory | ''>('')
-  const [stockFilter, setStockFilter] = useState<StockFilter>('')
-  const [residentFilter, setResidentFilter] = useState('')
-  const [activityFilter, setActivityFilter] = useState<ActivityFilter>('')
-  const [summaryFilter, setSummaryFilter] = useState<SummaryFilter>('all')
-
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showIssueModal, setShowIssueModal] = useState(false)
-
-  const [addRows, setAddRows] = useState<AddRow[]>([createEmptyAddRow()])
-  const [issueResidentId, setIssueResidentId] = useState('')
-  const [issueRows, setIssueRows] = useState<IssueRow[]>([createEmptyIssueRow()])
-
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
-    setLoading(true)
-    setMessage('')
-
-    try {
-      const orgId = await getCurrentOrganizationId()
-
-      if (!orgId) {
-        setOrganizationId(null)
-        setItems([])
-        setLogs([])
-        setResidents([])
-        setMessage('Nepavyko nustatyti įstaigos.')
-        return
-      }
-
-      setOrganizationId(orgId)
-
-      const [itemsResult, logsResult, residentsResult] = await Promise.all([
-        supabase
-          .from('inventory_items')
-          .select('id, organization_id, name, unit, quantity, category, subcategory, size, min_quantity, is_active, created_at, updated_at')
-          .eq('organization_id', orgId)
-          .order('updated_at', { ascending: false }),
-        supabase
-          .from('inventory_issue_history_view')
-          .select('id, organization_id, item_id, item_name, category, subcategory, size, unit, resident_id, resident_code, employee_user_id, employee_full_name, quantity, type, notes, created_at')
-          .eq('organization_id', orgId)
-          .order('created_at', { ascending: false })
-          .limit(300),
-        supabase
-          .from('residents')
-          .select('id, resident_code')
-          .eq('organization_id', orgId)
-          .order('resident_code', { ascending: true }),
-      ])
-
-      if (itemsResult.error) throw itemsResult.error
-      if (logsResult.error) throw logsResult.error
-      if (residentsResult.error) throw residentsResult.error
-
-      const loadedItems = (itemsResult.data || []) as InventoryItem[]
-      const loadedLogs = (logsResult.data || []) as InventoryLog[]
-      const loadedResidents = ((residentsResult.data || []) as Array<{ id: string; resident_code: string | null }>).map(
-        (resident) => ({
-          id: resident.id,
-          label: resident.resident_code?.trim() || `Gyventojas ${resident.id.slice(0, 6)}`,
-        })
-      )
-
-      setItems(loadedItems)
-      setLogs(loadedLogs)
-      setResidents(loadedResidents)
-
-      if (!issueResidentId && loadedResidents.length > 0) {
-        setIssueResidentId(loadedResidents[0].id)
-      }
-
-      if (issueRows.length === 1 && !issueRows[0].item_id && loadedItems.length > 0) {
-        setIssueRows([createEmptyIssueRow(loadedItems[0].id)])
-      }
-    } catch (error: any) {
-      setItems([])
-      setLogs([])
-      setResidents([])
-      setMessage(error?.message || 'Nepavyko įkelti sandėlio duomenų.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const stats = useMemo(() => {
-    const totalItems = items.length
-    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
-    const lowStock = items.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'low').length
-    const emptyStock = items.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'empty').length
-    const totalLogs = logs.length
-    const outLogs = logs.filter((log) => log.type === 'out').length
-    const inLogs = logs.filter((log) => log.type === 'in').length
-
-    return { totalItems, totalQuantity, lowStock, emptyStock, totalLogs, outLogs, inLogs }
-  }, [items, logs])
-
-  const availableItems = useMemo(() => items.filter((item) => Number(item.quantity || 0) > 0), [items])
-
-  const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase()
-
-    let next = items.filter((item) => {
-      if (categoryFilter && item.category !== categoryFilter) return false
-
-      const status = getStockStatus(item.quantity, item.min_quantity)
-      const effectiveStockFilter = summaryFilter === 'low' ? 'low' : summaryFilter === 'empty' ? 'empty' : stockFilter
-      if (effectiveStockFilter && status !== effectiveStockFilter) return false
-
-      if (!q) return true
-
-      const haystack = [
-        item.name,
-        getCategoryLabel(item.category),
-        getSubcategoryLabel(item.category, item.subcategory),
-        item.size,
-        item.unit,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-      return haystack.includes(q)
-    })
-
-    next = next.sort((a, b) => {
-      const statusOrder = { empty: 0, low: 1, ok: 2, none: 3 }
-      const aStatus = statusOrder[getStockStatus(a.quantity, a.min_quantity)]
-      const bStatus = statusOrder[getStockStatus(b.quantity, b.min_quantity)]
-      if (aStatus !== bStatus) return aStatus - bStatus
-      return a.name.localeCompare(b.name, 'lt')
-    })
-
-    return next
-  }, [items, search, categoryFilter, stockFilter, summaryFilter])
-
-  const filteredLogs = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const effectiveActivityFilter = summaryFilter === 'out' ? 'out' : summaryFilter === 'in' ? 'in' : activityFilter
-
-    return logs.filter((log) => {
-      if (categoryFilter && log.category !== categoryFilter) return false
-      if (residentFilter && log.resident_id !== residentFilter) return false
-      if (effectiveActivityFilter && log.type !== effectiveActivityFilter) return false
-      if (!q) return true
-
-      const haystack = [
-        log.item_name,
-        getCategoryLabel(log.category),
-        getSubcategoryLabel(log.category, log.subcategory),
-        log.size,
-        log.notes,
-        log.resident_code,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-      return haystack.includes(q)
-    })
-  }, [logs, search, categoryFilter, residentFilter, activityFilter, summaryFilter])
-
-  function openAddModal() {
-    setShowAddModal(true)
-    setAddRows([createEmptyAddRow()])
-    setMessage('')
-  }
-
-  function openIssueModal(defaultItemId?: string) {
-    setShowIssueModal(true)
-    setIssueRows([createEmptyIssueRow(defaultItemId || availableItems[0]?.id || '')])
-    setMessage('')
-  }
-
-  function closeModals() {
-    if (saving) return
-    setShowAddModal(false)
-    setShowIssueModal(false)
-  }
-
-  function updateAddRow(index: number, field: keyof AddRow, value: string) {
-    setAddRows((current) =>
-      current.map((row, rowIndex) => {
-        if (rowIndex !== index) return row
-        const nextRow = { ...row, [field]: value }
-        if (field === 'category') {
-          const nextCategory = value as InventoryCategory
-          const options = SUBCATEGORY_OPTIONS[nextCategory]
-          nextRow.subcategory = options[0]?.value || ''
-          if (!shouldUseSize(nextCategory)) nextRow.size = ''
-          if (shouldUseSize(nextCategory) && !nextRow.size) nextRow.size = 'M'
-        }
-        return nextRow
-      })
-    )
-  }
-
-  function updateIssueRow(index: number, field: keyof IssueRow, value: string) {
-    setIssueRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)))
-  }
-
-  function addAddRow() {
-    setAddRows((current) => [...current, createEmptyAddRow()])
-  }
-
-  function removeAddRow(index: number) {
-    setAddRows((current) => (current.length === 1 ? current : current.filter((_, rowIndex) => rowIndex !== index)))
-  }
-
-  function addIssueRow() {
-    setIssueRows((current) => [...current, createEmptyIssueRow(availableItems[0]?.id || '')])
-  }
-
-  function removeIssueRow(index: number) {
-    setIssueRows((current) => (current.length === 1 ? current : current.filter((_, rowIndex) => rowIndex !== index)))
-  }
-
-  async function writeInventoryLog(payload: Record<string, unknown>) {
-    const firstTry = await supabase.from('inventory_logs').insert({ ...payload, performed_by: 'Administratorius' })
-
-    if (!firstTry.error) return
-
-    if (String(firstTry.error.message || '').toLowerCase().includes('employee_user_id')) {
-      throw new Error('inventory_logs.employee_user_id dar yra privalomas. Reikia SQL: ALTER TABLE inventory_logs ALTER COLUMN employee_user_id DROP NOT NULL;')
-    }
-
-    const secondTry = await supabase.from('inventory_logs').insert(payload)
-    if (secondTry.error) throw secondTry.error
-  }
-
-  async function handleBulkAdd(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-
-    if (!organizationId) {
-      setMessage('Nepavyko nustatyti įstaigos.')
-      return
-    }
-
-    const cleaned = addRows
-      .map((row) => ({
-        ...row,
-        name: row.name.trim(),
-        quantityNumber: Number(row.quantity),
-        minQuantityNumber: row.min_quantity.trim() ? Number(row.min_quantity) : 0,
-      }))
-      .filter((row) => row.name)
-
-    if (!cleaned.length) {
-      setMessage('Įveskite bent vieną prekę.')
-      return
-    }
-
-    for (const row of cleaned) {
-      if (!Number.isFinite(row.quantityNumber) || row.quantityNumber <= 0) {
-        setMessage('Visų eilučių kiekiai turi būti didesni už 0.')
-        return
-      }
-      if (!Number.isFinite(row.minQuantityNumber) || row.minQuantityNumber < 0) {
-        setMessage('Minimalus kiekis negali būti neigiamas.')
-        return
-      }
-    }
-
-    setSaving(true)
-    setMessage('')
-
-    try {
-      for (const row of cleaned) {
-        const normalizedSize = shouldUseSize(row.category) ? row.size.trim() || null : null
-        const existing = items.find(
-          (item) =>
-            item.name.trim().toLowerCase() === row.name.toLowerCase() &&
-            (item.category || '') === row.category &&
-            (item.subcategory || '') === row.subcategory &&
-            (item.unit || '') === row.unit &&
-            (item.size || '') === (normalizedSize || '')
-        )
-
-        if (existing) {
-          const newQuantity = Number(existing.quantity || 0) + row.quantityNumber
-          const updateResult = await supabase
-            .from('inventory_items')
-            .update({
-              quantity: newQuantity,
-              min_quantity: row.minQuantityNumber,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existing.id)
-
-          if (updateResult.error) throw updateResult.error
-
-          await writeInventoryLog({
-            organization_id: organizationId,
-            item_id: existing.id,
-            quantity: row.quantityNumber,
-            type: 'in',
-            notes: 'Papildyta iš sandėlio formos',
-          })
-        } else {
-          const insertResult = await supabase
-            .from('inventory_items')
-            .insert({
-              organization_id: organizationId,
-              name: row.name,
-              category: row.category,
-              subcategory: row.subcategory || null,
-              size: normalizedSize,
-              unit: row.unit,
-              quantity: row.quantityNumber,
-              min_quantity: row.minQuantityNumber,
-              is_active: true,
-            })
-            .select('id')
-            .single()
-
-          if (insertResult.error) throw insertResult.error
-
-          await writeInventoryLog({
-            organization_id: organizationId,
-            item_id: insertResult.data.id,
-            quantity: row.quantityNumber,
-            type: 'in',
-            notes: 'Nauja prekė pridėta į sandėlį',
-          })
-        }
-      }
-
-      setShowAddModal(false)
-      setAddRows([createEmptyAddRow()])
-      setMessage('Prekės sėkmingai pridėtos.')
-      await loadData()
-    } catch (error: any) {
-      setMessage(error?.message || 'Nepavyko pridėti prekių.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleBulkIssue(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-
-    if (!organizationId) {
-      setMessage('Nepavyko nustatyti įstaigos.')
-      return
-    }
-
-    if (!issueResidentId) {
-      setMessage('Pasirinkite gyventoją.')
-      return
-    }
-
-    const cleaned = issueRows.filter((row) => row.item_id)
-    if (!cleaned.length) {
-      setMessage('Pasirinkite bent vieną prekę nurašymui.')
-      return
-    }
-
-    for (const row of cleaned) {
-      const quantity = Number(row.quantity)
-      const item = items.find((candidate) => candidate.id === row.item_id)
-      if (!Number.isFinite(quantity) || quantity <= 0) {
-        setMessage('Nurašymo kiekiai turi būti didesni už 0.')
-        return
-      }
-      if (!item) {
-        setMessage('Viena iš pasirinktų prekių neberasta.')
-        return
-      }
-      if (quantity > Number(item.quantity || 0)) {
-        setMessage(`Nepakanka likučio prekei „${item.name}“.`)
-        return
-      }
-    }
-
-    setSaving(true)
-    setMessage('')
-
-    try {
-      for (const row of cleaned) {
-        const item = items.find((candidate) => candidate.id === row.item_id)
-        if (!item) continue
-        const quantity = Number(row.quantity)
-        const nextQuantity = Number(item.quantity || 0) - quantity
-
-        const updateResult = await supabase
-          .from('inventory_items')
-          .update({ quantity: nextQuantity, updated_at: new Date().toISOString() })
-          .eq('id', item.id)
-
-        if (updateResult.error) throw updateResult.error
-
-        await writeInventoryLog({
-          organization_id: organizationId,
-          item_id: item.id,
-          resident_id: issueResidentId,
-          quantity: -quantity,
-          type: 'out',
-          notes: row.notes.trim() || null,
-        })
-      }
-
-      setShowIssueModal(false)
-      setIssueRows([createEmptyIssueRow(availableItems[0]?.id || '')])
-      setMessage('Prekės sėkmingai nurašytos.')
-      await loadData()
-    } catch (error: any) {
-      setMessage(error?.message || 'Nepavyko nurašyti prekių.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div style={styles.outer}>
-        <div style={styles.page}>
-          <div style={styles.loadingCard}>Kraunami sandėlio duomenys…</div>
-        </div>
-      </div>
-    )
-  }
-
+function DataCard({
+  title,
+  meta,
+  children,
+}: {
+  title: string
+  meta?: string
+  children: ReactNode
+}) {
   return (
-    <div style={styles.outer}>
-      <div style={styles.page}>
-        <div style={styles.topBar}>
-          <Link href="/dashboard" style={styles.backLink}>
-            ← Grįžti į dashboard
-          </Link>
-        </div>
-
-        <div style={styles.header}>
-          <div>
-            <h1 style={styles.title}>Sandėlis</h1>
-            <p style={styles.subtitle}>Pridėk prekes, nurašyk gyventojui ir stebėk judėjimą vienoje vietoje.</p>
-          </div>
-          <div style={styles.headerButtons}>
-            <button type="button" onClick={openAddModal} style={styles.secondaryButton}>
-              + Pridėti prekes
-            </button>
-            <button type="button" onClick={() => openIssueModal()} style={styles.primaryButton}>
-              Nurašyti gyventojui
-            </button>
-          </div>
-        </div>
-
-        {message ? <div style={styles.message}>{message}</div> : null}
-
-        <div style={styles.statsGrid}>
-          <StatCard label="Skirtingų prekių" value={String(stats.totalItems)} active={summaryFilter === 'all'} onClick={() => setSummaryFilter('all')} />
-          <StatCard label="Bendras kiekis" value={String(stats.totalQuantity)} active={summaryFilter === 'all'} onClick={() => setSummaryFilter('all')} />
-          <StatCard label="Baigiasi" value={String(stats.lowStock)} active={summaryFilter === 'low'} onClick={() => setSummaryFilter('low')} />
-          <StatCard label="Pasibaigė" value={String(stats.emptyStock)} active={summaryFilter === 'empty'} onClick={() => setSummaryFilter('empty')} />
-          <StatCard label="Visi judėjimai" value={String(stats.totalLogs)} active={summaryFilter === 'logs'} onClick={() => setSummaryFilter('logs')} />
-          <StatCard label="Nurašymai" value={String(stats.outLogs)} active={summaryFilter === 'out'} onClick={() => setSummaryFilter('out')} />
-          <StatCard label="Papildymai" value={String(stats.inLogs)} active={summaryFilter === 'in'} onClick={() => setSummaryFilter('in')} />
-        </div>
-
-        <div style={styles.filtersCard}>
-          <div style={styles.filtersGrid}>
-            <Field label="Paieška">
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Prekė, tipas, pastabos..." style={styles.input} />
-            </Field>
-
-            <Field label="Kategorija">
-              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as InventoryCategory | '')} style={styles.input}>
-                <option value="">Visos</option>
-                {CATEGORY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Likutis">
-              <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value as StockFilter)} style={styles.input}>
-                <option value="">Visi</option>
-                <option value="ok">Yra sandėlyje</option>
-                <option value="low">Baigiasi</option>
-                <option value="empty">Pasibaigė</option>
-              </select>
-            </Field>
-
-            <Field label="Gyventojas istorijoje">
-              <select value={residentFilter} onChange={(e) => setResidentFilter(e.target.value)} style={styles.input}>
-                <option value="">Visi</option>
-                {residents.map((resident) => (
-                  <option key={resident.id} value={resident.id}>
-                    {resident.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Operacija istorijoje">
-              <select value={activityFilter} onChange={(e) => setActivityFilter(e.target.value as ActivityFilter)} style={styles.input}>
-                <option value="">Visos</option>
-                <option value="out">Nurašymai</option>
-                <option value="in">Papildymai</option>
-              </select>
-            </Field>
-          </div>
-        </div>
-
-        <div style={styles.layoutGrid}>
-          <section style={styles.panel}>
-            <div style={styles.panelHeader}>
-              <div>
-                <h2 style={styles.panelTitle}>Likučiai</h2>
-                <p style={styles.panelSubtitle}>Aktyvus filtras: {summaryFilter === 'all' ? 'viskas' : summaryFilter}</p>
-              </div>
-              <span style={styles.badge}>{filteredItems.length} įraš.</span>
-            </div>
-
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Prekė</th>
-                    <th style={styles.th}>Kategorija</th>
-                    <th style={styles.th}>Tipas</th>
-                    <th style={styles.th}>Dydis</th>
-                    <th style={styles.th}>Kiekis</th>
-                    <th style={styles.th}>Min.</th>
-                    <th style={styles.th}>Būsena</th>
-                    <th style={styles.th}>Veiksmas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.map((item) => {
-                    const status = getStockStatus(item.quantity, item.min_quantity)
-                    return (
-                      <tr key={item.id}>
-                        <td style={styles.tdStrong}>{item.name}</td>
-                        <td style={styles.td}>{getCategoryLabel(item.category)}</td>
-                        <td style={styles.td}>{getSubcategoryLabel(item.category, item.subcategory) || '—'}</td>
-                        <td style={styles.td}>{shouldUseSize(item.category) ? item.size || '—' : '—'}</td>
-                        <td style={styles.td}>{Number(item.quantity || 0)} {item.unit || ''}</td>
-                        <td style={styles.td}>{item.min_quantity ?? '—'}</td>
-                        <td style={styles.td}>
-                          <span
-                            style={
-                              status === 'empty'
-                                ? styles.statusDanger
-                                : status === 'low'
-                                  ? styles.statusWarn
-                                  : styles.statusOk
-                            }
-                          >
-                            {status === 'empty' ? 'Pasibaigė' : status === 'low' ? 'Baigiasi' : 'Yra'}
-                          </span>
-                        </td>
-                        <td style={styles.td}>
-                          <button
-                            type="button"
-                            style={Number(item.quantity || 0) <= 0 ? styles.rowButtonDisabled : styles.rowButton}
-                            disabled={Number(item.quantity || 0) <= 0}
-                            onClick={() => openIssueModal(item.id)}
-                          >
-                            Nurašyti
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {!filteredItems.length ? (
-                    <tr>
-                      <td colSpan={8} style={styles.emptyCell}>
-                        Pagal pasirinktus filtrus nieko nerasta.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section style={styles.panel}>
-            <div style={styles.panelHeader}>
-              <div>
-                <h2 style={styles.panelTitle}>Paskutiniai judėjimai</h2>
-                <p style={styles.panelSubtitle}>Papildymai ir nurašymai su gyventoju.</p>
-              </div>
-              <span style={styles.badge}>{filteredLogs.length} įraš.</span>
-            </div>
-
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Data</th>
-                    <th style={styles.th}>Prekė</th>
-                    <th style={styles.th}>Operacija</th>
-                    <th style={styles.th}>Kiekis</th>
-                    <th style={styles.th}>Gyventojas</th>
-                    <th style={styles.th}>Pastabos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLogs.slice(0, 100).map((log) => (
-                    <tr key={log.id}>
-                      <td style={styles.td}>{log.created_at ? new Date(log.created_at).toLocaleString('lt-LT') : '—'}</td>
-                      <td style={styles.tdStrong}>{log.item_name || '—'}</td>
-                      <td style={styles.td}>{getLogTypeLabel(log.type)}</td>
-                      <td style={styles.td}>{Number(log.quantity || 0)} {log.unit || ''}</td>
-                      <td style={styles.td}>{log.resident_code || '—'}</td>
-                      <td style={styles.td}>{log.notes || '—'}</td>
-                    </tr>
-                  ))}
-                  {!filteredLogs.length ? (
-                    <tr>
-                      <td colSpan={6} style={styles.emptyCell}>
-                        Pagal pasirinktus filtrus judėjimų nėra.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </section>
+    <section style={styles.card}>
+      <div style={styles.cardHeader}>
+        <div>
+          <h2 style={styles.cardTitle}>{title}</h2>
+          {meta ? <p style={styles.cardSubtitle}>{meta}</p> : null}
         </div>
       </div>
 
-      <Modal open={showAddModal} onClose={closeModals} title="Pridėti prekes" subtitle="Gali su pliusu įdėti kelias eilutes iš karto.">
-        <form onSubmit={handleBulkAdd}>
-          <div style={styles.modalBody}>
-            {addRows.map((row, index) => {
-              const subcategories = SUBCATEGORY_OPTIONS[row.category]
-              const showSize = shouldUseSize(row.category)
-              return (
-                <div key={index} style={styles.rowCard}>
-                  <div style={styles.rowCardHeader}>
-                    <strong style={styles.rowCardTitle}>Eilutė #{index + 1}</strong>
-                    <button type="button" style={styles.smallGhostButton} onClick={() => removeAddRow(index)}>
-                      Pašalinti
-                    </button>
-                  </div>
-
-                  <div style={styles.modalGrid}>
-                    <Field label="Pavadinimas">
-                      <input value={row.name} onChange={(e) => updateAddRow(index, 'name', e.target.value)} style={styles.input} placeholder="Pvz. Tena Pants" />
-                    </Field>
-
-                    <Field label="Kategorija">
-                      <select value={row.category} onChange={(e) => updateAddRow(index, 'category', e.target.value)} style={styles.input}>
-                        {CATEGORY_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    <Field label="Tipas">
-                      <select value={row.subcategory} onChange={(e) => updateAddRow(index, 'subcategory', e.target.value)} style={styles.input}>
-                        {subcategories.length ? (
-                          subcategories.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))
-                        ) : (
-                          <option value="">Nėra</option>
-                        )}
-                      </select>
-                    </Field>
-
-                    {showSize ? (
-                      <Field label="Dydis">
-                        <input value={row.size} onChange={(e) => updateAddRow(index, 'size', e.target.value)} style={styles.input} placeholder="Pvz. M" />
-                      </Field>
-                    ) : (
-                      <Field label="Vienetas">
-                        <select value={row.unit} onChange={(e) => updateAddRow(index, 'unit', e.target.value)} style={styles.input}>
-                          {UNIT_OPTIONS.map((unit) => (
-                            <option key={unit} value={unit}>
-                              {unit}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    )}
-
-                    {showSize ? (
-                      <Field label="Vienetas">
-                        <select value={row.unit} onChange={(e) => updateAddRow(index, 'unit', e.target.value)} style={styles.input}>
-                          {UNIT_OPTIONS.map((unit) => (
-                            <option key={unit} value={unit}>
-                              {unit}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    ) : null}
-
-                    <Field label="Kiekis">
-                      <input value={row.quantity} onChange={(e) => updateAddRow(index, 'quantity', e.target.value)} style={styles.input} type="number" min="0" step="1" />
-                    </Field>
-
-                    <Field label="Minimalus kiekis">
-                      <input value={row.min_quantity} onChange={(e) => updateAddRow(index, 'min_quantity', e.target.value)} style={styles.input} type="number" min="0" step="1" />
-                    </Field>
-                  </div>
-                </div>
-              )
-            })}
-
-            <button type="button" onClick={addAddRow} style={styles.addLineButton}>
-              + Pridėti dar vieną eilutę
-            </button>
-          </div>
-
-          <div style={styles.modalActions}>
-            <button type="button" onClick={closeModals} style={styles.secondaryButton} disabled={saving}>
-              Uždaryti
-            </button>
-            <button type="submit" style={styles.primaryButton} disabled={saving}>
-              {saving ? 'Saugoma…' : 'Išsaugoti'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal open={showIssueModal} onClose={closeModals} title="Nurašyti gyventojui" subtitle="Vienu kartu gali nurašyti kelias prekes tam pačiam gyventojui.">
-        <form onSubmit={handleBulkIssue}>
-          <div style={styles.modalBody}>
-            <div style={styles.rowCard}>
-              <Field label="Gyventojas">
-                <select value={issueResidentId} onChange={(e) => setIssueResidentId(e.target.value)} style={styles.input}>
-                  <option value="">Pasirinkti</option>
-                  {residents.map((resident) => (
-                    <option key={resident.id} value={resident.id}>
-                      {resident.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-
-            {issueRows.map((row, index) => {
-              const selectedItem = items.find((item) => item.id === row.item_id)
-              return (
-                <div key={index} style={styles.rowCard}>
-                  <div style={styles.rowCardHeader}>
-                    <strong style={styles.rowCardTitle}>Eilutė #{index + 1}</strong>
-                    <button type="button" style={styles.smallGhostButton} onClick={() => removeIssueRow(index)}>
-                      Pašalinti
-                    </button>
-                  </div>
-
-                  <div style={styles.modalGrid}>
-                    <Field label="Prekė">
-                      <select value={row.item_id} onChange={(e) => updateIssueRow(index, 'item_id', e.target.value)} style={styles.input}>
-                        <option value="">Pasirinkti</option>
-                        {availableItems.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name} · {getCategoryLabel(item.category)} · likutis {Number(item.quantity || 0)}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    <Field label="Kiekis">
-                      <input value={row.quantity} onChange={(e) => updateIssueRow(index, 'quantity', e.target.value)} style={styles.input} type="number" min="1" step="1" />
-                    </Field>
-
-                    <Field label="Pastabos">
-                      <input value={row.notes} onChange={(e) => updateIssueRow(index, 'notes', e.target.value)} style={styles.input} placeholder="Nebūtina" />
-                    </Field>
-
-                    <div style={styles.infoTile}>
-                      <span style={styles.infoTileLabel}>Likutis</span>
-                      <strong style={styles.infoTileValue}>
-                        {selectedItem ? `${Number(selectedItem.quantity || 0)} ${selectedItem.unit || ''}` : '—'}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-
-            <button type="button" onClick={addIssueRow} style={styles.addLineButton}>
-              + Pridėti dar vieną eilutę
-            </button>
-          </div>
-
-          <div style={styles.modalActions}>
-            <button type="button" onClick={closeModals} style={styles.secondaryButton} disabled={saving}>
-              Uždaryti
-            </button>
-            <button type="submit" style={styles.primaryButton} disabled={saving}>
-              {saving ? 'Saugoma…' : 'Patvirtinti nurašymą'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-    </div>
+      {children}
+    </section>
   )
 }
 
+function EmptyState({ text }: { text: string }) {
+  return <div style={styles.emptyState}>{text}</div>
+}
+
+function getCategoryStatusStyle(status: string): CSSProperties {
+  if (status === 'empty') {
+    return {
+      background: '#fff1f2',
+      color: '#be123c',
+      border: '1px solid #fecdd3',
+    }
+  }
+
+  if (status === 'low') {
+    return {
+      background: '#fffbeb',
+      color: '#b45309',
+      border: '1px solid #fde68a',
+    }
+  }
+
+  if (status === 'none') {
+    return {
+      background: '#f8fafc',
+      color: '#64748b',
+      border: '1px solid #e2e8f0',
+    }
+  }
+
+  return {
+    background: '#ecfdf5',
+    color: '#047857',
+    border: '1px solid #a7f3d0',
+  }
+}
+
 const styles: Record<string, CSSProperties> = {
-  outer: {
-    minHeight: '100vh',
-    background: COLORS.bg,
-    padding: '24px',
-  },
   page: {
-    maxWidth: 1480,
-    margin: '0 auto',
     display: 'grid',
     gap: 18,
   },
-  loadingCard: {
-    background: COLORS.surface,
-    border: `1px solid ${COLORS.border}`,
+  hero: {
+    background:
+      'radial-gradient(circle at top left, rgba(34,197,94,0.12), transparent 34%), linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+    border: '1px solid #e5e7eb',
     borderRadius: 24,
-    padding: '32px 24px',
-    color: COLORS.text,
-    boxShadow: COLORS.shadow,
-  },
-  topBar: {
-    display: 'flex',
-    justifyContent: 'flex-start',
-  },
-  backLink: {
-    color: COLORS.greenDark,
-    textDecoration: 'none',
-    fontWeight: 700,
-  },
-  header: {
-    background: COLORS.surface,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 24,
-    padding: '24px 26px',
-    boxShadow: COLORS.shadow,
+    padding: 24,
     display: 'flex',
     justifyContent: 'space-between',
     gap: 16,
     alignItems: 'center',
     flexWrap: 'wrap',
+    boxShadow: '0 18px 48px rgba(15, 23, 42, 0.045)',
+  },
+  eyebrow: {
+    color: '#047857',
+    fontSize: 12,
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
   },
   title: {
-    margin: 0,
+    margin: '6px 0 0',
+    color: '#0f172a',
     fontSize: 34,
-    lineHeight: 1.08,
-    color: COLORS.text,
-    letterSpacing: '-0.02em',
+    lineHeight: 1.05,
+    fontWeight: 950,
+    letterSpacing: '-0.05em',
   },
   subtitle: {
-    margin: '8px 0 0',
-    color: COLORS.textSoft,
+    margin: '10px 0 0',
+    color: '#64748b',
     fontSize: 15,
+    fontWeight: 650,
+    lineHeight: 1.5,
+    maxWidth: 680,
   },
-  headerButtons: {
+  heroActions: {
     display: 'flex',
-    gap: 12,
+    gap: 10,
     flexWrap: 'wrap',
   },
   primaryButton: {
     border: 'none',
-    background: COLORS.green,
-    color: '#fff',
-    borderRadius: 14,
-    padding: '12px 18px',
-    fontWeight: 700,
+    borderRadius: 15,
+    padding: '12px 15px',
+    background: '#047857',
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 850,
+    textDecoration: 'none',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    boxShadow: '0 14px 30px rgba(4,120,87,0.18)',
     cursor: 'pointer',
-    boxShadow: '0 10px 24px rgba(22, 163, 74, 0.22)',
   },
   secondaryButton: {
-    border: `1px solid ${COLORS.green}`,
-    background: '#fff',
-    color: COLORS.greenDark,
-    borderRadius: 14,
-    padding: '12px 18px',
-    fontWeight: 700,
+    border: '1px solid #a7f3d0',
+    borderRadius: 15,
+    padding: '12px 15px',
+    background: '#ffffff',
+    color: '#047857',
+    fontSize: 14,
+    fontWeight: 850,
+    textDecoration: 'none',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
     cursor: 'pointer',
-  },
-  smallGhostButton: {
-    border: `1px solid ${COLORS.border}`,
-    background: '#fff',
-    color: COLORS.textSoft,
-    borderRadius: 12,
-    padding: '8px 12px',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  rowButton: {
-    border: `1px solid ${COLORS.green}`,
-    background: COLORS.greenSofter,
-    color: COLORS.greenDark,
-    borderRadius: 10,
-    padding: '9px 12px',
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  rowButtonDisabled: {
-    border: `1px solid ${COLORS.border}`,
-    background: '#f9fafb',
-    color: '#9ca3af',
-    borderRadius: 10,
-    padding: '9px 12px',
-    fontWeight: 700,
   },
   message: {
-    background: COLORS.greenSofter,
-    border: `1px solid ${COLORS.borderStrong}`,
-    color: COLORS.greenDark,
-    borderRadius: 18,
-    padding: '14px 16px',
-    fontWeight: 600,
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    border: '1px solid #bfdbfe',
+    borderRadius: 16,
+    padding: 13,
+    fontSize: 14,
+    fontWeight: 800,
   },
   statsGrid: {
     display: 'grid',
@@ -1173,288 +1674,480 @@ const styles: Record<string, CSSProperties> = {
     gap: 12,
   },
   statCard: {
-    background: COLORS.surface,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 18,
-    padding: '16px 18px',
-    display: 'grid',
-    gap: 8,
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 20,
+    padding: 16,
+    boxShadow: '0 14px 38px rgba(15, 23, 42, 0.035)',
     textAlign: 'left',
     cursor: 'pointer',
-    boxShadow: COLORS.shadow,
   },
-  statCardActive: {
-    background: COLORS.green,
-    border: `1px solid ${COLORS.green}`,
-    borderRadius: 18,
-    padding: '16px 18px',
-    display: 'grid',
-    gap: 8,
-    textAlign: 'left',
-    cursor: 'pointer',
-    boxShadow: '0 14px 28px rgba(22, 163, 74, 0.22)',
+  activeStat: {
+    outline: '2px solid #16a34a',
+    boxShadow: '0 0 0 4px rgba(22,163,74,0.14)',
   },
-  statLabel: {
-    color: COLORS.textSoft,
-    fontSize: 13,
-    fontWeight: 600,
+  warningStat: {
+    background: '#fffbeb',
+    border: '1px solid #fde68a',
+  },
+  dangerStat: {
+    background: '#fff1f2',
+    border: '1px solid #fecdd3',
+  },
+  greenStat: {
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
   },
   statValue: {
-    color: COLORS.text,
+    color: '#0f172a',
     fontSize: 28,
+    fontWeight: 950,
     lineHeight: 1,
   },
-  filtersCard: {
-    background: COLORS.surface,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 22,
-    padding: 18,
-    boxShadow: COLORS.shadow,
+  statLabel: {
+    marginTop: 8,
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: 850,
   },
-  filtersGrid: {
+  toolbar: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 20,
+    padding: 14,
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: 12,
+    alignItems: 'end',
   },
-  layoutGrid: {
+  searchBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 9,
+    border: '1px solid #d1d5db',
+    borderRadius: 14,
+    padding: '0 12px',
+    color: '#64748b',
+  },
+  searchInput: {
+    width: '100%',
+    border: 'none',
+    outline: 'none',
+    padding: '11px 0',
+    fontSize: 14,
+    background: 'transparent',
+  },
+  refreshButton: {
+    border: '1px solid #d1d5db',
+    borderRadius: 14,
+    background: '#ffffff',
+    color: '#0f172a',
+    padding: '11px 14px',
+    fontSize: 14,
+    fontWeight: 850,
+    cursor: 'pointer',
+  },
+  categoryGrid: {
     display: 'grid',
-    gridTemplateColumns: '1.15fr 1fr',
-    gap: 18,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gap: 14,
   },
-  panel: {
-    background: COLORS.surface,
-    border: `1px solid ${COLORS.border}`,
+  categoryCard: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
     borderRadius: 24,
     padding: 18,
-    boxShadow: COLORS.shadow,
-    minWidth: 0,
+    minHeight: 225,
+    display: 'grid',
+    gap: 16,
+    boxShadow: '0 16px 44px rgba(15, 23, 42, 0.035)',
   },
-  panelHeader: {
+  categoryTop: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: 12,
     alignItems: 'center',
-    marginBottom: 14,
-    flexWrap: 'wrap',
   },
-  panelTitle: {
-    margin: 0,
-    color: COLORS.text,
-    fontSize: 22,
+  categoryIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    background: '#ecfdf5',
+    color: '#047857',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  panelSubtitle: {
-    margin: '4px 0 0',
-    color: COLORS.textSoft,
-    fontSize: 14,
-  },
-  badge: {
-    background: COLORS.greenSofter,
-    color: COLORS.greenDark,
-    border: `1px solid ${COLORS.borderStrong}`,
+  categoryStatus: {
+    padding: '5px 9px',
     borderRadius: 999,
-    padding: '8px 12px',
+    fontSize: 11,
+    fontWeight: 900,
+    whiteSpace: 'nowrap',
+  },
+  categoryTitle: {
+    margin: 0,
+    color: '#0f172a',
+    fontSize: 19,
+    fontWeight: 950,
+    letterSpacing: '-0.03em',
+  },
+  categoryDescription: {
+    margin: '7px 0 0',
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: 650,
+    lineHeight: 1.45,
+  },
+  categoryStats: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: 10,
+  },
+  categoryStatItem: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: 4,
+    minWidth: 0,
+  },
+  categoryStatNumber: {
+    color: '#0f172a',
+    fontSize: 18,
+    fontWeight: 950,
+    lineHeight: 1,
+  },
+  categoryStatLabel: {
+    color: '#0f172a',
+    fontSize: 13,
+    fontWeight: 750,
+    whiteSpace: 'nowrap',
+  },
+  categoryActions: {
+    borderTop: '1px solid #f1f5f9',
+    paddingTop: 12,
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 10,
+    alignItems: 'center',
+  },
+  categoryAddButton: {
+    border: '1px solid #a7f3d0',
+    background: '#ecfdf5',
+    color: '#047857',
+    borderRadius: 12,
+    padding: '8px 10px',
     fontSize: 12,
-    fontWeight: 700,
+    fontWeight: 900,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardFooter: {
+    color: '#047857',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 13,
+    fontWeight: 900,
+    textDecoration: 'none',
+  },
+  bottomGrid: {
+  display: 'grid',
+  gridTemplateColumns: '1fr',
+  gap: 16,
+  alignItems: 'start',
+},
+  card: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 24,
+    padding: 20,
+    boxShadow: '0 16px 44px rgba(15, 23, 42, 0.035)',
+    minWidth: 0,
+  },
+  cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  cardTitle: {
+    margin: 0,
+    color: '#0f172a',
+    fontSize: 20,
+    fontWeight: 950,
+    letterSpacing: '-0.03em',
+  },
+  cardSubtitle: {
+    margin: '6px 0 0',
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: 650,
+  },
+  emptyState: {
+    marginTop: 16,
+    padding: 22,
+    border: '1px dashed #cbd5e1',
+    borderRadius: 16,
+    color: '#64748b',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: 750,
   },
   tableWrap: {
+    marginTop: 14,
     overflowX: 'auto',
-    border: `1px solid ${COLORS.borderSoft}`,
-    borderRadius: 18,
-    background: '#fff',
   },
   table: {
     width: '100%',
+    minWidth: 900,
     borderCollapse: 'collapse',
-    minWidth: 760,
+  },
+  historyTable: {
+    width: '100%',
+    minWidth: 900,
+    borderCollapse: 'collapse',
   },
   th: {
     textAlign: 'left',
-    background: COLORS.surfaceAlt,
-    color: COLORS.textSoft,
-    fontSize: 13,
-    fontWeight: 700,
-    padding: '12px 14px',
-    borderBottom: `1px solid ${COLORS.border}`,
+    padding: '11px 10px',
+    borderBottom: '1px solid #e5e7eb',
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: 900,
     whiteSpace: 'nowrap',
   },
+  tr: {
+    borderBottom: '1px solid #f1f5f9',
+  },
   td: {
-    padding: '13px 14px',
-    borderBottom: `1px solid ${COLORS.borderSoft}`,
-    color: COLORS.textSoft,
-    fontSize: 14,
-    verticalAlign: 'middle',
-    background: '#fff',
-  },
-  tdStrong: {
-    padding: '13px 14px',
-    borderBottom: `1px solid ${COLORS.borderSoft}`,
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: 700,
-    verticalAlign: 'middle',
-    background: '#fff',
-  },
-  emptyCell: {
-    padding: '22px 16px',
-    textAlign: 'center',
-    color: COLORS.textSoft,
-    background: '#fff',
-  },
-  statusOk: {
-    display: 'inline-flex',
-    padding: '6px 10px',
-    borderRadius: 999,
-    background: COLORS.greenSoft,
-    color: COLORS.greenDark,
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  statusWarn: {
-    display: 'inline-flex',
-    padding: '6px 10px',
-    borderRadius: 999,
-    background: COLORS.amberSoft,
-    color: COLORS.amber,
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  statusDanger: {
-    display: 'inline-flex',
-    padding: '6px 10px',
-    borderRadius: 999,
-    background: COLORS.redSoft,
-    color: COLORS.red,
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  field: {
-    display: 'grid',
-    gap: 7,
-  },
-  fieldLabel: {
+    padding: '13px 10px',
+    color: '#334155',
     fontSize: 13,
-    color: COLORS.textSoft,
-    fontWeight: 700,
+    fontWeight: 650,
+    verticalAlign: 'middle',
   },
-  input: {
-    width: '100%',
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 14,
-    padding: '12px 13px',
+  tdBold: {
+    padding: '13px 10px',
+    color: '#0f172a',
+    fontSize: 13,
+    fontWeight: 900,
+    verticalAlign: 'middle',
+  },
+  statusBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '5px 9px',
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 900,
+    whiteSpace: 'nowrap',
+  },
+  inlineActions: {
+    display: 'flex',
+    gap: 7,
+    flexWrap: 'wrap',
+  },
+  inlineGreenButton: {
+    border: '1px solid #a7f3d0',
+    background: '#ecfdf5',
+    color: '#047857',
+    borderRadius: 11,
+    padding: '7px 9px',
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: 'pointer',
+  },
+  inlineDangerButton: {
+    border: '1px solid #fecdd3',
+    background: '#fff1f2',
+    color: '#be123c',
+    borderRadius: 11,
+    padding: '7px 9px',
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: 'pointer',
+  },
+  logBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    padding: '5px 9px',
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 900,
+    whiteSpace: 'nowrap',
+  },
+  inBadge: {
+    background: '#ecfdf5',
+    color: '#047857',
+    border: '1px solid #a7f3d0',
+  },
+  outBadge: {
+    background: '#fff1f2',
+    color: '#be123c',
+    border: '1px solid #fecdd3',
+  },
+  statusList: {
+    marginTop: 18,
+    display: 'grid',
+    gap: 13,
+  },
+  statusItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    color: '#334155',
     fontSize: 14,
-    color: COLORS.text,
-    background: '#fff',
-    outline: 'none',
-    boxShadow: 'inset 0 1px 2px rgba(17, 24, 39, 0.03)',
+    fontWeight: 750,
+  },
+  statusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    background: '#22c55e',
   },
   modalBackdrop: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(17, 24, 39, 0.22)',
+    background: 'rgba(15, 23, 42, 0.45)',
     display: 'flex',
-    justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
-    padding: 20,
+    justifyContent: 'center',
+    padding: 16,
+    zIndex: 100,
   },
   modalCard: {
-    width: 'min(1100px, 100%)',
-    maxHeight: '90vh',
+    width: '100%',
+    maxWidth: 1060,
+    maxHeight: '92vh',
     overflow: 'auto',
-    background: COLORS.surface,
-    borderRadius: 26,
-    border: `1px solid ${COLORS.border}`,
-    boxShadow: COLORS.shadowStrong,
+    background: '#ffffff',
+    borderRadius: 24,
+    padding: 22,
+    display: 'grid',
+    gap: 18,
+    boxShadow: '0 24px 70px rgba(15, 23, 42, 0.25)',
   },
   modalHeader: {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
     gap: 16,
-    padding: '22px 22px 0',
+    alignItems: 'flex-start',
   },
   modalTitle: {
     margin: 0,
-    color: COLORS.text,
-    fontSize: 26,
+    color: '#0f172a',
+    fontSize: 24,
+    fontWeight: 950,
+    letterSpacing: '-0.04em',
   },
   modalSubtitle: {
     margin: '6px 0 0',
-    color: COLORS.textSoft,
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: 650,
   },
   iconButton: {
-    border: `1px solid ${COLORS.border}`,
-    background: '#fff',
-    color: COLORS.textSoft,
-    width: 40,
-    height: 40,
-    borderRadius: 999,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    border: '1px solid #d1d5db',
+    background: '#ffffff',
+    color: '#0f172a',
     cursor: 'pointer',
-    fontSize: 16,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modalBody: {
-    padding: 22,
+  multiLines: {
     display: 'grid',
-    gap: 14,
+    gap: 12,
   },
-  modalGrid: {
+  multiLine: {
+    background: '#f8fafc',
+    border: '1px solid #e5e7eb',
+    borderRadius: 18,
+    padding: 14,
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: 12,
     alignItems: 'end',
   },
-  rowCard: {
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 18,
-    background: COLORS.surfaceAlt,
-    padding: 16,
+  field: {
     display: 'grid',
-    gap: 14,
+    gap: 6,
+    minWidth: 0,
   },
-  rowCardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    alignItems: 'center',
-    flexWrap: 'wrap',
+  label: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: 850,
   },
-  rowCardTitle: {
-    color: COLORS.text,
-    fontSize: 15,
+  input: {
+    width: '100%',
+    border: '1px solid #d1d5db',
+    borderRadius: 13,
+    padding: '11px 12px',
+    fontSize: 14,
+    outline: 'none',
+    background: '#ffffff',
+    boxSizing: 'border-box',
   },
-  addLineButton: {
-    border: `1px dashed ${COLORS.green}`,
-    background: COLORS.greenSofter,
-    color: COLORS.greenDark,
-    borderRadius: 16,
-    padding: '14px 16px',
-    fontWeight: 700,
+  issueInfo: {
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
+    color: '#334155',
+    padding: 12,
+    borderRadius: 14,
+    fontSize: 14,
+    fontWeight: 750,
+  },
+  removeLineButton: {
+    border: '1px solid #fecdd3',
+    background: '#fff1f2',
+    color: '#be123c',
+    borderRadius: 13,
+    padding: '11px 12px',
+    fontSize: 13,
+    fontWeight: 900,
     cursor: 'pointer',
   },
   modalActions: {
     display: 'flex',
     justifyContent: 'flex-end',
-    gap: 12,
-    padding: '0 22px 22px',
+    gap: 10,
     flexWrap: 'wrap',
   },
-  infoTile: {
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 16,
-    padding: '12px 14px',
-    background: '#fff',
-    minHeight: 48,
-    display: 'grid',
-    alignContent: 'center',
-    gap: 4,
+  cancelButton: {
+    border: '1px solid #d1d5db',
+    borderRadius: 14,
+    padding: '11px 14px',
+    background: '#ffffff',
+    color: '#0f172a',
+    fontSize: 14,
+    fontWeight: 850,
+    cursor: 'pointer',
   },
-  infoTileLabel: {
-    color: COLORS.textSoft,
-    fontSize: 12,
-    fontWeight: 700,
+  saveButton: {
+    border: 'none',
+    borderRadius: 14,
+    padding: '11px 14px',
+    background: '#047857',
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 850,
+    cursor: 'pointer',
   },
-  infoTileValue: {
-    color: COLORS.text,
-    fontSize: 16,
+  dangerSaveButton: {
+    border: 'none',
+    borderRadius: 14,
+    padding: '11px 14px',
+    background: '#dc2626',
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 850,
+    cursor: 'pointer',
   },
 }
