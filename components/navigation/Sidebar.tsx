@@ -17,6 +17,7 @@ import {
   PackageOpen,
   ClipboardCheck,
 ShieldCheck,
+HeartPulse,
   ListChecks,
 } from 'lucide-react'
 import { getCurrentAccess, type SystemRole } from '@/lib/app-access'
@@ -34,7 +35,10 @@ const MENU: MenuItem[] = [
   { label: 'Įstaigos', href: '/organizations', icon: Building2, roles: ['owner'] },
   { label: 'Darbuotojai', href: '/employees', icon: Users, roles: ['admin'] },
   { label: 'Užduotys', href: '/tasks', icon: ListChecks, roles: ['admin', 'employee'] },
+  { label: 'Mano profilis', href: '/my-profile', icon: UserRound, roles: ['admin', 'employee'] },
   { label: 'Gyventojai', href: '/residents', icon: UserRound, roles: ['admin', 'employee'] },
+  { label: 'Veiklos', href: '/activities-grid', icon: ClipboardCheck, roles: ['admin', 'employee'] },
+  { label: 'Medicina', href: '/medicine', icon: HeartPulse, roles: ['admin', 'employee'] },
   { label: 'Kambariai', href: '/rooms', icon: Home, roles: ['admin', 'employee'] },
   { label: 'Sandėliai', href: '/inventory', icon: PackageOpen, roles: ['admin', 'employee'] },
   { label: 'Perdavimo žurnalai', href: '/handover-logs', icon: ClipboardCheck, roles: ['admin', 'employee'] },

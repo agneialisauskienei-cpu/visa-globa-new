@@ -24,3 +24,118 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+
+/* VisaGloba activities Excel matrix */
+.ht-theme-classic thead th {
+  background: #dbeafe !important;
+  color: #1e3a8a !important;
+  font-weight: 900 !important;
+  border-color: #bfdbfe !important;
+}
+
+.ht-theme-classic thead tr:nth-child(2) th {
+  background: #1e4f83 !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}
+
+.ht-theme-classic td {
+  border-color: #e5e7eb !important;
+}
+
+.ht-theme-classic .vg-person-cell {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-weight: 900 !important;
+  white-space: pre-line !important;
+}
+
+.ht-theme-classic .vg-status-d {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  font-weight: 900 !important;
+  font-size: 18px !important;
+  text-align: center !important;
+}
+
+.ht-theme-classic .vg-status-n {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+  font-weight: 900 !important;
+  font-size: 18px !important;
+  text-align: center !important;
+}
+
+.ht-theme-classic .vg-status-a {
+  background: #fef3c7 !important;
+  color: #c2410c !important;
+  font-weight: 900 !important;
+  font-size: 18px !important;
+  text-align: center !important;
+}
+
+.ht-theme-classic .vg-status-t {
+  background: #fef9c3 !important;
+  color: #854d0e !important;
+  font-weight: 900 !important;
+  font-size: 18px !important;
+  text-align: center !important;
+}
+
+.ht-theme-classic .vg-status-empty {
+  background: #ffffff !important;
+  color: #475569 !important;
+  text-align: center !important;
+}
+
+.ht-theme-classic .area {
+  background: rgba(59, 130, 246, .18) !important;
+}
+
+.ht-theme-classic .current {
+  border-color: #2563eb !important;
+}
+
+
+/* VisaGloba Team schedule matrix */
+.ht-theme-classic .vg-team-person-cell {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  font-weight: 900 !important;
+  white-space: pre-line !important;
+}
+
+.ht-theme-classic .vg-team-work {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+}
+
+.ht-theme-classic .vg-team-vacation {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+}
+
+.ht-theme-classic .vg-team-sick {
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+}
+
+.ht-theme-classic .vg-team-off {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+}
+
+.ht-theme-classic .vg-team-empty {
+  background: #ffffff !important;
+  color: #94a3b8 !important;
+}
+

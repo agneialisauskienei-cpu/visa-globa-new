@@ -37,6 +37,11 @@ export const APP_MENU: AppMenuItem[] = [
     href: '/inventory',
     roles: ['owner', 'admin', 'employee'],
   },
+{
+  label: "Medicina",
+  href: "/medicine",
+  roles: ["admin", "employee"],
+}
   {
     label: 'Užklausos',
     href: '/requests',
