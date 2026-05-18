@@ -6,7 +6,6 @@ type CreateOrganizationBody = {
   code?: string
   address?: string
   plan?: string
-  actorUserId?: string | null
 }
 
 type PlanLimitsRow = {
@@ -40,15 +39,58 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ ok: false, error: message }, { status })
 }
 
+async function requireAdmin(request: NextRequest) {
+  const authHeader = request.headers.get("authorization")
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.replace("Bearer ", "").trim()
+
+  const supabase = getServiceSupabase()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token)
+
+  if (authError || !user) {
+    return null
+  }
+
+  const { data: membership } = await supabase
+    .from("organization_members")
+    .select("role, is_active")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle()
+
+  if (!membership) {
+    return null
+  }
+
+  if (!["owner", "admin"].includes(membership.role)) {
+    return null
+  }
+
+  return user
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const authUser = await requireAdmin(request)
+
+    if (!authUser) {
+      return jsonError("Neturite teisių.", 403)
+    }
+
     const body = (await request.json()) as CreateOrganizationBody
 
     const name = body.name?.trim() || ''
     const code = body.code?.trim() || ''
     const address = body.address?.trim() || ''
     const plan = body.plan?.trim().toLowerCase() || 'basic'
-    const actorUserId = body.actorUserId?.trim() || null
 
     if (!name) {
       return jsonError('Įstaigos pavadinimas yra privalomas.')
@@ -106,7 +148,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: auditError } = await supabase.rpc('log_audit_event', {
-      p_actor_user_id: actorUserId,
       p_organization_id: organization.id,
       p_entity_type: 'organization',
       p_entity_id: organization.id,

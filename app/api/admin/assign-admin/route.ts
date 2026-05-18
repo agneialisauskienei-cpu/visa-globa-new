@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js'
 type AssignAdminBody = {
   organizationId?: string
   email?: string
-  actorUserId?: string | null
 }
 
 type PlanLimitsRow = {
@@ -48,12 +47,55 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ ok: false, error: message }, { status })
 }
 
+async function requireAdmin(request: NextRequest) {
+  const authHeader = request.headers.get("authorization")
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.replace("Bearer ", "").trim()
+
+  const supabase = getServiceSupabase()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token)
+
+  if (authError || !user) {
+    return null
+  }
+
+  const { data: membership } = await supabase
+    .from("organization_members")
+    .select("role, is_active")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle()
+
+  if (!membership) {
+    return null
+  }
+
+  if (!["owner", "admin"].includes(membership.role)) {
+    return null
+  }
+
+  return user
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const authUser = await requireAdmin(request)
+
+    if (!authUser) {
+      return jsonError("Neturite teisių.", 403)
+    }
+
     const body = (await request.json()) as AssignAdminBody
     const organizationId = body.organizationId?.trim()
     const email = body.email?.trim().toLowerCase()
-    const actorUserId = body.actorUserId?.trim() || null
 
     if (!organizationId) {
       return jsonError('Trūksta organizationId.')
@@ -144,7 +186,6 @@ export async function POST(request: NextRequest) {
         role: 'admin',
         token,
         status: 'pending',
-        invited_by: actorUserId,
         expires_at: expiresAt,
       })
 
@@ -153,7 +194,6 @@ export async function POST(request: NextRequest) {
       }
 
       await supabase.rpc('log_audit_event', {
-        p_actor_user_id: actorUserId,
         p_organization_id: organizationId,
         p_entity_type: 'organization_invite',
         p_entity_id: email,
@@ -245,7 +285,6 @@ export async function POST(request: NextRequest) {
         .update({
           role: 'admin',
           is_active: true,
-          invited_by: actorUserId,
         })
         .eq('id', existingMembership.id)
 
@@ -260,7 +299,6 @@ export async function POST(request: NextRequest) {
           user_id: profile.id,
           role: 'admin',
           is_active: true,
-          invited_by: actorUserId,
         })
 
       if (insertMembershipError) {
@@ -284,7 +322,6 @@ export async function POST(request: NextRequest) {
     }
 
     await supabase.rpc('log_audit_event', {
-      p_actor_user_id: actorUserId,
       p_organization_id: organizationId,
       p_entity_type: 'organization_member',
       p_entity_id: profile.id,
