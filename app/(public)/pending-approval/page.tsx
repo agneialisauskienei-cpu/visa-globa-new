@@ -25,41 +25,54 @@ export default function PendingApprovalPage() {
       if (!active) return
       setEmail(user.email || '')
 
-      // Super admin
-      if ((user.email || '').toLowerCase() === 'info@skaitytaknyga.lt') {
-        router.replace('/organizations')
-        return
-      }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id, role')
+        .eq('id', user.id)
+        .maybeSingle()
 
-      // Admin pagal tavo taisyklę
-      if ((user.email || '').toLowerCase() === 'miauksena@gmail.com') {
-        router.replace('/admin-dashboard')
-        return
-      }
-
-      const { data: memberships } = await supabase
+      let query = supabase
         .from('organization_members')
-        .select('role, organization_id, created_at')
+        .select('role, organization_id, is_active')
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
+
+      if (profile?.organization_id) {
+        query = query.eq('organization_id', profile.organization_id)
+      }
+
+      const { data: memberships, error } = await query.limit(1)
+
+      if (error) {
+        console.error('[PendingApproval] membership check failed', error)
+        if (active) setChecking(false)
+        return
+      }
 
       const membership = memberships?.[0] || null
 
-      if (membership?.role === 'owner' || membership?.role === 'admin') {
+      if (!membership) {
+        if (active) setChecking(false)
+        return
+      }
+
+      try {
+        window.localStorage.setItem('active_organization_id', membership.organization_id)
+      } catch {}
+
+      const role = membership.role || profile?.role
+
+      if (role === 'owner' || role === 'admin' || role === 'super_admin') {
         router.replace('/admin-dashboard')
         return
       }
 
-      if (membership?.role === 'employee') {
+      if (role === 'employee') {
         router.replace('/employee-dashboard')
         return
       }
 
-      if (active) {
-        setChecking(false)
-      }
+      if (active) setChecking(false)
     }
 
     void checkNow()
