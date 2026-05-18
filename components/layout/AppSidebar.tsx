@@ -1,3 +1,4 @@
+```tsx
 "use client"
 
 import Link from "next/link"
@@ -12,8 +13,6 @@ import {
   Home,
   Inbox,
   LogOut,
-  MailPlus,
-  Settings,
   ShieldCheck,
   User,
   UserRound,
@@ -58,7 +57,6 @@ function menuIcon(icon: string) {
   if (icon === "inbox") return Inbox
   if (icon === "chart") return BarChart3
   if (icon === "shield") return ShieldCheck
-  
 
   return Home
 }
@@ -115,27 +113,6 @@ function VisaGlobaLogo() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path
-        d="M12.4 17.5L16.4 13.6C17.5 12.5 19.2 12.5 20.3 13.6L22 15.2"
-        stroke="currentColor"
-        strokeWidth="3.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M27.6 17.5L23.6 13.6C22.5 12.5 20.8 12.5 19.7 13.6L18 15.2"
-        stroke="currentColor"
-        strokeWidth="3.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M14.6 20.2L18.4 23.8C19.3 24.7 20.7 24.7 21.6 23.8L25.4 20.2"
-        stroke="currentColor"
-        strokeWidth="3.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   )
 }
@@ -178,7 +155,9 @@ export default function AppSidebar() {
     if (!access) return []
 
     if (access.role === "super_admin") {
-      return SUPER_ADMIN_MENU.filter((item) => hasPermission(access, item.permission))
+      return SUPER_ADMIN_MENU.filter((item) =>
+        hasPermission(access, item.permission)
+      )
     }
 
     return APP_MENU
@@ -221,17 +200,19 @@ export default function AppSidebar() {
         </nav>
       </div>
 
-      <div style={styles.avatar}>
-  {avatarUrl ? (
-    <img
-      src={avatarUrl}
-      alt="Avatar"
-      style={styles.avatarImage}
-    />
-  ) : (
-    (access?.email || "NA").slice(0, 2).toUpperCase()
-  )}
-</div>
+      <div style={styles.footer}>
+        <div style={styles.userBox}>
+          <div style={styles.avatar}>
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt="Avatar"
+                style={styles.avatarImage}
+              />
+            ) : (
+              (access?.email || "NA").slice(0, 2).toUpperCase()
+            )}
+          </div>
 
           <div style={styles.userInfo}>
             <div style={styles.userName}>Naudotojas</div>
@@ -239,7 +220,11 @@ export default function AppSidebar() {
           </div>
         </div>
 
-        <button type="button" style={styles.logout} onClick={() => void logout()}>
+        <button
+          type="button"
+          style={styles.logout}
+          onClick={() => void logout()}
+        >
           <LogOut size={17} />
           Atsijungti
         </button>
@@ -361,6 +346,14 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#ffffff",
     fontSize: 12,
     fontWeight: 950,
+    overflow: "hidden",
+  },
+
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    borderRadius: "50%",
   },
 
   userInfo: {
@@ -396,3 +389,4 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
   },
 }
+```
