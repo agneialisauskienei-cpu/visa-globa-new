@@ -203,7 +203,7 @@ export default function MyResidentsPage() {
 
         if (error) throw error
 
-        const assignedResidents = (data as ResidentAssignmentRow[]) || []
+        const assignedResidents = (data as unknown as ResidentAssignmentRow[]) || []
         setItems(assignedResidents)
 
         const residentIds = assignedResidents
@@ -591,7 +591,7 @@ export default function MyResidentsPage() {
 
               <button
                 type="button"
-                onClick={() => router.push(ROUTES.employeeNotifications)}
+                onClick={() => router.push("/notifications")}
                 className="mt-6 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
               >
                 <span>
@@ -621,7 +621,7 @@ export default function MyResidentsPage() {
         <TasksModal tasks={openTasks} onClose={() => setShowTasksModal(false)} />
       )}
 
-      <MobileBottomNav notificationsCount={notificationsCount} />
+      <MobileBottomNav />
     </main>
   )
 }

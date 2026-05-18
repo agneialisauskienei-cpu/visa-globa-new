@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthContext } from '@/lib/server/auth-context'
+import { getStarterAuthContext } from '@/lib/server/auth-context'
 
 export async function GET(request: NextRequest) {
   try {
-    const { supabase, ctx } = await getAuthContext(request)
+    const { supabase, ctx } = await getStarterAuthContext(request)
 
     const { data, error } = await supabase
       .from('resident_assignments')
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, ctx } = await getAuthContext(request)
+    const { supabase, ctx } = await getStarterAuthContext(request)
 
     if (!['owner', 'admin', 'manager'].includes(ctx.role)) {
       return NextResponse.json(
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { supabase, ctx } = await getAuthContext(request)
+    const { supabase, ctx } = await getStarterAuthContext(request)
 
     if (!['owner', 'admin', 'manager'].includes(ctx.role)) {
       return NextResponse.json(

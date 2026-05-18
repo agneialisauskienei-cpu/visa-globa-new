@@ -247,7 +247,7 @@ async function writeAuditLog(input: {
     ];
 
     for (const attempt of attempts) {
-      const { error } = await supabase.from(attempt.table).insert(attempt.payload);
+      const { error } = await supabase.from(attempt.table).insert(attempt.payload as any);
       if (!error) return;
     }
   } catch {

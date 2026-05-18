@@ -188,7 +188,7 @@ export default function MySchedulePage() {
         )}
       </div>
 
-      <MobileBottomNav notificationsCount={notificationsCount} />
+      <MobileBottomNav />
     </div>
   )
 }

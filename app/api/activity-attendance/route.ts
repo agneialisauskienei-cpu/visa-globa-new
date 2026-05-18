@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthContext } from '@/lib/server/auth-context'
+import { getStarterAuthContext } from '@/lib/server/auth-context'
 
 type AttendanceStatus = 'attended' | 'absent' | 'refused'
 
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, ctx } = await getAuthContext(request)
+    const { supabase, ctx } = await getStarterAuthContext(request)
     const body = await request.json()
 
     const session_id = String(body?.session_id || '').trim()

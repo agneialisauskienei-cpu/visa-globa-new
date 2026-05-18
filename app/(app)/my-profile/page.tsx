@@ -355,7 +355,6 @@ export default function MyProfilePage() {
       });
 
       if (
-        currentMembership?.role === "super_admin" ||
         currentMembership?.role === "owner" ||
         currentMembership?.role === "admin"
       ) {
@@ -1378,7 +1377,7 @@ export default function MyProfilePage() {
         }
       `}</style>
 
-      <MobileBottomNav notificationsCount={notificationsCount} />
+      <MobileBottomNav />
 
       {showProfileModal ? (
         <Modal
