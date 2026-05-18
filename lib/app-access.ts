@@ -317,7 +317,8 @@ export async function getCurrentAccess(): Promise<CurrentAccess> {
     .from("organization_members")
     .select("role, organization_id, staff_type, position, extra_permissions")
     .eq("user_id", user.id)
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   const role = (membership?.role as MembershipRole) ?? "employee"
   const staffType = (membership?.staff_type as StaffType) ?? null
