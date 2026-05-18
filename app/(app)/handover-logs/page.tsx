@@ -929,7 +929,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function FilterToggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className={`rounded-2xl border px-3 py-2 text-xs font-black ${active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600"}`}>
+    <button type="button" onClick={onClick} className={`inline-flex h-12 items-center justify-center rounded-2xl border px-4 text-sm font-black transition ${active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600"}`}>
       {children}
     </button>
   );
