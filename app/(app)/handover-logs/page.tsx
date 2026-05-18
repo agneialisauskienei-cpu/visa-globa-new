@@ -734,10 +734,10 @@ export default function HandoverLogsPage() {
                 </label>
               </div>
 
-              <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-[1.2fr_1fr_1fr_auto]">
-                <select value={residentFilter} onChange={(event) => setResidentFilter(event.target.value)} className="input"><option value="all">Visi gyventojai</option>{residents.map((resident) => <option key={resident.id} value={resident.id}>{residentName(resident, roomsById)}</option>)}</select>
-                <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input"><option value="all">Visi prioritetai</option>{PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
-                <select value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="input"><option value="all">Visos pamainos</option>{SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <select value={residentFilter} onChange={(event) => setResidentFilter(event.target.value)} className="input min-w-[220px] flex-1"><option value="all">Visi gyventojai</option>{residents.map((resident) => <option key={resident.id} value={resident.id}>{residentName(resident, roomsById)}</option>)}</select>
+                <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input min-w-[220px] flex-1"><option value="all">Visi prioritetai</option>{PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
+                <select value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="input min-w-[220px] flex-1"><option value="all">Visos pamainos</option>{SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
                 <div className="flex min-w-0 flex-wrap gap-2">
                   <FilterToggle active={!includeArchived && !unreadOnly && !importantOnly} onClick={() => { setIncludeArchived(false); setUnreadOnly(false); }}>Visi aktyvūs</FilterToggle>
                   <FilterToggle active={unreadOnly} onClick={() => { setIncludeArchived(false); setUnreadOnly((v) => !v); }}>Nepatvirtinti</FilterToggle>

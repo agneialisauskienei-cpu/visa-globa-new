@@ -366,14 +366,15 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     gap: 10,
     borderRadius: 15,
-    padding: 11,
+    padding: "10px 12px",
+    minWidth: 0,
     background: "rgba(255,255,255,.08)",
   },
 
   avatar: {
-    width: 36,
-    height: 36,
-    minWidth: 36,
+    width: 42,
+    height: 42,
+    minWidth: 42,
     borderRadius: 13,
     display: "flex",
     alignItems: "center",
@@ -393,6 +394,8 @@ const styles: Record<string, CSSProperties> = {
 
   userInfo: {
     minWidth: 0,
+    flex: 1,
+    overflow: "hidden",
   },
 
   userName: {
