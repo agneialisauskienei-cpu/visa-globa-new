@@ -862,6 +862,7 @@ export default function TeamPage() {
 
       setMessage((prev) => prev || "Darbuotojo duomenys atnaujinti.");
       closeEmployeeEditor();
+      window.location.reload();
     } catch (error) {
       console.error("[TeamPage] saveEmployee failed", error);
       setMessage(getReadableError(error));
