@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
+import MobileEmployeeDashboard from "@/components/mobile/MobileEmployeeDashboard";
 import {
   ArrowRight,
   BadgeAlert,
@@ -93,7 +94,13 @@ export default function EmployeeDashboardPage() {
   const notificationCount = notificationsRead ? "0" : "2";
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-50 px-3 py-4 text-slate-950 sm:px-5 sm:py-6 lg:px-6">
+    <>
+      <div className="lg:hidden">
+        <MobileEmployeeDashboard />
+      </div>
+
+      <div className="hidden lg:block">
+        <main className="min-h-screen overflow-x-hidden bg-slate-50 px-3 py-4 text-slate-950 sm:px-5 sm:py-6 lg:px-6">
       <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6">
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6 lg:p-7">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -690,7 +697,9 @@ export default function EmployeeDashboardPage() {
           transform: scale(0.98);
         }
       `}</style>
-    </main>
+        </main>
+      </div>
+    </>
   );
 }
 
