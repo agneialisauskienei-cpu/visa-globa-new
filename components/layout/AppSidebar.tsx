@@ -146,6 +146,7 @@ export default function AppSidebar() {
   const searchParams = useSearchParams()
 
   const [access, setAccess] = useState<CurrentAccess | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   useEffect(() => {
     void loadAccess()
@@ -154,6 +155,16 @@ export default function AppSidebar() {
   async function loadAccess() {
     const current = await getCurrentAccess()
     setAccess(current)
+
+    if (current?.userId) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", current.userId)
+        .single()
+
+      setAvatarUrl(data?.avatar_url || null)
+    }
   }
 
   async function logout() {
@@ -210,11 +221,17 @@ export default function AppSidebar() {
         </nav>
       </div>
 
-      <div style={styles.footer}>
-        <div style={styles.userBox}>
-          <div style={styles.avatar}>
-            {(access?.email || "NA").slice(0, 2).toUpperCase()}
-          </div>
+      <div style={styles.avatar}>
+  {avatarUrl ? (
+    <img
+      src={avatarUrl}
+      alt="Avatar"
+      style={styles.avatarImage}
+    />
+  ) : (
+    (access?.email || "NA").slice(0, 2).toUpperCase()
+  )}
+</div>
 
           <div style={styles.userInfo}>
             <div style={styles.userName}>Naudotojas</div>
