@@ -49,20 +49,6 @@ export default function LoginPage() {
         return
       }
 
-      // Super admin
-      if (normalizedEmail === 'info@skaitytaknyga.lt') {
-        router.replace('/organizations')
-        router.refresh()
-        return
-      }
-
-      // Admin pagal tavo taisyklę
-      if (normalizedEmail === 'miauksena@gmail.com') {
-        router.replace('/admin-dashboard')
-        router.refresh()
-        return
-      }
-
       // Membership tikrinam stabiliau: imam pirmą aktyvų įrašą, o ne tik maybeSingle scenarijų
       const { data: memberships, error: membershipError } = await supabase
         .from('organization_members')
