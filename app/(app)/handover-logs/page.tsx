@@ -596,7 +596,7 @@ export default function HandoverLogsPage() {
                 <ClipboardList className="h-7 w-7" />
               </div>
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">Perdavimo žurnalai</p>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Perdavimo žurnalai</p>
                 <h1 className="mt-2 text-4xl font-black tracking-tight">Pamainų perdavimas</h1>
                 <p className="mt-2 text-lg font-semibold text-slate-500">
                   Svarbi informacija tarp pamainų, susieta su gyventojais ir atsakomybės tęstinumu.
@@ -627,7 +627,7 @@ export default function HandoverLogsPage() {
 
         <section className="grid gap-6 xl:grid-cols-[560px_minmax(0,1fr)]">
           <article className="xl:sticky xl:top-6 self-start rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">Naujas įrašas</p>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Naujas įrašas</p>
             <h2 className="mt-1 text-2xl font-black tracking-tight">Perduoti informaciją</h2>
             <p className="mt-1 font-semibold text-slate-500">Pirmiausia pasirink temą, tada, jei reikia, priskirk gyventoją.</p>
 
@@ -721,25 +721,26 @@ export default function HandoverLogsPage() {
           </article>
 
           <div className="min-w-0 space-y-6">
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                 <div>
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">Filtrai</p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight">Pamainos informacija</h2>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Filtrai</p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Pamainos informacija</h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">Atrinkite įrašus pagal gyventoją, prioritetą, pamainą ir būseną.</p>
                 </div>
-                <label className="relative block w-full lg:w-96">
+                <label className="relative block w-full xl:max-w-md">
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ieškoti..." className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 font-bold text-slate-900 outline-none focus:border-emerald-300 focus:bg-white" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ieškoti pagal tekstą, gyventoją..." className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 font-bold text-slate-900 outline-none focus:border-emerald-300 focus:bg-white" />
                 </label>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-[1.2fr_1fr_1fr_auto]">
                 <select value={residentFilter} onChange={(event) => setResidentFilter(event.target.value)} className="input"><option value="all">Visi gyventojai</option>{residents.map((resident) => <option key={resident.id} value={resident.id}>{residentName(resident, roomsById)}</option>)}</select>
                 <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input"><option value="all">Visi prioritetai</option>{PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
                 <select value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="input"><option value="all">Visos pamainos</option>{SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
                 <div className="flex min-w-0 flex-wrap gap-2">
-                  <FilterToggle active={unreadOnly} onClick={() => setUnreadOnly((v) => !v)}>Kol nepatvirtinta</FilterToggle>
-                  <FilterToggle active={importantOnly} onClick={() => setImportantOnly((v) => !v)}>Tik svarbūs</FilterToggle>
+                  <FilterToggle active={unreadOnly} onClick={() => setUnreadOnly((v) => !v)}>Nepatvirtinti</FilterToggle>
+                  <FilterToggle active={importantOnly} onClick={() => setImportantOnly((v) => !v)}>Svarbūs</FilterToggle>
                   <FilterToggle active={includeArchived} onClick={() => setIncludeArchived((v) => !v)}>Archyvas</FilterToggle>
                 </div>
               </div>
@@ -747,7 +748,7 @@ export default function HandoverLogsPage() {
 
             {hotResidents.length > 0 ? (
               <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">Dažniausiai minimi</p>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Dažniausiai minimi</p>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {hotResidents.map((item) => (
                     <button key={item.resident.id} type="button" onClick={() => setResidentFilter(item.resident.id)} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left hover:border-emerald-200 hover:bg-emerald-50">
@@ -819,7 +820,7 @@ export default function HandoverLogsPage() {
           <section className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-7">
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
                   Kaip naudoti
                 </p>
                 <h2 className="mt-1 text-4xl font-black tracking-tight">
@@ -964,7 +965,7 @@ function LogModal({
       <section className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-7">
           <div>
-            <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">Perdavimo įrašas</p>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Perdavimo įrašas</p>
             <h2 className="mt-1 text-4xl font-black tracking-tight">{log.title}</h2>
             <p className="mt-2 font-semibold text-slate-500">{residentName(resident, roomsById)} · {profileName(author)} · {formatDate(log.created_at)}</p>
           </div>
