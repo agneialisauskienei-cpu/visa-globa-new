@@ -769,6 +769,12 @@ export default function TeamPage() {
         position: editForm.position.trim() || null,
         department: editForm.department.trim() || null,
         staff_type: editForm.staff_type || null,
+        extra_permissions: Array.from(
+          new Set([
+            ...staffPermissions(editForm.staff_type),
+            ...editForm.extra_permissions,
+          ]),
+        ),
         role: editForm.role || "employee",
         contract_number: editForm.contract_number.trim() || null,
         employment_start_date: editForm.employment_start_date || null,
@@ -2220,9 +2226,19 @@ export default function TeamPage() {
                 <Field label="Sistemos pareigų tipas">
                   <select
                     value={editForm.staff_type}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, staff_type: event.target.value })
-                    }
+                    onChange={(event) => {
+                      const staffType = event.target.value;
+                      setEditForm({
+                        ...editForm,
+                        staff_type: staffType,
+                        extra_permissions: Array.from(
+                          new Set([
+                            ...staffPermissions(staffType),
+                            ...editForm.extra_permissions,
+                          ]),
+                        ),
+                      });
+                    }}
                     className="input"
                   >
                     <option value="">Pasirinkti</option>
