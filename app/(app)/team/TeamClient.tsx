@@ -2231,6 +2231,9 @@ export default function TeamPage() {
                       setEditForm({
                         ...editForm,
                         staff_type: staffType,
+                        position:
+                          STAFF_TYPES.find((type) => type.value === staffType)?.label ||
+                          editForm.position,
                         extra_permissions: Array.from(
                           new Set([
                             ...staffPermissions(staffType),
