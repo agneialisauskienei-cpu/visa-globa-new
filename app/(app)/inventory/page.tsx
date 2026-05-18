@@ -4,20 +4,21 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import {
+  AlertTriangle,
   ArrowDownCircle,
   ArrowRight,
   ArrowUpCircle,
   BedDouble,
   Boxes,
-  ClipboardList,
   PackageOpen,
   Pill,
   Plus,
+  RefreshCw,
   Search,
+  Send,
   ShieldCheck,
   Shirt,
   Sparkles,
-  Trash2,
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -71,6 +72,7 @@ type InventoryLog = {
 type PersonOption = {
   id: string
   label: string
+  isActive?: boolean
 }
 
 type CategoryMeta = {
@@ -109,11 +111,18 @@ type RefillLine = {
   notes: string
 }
 
+type UniformReturnLine = {
+  itemId: string
+  targetId: string
+  quantity: string
+  notes: string
+}
+
 const CATEGORIES: CategoryMeta[] = [
   {
     code: 'diapers',
     title: 'Sauskelnės',
-    description: 'Dydžiai, likučiai ir nurašymai gyventojams.',
+    description: 'Dydžiai, likučiai ir išdavimai gyventojams.',
     href: '/inventory/diapers',
     icon: PackageOpen,
   },
@@ -134,7 +143,7 @@ const CATEGORIES: CategoryMeta[] = [
   {
     code: 'medication',
     title: 'Vaistai',
-    description: 'Vaistų likučiai, papildymai ir nurašymai.',
+    description: 'Vaistų likučiai, papildymai ir išdavimai.',
     href: '/inventory/medication',
     icon: Pill,
   },
@@ -235,6 +244,13 @@ const DEFAULT_REFILL_LINE: RefillLine = {
   notes: '',
 }
 
+const DEFAULT_UNIFORM_RETURN_LINE: UniformReturnLine = {
+  itemId: '',
+  targetId: '',
+  quantity: '1',
+  notes: '',
+}
+
 function getReadableError(error: unknown) {
   if (!error) return 'Nepavyko įvykdyti veiksmo.'
   if (error instanceof Error) return error.message
@@ -311,6 +327,17 @@ function isUniformItem(item: InventoryItem | null | undefined) {
   return item?.category === 'uniforms'
 }
 
+function isUniformReturnLog(log: InventoryLog) {
+  return log.category === 'uniforms' && log.type === 'in' && (log.resident_code || '').startsWith('Grąžino darbuotojas:')
+}
+
+function getLogOperationLabel(log: InventoryLog) {
+  if (isUniformReturnLog(log)) return 'Grąžinimas'
+  if (log.type === 'in') return 'Papildymas'
+  if (log.type === 'out') return 'Išdavimas'
+  return 'Koregavimas'
+}
+
 export default function InventoryPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -330,20 +357,24 @@ export default function InventoryPage() {
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [showIssueModal, setShowIssueModal] = useState(false)
+  const [showUniformIssueModal, setShowUniformIssueModal] = useState(false)
   const [showRefillModal, setShowRefillModal] = useState(false)
+  const [showUniformReturnModal, setShowUniformReturnModal] = useState(false)
 
   const [addForms, setAddForms] = useState<AddForm[]>([DEFAULT_ADD_FORM])
   const [issueLines, setIssueLines] = useState<IssueLine[]>([DEFAULT_ISSUE_LINE])
   const [refillLines, setRefillLines] = useState<RefillLine[]>([DEFAULT_REFILL_LINE])
+  const [uniformReturnLines, setUniformReturnLines] = useState<UniformReturnLine[]>([DEFAULT_UNIFORM_RETURN_LINE])
 
   useEffect(() => {
     void loadInventory()
   }, [])
 
-  async function loadInventory() {
+  async function loadInventory(options: { clearMessage?: boolean } = {}) {
     try {
+      const { clearMessage = true } = options
       setLoading(true)
-      setMessage('')
+      if (clearMessage) setMessage('')
 
       const orgId = await getCurrentOrganizationId()
 
@@ -385,9 +416,8 @@ export default function InventoryPage() {
 
         supabase
           .from('organization_members')
-          .select('user_id')
-          .eq('organization_id', orgId)
-          .eq('is_active', true),
+          .select('user_id, is_active')
+          .eq('organization_id', orgId),
       ])
 
       if (itemsResult.error) throw itemsResult.error
@@ -414,6 +444,12 @@ export default function InventoryPage() {
       const memberUserIds = ((membersResult.data || []) as Record<string, unknown>[])
         .map((member) => String(member.user_id || '').trim())
         .filter(Boolean)
+      const memberActivityByUserId = new Map(
+        ((membersResult.data || []) as Record<string, unknown>[]).map((member) => [
+          String(member.user_id || '').trim(),
+          member.is_active !== false,
+        ])
+      )
 
       if (memberUserIds.length > 0) {
         const { data: profilesData, error: profilesError } = await supabase
@@ -432,7 +468,8 @@ export default function InventoryPage() {
 
             return {
               id: String(profile.id),
-              label: fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || email || String(profile.id),
+              label: `${fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || email || String(profile.id)}${memberActivityByUserId.get(String(profile.id)) === false ? ' (neaktyvus)' : ''}`,
+              isActive: memberActivityByUserId.get(String(profile.id)) !== false,
             }
           })
         )
@@ -470,9 +507,21 @@ export default function InventoryPage() {
     setMessage('')
   }
 
+  function openUniformIssueModal(itemId?: string) {
+    setIssueLines([{ ...DEFAULT_ISSUE_LINE, itemId: itemId || '' }])
+    setShowUniformIssueModal(true)
+    setMessage('')
+  }
+
   function openRefillModal(itemId?: string) {
     setRefillLines([{ ...DEFAULT_REFILL_LINE, itemId: itemId || '' }])
     setShowRefillModal(true)
+    setMessage('')
+  }
+
+  function openUniformReturnModal(itemId?: string) {
+    setUniformReturnLines([{ ...DEFAULT_UNIFORM_RETURN_LINE, itemId: itemId || '' }])
+    setShowUniformReturnModal(true)
     setMessage('')
   }
 
@@ -507,6 +556,12 @@ export default function InventoryPage() {
     )
   }
 
+  function updateUniformReturnLine(index: number, patch: Partial<UniformReturnLine>) {
+    setUniformReturnLines((prev) =>
+      prev.map((line, currentIndex) => (currentIndex === index ? { ...line, ...patch } : line))
+    )
+  }
+
   async function getActorName() {
     const {
       data: { user },
@@ -534,10 +589,14 @@ export default function InventoryPage() {
 
   async function createItems() {
     try {
-      if (!organizationId) {
+      const activeOrganizationId = organizationId || (await getCurrentOrganizationId())
+
+      if (!activeOrganizationId) {
         setMessage('Nepavyko nustatyti aktyvios įstaigos.')
         return
       }
+
+      if (!organizationId) setOrganizationId(activeOrganizationId)
 
       const rows = addForms.map((form) => {
         const cleanName = form.name.trim()
@@ -554,7 +613,7 @@ export default function InventoryPage() {
         }
 
         return {
-          organization_id: organizationId,
+          organization_id: activeOrganizationId,
           name: cleanName,
           category: form.category,
           subcategory: cleanSubcategory || null,
@@ -575,7 +634,7 @@ export default function InventoryPage() {
       setShowAddModal(false)
       setAddForms([DEFAULT_ADD_FORM])
       setMessage(rows.length === 1 ? 'Prekė sėkmingai pridėta.' : 'Prekės sėkmingai pridėtos.')
-      await loadInventory()
+      await loadInventory({ clearMessage: false })
     } catch (error) {
       setMessage(getReadableError(error))
     } finally {
@@ -590,6 +649,7 @@ export default function InventoryPage() {
         return
       }
 
+      const uniformIssue = showUniformIssueModal
       const actor = await getActorName()
       const updates: Array<{ item: InventoryItem; newQuantity: number }> = []
       const historyRows: Array<Record<string, unknown>> = []
@@ -599,7 +659,9 @@ export default function InventoryPage() {
         const quantity = Number(line.quantity || 0)
 
         if (!item) throw new Error('Kiekvienoje eilutėje pasirink prekę.')
-        if (Number.isNaN(quantity) || quantity <= 0) throw new Error('Nurašomas kiekis turi būti didesnis už 0.')
+        if (uniformIssue && !isUniformItem(item)) throw new Error('Uniformų išdavime galima rinktis tik uniformas.')
+        if (!uniformIssue && isUniformItem(item)) throw new Error('Uniformoms naudok atskirą mygtuką „Išduoti uniformą“.')
+        if (Number.isNaN(quantity) || quantity <= 0) throw new Error('Išduodamas kiekis turi būti didesnis už 0.')
 
         const currentQuantity = Number(item.quantity || 0)
         if (quantity > currentQuantity) {
@@ -655,9 +717,10 @@ export default function InventoryPage() {
       if (historyError) throw historyError
 
       setShowIssueModal(false)
+      setShowUniformIssueModal(false)
       setIssueLines([DEFAULT_ISSUE_LINE])
-      setMessage('Prekės sėkmingai nurašytos.')
-      await loadInventory()
+      setMessage('Prekės sėkmingai išduotos.')
+      await loadInventory({ clearMessage: false })
     } catch (error) {
       setMessage(getReadableError(error))
     } finally {
@@ -729,7 +792,81 @@ export default function InventoryPage() {
       setShowRefillModal(false)
       setRefillLines([DEFAULT_REFILL_LINE])
       setMessage('Sandėlis sėkmingai papildytas.')
-      await loadInventory()
+      await loadInventory({ clearMessage: false })
+    } catch (error) {
+      setMessage(getReadableError(error))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function returnUniforms() {
+    try {
+      if (!organizationId) {
+        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
+        return
+      }
+
+      const actor = await getActorName()
+      const updates: Array<{ item: InventoryItem; newQuantity: number }> = []
+      const historyRows: Array<Record<string, unknown>> = []
+
+      for (const line of uniformReturnLines) {
+        const item = items.find((currentItem) => currentItem.id === line.itemId)
+        const quantity = Number(line.quantity || 0)
+        const employee = employees.find((option) => option.id === line.targetId)
+
+        if (!item) throw new Error('Kiekvienoje eilutėje pasirink uniformą.')
+        if (!isUniformItem(item)) throw new Error('Grąžinimui galima rinktis tik uniformas.')
+        if (!employee) throw new Error('Pasirink darbuotoją, kuris grąžino uniformą.')
+        if (Number.isNaN(quantity) || quantity <= 0) throw new Error('Grąžinamas kiekis turi būti didesnis už 0.')
+
+        const currentQuantity = Number(item.quantity || 0)
+        updates.push({
+          item,
+          newQuantity: currentQuantity + quantity,
+        })
+
+        historyRows.push({
+          organization_id: organizationId,
+          item_id: item.id,
+          item_name: item.name,
+          category: item.category,
+          subcategory: item.subcategory,
+          size: item.size,
+          unit: item.unit,
+          resident_id: null,
+          resident_code: `Grąžino darbuotojas: ${employee.label}`,
+          employee_user_id: actor.userId,
+          employee_full_name: actor.name,
+          quantity,
+          type: 'in',
+          notes: line.notes.trim() || 'Uniforma grąžinta darbuotojui išėjus iš darbo / pasibaigus naudojimui.',
+        })
+      }
+
+      setSaving(true)
+      setMessage('')
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({
+            quantity: update.newQuantity,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', update.item.id)
+
+        if (error) throw error
+      }
+
+      const { error: historyError } = await supabase.from('inventory_issue_history').insert(historyRows)
+      if (historyError) throw historyError
+
+      setShowUniformReturnModal(false)
+      setUniformReturnLines([DEFAULT_UNIFORM_RETURN_LINE])
+      setMessage('Uniformos sėkmingai grąžintos į sandėlį.')
+      await loadInventory({ clearMessage: false })
     } catch (error) {
       setMessage(getReadableError(error))
     } finally {
@@ -838,29 +975,79 @@ export default function InventoryPage() {
     }
   }, [items, logs])
 
+  const riskRows = useMemo(() => {
+    const criticalItems = items
+      .filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'empty')
+      .slice(0, 3)
+    const lowItems = items
+      .filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'low')
+      .slice(0, 3)
+
+    return [
+      {
+        title: 'Pasibaigusios prekės',
+        value: globalStats.empty,
+        desc: criticalItems.length
+          ? criticalItems.map((item) => item.name).join(', ')
+          : 'Kritinių likučių nėra.',
+        tone: 'danger' as const,
+      },
+      {
+        title: 'Baigiasi likučiai',
+        value: globalStats.low,
+        desc: lowItems.length ? lowItems.map((item) => item.name).join(', ') : 'Minimalūs kiekiai nepasiekti.',
+        tone: 'warning' as const,
+      },
+      {
+        title: 'Šiandienos veiksmas',
+        value: globalStats.empty + globalStats.low,
+        desc: globalStats.empty + globalStats.low > 0 ? 'Peržiūrėti rizikas ir papildyti sandėlį.' : 'Sandėlio rizikos suvaldytos.',
+        tone: globalStats.empty > 0 ? 'danger' as const : globalStats.low > 0 ? 'warning' as const : 'green' as const,
+      },
+    ]
+  }, [items, globalStats])
+
   return (
-    <div style={styles.page}>
+    <main style={styles.page}>
       <section style={styles.hero}>
-        <div>
-          <div style={styles.eyebrow}>Sandėlių valdymas</div>
-          <h1 style={styles.title}>Sandėlis</h1>
-          <p style={styles.subtitle}>
-            Valdyk prekių likučius, stebėk judėjimą ir greitai pasiek kiekvieną kategoriją.
-          </p>
+        <div style={styles.heroContent}>
+          <div style={styles.heroIcon}>
+            <Boxes size={29} strokeWidth={2.2} />
+          </div>
+
+          <div>
+            <div style={styles.eyebrow}>Sandėlių valdymas</div>
+            <h1 style={styles.title}>Sandėlis</h1>
+            <p style={styles.subtitle}>
+              Valdyk prekių likučius, stebėk judėjimą ir greitai pasiek kiekvieną kategoriją.
+            </p>
+          </div>
         </div>
 
         <div style={styles.heroActions}>
-          <button type="button" onClick={() => openAddModal()} style={styles.secondaryButton}>
-            <Plus size={16} /> Pridėti prekes
-          </button>
+          <div style={styles.actionGroup}>
+            <button type="button" onClick={() => openAddModal()} style={styles.secondaryButton}>
+              <Plus size={16} /> Pridėti prekes
+            </button>
 
-          <button type="button" onClick={() => openRefillModal()} style={styles.secondaryButton}>
-            <ArrowUpCircle size={16} /> Papildyti
-          </button>
+            <button type="button" onClick={() => openRefillModal()} style={styles.secondaryButton}>
+              <ArrowUpCircle size={16} /> Papildyti prekes
+            </button>
 
-          <button type="button" onClick={() => openIssueModal()} style={styles.primaryButton}>
-            <Trash2 size={16} /> Nurašyti
-          </button>
+            <button type="button" onClick={() => openIssueModal()} style={styles.primaryButton}>
+              <Send size={16} /> Išduoti prekes gyventojui
+            </button>
+          </div>
+
+          <div style={styles.uniformActionGroup}>
+            <button type="button" onClick={() => openUniformIssueModal()} style={styles.secondaryButton}>
+              <Shirt size={16} /> Išduoti uniformą
+            </button>
+
+            <button type="button" onClick={() => openUniformReturnModal()} style={styles.secondaryButton}>
+              <ArrowDownCircle size={16} /> Grąžinti uniformą
+            </button>
+          </div>
         </div>
       </section>
 
@@ -872,8 +1059,42 @@ export default function InventoryPage() {
         <StatCard label="Baigiasi" value={globalStats.low} tone="warning" onClick={() => setStockFilter((prev) => (prev === 'low' ? '' : 'low'))} active={stockFilter === 'low'} />
         <StatCard label="Pasibaigė" value={globalStats.empty} tone="danger" onClick={() => setStockFilter((prev) => (prev === 'empty' ? '' : 'empty'))} active={stockFilter === 'empty'} />
         <StatCard label="Judėjimų" value={globalStats.movements} onClick={() => setLogTypeFilter('')} active={!logTypeFilter} />
-        <StatCard label="Nurašymų" value={globalStats.out} tone="green" onClick={() => setLogTypeFilter((prev) => (prev === 'out' ? '' : 'out'))} active={logTypeFilter === 'out'} />
+        <StatCard label="Išdavimų" value={globalStats.out} tone="green" onClick={() => setLogTypeFilter((prev) => (prev === 'out' ? '' : 'out'))} active={logTypeFilter === 'out'} />
         <StatCard label="Papildymų" value={globalStats.incoming} onClick={() => setLogTypeFilter((prev) => (prev === 'in' ? '' : 'in'))} active={logTypeFilter === 'in'} />
+      </section>
+
+      <section style={styles.riskPanel}>
+        <div style={styles.riskHeader}>
+          <div>
+            <div style={styles.warningEyebrow}>Prioritetai</div>
+            <h2 style={styles.cardTitle}>Reikia dėmesio</h2>
+            <p style={styles.cardSubtitle}>Svarbiausi sandėlio signalai darbuotojui prieš išduodant prekes.</p>
+          </div>
+
+          <div style={styles.warningIcon}>
+            <AlertTriangle size={23} />
+          </div>
+        </div>
+
+        <div style={styles.riskGrid}>
+          {riskRows.map((row) => (
+            <button
+              key={row.title}
+              type="button"
+              onClick={() => {
+                if (row.tone === 'danger') setStockFilter((prev) => (prev === 'empty' ? '' : 'empty'))
+                if (row.tone === 'warning') setStockFilter((prev) => (prev === 'low' ? '' : 'low'))
+              }}
+              style={{ ...styles.riskCard, ...getRiskCardStyle(row.tone) }}
+            >
+              <div>
+                <p style={styles.riskTitle}>{row.title}</p>
+                <p style={styles.riskDesc}>{row.desc}</p>
+              </div>
+              <strong style={styles.riskValue}>{row.value}</strong>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section style={styles.toolbar}>
@@ -927,14 +1148,14 @@ export default function InventoryPage() {
         <Field label="Operacija istorijoje">
           <select value={logTypeFilter} onChange={(event) => setLogTypeFilter(event.target.value as LogTypeFilter)} style={styles.input}>
             <option value="">Visos</option>
-            <option value="out">Nurašymai</option>
+            <option value="out">Išdavimai</option>
             <option value="in">Papildymai</option>
             <option value="adjustment">Koregavimai</option>
           </select>
         </Field>
 
         <button type="button" onClick={() => void loadInventory()} style={styles.refreshButton}>
-          Atnaujinti
+          <RefreshCw size={16} /> Atnaujinti
         </button>
       </section>
 
@@ -943,6 +1164,8 @@ export default function InventoryPage() {
           const Icon = category.icon
           const stats = categoryStats[category.code]
           const status = stats.empty > 0 ? 'empty' : stats.low > 0 ? 'low' : stats.items > 0 ? 'ok' : 'none'
+          const riskCount = stats.low + stats.empty
+          const fillPercent = stats.items > 0 ? Math.max(8, Math.round(((stats.items - riskCount) / stats.items) * 100)) : 0
 
           return (
             <article key={category.code} style={styles.categoryCard}>
@@ -978,6 +1201,16 @@ export default function InventoryPage() {
                 </div>
               </div>
 
+              <div>
+                <div style={styles.progressMeta}>
+                  <span>Stabilumas</span>
+                  <strong>{stats.items ? `${fillPercent}%` : '—'}</strong>
+                </div>
+                <div style={styles.progressTrack}>
+                  <span style={{ ...styles.progressBar, width: `${fillPercent}%`, background: status === 'empty' ? '#e11d48' : status === 'low' ? '#f59e0b' : '#10b981' }} />
+                </div>
+              </div>
+
               <div style={styles.categoryActions}>
                 <button type="button" onClick={() => openAddModal(category.code)} style={styles.categoryAddButton}>
                   <Plus size={15} /> Pridėti
@@ -997,7 +1230,7 @@ export default function InventoryPage() {
           {loading ? (
             <EmptyState text="Kraunama..." />
           ) : filteredItems.length === 0 ? (
-            <EmptyState text="Prekių nerasta." />
+            <EmptyState text="Sandėlis dar tuščias pagal pasirinktus filtrus. Pridėkite pirmą prekę arba išvalykite filtrus." />
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
@@ -1037,9 +1270,20 @@ export default function InventoryPage() {
                           <button type="button" onClick={() => openRefillModal(item.id)} style={styles.inlineGreenButton}>
                             Papildyti
                           </button>
-                          <button type="button" onClick={() => openIssueModal(item.id)} style={styles.inlineDangerButton}>
-                            Nurašyti
-                          </button>
+                          {isUniformItem(item) ? (
+                            <>
+                              <button type="button" onClick={() => openUniformIssueModal(item.id)} style={styles.inlineDangerButton}>
+                                Išduoti darbuotojui
+                              </button>
+                              <button type="button" onClick={() => openUniformReturnModal(item.id)} style={styles.inlineGreenButton}>
+                                Grąžinti
+                              </button>
+                            </>
+                          ) : (
+                            <button type="button" onClick={() => openIssueModal(item.id)} style={styles.inlineDangerButton}>
+                              Išduoti gyventojui
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1054,7 +1298,7 @@ export default function InventoryPage() {
           {loading ? (
             <EmptyState text="Kraunama..." />
           ) : filteredLogs.length === 0 ? (
-            <EmptyState text="Judėjimų nerasta." />
+            <EmptyState text="Judėjimų dar nėra pagal pasirinktus filtrus. Papildymai, išdavimai ir grąžinimai atsiras čia." />
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.historyTable}>
@@ -1077,7 +1321,7 @@ export default function InventoryPage() {
                       <td style={styles.td}>
                         <span style={{ ...styles.logBadge, ...(log.type === 'in' ? styles.inBadge : styles.outBadge) }}>
                           {log.type === 'in' ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
-                          {log.type === 'in' ? 'Papildymas' : log.type === 'out' ? 'Nurašymas' : 'Koregavimas'}
+                          {getLogOperationLabel(log)}
                         </span>
                       </td>
                       <td style={styles.td}>{formatQuantity(log.quantity, log.unit)}</td>
@@ -1113,7 +1357,7 @@ export default function InventoryPage() {
           </div>
           <div style={styles.statusItem}>
             <span style={styles.statusDot} />
-            Multi nurašymas ir papildymas aktyvus
+            Multi išdavimas, grąžinimas ir papildymas aktyvus
           </div>
         </div>
       </section>
@@ -1122,6 +1366,7 @@ export default function InventoryPage() {
         <MultiAddModal
           forms={addForms}
           saving={saving}
+          message={message}
           onClose={() => {
             if (!saving) setShowAddModal(false)
           }}
@@ -1143,14 +1388,38 @@ export default function InventoryPage() {
 
       {showIssueModal ? (
         <MultiIssueModal
-          title="Nurašyti"
+          title="Išduoti gyventojui"
+          subtitle="Gali išduoti kelias prekes vienu kartu. Šis veiksmas skirtas gyventojų prekėms."
+          targetType="resident"
           lines={issueLines}
-          items={items}
+          items={items.filter((item) => !isUniformItem(item))}
           residents={residents}
           employees={employees}
           saving={saving}
+          message={message}
           onClose={() => {
             if (!saving) setShowIssueModal(false)
+          }}
+          onChange={updateIssueLine}
+          onAddLine={() => setIssueLines((prev) => [...prev, DEFAULT_ISSUE_LINE])}
+          onRemoveLine={(index) => setIssueLines((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
+          onSubmit={() => void issueItems()}
+        />
+      ) : null}
+
+      {showUniformIssueModal ? (
+        <MultiIssueModal
+          title="Išduoti uniformą"
+          subtitle="Uniformos išduodamos tik darbuotojams ir vėliau gali būti grąžintos į sandėlį."
+          targetType="employee"
+          lines={issueLines}
+          items={items.filter(isUniformItem)}
+          residents={residents}
+          employees={employees}
+          saving={saving}
+          message={message}
+          onClose={() => {
+            if (!saving) setShowUniformIssueModal(false)
           }}
           onChange={updateIssueLine}
           onAddLine={() => setIssueLines((prev) => [...prev, DEFAULT_ISSUE_LINE])}
@@ -1164,6 +1433,7 @@ export default function InventoryPage() {
           lines={refillLines}
           items={items}
           saving={saving}
+          message={message}
           onClose={() => {
             if (!saving) setShowRefillModal(false)
           }}
@@ -1173,13 +1443,31 @@ export default function InventoryPage() {
           onSubmit={() => void refillItems()}
         />
       ) : null}
-    </div>
+
+      {showUniformReturnModal ? (
+        <MultiUniformReturnModal
+          lines={uniformReturnLines}
+          items={items.filter(isUniformItem)}
+          employees={employees}
+          saving={saving}
+          message={message}
+          onClose={() => {
+            if (!saving) setShowUniformReturnModal(false)
+          }}
+          onChange={updateUniformReturnLine}
+          onAddLine={() => setUniformReturnLines((prev) => [...prev, DEFAULT_UNIFORM_RETURN_LINE])}
+          onRemoveLine={(index) => setUniformReturnLines((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
+          onSubmit={() => void returnUniforms()}
+        />
+      ) : null}
+    </main>
   )
 }
 
 function MultiAddModal({
   forms,
   saving,
+  message,
   onClose,
   onChange,
   onAddLine,
@@ -1188,6 +1476,7 @@ function MultiAddModal({
 }: {
   forms: AddForm[]
   saving: boolean
+  message: string
   onClose: () => void
   onChange: (index: number, patch: Partial<AddForm>) => void
   onAddLine: () => void
@@ -1196,6 +1485,8 @@ function MultiAddModal({
 }) {
   return (
     <Modal title="Pridėti prekes" subtitle="Gali pridėti kelias skirtingas prekes vienu kartu." onClose={onClose}>
+      {message ? <div style={styles.modalMessage}>{message}</div> : null}
+
       <div style={styles.multiLines}>
         {forms.map((form, index) => (
           <div key={index} style={styles.multiLine}>
@@ -1283,11 +1574,14 @@ function MultiAddModal({
 
 function MultiIssueModal({
   title,
+  subtitle,
+  targetType,
   lines,
   items,
   residents,
   employees,
   saving,
+  message,
   onClose,
   onChange,
   onAddLine,
@@ -1295,11 +1589,14 @@ function MultiIssueModal({
   onSubmit,
 }: {
   title: string
+  subtitle: string
+  targetType: 'resident' | 'employee'
   lines: IssueLine[]
   items: InventoryItem[]
   residents: PersonOption[]
   employees: PersonOption[]
   saving: boolean
+  message: string
   onClose: () => void
   onChange: (index: number, patch: Partial<IssueLine>) => void
   onAddLine: () => void
@@ -1307,11 +1604,15 @@ function MultiIssueModal({
   onSubmit: () => void
 }) {
   return (
-    <Modal title={title} subtitle="Gali nurašyti kelias prekes vienu kartu. Uniformos priskiriamos darbuotojams." onClose={onClose}>
+    <Modal title={title} subtitle={subtitle} onClose={onClose}>
+      {message ? <div style={styles.modalMessage}>{message}</div> : null}
+
       <div style={styles.multiLines}>
         {lines.map((line, index) => {
           const selectedItem = items.find((item) => item.id === line.itemId) || null
-          const targetOptions = isUniformItem(selectedItem) ? employees : residents
+          const targetOptions = targetType === 'employee'
+            ? employees.filter((employee) => employee.isActive !== false)
+            : residents
 
           return (
             <div key={index} style={styles.multiLine}>
@@ -1328,9 +1629,9 @@ function MultiIssueModal({
                 </select>
               </Field>
 
-              <Field label={isUniformItem(selectedItem) ? 'Darbuotojas *' : 'Gyventojas *'}>
+              <Field label={targetType === 'employee' ? 'Darbuotojas *' : 'Gyventojas *'}>
                 <select value={line.targetId} onChange={(event) => onChange(index, { targetId: event.target.value })} style={styles.input}>
-                  <option value="">Pasirink</option>
+                  <option value="">{targetType === 'employee' ? 'Pasirink darbuotoją' : 'Pasirink gyventoją'}</option>
                   {targetOptions.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
@@ -1374,7 +1675,7 @@ function MultiIssueModal({
           Atšaukti
         </button>
         <button type="button" onClick={onSubmit} disabled={saving} style={styles.dangerSaveButton}>
-          {saving ? 'Saugoma...' : 'Nurašyti'}
+          {saving ? 'Saugoma...' : 'Išduoti'}
         </button>
       </div>
     </Modal>
@@ -1385,6 +1686,7 @@ function MultiRefillModal({
   lines,
   items,
   saving,
+  message,
   onClose,
   onChange,
   onAddLine,
@@ -1394,6 +1696,7 @@ function MultiRefillModal({
   lines: RefillLine[]
   items: InventoryItem[]
   saving: boolean
+  message: string
   onClose: () => void
   onChange: (index: number, patch: Partial<RefillLine>) => void
   onAddLine: () => void
@@ -1402,6 +1705,8 @@ function MultiRefillModal({
 }) {
   return (
     <Modal title="Papildyti sandėlį" subtitle="Gali papildyti kelias prekes vienu kartu." onClose={onClose}>
+      {message ? <div style={styles.modalMessage}>{message}</div> : null}
+
       <div style={styles.multiLines}>
         {lines.map((line, index) => {
           const selectedItem = items.find((item) => item.id === line.itemId) || null
@@ -1448,6 +1753,96 @@ function MultiRefillModal({
         </button>
         <button type="button" onClick={onSubmit} disabled={saving} style={styles.saveButton}>
           {saving ? 'Saugoma...' : 'Papildyti'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+function MultiUniformReturnModal({
+  lines,
+  items,
+  employees,
+  saving,
+  message,
+  onClose,
+  onChange,
+  onAddLine,
+  onRemoveLine,
+  onSubmit,
+}: {
+  lines: UniformReturnLine[]
+  items: InventoryItem[]
+  employees: PersonOption[]
+  saving: boolean
+  message: string
+  onClose: () => void
+  onChange: (index: number, patch: Partial<UniformReturnLine>) => void
+  onAddLine: () => void
+  onRemoveLine: (index: number) => void
+  onSubmit: () => void
+}) {
+  return (
+    <Modal title="Grąžinti uniformą" subtitle="Uniformos grąžinamos į sandėlį ir istorijoje susiejamos su darbuotoju." onClose={onClose}>
+      {message ? <div style={styles.modalMessage}>{message}</div> : null}
+
+      <div style={styles.multiLines}>
+        {lines.map((line, index) => {
+          const selectedItem = items.find((item) => item.id === line.itemId) || null
+
+          return (
+            <div key={index} style={styles.multiLine}>
+              <Field label="Uniforma *">
+                <select value={line.itemId} onChange={(event) => onChange(index, { itemId: event.target.value })} style={styles.input}>
+                  <option value="">Pasirink uniformą</option>
+                  {items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} — {formatQuantity(item.quantity, item.unit)}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Darbuotojas *">
+                <select value={line.targetId} onChange={(event) => onChange(index, { targetId: event.target.value })} style={styles.input}>
+                  <option value="">Pasirink darbuotoją</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Kiekis *">
+                <input type="number" min="1" value={line.quantity} onChange={(event) => onChange(index, { quantity: event.target.value })} style={styles.input} />
+              </Field>
+
+              <Field label="Pastaba">
+                <input value={line.notes} onChange={(event) => onChange(index, { notes: event.target.value })} placeholder="Pvz. grąžinta išėjus iš darbo" style={styles.input} />
+              </Field>
+
+              {selectedItem ? <div style={styles.issueInfo}>Sandėlyje dabar: <strong>{formatQuantity(selectedItem.quantity, selectedItem.unit)}</strong></div> : null}
+
+              {lines.length > 1 ? (
+                <button type="button" onClick={() => onRemoveLine(index)} style={styles.removeLineButton}>
+                  Pašalinti
+                </button>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={styles.modalActions}>
+        <button type="button" onClick={onAddLine} style={styles.secondaryButton}>
+          <Plus size={16} /> Pridėti eilutę
+        </button>
+        <button type="button" onClick={onClose} style={styles.cancelButton}>
+          Atšaukti
+        </button>
+        <button type="button" onClick={onSubmit} disabled={saving} style={styles.saveButton}>
+          {saving ? 'Saugoma...' : 'Grąžinti'}
         </button>
       </div>
     </Modal>
@@ -1584,23 +1979,70 @@ function getCategoryStatusStyle(status: string): CSSProperties {
   }
 }
 
+function getRiskCardStyle(tone: 'danger' | 'warning' | 'green'): CSSProperties {
+  if (tone === 'danger') {
+    return {
+      background: '#fff1f2',
+      border: '1px solid #fecdd3',
+      color: '#be123c',
+    }
+  }
+
+  if (tone === 'warning') {
+    return {
+      background: '#fffbeb',
+      border: '1px solid #fde68a',
+      color: '#b45309',
+    }
+  }
+
+  return {
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
+    color: '#047857',
+  }
+}
+
 const styles: Record<string, CSSProperties> = {
   page: {
+    minHeight: '100vh',
+    background: '#f8fafc',
+    padding: 24,
     display: 'grid',
-    gap: 18,
+    gap: 24,
+    color: '#020617',
   },
   hero: {
-    background:
-      'radial-gradient(circle at top left, rgba(34,197,94,0.12), transparent 34%), linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-    border: '1px solid #e5e7eb',
-    borderRadius: 24,
-    padding: 24,
+    width: '100%',
+    maxWidth: 1280,
+    margin: '0 auto',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: 28,
+    padding: 28,
     display: 'flex',
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 24,
     alignItems: 'center',
     flexWrap: 'wrap',
-    boxShadow: '0 18px 48px rgba(15, 23, 42, 0.045)',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+  },
+  heroContent: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 20,
+    minWidth: 0,
+  },
+  heroIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 24,
+    background: '#ecfdf5',
+    color: '#047857',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: '0 0 auto',
   },
   eyebrow: {
     color: '#047857',
@@ -1610,49 +2052,64 @@ const styles: Record<string, CSSProperties> = {
     letterSpacing: '0.06em',
   },
   title: {
-    margin: '6px 0 0',
+    margin: '8px 0 0',
     color: '#0f172a',
-    fontSize: 34,
+    fontSize: 40,
     lineHeight: 1.05,
     fontWeight: 950,
-    letterSpacing: '-0.05em',
+    letterSpacing: '-0.03em',
   },
   subtitle: {
-    margin: '10px 0 0',
+    margin: '8px 0 0',
     color: '#64748b',
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: 650,
     lineHeight: 1.5,
     maxWidth: 680,
   },
   heroActions: {
     display: 'flex',
+    gap: 16,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  actionGroup: {
+    display: 'flex',
     gap: 10,
     flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  uniformActionGroup: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    borderLeft: '1px solid #e2e8f0',
+    paddingLeft: 16,
   },
   primaryButton: {
-    border: 'none',
-    borderRadius: 15,
-    padding: '12px 15px',
+    border: '1px solid #34d399',
+    borderRadius: 16,
+    padding: '12px 18px',
     background: '#047857',
     color: '#ffffff',
     fontSize: 14,
-    fontWeight: 850,
+    fontWeight: 900,
     textDecoration: 'none',
     display: 'inline-flex',
     alignItems: 'center',
     gap: 8,
-    boxShadow: '0 14px 30px rgba(4,120,87,0.18)',
+    boxShadow: '0 10px 22px rgba(4,120,87,0.18)',
     cursor: 'pointer',
   },
   secondaryButton: {
-    border: '1px solid #a7f3d0',
-    borderRadius: 15,
-    padding: '12px 15px',
-    background: '#ffffff',
+    border: '1px solid #bbf7d0',
+    borderRadius: 16,
+    padding: '12px 18px',
+    background: '#ecfdf5',
     color: '#047857',
     fontSize: 14,
-    fontWeight: 850,
+    fontWeight: 900,
     textDecoration: 'none',
     display: 'inline-flex',
     alignItems: 'center',
@@ -1660,6 +2117,9 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer',
   },
   message: {
+    width: '100%',
+    maxWidth: 1280,
+    margin: '0 auto',
     background: '#eff6ff',
     color: '#1d4ed8',
     border: '1px solid #bfdbfe',
@@ -1669,22 +2129,25 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
   },
   statsGrid: {
+    width: '100%',
+    maxWidth: 1280,
+    margin: '0 auto',
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: 12,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+    gap: 16,
   },
   statCard: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 20,
-    padding: 16,
-    boxShadow: '0 14px 38px rgba(15, 23, 42, 0.035)',
+    border: '1px solid #e2e8f0',
+    borderRadius: 24,
+    padding: 20,
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
     textAlign: 'left',
     cursor: 'pointer',
   },
   activeStat: {
-    outline: '2px solid #16a34a',
-    boxShadow: '0 0 0 4px rgba(22,163,74,0.14)',
+    outline: '2px solid #10b981',
+    boxShadow: '0 0 0 4px rgba(16,185,129,0.12)',
   },
   warningStat: {
     background: '#fffbeb',
@@ -1700,7 +2163,7 @@ const styles: Record<string, CSSProperties> = {
   },
   statValue: {
     color: '#0f172a',
-    fontSize: 28,
+    fontSize: 34,
     fontWeight: 950,
     lineHeight: 1,
   },
@@ -1710,11 +2173,83 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 12,
     fontWeight: 850,
   },
-  toolbar: {
+  riskPanel: {
+    width: '100%',
+    maxWidth: 1280,
+    margin: '0 auto',
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
+    borderRadius: 28,
+    padding: 24,
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+  },
+  riskHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 16,
+    alignItems: 'flex-start',
+  },
+  warningEyebrow: {
+    color: '#d97706',
+    fontSize: 12,
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+  },
+  warningIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 18,
+    background: '#fffbeb',
+    color: '#d97706',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: '0 0 auto',
+  },
+  riskGrid: {
+    marginTop: 20,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: 12,
+  },
+  riskCard: {
     borderRadius: 20,
-    padding: 14,
+    padding: 16,
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 14,
+    alignItems: 'flex-start',
+    textAlign: 'left',
+    cursor: 'pointer',
+  },
+  riskTitle: {
+    margin: 0,
+    color: '#0f172a',
+    fontSize: 15,
+    fontWeight: 950,
+  },
+  riskDesc: {
+    margin: '6px 0 0',
+    color: '#475569',
+    fontSize: 13,
+    fontWeight: 700,
+    lineHeight: 1.45,
+  },
+  riskValue: {
+    color: 'currentColor',
+    fontSize: 32,
+    fontWeight: 950,
+    lineHeight: 1,
+  },
+  toolbar: {
+    width: '100%',
+    maxWidth: 1280,
+    margin: '0 auto',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: 24,
+    padding: 18,
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: 12,
@@ -1724,7 +2259,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 9,
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     borderRadius: 14,
     padding: '0 12px',
     color: '#64748b',
@@ -1738,29 +2273,36 @@ const styles: Record<string, CSSProperties> = {
     background: 'transparent',
   },
   refreshButton: {
-    border: '1px solid #d1d5db',
+    border: '1px solid #cbd5e1',
     borderRadius: 14,
     background: '#ffffff',
     color: '#0f172a',
     padding: '11px 14px',
     fontSize: 14,
-    fontWeight: 850,
+    fontWeight: 900,
     cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   categoryGrid: {
+    width: '100%',
+    maxWidth: 1280,
+    margin: '0 auto',
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
     gap: 14,
   },
   categoryCard: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: 24,
     padding: 18,
     minHeight: 225,
     display: 'grid',
     gap: 16,
-    boxShadow: '0 16px 44px rgba(15, 23, 42, 0.035)',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
   },
   categoryTop: {
     display: 'flex',
@@ -1803,6 +2345,26 @@ const styles: Record<string, CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: 10,
+  },
+  progressMeta: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: 900,
+  },
+  progressTrack: {
+    marginTop: 8,
+    height: 8,
+    overflow: 'hidden',
+    borderRadius: 999,
+    background: '#e2e8f0',
+  },
+  progressBar: {
+    display: 'block',
+    height: '100%',
+    borderRadius: 999,
   },
   categoryStatItem: {
     display: 'flex',
@@ -1853,17 +2415,20 @@ const styles: Record<string, CSSProperties> = {
     textDecoration: 'none',
   },
   bottomGrid: {
-  display: 'grid',
-  gridTemplateColumns: '1fr',
-  gap: 16,
-  alignItems: 'start',
-},
+    width: '100%',
+    maxWidth: 1280,
+    margin: '0 auto',
+    display: 'grid',
+    gridTemplateColumns: '1fr',
+    gap: 20,
+    alignItems: 'start',
+  },
   card: {
     background: '#ffffff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #e2e8f0',
     borderRadius: 24,
-    padding: 20,
-    boxShadow: '0 16px 44px rgba(15, 23, 42, 0.035)',
+    padding: 24,
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
     minWidth: 0,
   },
   cardHeader: {
@@ -1887,9 +2452,9 @@ const styles: Record<string, CSSProperties> = {
   },
   emptyState: {
     marginTop: 16,
-    padding: 22,
+    padding: 28,
     border: '1px dashed #cbd5e1',
-    borderRadius: 16,
+    borderRadius: 20,
     color: '#64748b',
     textAlign: 'center',
     fontSize: 14,
@@ -1911,8 +2476,8 @@ const styles: Record<string, CSSProperties> = {
   },
   th: {
     textAlign: 'left',
-    padding: '11px 10px',
-    borderBottom: '1px solid #e5e7eb',
+    padding: '12px 10px',
+    borderBottom: '1px solid #e2e8f0',
     color: '#64748b',
     fontSize: 12,
     fontWeight: 900,
@@ -1922,14 +2487,14 @@ const styles: Record<string, CSSProperties> = {
     borderBottom: '1px solid #f1f5f9',
   },
   td: {
-    padding: '13px 10px',
+    padding: '14px 10px',
     color: '#334155',
     fontSize: 13,
     fontWeight: 650,
     verticalAlign: 'middle',
   },
   tdBold: {
-    padding: '13px 10px',
+    padding: '14px 10px',
     color: '#0f172a',
     fontSize: 13,
     fontWeight: 900,
@@ -2103,6 +2668,16 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 14,
     fontSize: 14,
     fontWeight: 750,
+  },
+  modalMessage: {
+    background: '#fff1f2',
+    border: '1px solid #fecdd3',
+    color: '#be123c',
+    borderRadius: 16,
+    padding: 13,
+    fontSize: 14,
+    fontWeight: 850,
+    lineHeight: 1.45,
   },
   removeLineButton: {
     border: '1px solid #fecdd3',

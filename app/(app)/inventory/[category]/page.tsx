@@ -66,7 +66,7 @@ const CATEGORY_SUBTITLES: Record<CategoryKey, string> = {
   diapers: 'Dydžių, likučių ir išdavimų valdymas.',
   bedding: 'Patalynės, užvalkalų ir komplektų judėjimas.',
   cleaning: 'Valymo priemonių likučiai ir sunaudojimas.',
-  medication: 'Vaistų likučiai, papildymai ir nurašymai.',
+  medication: 'Vaistų likučiai, papildymai ir išdavimai.',
   uniforms: 'Darbuotojų apranga, dydžiai ir išdavimai.',
   other: 'Kitos sandėlio prekės ir jų judėjimas.',
 }
@@ -166,7 +166,7 @@ export default function InventoryCategoryPage() {
   }
 
   function operationLabel(type: string | null) {
-    if (type === 'out') return 'Nurašymas'
+    if (type === 'out') return 'Išdavimas'
     if (type === 'in') return 'Papildymas'
     if (type === 'adjustment') return 'Koregavimas'
     return '—'
@@ -392,13 +392,13 @@ export default function InventoryCategoryPage() {
       pastaba: row.notes || '',
     }))
 
-    const headers = Object.keys(rows[0] || {})
+    const headers = Object.keys(rows[0] || {}) as Array<keyof (typeof rows)[number]>
     if (!headers.length) return
 
     const csv = [
       headers.join(','),
       ...rows.map((row) =>
-        headers.map((header) => `"${String((row as any)[header] || '').replace(/"/g, '""')}"`).join(',')
+        headers.map((header) => `"${String(row[header] || '').replace(/"/g, '""')}"`).join(',')
       ),
     ].join('\n')
 
@@ -462,7 +462,7 @@ export default function InventoryCategoryPage() {
 
         <button style={{ ...styles.statCard, ...styles.greenStat }} onClick={() => setOperationDraft('out')}>
           <strong>{stats.out}</strong>
-          <span>Nurašymai</span>
+          <span>Išdavimai</span>
         </button>
 
         <button style={styles.statCard} onClick={() => setOperationDraft('in')}>
@@ -505,7 +505,7 @@ export default function InventoryCategoryPage() {
             <span>Operacija</span>
             <select value={operationDraft} onChange={(e) => setOperationDraft(e.target.value as OperationFilter)} style={styles.input}>
               <option value="">Visos</option>
-              <option value="out">Nurašymai</option>
+              <option value="out">Išdavimai</option>
               <option value="in">Papildymai</option>
               <option value="adjustment">Koregavimai</option>
             </select>

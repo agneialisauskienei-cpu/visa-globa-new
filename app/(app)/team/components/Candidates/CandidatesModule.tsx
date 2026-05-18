@@ -1,34 +1,34 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import { supabase } from "@/lib/supabase"
-import { Mail, Plus, Copy, Trash2 } from "lucide-react"
+import { useMemo, useState } from "react";
+import { CheckCircle2, Copy, Mail, Plus, Trash2, UserPlus } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 type Candidate = {
-  id: string
-  first_name: string
-  last_name: string
-  email: string | null
-  phone: string | null
-  desired_role: string | null
-  status: string | null
-  experience: string | null
-  created_at: string | null
-}
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  desired_role: string | null;
+  status: string | null;
+  experience: string | null;
+  created_at: string | null;
+};
 
 type CandidateQuestion = {
-  id: string
-  label: string
-  required: boolean
-  includeInContract: boolean
-  category: "contract" | "work" | "availability" | "qualification" | "other"
-}
+  id: string;
+  label: string;
+  required: boolean;
+  includeInContract: boolean;
+  category: "contract" | "work" | "availability" | "qualification" | "other";
+};
 
 type CandidatesModuleProps = {
-  organizationId: string | null | undefined
-  candidates?: Candidate[] | null
-  onRefresh?: () => void | Promise<void>
-}
+  organizationId: string | null | undefined;
+  candidates?: Candidate[] | null;
+  onRefresh?: () => void | Promise<void>;
+};
 
 const DEFAULT_QUESTIONS: CandidateQuestion[] = [
   {
@@ -47,7 +47,8 @@ const DEFAULT_QUESTIONS: CandidateQuestion[] = [
   },
   {
     id: "employment_type",
-    label: "Kokio darbo krūvio pageidaujate: pilno etato, dalinio etato ar pamaininio darbo?",
+    label:
+      "Kokio darbo krūvio pageidaujate: pilno etato, dalinio etato ar pamaininio darbo?",
     required: true,
     includeInContract: true,
     category: "contract",
@@ -61,7 +62,8 @@ const DEFAULT_QUESTIONS: CandidateQuestion[] = [
   },
   {
     id: "night_weekend",
-    label: "Ar sutiktumėte dirbti vakarais, savaitgaliais ar švenčių dienomis, jei pareigybė to reikalauja?",
+    label:
+      "Ar sutiktumėte dirbti vakarais, savaitgaliais ar švenčių dienomis, jei pareigybė to reikalauja?",
     required: false,
     includeInContract: false,
     category: "availability",
@@ -82,7 +84,8 @@ const DEFAULT_QUESTIONS: CandidateQuestion[] = [
   },
   {
     id: "certificates",
-    label: "Ar turite pareigoms reikalingų pažymų, licencijų ar mokymų? Nurodykite tik dokumento tipą ir galiojimą, be asmens kodo ar dokumento kopijų.",
+    label:
+      "Ar turite pareigoms reikalingų pažymų, licencijų ar mokymų? Nurodykite tik dokumento tipą ir galiojimą, be asmens kodo ar dokumento kopijų.",
     required: false,
     includeInContract: false,
     category: "qualification",
@@ -101,7 +104,7 @@ const DEFAULT_QUESTIONS: CandidateQuestion[] = [
     includeInContract: false,
     category: "work",
   },
-]
+];
 
 const FORBIDDEN_HINTS = [
   "asmens kod",
@@ -120,35 +123,35 @@ const FORBIDDEN_HINTS = [
   "vaikų skai",
   "nėšt",
   "lytin",
-]
+];
 
 function candidateStatusLabel(status?: string | null) {
   switch ((status || "new").toLowerCase()) {
     case "new":
-      return "Naujas"
+      return "Naujas";
     case "questionnaire_sent":
-      return "Klausimynas išsiųstas"
+      return "Klausimynas išsiųstas";
     case "answered":
-      return "Atsakyta"
+      return "Atsakyta";
     case "invited":
-      return "Pakviestas"
+      return "Pakviestas";
     case "rejected":
-      return "Atmestas"
+      return "Atmestas";
     case "hired":
-      return "Priimtas"
+      return "Priimtas";
     default:
-      return status || "Naujas"
+      return status || "Naujas";
   }
 }
 
 function hasForbiddenData(text: string) {
-  const lower = text.toLowerCase()
-  return FORBIDDEN_HINTS.some((hint) => lower.includes(hint))
+  const lower = text.toLowerCase();
+  return FORBIDDEN_HINTS.some((hint) => lower.includes(hint));
 }
 
 function buildEmailBody(candidateName: string, questions: CandidateQuestion[]) {
-  const required = questions.filter((q) => q.required)
-  const optional = questions.filter((q) => !q.required)
+  const required = questions.filter((q) => q.required);
+  const optional = questions.filter((q) => !q.required);
 
   return [
     `Sveiki, ${candidateName || ""},`,
@@ -166,12 +169,31 @@ function buildEmailBody(candidateName: string, questions: CandidateQuestion[]) {
     ...required.map((q, index) => `${index + 1}. ${q.label}`),
     "",
     "Papildomi klausimai:",
-    ...(optional.length ? optional.map((q, index) => `${index + 1}. ${q.label}`) : ["Papildomų klausimų nėra."]),
+    ...(optional.length
+      ? optional.map((q, index) => `${index + 1}. ${q.label}`)
+      : ["Papildomų klausimų nėra."]),
     "",
     "Atsakydami į šį laišką patvirtinate, kad pateikta informacija yra teisinga ir ją galima naudoti atrankos tikslu.",
     "",
     "Pagarbiai",
-  ].join("\n")
+  ].join("\n");
+}
+
+function errorText(error: unknown) {
+  if (!error) return "Nežinoma klaida.";
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object") {
+    const e = error as Record<string, unknown>;
+    return [
+      e.message ? `message: ${String(e.message)}` : "",
+      e.details ? `details: ${String(e.details)}` : "",
+      e.hint ? `hint: ${String(e.hint)}` : "",
+      e.code ? `code: ${String(e.code)}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+  return String(error);
 }
 
 export default function CandidatesModule({
@@ -179,60 +201,62 @@ export default function CandidatesModule({
   candidates,
   onRefresh,
 }: CandidatesModuleProps) {
-  const safeCandidates = Array.isArray(candidates) ? candidates : []
+  const safeCandidates = Array.isArray(candidates) ? candidates : [];
 
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
-  const [desiredRole, setDesiredRole] = useState("")
-  const [experience, setExperience] = useState("")
-  const [consent, setConsent] = useState(false)
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [desiredRole, setDesiredRole] = useState("");
+  const [experience, setExperience] = useState("");
+  const [consent, setConsent] = useState(false);
 
-  const [questions, setQuestions] = useState<CandidateQuestion[]>(DEFAULT_QUESTIONS)
-  const [newQuestion, setNewQuestion] = useState("")
-  const [newQuestionRequired, setNewQuestionRequired] = useState(false)
-  const [newQuestionContract, setNewQuestionContract] = useState(false)
+  const [questions, setQuestions] = useState<CandidateQuestion[]>(DEFAULT_QUESTIONS);
+  const [newQuestion, setNewQuestion] = useState("");
+  const [newQuestionRequired, setNewQuestionRequired] = useState(false);
+  const [newQuestionContract, setNewQuestionContract] = useState(false);
 
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState(false);
+  const [acceptingCandidateId, setAcceptingCandidateId] = useState<string | null>(null);
   const [message, setMessage] = useState<{
-    type: "success" | "error" | "warning"
-    text: string
-    details?: string
-  } | null>(null)
+    type: "success" | "error" | "warning";
+    text: string;
+    details?: string;
+  } | null>(null);
 
-  const candidateName = `${firstName} ${lastName}`.trim()
+  const candidateName = `${firstName} ${lastName}`.trim();
   const selectedQuestions = useMemo(
     () => questions.filter((q) => q.label.trim()),
     [questions],
-  )
+  );
 
   const emailBody = useMemo(
     () => buildEmailBody(candidateName || "kandidate", selectedQuestions),
     [candidateName, selectedQuestions],
-  )
+  );
 
   const mailtoHref = useMemo(() => {
-    const subject = encodeURIComponent("Klausimai dėl darbo atrankos")
-    const body = encodeURIComponent(emailBody)
-    return `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`
-  }, [email, emailBody])
+    const subject = encodeURIComponent("Klausimai dėl darbo atrankos");
+    const body = encodeURIComponent(emailBody);
+    return `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`;
+  }, [email, emailBody]);
 
   function addQuestion() {
-    const trimmed = newQuestion.trim()
+    const trimmed = newQuestion.trim();
 
     if (!trimmed) {
-      setMessage({ type: "error", text: "Įrašyk klausimą." })
-      return
+      setMessage({ type: "error", text: "Įrašyk klausimą." });
+      return;
     }
 
     if (hasForbiddenData(trimmed)) {
       setMessage({
         type: "error",
         text: "Šis klausimas gali prašyti perteklinių arba jautrių duomenų.",
-        details: "Nenaudok asmens kodo, dokumentų kopijų, diagnozių, politinių/religinių ar kitų specialių kategorijų duomenų.",
-      })
-      return
+        details:
+          "Nenaudok asmens kodo, dokumentų kopijų, diagnozių, politinių/religinių ar kitų specialių kategorijų duomenų.",
+      });
+      return;
     }
 
     setQuestions((prev) => [
@@ -244,138 +268,240 @@ export default function CandidatesModule({
         includeInContract: newQuestionContract,
         category: newQuestionContract ? "contract" : "other",
       },
-    ])
+    ]);
 
-    setNewQuestion("")
-    setNewQuestionRequired(false)
-    setNewQuestionContract(false)
-    setMessage(null)
+    setNewQuestion("");
+    setNewQuestionRequired(false);
+    setNewQuestionContract(false);
+    setMessage(null);
   }
 
   function removeQuestion(id: string) {
-    setQuestions((prev) => prev.filter((question) => question.id !== id))
+    setQuestions((prev) => prev.filter((question) => question.id !== id));
   }
 
   async function copyEmailText() {
-    await navigator.clipboard.writeText(emailBody)
-    setMessage({ type: "success", text: "Laiško tekstas nukopijuotas." })
+    await navigator.clipboard.writeText(emailBody);
+    setMessage({ type: "success", text: "Laiško tekstas nukopijuotas." });
   }
 
   async function saveCandidate(status: "new" | "questionnaire_sent" = "new") {
-    setMessage(null)
+    setMessage(null);
 
     if (!organizationId) {
-      setMessage({ type: "error", text: "Nenustatyta organizacija." })
-      return
+      setMessage({ type: "error", text: "Nenustatyta organizacija." });
+      return;
     }
 
     if (!firstName.trim() || !lastName.trim()) {
-      setMessage({ type: "error", text: "Įvesk kandidato vardą ir pavardę." })
-      return
+      setMessage({ type: "error", text: "Įvesk kandidato vardą ir pavardę." });
+      return;
     }
 
     if (!email.trim()) {
-      setMessage({ type: "error", text: "Įvesk kandidato el. paštą, nes klausimynas siunčiamas paštu." })
-      return
+      setMessage({
+        type: "error",
+        text: "Įvesk kandidato el. paštą, nes klausimynas siunčiamas paštu.",
+      });
+      return;
     }
 
     if (!consent) {
       setMessage({
         type: "error",
         text: "Būtinas kandidato sutikimas dėl duomenų tvarkymo atrankos tikslu.",
-      })
-      return
+      });
+      return;
     }
 
     if (selectedQuestions.some((q) => hasForbiddenData(q.label))) {
       setMessage({
         type: "error",
         text: "Klausimyne yra draudžiamų / perteklinių duomenų užuominų.",
-        details: "Pašalink klausimus apie asmens kodą, dokumentų kopijas, diagnozes ar specialių kategorijų duomenis.",
-      })
-      return
+        details:
+          "Pašalink klausimus apie asmens kodą, dokumentų kopijas, diagnozes ar specialių kategorijų duomenis.",
+      });
+      return;
     }
 
-    setSaving(true)
+    setSaving(true);
 
     try {
+      const candidatePayload = {
+        organization_id: organizationId,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim(),
+        phone: phone.trim() || null,
+        desired_role: desiredRole.trim() || null,
+        experience: experience.trim() || null,
+        status,
+        consent: true,
+      };
+
       const { data: candidate, error: candidateError } = await supabase
-        .from("personnel_candidates")
-        .insert({
-          organization_id: organizationId,
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          email: email.trim(),
-          phone: phone.trim() || null,
-          desired_role: desiredRole.trim() || null,
-          experience: experience.trim() || null,
-          status,
-          consent: true,
-        })
+        .from("candidates")
+        .insert(candidatePayload)
         .select("id")
-        .single()
+        .single();
 
       if (candidateError) {
         setMessage({
           type: "error",
-          text: "Nepavyko išsaugoti kandidato.",
-          details: candidateError.message,
-        })
-        return
+          text: "Nepavyko išsaugoti kandidato į `candidates`.",
+          details: errorText(candidateError),
+        });
+        return;
       }
 
-      // Atskirai saugome, kokie klausimai buvo išsiųsti.
-      // Taip vėliau galima žinoti, kas buvo prašyta ir ką galima naudoti darbo sutarties paruošimui.
+      const questionnairePayload = {
+        organization_id: organizationId,
+        candidate_id: candidate.id,
+        status: status === "questionnaire_sent" ? "sent" : "draft",
+        questions: selectedQuestions,
+        email_body: emailBody,
+        sent_to: email.trim(),
+      };
+
       const { error: questionnaireError } = await supabase
-        .from("personnel_candidate_questionnaires")
-        .insert({
-          organization_id: organizationId,
-          candidate_id: candidate.id,
-          status: status === "questionnaire_sent" ? "sent" : "draft",
-          questions: selectedQuestions,
-          email_body: emailBody,
-          sent_to: email.trim(),
-        })
+        .from("candidate_questionnaires")
+        .insert(questionnairePayload);
 
       if (questionnaireError) {
         setMessage({
           type: "warning",
           text: "Kandidatas išsaugotas, bet klausimyno įrašas neišsaugotas.",
-          details: questionnaireError.message,
-        })
-        await onRefresh?.()
-        return
+          details: errorText(questionnaireError),
+        });
+        await onRefresh?.();
+        return;
       }
 
       setMessage({
         type: "success",
-        text: status === "questionnaire_sent"
-          ? "Kandidatas išsaugotas, klausimyno tekstas paruoštas siuntimui."
-          : "Kandidatas išsaugotas.",
-      })
+        text:
+          status === "questionnaire_sent"
+            ? "Kandidatas išsaugotas, klausimyno tekstas paruoštas siuntimui."
+            : "Kandidatas išsaugotas.",
+      });
 
-      await onRefresh?.()
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPhone("");
+      setDesiredRole("");
+      setExperience("");
+      setConsent(false);
+      setQuestions(DEFAULT_QUESTIONS);
+
+      await onRefresh?.();
     } catch (error) {
       setMessage({
         type: "error",
         text: "Klaida saugant kandidatą.",
-        details: error instanceof Error ? error.message : String(error),
-      })
+        details: errorText(error),
+      });
     } finally {
-      setSaving(false)
+      setSaving(false);
+    }
+  }
+
+
+  async function acceptCandidateToTeam(candidate: Candidate) {
+    setMessage(null);
+
+    if (!organizationId) {
+      setMessage({ type: "error", text: "Nenustatyta organizacija." });
+      return;
+    }
+
+    const candidateEmail = (candidate.email || "").trim();
+
+    if (!candidateEmail) {
+      setMessage({
+        type: "error",
+        text: "Kandidatas neturi el. pašto, todėl negalima sukurti kvietimo prisijungti.",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Priimti kandidatą ${candidate.first_name} ${candidate.last_name} ir sukurti kvietimą prisijungti prie darbuotojų modulio?`,
+    );
+
+    if (!confirmed) return;
+
+    setAcceptingCandidateId(candidate.id);
+
+    try {
+      const inviteToken =
+        globalThis.crypto?.randomUUID?.() ||
+        `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const invitePayload = {
+        organization_id: organizationId,
+        email: candidateEmail,
+        role: "employee",
+        status: "pending",
+        token: inviteToken,
+      };
+
+      const { error: inviteError } = await supabase
+        .from("organization_invites")
+        .insert(invitePayload);
+
+      if (inviteError) {
+        setMessage({
+          type: "error",
+          text: "Nepavyko sukurti kvietimo darbuotojui.",
+          details: errorText(inviteError),
+        });
+        return;
+      }
+
+      const { error: candidateError } = await supabase
+        .from("candidates")
+        .update({ status: "invited" })
+        .eq("id", candidate.id)
+        .eq("organization_id", organizationId);
+
+      if (candidateError) {
+        setMessage({
+          type: "warning",
+          text: "Kvietimas sukurtas, bet kandidato būsena neatnaujinta.",
+          details: errorText(candidateError),
+        });
+        await onRefresh?.();
+        return;
+      }
+
+      setMessage({
+        type: "success",
+        text: `Kandidatas ${candidate.first_name} ${candidate.last_name} priimtas. Sukurtas kvietimas prisijungti.`,
+      });
+
+      await onRefresh?.();
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: "Nepavyko priimti kandidato į darbuotojus.",
+        details: errorText(error),
+      });
+    } finally {
+      setAcceptingCandidateId(null);
     }
   }
 
   function resetForm() {
-    setFirstName("")
-    setLastName("")
-    setEmail("")
-    setPhone("")
-    setDesiredRole("")
-    setExperience("")
-    setConsent(false)
-    setQuestions(DEFAULT_QUESTIONS)
-    setMessage(null)
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setPhone("");
+    setDesiredRole("");
+    setExperience("");
+    setConsent(false);
+    setQuestions(DEFAULT_QUESTIONS);
+    setMessage(null);
   }
 
   return (
@@ -388,8 +514,7 @@ export default function CandidatesModule({
           <h2 className="mt-1 text-3xl font-black text-slate-950">Kandidatai</h2>
           <p className="mt-2 max-w-4xl text-sm font-semibold text-slate-500">
             Čia paruošiami klausimai, siunčiami kandidatui el. paštu. Sistema neprašo asmens kodo,
-            dokumentų kopijų ar perteklinių jautrių duomenų. Atsakymai turi būti naudojami tik atrankai
-            ir būtinai informacijai darbo sutarties paruošimui.
+            dokumentų kopijų ar perteklinių jautrių duomenų.
           </p>
         </div>
 
@@ -498,18 +623,21 @@ export default function CandidatesModule({
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
             >
               <Plus size={16} />
-              Išsaugoti kandidatą
+              {saving ? "Saugoma..." : "Išsaugoti kandidatą"}
             </button>
 
             <a
               href={email ? mailtoHref : undefined}
               onClick={(event) => {
                 if (!email) {
-                  event.preventDefault()
-                  setMessage({ type: "error", text: "Įvesk kandidato el. paštą prieš siunčiant klausimyną." })
-                  return
+                  event.preventDefault();
+                  setMessage({
+                    type: "error",
+                    text: "Įvesk kandidato el. paštą prieš siunčiant klausimyną.",
+                  });
+                  return;
                 }
-                void saveCandidate("questionnaire_sent")
+                void saveCandidate("questionnaire_sent");
               }}
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
             >
@@ -530,7 +658,7 @@ export default function CandidatesModule({
           {message ? (
             <div
               className={[
-                "mt-4 rounded-2xl border px-4 py-3 text-sm font-bold",
+                "mt-4 whitespace-pre-wrap rounded-2xl border px-4 py-3 text-sm font-bold",
                 message.type === "success"
                   ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                   : message.type === "warning"
@@ -540,7 +668,7 @@ export default function CandidatesModule({
             >
               <div>{message.text}</div>
               {message.details ? (
-                <div className="mt-1 break-words text-xs font-semibold opacity-80">
+                <div className="mt-2 break-words rounded-xl bg-white/60 p-3 text-xs font-semibold opacity-90">
                   {message.details}
                 </div>
               ) : null}
@@ -655,6 +783,7 @@ export default function CandidatesModule({
                 <th className="px-4 py-3 font-black">Pareigos</th>
                 <th className="px-4 py-3 font-black">Būsena</th>
                 <th className="px-4 py-3 font-black">Patirtis</th>
+                <th className="px-4 py-3 text-right font-black">Veiksmai</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -674,11 +803,29 @@ export default function CandidatesModule({
                       </span>
                     </td>
                     <td className="px-4 py-3">{candidate.experience || "—"}</td>
+                    <td className="px-4 py-3 text-right">
+                      {(candidate.status || "new") === "invited" || (candidate.status || "new") === "hired" ? (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+                          <CheckCircle2 size={14} />
+                          Perduota komandai
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={acceptingCandidateId === candidate.id}
+                          onClick={() => void acceptCandidateToTeam(candidate)}
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:opacity-60"
+                        >
+                          <UserPlus size={15} />
+                          {acceptingCandidateId === candidate.id ? "Kuriama..." : "Priimti į komandą"}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center font-bold text-slate-500">
+                  <td colSpan={6} className="px-4 py-10 text-center font-bold text-slate-500">
                     Kandidatų dar nėra.
                   </td>
                 </tr>
@@ -688,5 +835,5 @@ export default function CandidatesModule({
         </div>
       </div>
     </section>
-  )
+  );
 }

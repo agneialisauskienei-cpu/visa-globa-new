@@ -2,13 +2,32 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
+import type { ReactNode } from "react"
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  Bed,
+  Building2,
+  CheckCircle2,
+  DoorOpen,
+  Download,
+  Hammer,
+  Home,
+  Layers,
+  Plus,
+  Search,
+  Sparkles,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
-import { logAudit } from "@/lib/audit"
 
 type Gender = "male" | "female" | "mixed" | ""
 type RoomType = "single" | "double" | "triple" | "quad" | "other"
 type AssignMode = "active" | "arriving_soon" | "hospital" | "temporary_leave"
+type ModalMode = "details" | "reserve"
 
 type RoomRow = {
   id: string
@@ -66,24 +85,27 @@ type Room = {
 
 type Resident = {
   id: string
+  resident_id?: string | null
   organization_id: string
   first_name: string | null
   last_name: string | null
   full_name: string | null
   resident_code: string | null
   current_room_id: string | null
+  room_id?: string | null
   current_status: string | null
   status: string | null
   archived_at: string | null
   room_reserved_until: string | null
   is_active: boolean | null
+  care_level?: string | null
 }
 
-type EditForm = {
+type RoomForm = {
   id: string
   name: string
   room_type: RoomType
-  capacity: number
+  capacity: string
   floor: string
   gender: Gender
   area_m2: string
@@ -97,6 +119,7 @@ type EditForm = {
   wheelchair_accessible: boolean
   notes: string
   is_active: boolean
+  room_status: string
 }
 
 type BulkForm = {
@@ -120,6 +143,27 @@ type AssignForm = {
   reservedUntil: string
 }
 
+const emptyRoomForm: RoomForm = {
+  id: "",
+  name: "",
+  room_type: "single",
+  capacity: "1",
+  floor: "",
+  gender: "",
+  area_m2: "",
+  sort_order: "",
+  oxygen: false,
+  nursing: false,
+  wc: false,
+  shower: false,
+  sink: false,
+  functional_bed: false,
+  wheelchair_accessible: false,
+  notes: "",
+  is_active: true,
+  room_status: "",
+}
+
 const emptyBulkForm: BulkForm = {
   prefix: "",
   startNumber: "101",
@@ -141,9 +185,19 @@ const emptyAssignForm: AssignForm = {
   reservedUntil: "",
 }
 
-function toInt(value: string, fallback = 0) {
-  const n = parseInt(value, 10)
+function toInt(value: string | number | null | undefined, fallback = 0) {
+  const n = parseInt(String(value ?? ""), 10)
   return Number.isFinite(n) ? n : fallback
+}
+
+function toNumber(value: string | number | null | undefined, fallback: number | null = null) {
+  const n = Number(String(value ?? "").replace(",", "."))
+  return Number.isFinite(n) ? n : fallback
+}
+
+function text(value: unknown, fallback = "—") {
+  if (value === null || value === undefined || value === "") return fallback
+  return String(value)
 }
 
 function formatType(type: RoomType) {
@@ -161,26 +215,28 @@ function formatType(type: RoomType) {
   }
 }
 
+function capacityByType(type: RoomType, otherCapacity = 5) {
+  if (type === "single") return 1
+  if (type === "double") return 2
+  if (type === "triple") return 3
+  if (type === "quad") return 4
+  return otherCapacity
+}
+
 function formatGender(gender: Gender) {
-  switch (gender) {
-    case "male":
-      return "Vyrai"
-    case "female":
-      return "Moterys"
-    case "mixed":
-      return "Mišrus"
-    default:
-      return "—"
-  }
+  if (gender === "male") return "Vyrams"
+  if (gender === "female") return "Moterims"
+  if (gender === "mixed") return "Mišrus"
+  return "Nenurodyta"
 }
 
 function statusLabel(status: string | null | undefined) {
-  if (status === "arriving_soon") return "Netrukus atvyks"
-  if (status === "active") return "Gyvena"
-  if (status === "hospital") return "Ligoninėje"
-  if (status === "temporary_leave") return "Laikinai išvykęs"
-  if (status === "deceased") return "Mirė"
-  if (status === "contract_ended") return "Nutraukė sutartį"
+  if (status === "arriving_soon" || status === "netrukus_atvyks") return "Netrukus atvyks"
+  if (status === "active" || status === "gyvena") return "Gyvena"
+  if (status === "hospital" || status === "ligonineje") return "Ligoninėje"
+  if (status === "temporary_leave" || status === "laikinai_isvykes") return "Laikinai išvykęs"
+  if (status === "deceased" || status === "mire") return "Mirė"
+  if (status === "contract_ended" || status === "sutartis_nutraukta") return "Nutraukė sutartį"
   return "—"
 }
 
@@ -196,6 +252,59 @@ function residentName(resident: Resident | null | undefined) {
   return `${fullName || combined || "Gyventojas"}${code}`
 }
 
+function occupiedByLabel(room: Room, residents: Resident[]) {
+  if (!room.occupied_by) return "—"
+
+  const occupiedBy = String(room.occupied_by)
+
+  const matchedResident = residents.find((resident) => {
+    const possibleIds = [
+      resident.id,
+      resident.resident_id,
+      resident.resident_code,
+      resident.full_name,
+      [resident.first_name, resident.last_name].filter(Boolean).join(" "),
+    ]
+      .filter(Boolean)
+      .map((value) => String(value))
+
+    return possibleIds.includes(occupiedBy)
+  })
+
+  return matchedResident ? residentName(matchedResident) : occupiedBy
+}
+
+
+
+function residentRoomKey(resident: Resident) {
+  return String(resident.current_room_id || resident.room_id || "").trim()
+}
+
+function matchesRoom(resident: Resident, room: Pick<Room | RoomRow, "id" | "name">) {
+  const key = residentRoomKey(resident)
+  if (!key) return false
+  return key === room.id || key === room.name || key.toLowerCase() === String(room.name || "").toLowerCase()
+}
+
+function isActiveResidentStatus(resident: Resident) {
+  return (
+    resident.current_status === "active" ||
+    resident.current_status === "gyvena" ||
+    resident.status === "active" ||
+    resident.status === "gyvena"
+  )
+}
+
+function isReservedResidentStatus(resident: Resident) {
+  return (
+    resident.current_status === "arriving_soon" ||
+    resident.current_status === "netrukus_atvyks" ||
+    resident.status === "arriving_soon" ||
+    resident.status === "netrukus_atvyks" ||
+    Boolean(resident.room_reserved_until)
+  )
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "—"
   const date = new Date(value)
@@ -205,11 +314,7 @@ function formatDate(value: string | null | undefined) {
 
 function downloadCsv(filename: string, rows: string[][]) {
   const csv = rows
-    .map((row) =>
-      row
-        .map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`)
-        .join(",")
-    )
+    .map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(","))
     .join("\n")
 
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" })
@@ -221,45 +326,185 @@ function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
-function getRoomVisual(room: Room) {
-  if (!room.is_active) {
-    return {
-      label: "Neaktyvus",
-      style: styles.roomInactive,
-      badge: styles.statusInactive,
-    }
+function normalizeRoom(row: RoomRow, residents: Resident[]): Room {
+  const activeResidents = residents.filter(
+    (resident) =>
+      matchesRoom(resident, row) &&
+      resident.is_active !== false &&
+      !resident.archived_at &&
+      isActiveResidentStatus(resident)
+  )
+
+  const reservedResidents = residents.filter(
+    (resident) =>
+      matchesRoom(resident, row) &&
+      resident.is_active !== false &&
+      !resident.archived_at &&
+      isReservedResidentStatus(resident)
+  )
+
+  return {
+    id: row.id,
+    organization_id: row.organization_id,
+    name: row.name,
+    room_type: row.room_type || "other",
+    capacity: row.capacity || 1,
+    floor: row.floor ?? null,
+    gender: row.gender || "",
+    area_m2: row.area_m2 ?? null,
+    sort_order: row.sort_order ?? (row as any).display_order ?? null,
+    oxygen: Boolean((row as any).oxygen ?? (row as any).has_oxygen),
+    nursing: Boolean((row as any).nursing ?? (row as any).has_nursing),
+    wc: Boolean((row as any).wc ?? (row as any).has_private_wc),
+    shower: Boolean((row as any).shower ?? (row as any).has_shower),
+    sink: Boolean((row as any).sink ?? (row as any).has_sink),
+    functional_bed: Boolean((row as any).functional_bed ?? (row as any).has_functional_bed),
+    wheelchair_accessible: Boolean((row as any).wheelchair_accessible ?? (row as any).is_accessible),
+    notes: row.notes || "",
+    is_active: row.is_active !== false,
+    created_at: row.created_at,
+    occupied_by: row.occupied_by || null,
+    reserved_for: row.reserved_for || null,
+    reserved_until: row.reserved_until || null,
+    room_status: row.room_status || null,
+    occupied: activeResidents.length + (row.occupied_by ? 1 : 0),
+    reserved: reservedResidents.length + (row.reserved_for ? 1 : 0),
+  }
+}
+
+function roomVisual(room: Room) {
+  if (!room.is_active || room.room_status === "inactive") {
+    return { label: "Neaktyvus", tone: "neutral" as const, bar: "bg-slate-400" }
+  }
+
+  if (room.room_status === "repair") {
+    return { label: "Remontuojamas", tone: "danger" as const, bar: "bg-red-500" }
+  }
+
+  if (room.room_status === "preparing") {
+    return { label: "Ruošiamas", tone: "warning" as const, bar: "bg-amber-500" }
   }
 
   if (room.reserved > 0 || room.room_status === "reserved" || room.reserved_for) {
-    return {
-      label: "Rezervuotas",
-      style: styles.roomReserved,
-      badge: styles.statusReserved,
-    }
+    return { label: "Rezervuotas", tone: "warning" as const, bar: "bg-amber-500" }
   }
 
   if (room.occupied >= room.capacity || room.room_status === "occupied" || room.occupied_by) {
-    return {
-      label: "Užimtas",
-      style: styles.roomOccupied,
-      badge: styles.statusOccupied,
-    }
+    return { label: "Užimtas", tone: "danger" as const, bar: "bg-red-500" }
   }
 
   if (room.occupied > 0) {
-    return {
-      label: "Iš dalies užimtas",
-      style: styles.roomPartial,
-      badge: styles.statusPartial,
-    }
+    return { label: "Dalinai užimtas", tone: "blue" as const, bar: "bg-blue-500" }
   }
 
-  return {
-    label: "Laisvas",
-    style: styles.roomFree,
-    badge: styles.statusFree,
-  }
+  return { label: "Laisvas", tone: "green" as const, bar: "bg-emerald-600" }
 }
+
+function featureList(room: Room) {
+  const features = [
+    room.oxygen ? "Deguonis" : null,
+    room.nursing ? "Tinka slaugai" : null,
+    room.wc ? "WC" : null,
+    room.shower ? "Dušas" : null,
+    room.sink ? "Kriauklė" : null,
+    room.functional_bed ? "Funkcinė lova" : null,
+    room.wheelchair_accessible ? "Pritaikyta vežimėliui" : null,
+  ].filter(Boolean) as string[]
+
+  return features.length ? features : ["Be pažymėtų privalumų"]
+}
+
+function Badge({
+  children,
+  tone = "neutral",
+}: {
+  children: ReactNode
+  tone?: "green" | "blue" | "warning" | "danger" | "neutral"
+}) {
+  const tones = {
+    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-700",
+    danger: "border-red-200 bg-red-50 text-red-700",
+    neutral: "border-slate-200 bg-slate-50 text-slate-600",
+  }
+
+  return (
+    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-black ${tones[tone]}`}>
+      {children}
+    </span>
+  )
+}
+
+function StatCard({
+  icon,
+  value,
+  label,
+  badge,
+}: {
+  icon: ReactNode
+  value: ReactNode
+  label: string
+  badge?: ReactNode
+}) {
+  return (
+    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+          {icon}
+        </div>
+        {badge}
+      </div>
+      <div className="text-3xl font-black tracking-[-0.04em] text-slate-950">{value}</div>
+      <div className="mt-1 text-sm font-bold text-slate-500">{label}</div>
+    </div>
+  )
+}
+
+function CompactRoomInfo({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-2xl font-black text-slate-950">{value}</div>
+      <div className="mt-1 text-sm font-bold text-slate-500">{label}</div>
+    </div>
+  )
+}
+
+function Panel({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-5">
+        <h3 className="text-[17px] font-black tracking-tight text-slate-950">{title}</h3>
+        {action}
+      </div>
+      <div className="px-5 pb-5 pt-2">{children}</div>
+    </section>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[130px_1fr] gap-3 text-sm">
+      <div className="font-bold text-slate-500">{label}</div>
+      <div className="font-black text-slate-800">{value}</div>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="space-y-2">
+      <span className="block text-sm font-black text-slate-700">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+const inputClass =
+  "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+
+const textareaClass =
+  "min-h-[104px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
 
 export default function RoomsPage() {
   const [organizationId, setOrganizationId] = useState<string | null>(null)
@@ -272,330 +517,183 @@ export default function RoomsPage() {
 
   const [query, setQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState<RoomType | "all">("all")
-  const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "free" | "partial" | "occupied" | "reserved" | "repair" | "inactive">("all")
   const [floorFilter, setFloorFilter] = useState<string>("all")
-  const [statusFilter, setStatusFilter] = useState<"all" | "free" | "partial" | "occupied" | "reserved">("all")
+  const [genderFilter, setGenderFilter] = useState<Gender | "all">("all")
+  const [featureFilter, setFeatureFilter] = useState<string>("all")
 
-  const [bulkOpen, setBulkOpen] = useState(true)
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [modalMode, setModalMode] = useState<ModalMode>("details")
+  const [roomForm, setRoomForm] = useState<RoomForm>(emptyRoomForm)
+  const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkForm, setBulkForm] = useState<BulkForm>(emptyBulkForm)
-
-  const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<EditForm | null>(null)
-
-  const [assignOpen, setAssignOpen] = useState(false)
   const [assignForm, setAssignForm] = useState<AssignForm>(emptyAssignForm)
-  const [releaseRoomId, setReleaseRoomId] = useState<string | null>(null)
 
   useEffect(() => {
     void loadOrganization()
   }, [])
 
   useEffect(() => {
-    if (organizationId) {
-      void loadRooms(organizationId)
-    }
+    if (organizationId) void loadData(organizationId)
   }, [organizationId])
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        closeEditModal()
-        closeAssignModal()
-        setReleaseRoomId(null)
-      }
-    }
+  const selectedRoom = useMemo(
+    () => rooms.find((room) => room.id === selectedRoomId) || null,
+    [rooms, selectedRoomId]
+  )
 
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [])
+  const roomResidents = useMemo(() => {
+    if (!selectedRoom) return []
 
-  async function loadOrganization() {
-    setError(null)
-    setLoading(true)
-
-    try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError || !user) {
-        setError("Nepavyko nustatyti prisijungusio vartotojo.")
-        setLoading(false)
-        return
-      }
-
-      const orgId = await getCurrentOrganizationId()
-
-      if (!orgId) {
-        setError("Nepavyko nustatyti aktyvios organizacijos.")
-        setLoading(false)
-        return
-      }
-
-      setOrganizationId(orgId)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Nepavyko nustatyti organizacijos.")
-      setLoading(false)
-    }
-  }
-
-  async function loadRooms(orgId: string) {
-    setLoading(true)
-    setError(null)
-
-    const { data: roomRows, error: roomError } = await supabase
-      .from("rooms")
-      .select(`
-        id,
-        organization_id,
-        name,
-        room_type,
-        capacity,
-        floor,
-        gender,
-        area_m2,
-        sort_order,
-        oxygen,
-        nursing,
-        wc,
-        shower,
-        sink,
-        functional_bed,
-        wheelchair_accessible,
-        notes,
-        is_active,
-        created_at,
-        occupied_by,
-        reserved_for,
-        reserved_until,
-        room_status
-      `)
-      .eq("organization_id", orgId)
-      .order("sort_order", { ascending: true, nullsFirst: false })
-      .order("name", { ascending: true })
-
-    if (roomError) {
-      setLoading(false)
-      setError(roomError.message)
-      return
-    }
-
-    const { data: residentsRows, error: residentsError } = await supabase
-      .from("residents")
-      .select(`
-        id,
-        organization_id,
-        first_name,
-        last_name,
-        full_name,
-        resident_code,
-        current_room_id,
-        current_status,
-        status,
-        archived_at,
-        room_reserved_until,
-        is_active
-      `)
-      .eq("organization_id", orgId)
-      .is("archived_at", null)
-
-    if (residentsError) {
-      setLoading(false)
-      setError(residentsError.message)
-      return
-    }
-
-    const residentList = ((residentsRows || []) as Resident[]).filter((resident) => resident.is_active !== false)
-
-    const occupiedMap = new Map<string, number>()
-    const reservedMap = new Map<string, number>()
-
-    for (const resident of residentList) {
-      const roomId = resident.current_room_id
-      if (!roomId) continue
-
-      const status = resident.current_status || resident.status
-
-      if (status === "arriving_soon") {
-        reservedMap.set(roomId, (reservedMap.get(roomId) || 0) + 1)
-      } else if (status === "active" || status === "hospital" || status === "temporary_leave") {
-        occupiedMap.set(roomId, (occupiedMap.get(roomId) || 0) + 1)
-      }
-    }
-
-    const mapped: Room[] = ((roomRows as RoomRow[] | null) || []).map((row) => ({
-      id: row.id,
-      organization_id: row.organization_id,
-      name: row.name,
-      room_type: (row.room_type as RoomType) || "other",
-      capacity: row.capacity ?? 1,
-      floor: row.floor,
-      gender: (row.gender as Gender) || "",
-      area_m2: row.area_m2,
-      sort_order: row.sort_order,
-      oxygen: !!row.oxygen,
-      nursing: !!row.nursing,
-      wc: !!row.wc,
-      shower: !!row.shower,
-      sink: !!row.sink,
-      functional_bed: !!row.functional_bed,
-      wheelchair_accessible: !!row.wheelchair_accessible,
-      notes: row.notes || "",
-      is_active: row.is_active ?? true,
-      created_at: row.created_at,
-      occupied_by: row.occupied_by || null,
-      reserved_for: row.reserved_for || null,
-      reserved_until: row.reserved_until || null,
-      room_status: row.room_status || null,
-      occupied: occupiedMap.get(row.id) || 0,
-      reserved: reservedMap.get(row.id) || 0,
-    }))
-
-    setRooms(mapped)
-    setResidents(residentList)
-    setLoading(false)
-  }
-
-  const residentsByRoom = useMemo(() => {
-    const map = new Map<string, Resident[]>()
-
-    residents.forEach((resident) => {
-      if (!resident.current_room_id) return
-      if (!map.has(resident.current_room_id)) map.set(resident.current_room_id, [])
-      map.get(resident.current_room_id)!.push(resident)
-    })
-
-    return map
-  }, [residents])
-
-  const filteredRooms = useMemo(() => {
-    return rooms.filter((room) => {
-      const search = query.trim().toLowerCase()
-      const roomResidents = residentsByRoom.get(room.id) || []
-      const searchOk =
-        !search ||
-        room.name.toLowerCase().includes(search) ||
-        formatType(room.room_type).toLowerCase().includes(search) ||
-        formatGender(room.gender).toLowerCase().includes(search) ||
-        room.notes.toLowerCase().includes(search) ||
-        roomResidents.some((resident) => residentName(resident).toLowerCase().includes(search))
-
-      const typeOk = typeFilter === "all" || room.room_type === typeFilter
-
-      const activeOk =
-        activeFilter === "all" ||
-        (activeFilter === "active" ? room.is_active : !room.is_active)
-
-      const floorOk =
-        floorFilter === "all" ||
-        String(room.floor ?? "") === floorFilter
-
-      const roomVisual = getRoomVisual(room)
-      const statusOk =
-        statusFilter === "all" ||
-        (statusFilter === "free" && roomVisual.label === "Laisvas") ||
-        (statusFilter === "partial" && roomVisual.label === "Iš dalies užimtas") ||
-        (statusFilter === "occupied" && roomVisual.label === "Užimtas") ||
-        (statusFilter === "reserved" && roomVisual.label === "Rezervuotas")
-
-      return searchOk && typeOk && activeOk && floorOk && statusOk
-    })
-  }, [rooms, residentsByRoom, query, typeFilter, activeFilter, floorFilter, statusFilter])
-
-  const stats = useMemo(() => {
-    const totalRooms = filteredRooms.length
-    const totalPlaces = filteredRooms.reduce((sum, room) => sum + room.capacity, 0)
-    const occupiedPlaces = filteredRooms.reduce((sum, room) => sum + room.occupied, 0)
-    const reservedPlaces = filteredRooms.reduce((sum, room) => sum + room.reserved, 0)
-    const freePlaces = Math.max(totalPlaces - occupiedPlaces - reservedPlaces, 0)
-
-    const freeRooms = filteredRooms.filter((room) => getRoomVisual(room).label === "Laisvas").length
-    const occupiedRooms = filteredRooms.filter((room) => getRoomVisual(room).label === "Užimtas").length
-    const reservedRooms = filteredRooms.filter((room) => getRoomVisual(room).label === "Rezervuotas").length
-    const partialRooms = filteredRooms.filter((room) => getRoomVisual(room).label === "Iš dalies užimtas").length
-
-    const byType = filteredRooms.reduce(
-      (acc, room) => {
-        acc[room.room_type] += 1
-        return acc
-      },
-      { single: 0, double: 0, triple: 0, quad: 0, other: 0 }
+    return residents.filter(
+      (resident) =>
+        matchesRoom(resident, selectedRoom) &&
+        resident.is_active !== false &&
+        !resident.archived_at
     )
-
-    return {
-      totalRooms,
-      totalPlaces,
-      occupiedPlaces,
-      reservedPlaces,
-      freePlaces,
-      freeRooms,
-      occupiedRooms,
-      reservedRooms,
-      partialRooms,
-      byType,
-    }
-  }, [filteredRooms])
-
-  const floors = useMemo(() => {
-    return Array.from(
-      new Set(
-        rooms
-          .map((room) => room.floor)
-          .filter((floor): floor is number => typeof floor === "number")
-      )
-    ).sort((a, b) => a - b)
-  }, [rooms])
-
-  const roomsByFloor = useMemo(() => {
-    const map = new Map<string, Room[]>()
-
-    filteredRooms.forEach((room) => {
-      const key = room.floor == null ? "Be aukšto" : `${room.floor} aukštas`
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(room)
-    })
-
-    return Array.from(map.entries())
-  }, [filteredRooms])
+  }, [residents, selectedRoom])
 
   const availableResidents = useMemo(() => {
-    return residents.filter((resident) => {
-      const status = resident.current_status || resident.status
-      return !resident.current_room_id || status === "arriving_soon"
+    return residents.filter(
+      (resident) =>
+        resident.is_active !== false &&
+        !resident.archived_at &&
+        (!residentRoomKey(resident) || residentRoomKey(resident) === assignForm.roomId || residentRoomKey(resident) === rooms.find((room) => room.id === assignForm.roomId)?.name)
+    )
+  }, [residents, assignForm.roomId, rooms])
+
+  const floors = useMemo(() => {
+    return Array.from(new Set(rooms.map((room) => room.floor).filter((floor) => floor !== null)))
+      .sort((a, b) => Number(a) - Number(b))
+      .map(String)
+  }, [rooms])
+
+  const filteredRooms = useMemo(() => {
+    const cleanQuery = query.trim().toLowerCase()
+
+    return rooms.filter((room) => {
+      const visual = roomVisual(room)
+      const residentsInRoom = residents.filter((resident) => matchesRoom(resident, room))
+      const residentsText = residentsInRoom.map(residentName).join(" ").toLowerCase()
+
+      if (cleanQuery) {
+        const searchable = [
+          room.name,
+          room.floor,
+          formatType(room.room_type),
+          formatGender(room.gender),
+          room.notes,
+          visual.label,
+          featureList(room).join(" "),
+          residentsText,
+        ]
+          .join(" ")
+          .toLowerCase()
+
+        if (!searchable.includes(cleanQuery)) return false
+      }
+
+      if (typeFilter !== "all" && room.room_type !== typeFilter) return false
+      if (floorFilter !== "all" && String(room.floor ?? "") !== floorFilter) return false
+      if (genderFilter !== "all" && room.gender !== genderFilter) return false
+
+      if (statusFilter !== "all") {
+        if (statusFilter === "free" && visual.label !== "Laisvas") return false
+        if (statusFilter === "partial" && visual.label !== "Dalinai užimtas") return false
+        if (statusFilter === "occupied" && visual.label !== "Užimtas") return false
+        if (statusFilter === "reserved" && visual.label !== "Rezervuotas") return false
+        if (statusFilter === "repair" && visual.label !== "Remontuojamas") return false
+        if (statusFilter === "inactive" && visual.label !== "Neaktyvus") return false
+      }
+
+      if (featureFilter !== "all") {
+        if (featureFilter === "oxygen" && !room.oxygen) return false
+        if (featureFilter === "nursing" && !room.nursing) return false
+        if (featureFilter === "care_suitable" && !(room.nursing || room.functional_bed || room.wheelchair_accessible || room.oxygen)) return false
+        if (featureFilter === "wc" && !room.wc) return false
+        if (featureFilter === "shower" && !room.shower) return false
+        if (featureFilter === "functional_bed" && !room.functional_bed) return false
+        if (featureFilter === "wheelchair_accessible" && !room.wheelchair_accessible) return false
+      }
+
+      return true
     })
-  }, [residents])
+  }, [rooms, residents, query, typeFilter, floorFilter, genderFilter, statusFilter, featureFilter])
 
-  const bulkPreview = useMemo(() => {
-    const single = toInt(bulkForm.singleCount)
-    const double = toInt(bulkForm.doubleCount)
-    const triple = toInt(bulkForm.tripleCount)
-    const quad = toInt(bulkForm.quadCount)
-    const other = toInt(bulkForm.otherCount)
-    const otherCapacity = Math.max(toInt(bulkForm.otherCapacity, 5), 1)
+  const stats = useMemo(() => {
+    const capacity = rooms.reduce((sum, room) => sum + room.capacity, 0)
+    const occupied = rooms.reduce((sum, room) => sum + room.occupied, 0)
+    const reserved = rooms.reduce((sum, room) => sum + room.reserved, 0)
+    const free = Math.max(capacity - occupied - reserved, 0)
 
-    const totalRooms = single + double + triple + quad + other
-    const totalPlaces = single * 1 + double * 2 + triple * 3 + quad * 4 + other * otherCapacity
+    return { capacity, occupied, reserved, free }
+  }, [rooms])
 
-    return { totalRooms, totalPlaces, otherCapacity }
-  }, [bulkForm])
-
-  function resetMessages() {
+  async function loadOrganization() {
+    setLoading(true)
     setError(null)
-    setSuccess(null)
+
+    try {
+      const orgId = await getCurrentOrganizationId()
+      if (!orgId) throw new Error("Nepavyko nustatyti organizacijos.")
+
+      setOrganizationId(orgId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko užkrauti organizacijos.")
+      setLoading(false)
+    }
   }
 
-  function openEditModal(room: Room) {
-    setEditingRoomId(room.id)
-    setEditForm({
+  async function loadData(orgId: string) {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [{ data: residentsData, error: residentsError }, { data: roomsData, error: roomsError }] =
+        await Promise.all([
+          supabase
+            .from("residents")
+            .select("*")
+            .eq("organization_id", orgId)
+            .order("full_name", { ascending: true }),
+          supabase
+            .from("rooms")
+            .select("*")
+            .eq("organization_id", orgId)
+            .order("name", { ascending: true }),
+        ])
+
+      if (residentsError) throw residentsError
+      if (roomsError) throw roomsError
+
+      const safeResidents = (residentsData || []) as Resident[]
+      setResidents(safeResidents)
+      setRooms(((roomsData || []) as RoomRow[]).map((row) => normalizeRoom(row, safeResidents)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko užkrauti kambarių.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function openRoom(room: Room, mode: ModalMode = "details") {
+    setSelectedRoomId(room.id)
+    setModalMode(mode)
+    setAssignForm((prev) => ({
+      ...prev,
+      roomId: room.id,
+      mode: mode === "reserve" ? "arriving_soon" : prev.mode,
+    }))
+
+    setRoomForm({
       id: room.id,
       name: room.name,
       room_type: room.room_type,
-      capacity: room.capacity,
-      floor: room.floor == null ? "" : String(room.floor),
+      capacity: String(room.capacity),
+      floor: room.floor === null ? "" : String(room.floor),
       gender: room.gender,
-      area_m2: room.area_m2 == null ? "" : String(room.area_m2),
-      sort_order: room.sort_order == null ? "" : String(room.sort_order),
+      area_m2: room.area_m2 === null ? "" : String(room.area_m2),
+      sort_order: room.sort_order === null ? "" : String(room.sort_order),
       oxygen: room.oxygen,
       nursing: room.nursing,
       wc: room.wc,
@@ -605,1752 +703,1167 @@ export default function RoomsPage() {
       wheelchair_accessible: room.wheelchair_accessible,
       notes: room.notes,
       is_active: room.is_active,
+      room_status: room.room_status || "",
     })
   }
 
-  function closeEditModal() {
-    setEditingRoomId(null)
-    setEditForm(null)
-  }
-
-  function openAssignModal(room: Room, mode: AssignMode = "active") {
-    setAssignForm({
-      roomId: room.id,
-      residentId: "",
-      mode,
-      reservedUntil: "",
-    })
-    setAssignOpen(true)
-  }
-
-  function closeAssignModal() {
-    setAssignOpen(false)
+  function openNewRoom() {
+    setModalMode("details")
+    setSelectedRoomId("new")
+    setRoomForm(emptyRoomForm)
     setAssignForm(emptyAssignForm)
   }
 
-  async function createRoomsBulk() {
-    if (!organizationId) return
-    resetMessages()
-    setSaving(true)
-
-    try {
-      const startNumber = toInt(bulkForm.startNumber, 101)
-      const startSortOrder = toInt(bulkForm.startSortOrder, 1)
-      const floor = bulkForm.floor.trim() ? toInt(bulkForm.floor) : null
-      const gender = bulkForm.gender || null
-
-      const single = Math.max(toInt(bulkForm.singleCount), 0)
-      const double = Math.max(toInt(bulkForm.doubleCount), 0)
-      const triple = Math.max(toInt(bulkForm.tripleCount), 0)
-      const quad = Math.max(toInt(bulkForm.quadCount), 0)
-      const other = Math.max(toInt(bulkForm.otherCount), 0)
-      const otherCapacity = Math.max(toInt(bulkForm.otherCapacity, 5), 1)
-
-      if (single + double + triple + quad + other === 0) {
-        setError("Nurodyk bent vieną kuriamų kambarių kiekį.")
-        setSaving(false)
-        return
-      }
-
-      let currentNumber = startNumber
-      let currentSortOrder = startSortOrder
-
-      const rows: Record<string, unknown>[] = []
-
-      const addRooms = (count: number, capacity: number, roomType: RoomType) => {
-        for (let i = 0; i < count; i += 1) {
-          rows.push({
-            organization_id: organizationId,
-            name: `${bulkForm.prefix}${currentNumber}`,
-            room_type: roomType,
-            capacity,
-            floor,
-            gender,
-            sort_order: currentSortOrder,
-            oxygen: false,
-            nursing: false,
-            wc: false,
-            shower: false,
-            sink: false,
-            functional_bed: false,
-            wheelchair_accessible: false,
-            notes: "",
-            is_active: true,
-            room_status: "available",
-          })
-          currentNumber += 1
-          currentSortOrder += 1
-        }
-      }
-
-      addRooms(single, 1, "single")
-      addRooms(double, 2, "double")
-      addRooms(triple, 3, "triple")
-      addRooms(quad, 4, "quad")
-      addRooms(other, otherCapacity, "other")
-
-      const names = rows.map((row) => String(row.name))
-      const { data: existingRooms, error: existingError } = await supabase
-        .from("rooms")
-        .select("name")
-        .eq("organization_id", organizationId)
-        .in("name", names)
-
-      if (existingError) {
-        setError(existingError.message)
-        setSaving(false)
-        return
-      }
-
-      if ((existingRooms || []).length > 0) {
-        const duplicateNames = (existingRooms || []).map((r: any) => r.name).join(", ")
-        setError(`Tokie kambariai jau egzistuoja: ${duplicateNames}`)
-        setSaving(false)
-        return
-      }
-
-      const { data: insertedRooms, error: insertError } = await supabase.from("rooms").insert(rows).select("id, name")
-
-      if (insertError) {
-        setError(insertError.message)
-        setSaving(false)
-        return
-      }
-
-      await logAudit({
-        organizationId,
-        tableName: "rooms",
-        recordId: insertedRooms?.[0]?.id || null,
-        action: "insert",
-        changes: {
-          created_count: rows.length,
-          rooms: rows.map((row) => row.name),
-        },
-      })
-
-      setSuccess(`Sukurta ${rows.length} kambarių.`)
-      setBulkForm(emptyBulkForm)
-      await loadRooms(organizationId)
-      setBulkOpen(false)
-    } finally {
-      setSaving(false)
-    }
+  function closeModal() {
+    setModalMode("details")
+    setSelectedRoomId(null)
+    setAssignForm(emptyAssignForm)
+    setRoomForm(emptyRoomForm)
   }
 
-  async function saveRoomEdit() {
-    if (!organizationId || !editForm) return
-    resetMessages()
+  async function saveRoom() {
+    if (!organizationId) return
+
     setSaving(true)
+    setError(null)
+    setSuccess(null)
 
     try {
-      const name = editForm.name.trim()
-      if (!name) {
-        setError("Kambario numeris / pavadinimas negali būti tuščias.")
-        setSaving(false)
-        return
-      }
-
-      if (editForm.capacity < 1) {
-        setError("Vietų skaičius turi būti bent 1.")
-        setSaving(false)
-        return
-      }
-
-      const duplicate = rooms.find(
-        (room) => room.id !== editForm.id && room.name.trim().toLowerCase() === name.toLowerCase()
-      )
-
-      if (duplicate) {
-        setError("Toks kambario numeris jau egzistuoja.")
-        setSaving(false)
-        return
-      }
-
-      const before = rooms.find((room) => room.id === editForm.id) || null
-
       const payload = {
-        name,
-        room_type: editForm.room_type,
-        capacity: editForm.capacity,
-        floor: editForm.floor.trim() ? toInt(editForm.floor) : null,
-        gender: editForm.gender || null,
-        area_m2: editForm.area_m2.trim() ? Number(editForm.area_m2) : null,
-        sort_order: editForm.sort_order.trim() ? toInt(editForm.sort_order) : null,
-        oxygen: editForm.oxygen,
-        nursing: editForm.nursing,
-        wc: editForm.wc,
-        shower: editForm.shower,
-        sink: editForm.sink,
-        functional_bed: editForm.functional_bed,
-        wheelchair_accessible: editForm.wheelchair_accessible,
-        notes: editForm.notes.trim(),
-        is_active: editForm.is_active,
+        organization_id: organizationId,
+        name: roomForm.name.trim(),
+        room_type: roomForm.room_type,
+        capacity: Math.max(toInt(roomForm.capacity, 1), 1),
+        floor: roomForm.floor ? toInt(roomForm.floor, 0) : null,
+        gender: roomForm.gender || null,
+        area_m2: toNumber(roomForm.area_m2, null),
+        display_order: roomForm.sort_order ? toInt(roomForm.sort_order, 0) : null,
+        has_oxygen: roomForm.oxygen,
+        has_nursing: roomForm.nursing,
+        has_private_wc: roomForm.wc,
+        has_shower: roomForm.shower,
+        has_sink: roomForm.sink,
+        has_functional_bed: roomForm.functional_bed,
+        is_accessible: roomForm.wheelchair_accessible,
+        notes: roomForm.notes.trim() || null,
+        is_active: roomForm.is_active,
+        room_status: roomForm.room_status || null,
       }
 
-      const { error: updateError } = await supabase
-        .from("rooms")
-        .update(payload)
-        .eq("id", editForm.id)
-        .eq("organization_id", organizationId)
+      if (!payload.name) throw new Error("Įrašyk kambario pavadinimą.")
 
-      if (updateError) {
-        setError(updateError.message)
-        setSaving(false)
-        return
+      if (selectedRoomId === "new" || !roomForm.id) {
+        const { error: insertError } = await supabase.from("rooms").insert(payload)
+        if (insertError) throw insertError
+        setSuccess("Kambarys sukurtas.")
+      } else {
+        const { error: updateError } = await supabase.from("rooms").update(payload).eq("id", roomForm.id)
+        if (updateError) throw updateError
+        setSuccess("Kambarys išsaugotas.")
       }
 
-      await logAudit({
-        organizationId,
-        tableName: "rooms",
-        recordId: editForm.id,
-        action: "update",
-        changes: {
-          before: before
-            ? {
-                name: before.name,
-                room_type: before.room_type,
-                capacity: before.capacity,
-                floor: before.floor,
-                gender: before.gender,
-                area_m2: before.area_m2,
-                sort_order: before.sort_order,
-                is_active: before.is_active,
-              }
-            : null,
-          after: payload,
-        },
-      })
-
-      setSuccess("Kambarys atnaujintas.")
-      await loadRooms(organizationId)
-      closeEditModal()
+      await loadData(organizationId)
+      closeModal()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko išsaugoti kambario.")
     } finally {
       setSaving(false)
     }
   }
 
-  async function assignResidentToRoom() {
+  async function deleteRoom(roomId: string) {
     if (!organizationId) return
+    const confirmed = window.confirm("Ar tikrai ištrinti kambarį? Jei kambaryje yra gyventojų, geriau jį pažymėti neaktyviu.")
+    if (!confirmed) return
 
-    const room = rooms.find((item) => item.id === assignForm.roomId)
-    const resident = residents.find((item) => item.id === assignForm.residentId)
-
-    if (!room) {
-      setError("Pasirinktas kambarys nerastas.")
-      return
-    }
-
-    if (!resident) {
-      setError("Pasirink gyventoją.")
-      return
-    }
-
-    if (assignForm.mode === "arriving_soon" && !assignForm.reservedUntil) {
-      setError("Rezervacijai nurodyk datą iki kada rezervuota.")
-      return
-    }
-
-    resetMessages()
     setSaving(true)
+    setError(null)
+    setSuccess(null)
 
     try {
-      const status = assignForm.mode
-      const reservedUntil = status === "arriving_soon" ? assignForm.reservedUntil : null
-      const isReservation = status === "arriving_soon"
+      const { error: deleteError } = await supabase.from("rooms").delete().eq("id", roomId)
+      if (deleteError) throw deleteError
 
-      const { error: clearRoomsError } = await supabase
-        .from("rooms")
-        .update({
-          occupied_by: null,
-          reserved_for: null,
-          reserved_until: null,
-          room_status: "available",
-        })
-        .or(`occupied_by.eq.${resident.id},reserved_for.eq.${resident.id}`)
+      setSuccess("Kambarys ištrintas.")
+      await loadData(organizationId)
+      closeModal()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko ištrinti kambario.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
-      if (clearRoomsError) throw clearRoomsError
+  async function assignResident() {
+    if (!organizationId) return
+
+    if (!assignForm.roomId || !assignForm.residentId) {
+      setError("Pasirink gyventoją ir kambarį.")
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const statusByMode: Record<AssignMode, string> = {
+        active: "active",
+        arriving_soon: "arriving_soon",
+        hospital: "hospital",
+        temporary_leave: "temporary_leave",
+      }
 
       const { error: residentError } = await supabase
         .from("residents")
         .update({
-          current_room_id: room.id,
-          current_status: status,
-          room_reserved_until: reservedUntil,
+          current_room_id: assignForm.roomId,
+          current_status: statusByMode[assignForm.mode],
+          room_reserved_until:
+            assignForm.mode === "arriving_soon" ? assignForm.reservedUntil || null : null,
         })
-        .eq("id", resident.id)
-        .eq("organization_id", organizationId)
+        .eq("id", assignForm.residentId)
 
       if (residentError) throw residentError
 
-      const { error: roomError } = await supabase
-        .from("rooms")
-        .update({
-          occupied_by: isReservation ? null : resident.id,
-          reserved_for: isReservation ? resident.id : null,
-          reserved_until: reservedUntil,
-          room_status: isReservation ? "reserved" : "occupied",
-        })
-        .eq("id", room.id)
-        .eq("organization_id", organizationId)
+      if (assignForm.mode === "arriving_soon") {
+        const selectedResident = residents.find((resident) => resident.id === assignForm.residentId)
 
-      if (roomError) throw roomError
-
-      await logAudit({
-        organizationId,
-        tableName: "rooms",
-        recordId: room.id,
-        action: "update",
-        changes: {
-  Veiksmas: isReservation ? "Kambario rezervacija" : "Gyventojo priskyrimas kambariui",
-  Kambarys: room.name,
-  Gyventojas: residentName(resident),
-  Statusas: statusLabel(status),
-  ...(reservedUntil ? { "Rezervuota iki": reservedUntil } : {}),
-},
-      })
-
-      const residentChanges: Record<string, { from: unknown; to: unknown }> = {}
-
-if ((resident.current_room_id || null) !== room.id) {
-  residentChanges.current_room_id = {
-    from: resident.current_room_id || null,
-    to: room.id,
-  }
-}
-
-if ((resident.current_status || resident.status || null) !== status) {
-  residentChanges.current_status = {
-    from: resident.current_status || resident.status || null,
-    to: status,
-  }
-}
-
-if ((resident.room_reserved_until || null) !== reservedUntil) {
-  residentChanges.room_reserved_until = {
-    from: resident.room_reserved_until || null,
-    to: reservedUntil,
-  }
-}
-
-if (Object.keys(residentChanges).length > 0) {
-  await logAudit({
-    organizationId,
-    tableName: "residents",
-    recordId: resident.id,
-    action: "update",
-    changes: residentChanges,
-  })
-}
-
-      setSuccess(isReservation ? "Kambarys rezervuotas gyventojui." : "Gyventojas priskirtas kambariui.")
-      await loadRooms(organizationId)
-      closeAssignModal()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Nepavyko priskirti gyventojo.")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function releaseRoom(roomId: string) {
-    if (!organizationId) return
-
-    const room = rooms.find((item) => item.id === roomId)
-    const roomResidents = residentsByRoom.get(roomId) || []
-
-    if (!room) return
-
-    if (!confirm(`Ar tikrai atlaisvinti kambarį ${room.name}? Gyventojams bus nuimtas kambario priskyrimas.`)) {
-      return
-    }
-
-    resetMessages()
-    setSaving(true)
-
-    try {
-      const residentIds = roomResidents.map((resident) => resident.id)
-
-      if (residentIds.length > 0) {
-        const { error: residentsError } = await supabase
-          .from("residents")
+        const { error: roomError } = await supabase
+          .from("rooms")
           .update({
-            current_room_id: null,
-            room_reserved_until: null,
+            room_status: "reserved",
+            reserved_for: residentName(selectedResident),
+            reserved_until: assignForm.reservedUntil || null,
           })
-          .in("id", residentIds)
-          .eq("organization_id", organizationId)
+          .eq("id", assignForm.roomId)
 
-        if (residentsError) throw residentsError
+        if (roomError) throw roomError
       }
 
-      const { error: roomError } = await supabase
-        .from("rooms")
-        .update({
-          occupied_by: null,
-          reserved_for: null,
-          reserved_until: null,
-          room_status: "available",
-        })
-        .eq("id", roomId)
-        .eq("organization_id", organizationId)
-
-      if (roomError) throw roomError
-
-      await logAudit({
-        organizationId,
-        tableName: "rooms",
-        recordId: roomId,
-        action: "update",
-        changes: {
-          action: "Kambarys atlaisvintas",
-          room: room.name,
-          residents: roomResidents.map((resident) => residentName(resident)),
-        },
-      })
-
-      setSuccess("Kambarys atlaisvintas.")
-      await loadRooms(organizationId)
-      setReleaseRoomId(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Nepavyko atlaisvinti kambario.")
+      setSuccess(assignForm.mode === "arriving_soon" ? "Kambarys rezervuotas." : "Gyventojas priskirtas.")
+      setAssignForm((prev) => ({ ...prev, residentId: "", reservedUntil: "" }))
+      await loadData(organizationId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko priskirti gyventojo.")
     } finally {
       setSaving(false)
     }
   }
 
-  function exportStats() {
-    const rows: string[][] = [
-      ["Rodiklis", "Reikšmė"],
-      ["Kambarių skaičius", String(stats.totalRooms)],
-      ["Vietų skaičius", String(stats.totalPlaces)],
-      ["Užimta vietų", String(stats.occupiedPlaces)],
-      ["Rezervuota vietų", String(stats.reservedPlaces)],
-      ["Laisva vietų", String(stats.freePlaces)],
-      ["Laisvų kambarių", String(stats.freeRooms)],
-      ["Rezervuotų kambarių", String(stats.reservedRooms)],
-      ["Užimtų kambarių", String(stats.occupiedRooms)],
-      ["Iš dalies užimtų kambarių", String(stats.partialRooms)],
-      ["Vienviečių", String(stats.byType.single)],
-      ["Dviviečių", String(stats.byType.double)],
-      ["Triviečių", String(stats.byType.triple)],
-      ["Keturviečių", String(stats.byType.quad)],
-      ["Kitų", String(stats.byType.other)],
-      [],
-      ["Kambariai"],
-      [
-        "Numeris",
-        "Tipas",
-        "Vietos",
-        "Užimta",
-        "Rezervuota",
-        "Laisva",
-        "Aukštas",
-        "Lytis",
-        "Aktyvus",
-        "Būsena",
-        "Gyventojai",
-        "Įranga",
-        "Pastabos",
-      ],
-      ...filteredRooms.map((room) => {
-        const roomResidents = residentsByRoom.get(room.id) || []
-        const visual = getRoomVisual(room)
+  async function releaseResident(residentId: string) {
+    if (!organizationId) return
 
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const { error: residentError } = await supabase
+        .from("residents")
+        .update({
+          current_room_id: null,
+          room_reserved_until: null,
+        })
+        .eq("id", residentId)
+
+      if (residentError) throw residentError
+
+      setSuccess("Gyventojas atlaisvintas iš kambario.")
+      await loadData(organizationId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko atlaisvinti vietos.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function confirmArrival(residentId: string) {
+    if (!organizationId) return
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const { error: residentError } = await supabase
+        .from("residents")
+        .update({
+          current_status: "active",
+          room_reserved_until: null,
+        })
+        .eq("id", residentId)
+
+      if (residentError) throw residentError
+
+      if (selectedRoom) {
+        const { error: roomError } = await supabase
+          .from("rooms")
+          .update({
+            room_status: null,
+            reserved_for: null,
+            reserved_until: null,
+          })
+          .eq("id", selectedRoom.id)
+
+        if (roomError) throw roomError
+      }
+
+      setSuccess("Atvykimas patvirtintas.")
+      await loadData(organizationId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko patvirtinti atvykimo.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function updateRoomStatus(status: string | null) {
+    if (!selectedRoom || !organizationId) return
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const { error: statusError } = await supabase
+        .from("rooms")
+        .update({ room_status: status })
+        .eq("id", selectedRoom.id)
+
+      if (statusError) throw statusError
+
+      setSuccess("Kambario būsena atnaujinta.")
+      await loadData(organizationId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko atnaujinti būsenos.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function bulkCreateRooms() {
+    if (!organizationId) return
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const rows: Partial<RoomRow>[] = []
+      let number = toInt(bulkForm.startNumber, 1)
+      let sort = toInt(bulkForm.startSortOrder, 1)
+      const floor = bulkForm.floor ? toInt(bulkForm.floor, 0) : null
+
+      const addRooms = (type: RoomType, count: number) => {
+        for (let i = 0; i < count; i += 1) {
+          const capacity = capacityByType(type, Math.max(toInt(bulkForm.otherCapacity, 5), 1))
+          rows.push({
+            organization_id: organizationId,
+            name: `${bulkForm.prefix}${number}`,
+            room_type: type,
+            capacity,
+            floor,
+            gender: bulkForm.gender || null,
+            display_order: sort,
+            is_active: true,
+          })
+          number += 1
+          sort += 1
+        }
+      }
+
+      addRooms("single", Math.max(toInt(bulkForm.singleCount, 0), 0))
+      addRooms("double", Math.max(toInt(bulkForm.doubleCount, 0), 0))
+      addRooms("triple", Math.max(toInt(bulkForm.tripleCount, 0), 0))
+      addRooms("quad", Math.max(toInt(bulkForm.quadCount, 0), 0))
+      addRooms("other", Math.max(toInt(bulkForm.otherCount, 0), 0))
+
+      if (rows.length === 0) throw new Error("Nurodyk bent vieną kuriamą kambarį.")
+
+      const { error: insertError } = await supabase.from("rooms").insert(rows)
+      if (insertError) throw insertError
+
+      setBulkForm(emptyBulkForm)
+      setBulkOpen(false)
+      setSuccess(`Sukurta kambarių: ${rows.length}.`)
+      await loadData(organizationId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko masiškai sukurti kambarių.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function exportRooms() {
+    downloadCsv("kambariai.csv", [
+      ["Kambarys", "Aukštas", "Tipas", "Lytis", "Talpa", "Užimta", "Rezervuota", "Laisva", "Statusas", "Privalumai"],
+      ...filteredRooms.map((room) => {
+        const visual = roomVisual(room)
         return [
           room.name,
+          String(room.floor ?? ""),
           formatType(room.room_type),
+          formatGender(room.gender),
           String(room.capacity),
           String(room.occupied),
           String(room.reserved),
           String(Math.max(room.capacity - room.occupied - room.reserved, 0)),
-          room.floor == null ? "" : String(room.floor),
-          formatGender(room.gender),
-          room.is_active ? "Taip" : "Ne",
           visual.label,
-          roomResidents.map((resident) => residentName(resident)).join(" | "),
-          [
-            room.oxygen ? "Deguonis" : "",
-            room.nursing ? "Slauga" : "",
-            room.wc ? "WC" : "",
-            room.shower ? "Dušas" : "",
-            room.sink ? "Kriauklė" : "",
-            room.functional_bed ? "Funkcinė lova" : "",
-            room.wheelchair_accessible ? "Pritaikytas neįgaliesiems" : "",
-          ]
-            .filter(Boolean)
-            .join(" | "),
-          room.notes,
+          featureList(room).join("; "),
         ]
       }),
-    ]
-
-    const date = new Date().toISOString().slice(0, 10)
-    downloadCsv(`kambariu-statistika-${date}.csv`, rows)
+    ])
   }
 
   if (loading) {
-    return <div className="p-6 text-sm text-slate-600">Kraunama...</div>
-  }
-
-  const selectedAssignRoom = rooms.find((room) => room.id === assignForm.roomId) || null
-  const selectedReleaseRoom = rooms.find((room) => room.id === releaseRoomId) || null
-  const selectedReleaseResidents = releaseRoomId ? residentsByRoom.get(releaseRoomId) || [] : []
-
-  return (
-    <div style={styles.page}>
-      <div style={styles.headerRow}>
-        <div>
-          <h1 style={styles.title}>Kambariai</h1>
-          <p style={styles.subtitle}>
-            Masinis kūrimas, statistika, užimtumas, rezervacijos ir gyventojų priskyrimas vienoje vietoje.
-          </p>
-        </div>
-
-        <div style={styles.headerActions}>
-          <button type="button" onClick={() => setBulkOpen((v) => !v)} style={styles.secondaryButton}>
-            {bulkOpen ? "Slėpti masinį kūrimą" : "Rodyti masinį kūrimą"}
-          </button>
-          <button type="button" onClick={exportStats} style={styles.primaryButton}>
-            Atsisiųsti statistiką
-          </button>
+    return (
+      <div className="min-h-screen bg-[#f5f7f4] px-4 py-8 lg:px-8">
+        <div className="mx-auto max-w-[1520px] rounded-[28px] border border-slate-200 bg-white p-8 text-sm font-black text-slate-500 shadow-sm">
+          Kraunamas kambarių modulis...
         </div>
       </div>
+    )
+  }
 
-      {error ? <div style={styles.errorBox}>{error}</div> : null}
-      {success ? <div style={styles.successBox}>{success}</div> : null}
-
-      {bulkOpen ? (
-        <section style={styles.panel}>
-          <div style={styles.panelHeader}>
-            <div>
-              <h2 style={styles.panelTitle}>Masinis kambarių sukūrimas</h2>
-              <p style={styles.panelText}>
-                Suvesk kiek vienviečių, dviviečių ir kitų kambarių turi, o sistema juos sukurs iš karto.
-              </p>
-            </div>
-          </div>
-
-          <div style={styles.bulkGrid}>
-            <label style={styles.field}>
-              <span style={styles.label}>Prefiksas</span>
-              <input
-                style={styles.input}
-                value={bulkForm.prefix}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, prefix: e.target.value }))}
-                placeholder="Pvz. A-"
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Pradinis numeris</span>
-              <input
-                style={styles.input}
-                type="number"
-                value={bulkForm.startNumber}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, startNumber: e.target.value }))}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Pradinis rikiavimo nr.</span>
-              <input
-                style={styles.input}
-                type="number"
-                value={bulkForm.startSortOrder}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, startSortOrder: e.target.value }))}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Aukštas</span>
-              <input
-                style={styles.input}
-                type="number"
-                value={bulkForm.floor}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, floor: e.target.value }))}
-                placeholder="Pvz. 2"
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Lytis</span>
-              <select
-                style={styles.input}
-                value={bulkForm.gender}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, gender: e.target.value as Gender }))}
-              >
-                <option value="">Nenurodyta</option>
-                <option value="male">Vyrai</option>
-                <option value="female">Moterys</option>
-                <option value="mixed">Mišrus</option>
-              </select>
-            </label>
-          </div>
-
-          <div style={styles.bulkCountsGrid}>
-            <label style={styles.field}>
-              <span style={styles.label}>Vienviečių</span>
-              <input
-                style={styles.input}
-                type="number"
-                min={0}
-                value={bulkForm.singleCount}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, singleCount: e.target.value }))}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Dviviečių</span>
-              <input
-                style={styles.input}
-                type="number"
-                min={0}
-                value={bulkForm.doubleCount}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, doubleCount: e.target.value }))}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Triviečių</span>
-              <input
-                style={styles.input}
-                type="number"
-                min={0}
-                value={bulkForm.tripleCount}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, tripleCount: e.target.value }))}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Keturviečių</span>
-              <input
-                style={styles.input}
-                type="number"
-                min={0}
-                value={bulkForm.quadCount}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, quadCount: e.target.value }))}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Kitų kambarių</span>
-              <input
-                style={styles.input}
-                type="number"
-                min={0}
-                value={bulkForm.otherCount}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, otherCount: e.target.value }))}
-              />
-            </label>
-
-            <label style={styles.field}>
-              <span style={styles.label}>Kitų kambarių vietos</span>
-              <input
-                style={styles.input}
-                type="number"
-                min={1}
-                value={bulkForm.otherCapacity}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, otherCapacity: e.target.value }))}
-              />
-            </label>
-          </div>
-
-          <div style={styles.previewBox}>
-            <strong>Peržiūra:</strong> bus sukurta <strong>{bulkPreview.totalRooms}</strong> kambarių ir{" "}
-            <strong>{bulkPreview.totalPlaces}</strong> vietų.
-          </div>
-
-          <div style={styles.actionsRow}>
-            <button type="button" onClick={createRoomsBulk} disabled={saving} style={styles.primaryButton}>
-              {saving ? "Kuriama..." : "Sukurti kambarius"}
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      <section style={styles.statsGrid}>
-        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("all")}>
-          <div style={styles.statLabel}>Kambarių</div>
-          <div style={styles.statValue}>{stats.totalRooms}</div>
-        </button>
-        <div style={styles.statCard}>
-          <div style={styles.statLabel}>Vietų</div>
-          <div style={styles.statValue}>{stats.totalPlaces}</div>
-        </div>
-        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("occupied")}>
-          <div style={styles.statLabel}>Užimta vietų</div>
-          <div style={styles.statValue}>{stats.occupiedPlaces}</div>
-        </button>
-        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("reserved")}>
-          <div style={styles.statLabel}>Rezervuota vietų</div>
-          <div style={styles.statValue}>{stats.reservedPlaces}</div>
-        </button>
-        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("free")}>
-          <div style={styles.statLabel}>Laisva vietų</div>
-          <div style={styles.statValue}>{stats.freePlaces}</div>
-        </button>
-        <button type="button" style={styles.statCard} onClick={() => setStatusFilter("partial")}>
-          <div style={styles.statLabel}>Iš dalies užimtų</div>
-          <div style={styles.statValue}>{stats.partialRooms}</div>
-        </button>
-      </section>
-
-      <section style={styles.panel}>
-        <div style={styles.filtersGrid}>
-          <label style={styles.field}>
-            <span style={styles.label}>Paieška</span>
-            <input
-              style={styles.input}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Kambario nr., gyventojas, tipas..."
-            />
-          </label>
-
-          <label style={styles.field}>
-            <span style={styles.label}>Tipas</span>
-            <select
-              style={styles.input}
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as RoomType | "all")}
-            >
-              <option value="all">Visi</option>
-              <option value="single">Vienviečiai</option>
-              <option value="double">Dviviečiai</option>
-              <option value="triple">Triviečiai</option>
-              <option value="quad">Keturviečiai</option>
-              <option value="other">Kiti</option>
-            </select>
-          </label>
-
-          <label style={styles.field}>
-            <span style={styles.label}>Būsena</span>
-            <select
-              style={styles.input}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            >
-              <option value="all">Visi</option>
-              <option value="free">Laisvi</option>
-              <option value="partial">Iš dalies užimti</option>
-              <option value="occupied">Užimti</option>
-              <option value="reserved">Rezervuoti</option>
-            </select>
-          </label>
-
-          <label style={styles.field}>
-            <span style={styles.label}>Aktyvumas</span>
-            <select
-              style={styles.input}
-              value={activeFilter}
-              onChange={(e) => setActiveFilter(e.target.value as "all" | "active" | "inactive")}
-            >
-              <option value="all">Visi</option>
-              <option value="active">Aktyvūs</option>
-              <option value="inactive">Neaktyvūs</option>
-            </select>
-          </label>
-
-          <label style={styles.field}>
-            <span style={styles.label}>Aukštas</span>
-            <select
-              style={styles.input}
-              value={floorFilter}
-              onChange={(e) => setFloorFilter(e.target.value)}
-            >
-              <option value="all">Visi</option>
-              {floors.map((floor) => (
-                <option key={floor} value={String(floor)}>
-                  {floor}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div style={styles.legendRow}>
-          <span style={{ ...styles.legendDot, background: "#dcfce7", borderColor: "#86efac" }} /> Laisvas
-          <span style={{ ...styles.legendDot, background: "#fef9c3", borderColor: "#fde047" }} /> Rezervuotas
-          <span style={{ ...styles.legendDot, background: "#ffedd5", borderColor: "#fdba74" }} /> Iš dalies užimtas
-          <span style={{ ...styles.legendDot, background: "#fee2e2", borderColor: "#fca5a5" }} /> Užimtas
-        </div>
-
-        <div style={styles.floorGridWrap}>
-          {roomsByFloor.map(([floor, floorRooms]) => (
-            <div key={floor} style={styles.floorBlock}>
-              <h3 style={styles.floorTitle}>{floor}</h3>
-
-              <div style={styles.roomGrid}>
-                {floorRooms.map((room) => {
-                  const visual = getRoomVisual(room)
-                  const roomResidents = residentsByRoom.get(room.id) || []
-
-                  return (
-                    <div key={room.id} style={{ ...styles.roomCard, ...visual.style }}>
-                      <div style={styles.roomCardTop}>
-                        <strong>{room.name}</strong>
-                        <span style={visual.badge}>{visual.label}</span>
-                      </div>
-
-                      <div style={styles.roomCardMeta}>
-                        {room.occupied + room.reserved} / {room.capacity} vietos · {formatType(room.room_type)}
-                      </div>
-
-                      <div style={styles.roomResidents}>
-                        {roomResidents.length > 0 ? (
-                          roomResidents.map((resident) => (
-                            <div key={resident.id} style={styles.residentPill}>
-                              {residentName(resident)}
-                              <span>{statusLabel(resident.current_status || resident.status)}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <span style={styles.metaText}>Gyventojų nėra</span>
-                        )}
-                      </div>
-
-                      <div style={styles.roomActions}>
-                        <button type="button" style={styles.greenSmallButton} onClick={() => openAssignModal(room, "active")}>
-                          Priskirti
-                        </button>
-                        <button type="button" style={styles.yellowSmallButton} onClick={() => openAssignModal(room, "arriving_soon")}>
-                          Rezervuoti
-                        </button>
-                        <button type="button" style={styles.secondaryButtonSmall} onClick={() => openEditModal(room)}>
-                          Redaguoti
-                        </button>
-                        {(roomResidents.length > 0 || room.occupied_by || room.reserved_for) ? (
-                          <button type="button" style={styles.dangerSmallButton} onClick={() => setReleaseRoomId(room.id)}>
-                            Atlaisvinti
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  )
-                })}
+  return (
+    <div className="min-h-screen bg-[#f5f7f4] px-4 py-6 text-slate-950 lg:px-8">
+      <div className="mx-auto max-w-[1520px]">
+        <section className="mb-6 rounded-[30px] border border-slate-200 bg-white p-7 shadow-sm">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center gap-5">
+              <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-emerald-50 text-emerald-700">
+                <Home size={36} />
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section style={styles.panel}>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Kambarys</th>
-                <th style={styles.th}>Tipas</th>
-                <th style={styles.th}>Vietos</th>
-                <th style={styles.th}>Užimtumas</th>
-                <th style={styles.th}>Gyventojai</th>
-                <th style={styles.th}>Aukštas</th>
-                <th style={styles.th}>Lytis</th>
-                <th style={styles.th}>Įranga</th>
-                <th style={styles.th}>Būsena</th>
-                <th style={styles.th}>Veiksmai</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRooms.map((room) => {
-                const roomResidents = residentsByRoom.get(room.id) || []
-                const free = Math.max(room.capacity - room.occupied - room.reserved, 0)
-                const visual = getRoomVisual(room)
-                const tags = [
-                  room.oxygen ? "Deguonis" : null,
-                  room.nursing ? "Slauga" : null,
-                  room.wc ? "WC" : null,
-                  room.shower ? "Dušas" : null,
-                  room.sink ? "Kriauklė" : null,
-                  room.functional_bed ? "Funkcinė lova" : null,
-                  room.wheelchair_accessible ? "Pritaikytas" : null,
-                ].filter(Boolean) as string[]
-
-                return (
-                  <tr key={room.id}>
-                    <td style={styles.tdStrong}>
-                      <div>{room.name}</div>
-                      <div style={styles.metaText}>
-                        <Link href={`/residents?room_id=${room.id}`} style={styles.link}>
-                          Gyventojai kambaryje
-                        </Link>
-                      </div>
-                    </td>
-                    <td style={styles.td}>{formatType(room.room_type)}</td>
-                    <td style={styles.td}>{room.capacity}</td>
-                    <td style={styles.td}>
-                      {room.occupied + room.reserved} / {room.capacity}
-                      <div style={styles.metaText}>
-                        Užimta: {room.occupied} · Rezervuota: {room.reserved} · Laisva: {free}
-                      </div>
-                    </td>
-                    <td style={styles.td}>
-                      {roomResidents.length > 0 ? (
-                        <div style={styles.tagWrap}>
-                          {roomResidents.map((resident) => (
-                            <span key={resident.id} style={styles.tag}>
-                              {residentName(resident)}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span style={styles.metaText}>Nėra</span>
-                      )}
-                    </td>
-                    <td style={styles.td}>{room.floor ?? "—"}</td>
-                    <td style={styles.td}>{formatGender(room.gender)}</td>
-                    <td style={styles.td}>
-                      <div style={styles.tagWrap}>
-                        {tags.length > 0 ? tags.map((tag) => (
-                          <span key={tag} style={styles.tag}>{tag}</span>
-                        )) : <span style={styles.metaText}>Nėra</span>}
-                      </div>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={visual.badge}>{visual.label}</span>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={styles.rowActions}>
-                        <button type="button" style={styles.greenSmallButton} onClick={() => openAssignModal(room, "active")}>
-                          Priskirti
-                        </button>
-                        <button type="button" style={styles.yellowSmallButton} onClick={() => openAssignModal(room, "arriving_soon")}>
-                          Rezervuoti
-                        </button>
-                        <button type="button" style={styles.secondaryButtonSmall} onClick={() => openEditModal(room)}>
-                          Redaguoti
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-
-              {filteredRooms.length === 0 ? (
-                <tr>
-                  <td colSpan={10} style={styles.emptyCell}>
-                    Kambarių pagal pasirinktus filtrus nerasta.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {assignOpen ? (
-        <div style={styles.modalBackdrop} onClick={closeAssignModal}>
-          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
               <div>
-                <h3 style={styles.modalTitle}>
-                  {assignForm.mode === "arriving_soon" ? "Rezervuoti kambarį" : "Priskirti gyventoją"}
-                </h3>
-                <p style={styles.panelText}>
-                  {selectedAssignRoom ? `Kambarys: ${selectedAssignRoom.name}` : "Pasirink kambario ir gyventojo duomenis."}
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Kambariai / Užimtumas / Rezervacijos
+                </div>
+                <h1 className="text-4xl font-black tracking-[-0.04em] text-slate-950">
+                  Kambarių valdymas
+                </h1>
+                <p className="mt-2 text-base font-bold text-slate-500">
+                  Kambariai, gyventojai, privalumai, rezervacijos ir paruošimo būsenos vienoje vietoje.
                 </p>
               </div>
-              <button type="button" style={styles.closeButton} onClick={closeAssignModal}>
-                ×
-              </button>
             </div>
 
-            <div style={styles.modalGrid}>
-              <label style={styles.field}>
-                <span style={styles.label}>Kambarys</span>
-                <select
-                  style={styles.input}
-                  value={assignForm.roomId}
-                  onChange={(e) => setAssignForm((prev) => ({ ...prev, roomId: e.target.value }))}
-                >
-                  <option value="">Pasirink kambarį</option>
-                  {rooms.map((room) => (
-                    <option key={room.id} value={room.id}>
-                      {room.name} · {room.occupied + room.reserved}/{room.capacity}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Gyventojas</span>
-                <select
-                  style={styles.input}
-                  value={assignForm.residentId}
-                  onChange={(e) => setAssignForm((prev) => ({ ...prev, residentId: e.target.value }))}
-                >
-                  <option value="">Pasirink gyventoją</option>
-                  {availableResidents.map((resident) => (
-                    <option key={resident.id} value={resident.id}>
-                      {residentName(resident)} · {statusLabel(resident.current_status || resident.status)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Veiksmas</span>
-                <select
-                  style={styles.input}
-                  value={assignForm.mode}
-                  onChange={(e) => setAssignForm((prev) => ({ ...prev, mode: e.target.value as AssignMode }))}
-                >
-                  <option value="active">Priskirti kaip gyvenantį</option>
-                  <option value="arriving_soon">Rezervuoti, netrukus atvyks</option>
-                  <option value="hospital">Priskirti, ligoninėje</option>
-                  <option value="temporary_leave">Priskirti, laikinai išvykęs</option>
-                </select>
-              </label>
-
-              {assignForm.mode === "arriving_soon" ? (
-                <label style={styles.field}>
-                  <span style={styles.label}>Rezervuota iki</span>
-                  <input
-                    style={styles.input}
-                    type="date"
-                    value={assignForm.reservedUntil}
-                    onChange={(e) => setAssignForm((prev) => ({ ...prev, reservedUntil: e.target.value }))}
-                  />
-                </label>
-              ) : null}
-            </div>
-
-            <div style={styles.modalFooter}>
-              <button type="button" style={styles.secondaryButton} onClick={closeAssignModal}>
-                Atšaukti
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setBulkOpen((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                <Layers size={17} />
+                Masinis kūrimas
               </button>
-              <button type="button" style={styles.primaryButton} onClick={assignResidentToRoom} disabled={saving}>
-                {saving ? "Saugoma..." : assignForm.mode === "arriving_soon" ? "Rezervuoti" : "Priskirti"}
+              <button
+                type="button"
+                onClick={exportRooms}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                <Download size={17} />
+                Eksportuoti
+              </button>
+              <button
+                type="button"
+                onClick={openNewRoom}
+                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800"
+              >
+                <Plus size={18} />
+                Naujas kambarys
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
+        </section>
 
-      {releaseRoomId && selectedReleaseRoom ? (
-        <div style={styles.modalBackdrop} onClick={() => setReleaseRoomId(null)}>
-          <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div>
-                <h3 style={styles.modalTitle}>Atlaisvinti kambarį</h3>
-                <p style={styles.panelText}>Kambarys: {selectedReleaseRoom.name}</p>
-              </div>
-              <button type="button" style={styles.closeButton} onClick={() => setReleaseRoomId(null)}>
-                ×
-              </button>
-            </div>
-
-            <div style={styles.warningBox}>
-              Gyventojams bus nuimtas kambario priskyrimas. Jų statusas nebus keičiamas.
-            </div>
-
-            <div style={styles.releaseList}>
-              {selectedReleaseResidents.length > 0 ? (
-                selectedReleaseResidents.map((resident) => (
-                  <div key={resident.id} style={styles.releaseItem}>
-                    <strong>{residentName(resident)}</strong>
-                    <span>{statusLabel(resident.current_status || resident.status)}</span>
-                  </div>
-                ))
-              ) : (
-                <div style={styles.metaText}>Gyventojų nėra, bus tik išvalyta kambario būsena.</div>
-              )}
-            </div>
-
-            <div style={styles.modalFooter}>
-              <button type="button" style={styles.secondaryButton} onClick={() => setReleaseRoomId(null)}>
-                Atšaukti
-              </button>
-              <button type="button" style={styles.dangerButton} onClick={() => releaseRoom(releaseRoomId)} disabled={saving}>
-                {saving ? "Atlaisvinama..." : "Atlaisvinti"}
-              </button>
-            </div>
+        {error ? (
+          <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {error}
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {editForm && editingRoomId ? (
-        <div style={styles.modalBackdrop} onClick={closeEditModal}>
-          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
+        {success ? (
+          <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+            {success}
+          </div>
+        ) : null}
+
+        <section className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <StatCard icon={<Building2 size={21} />} value={rooms.length} label="Kambariai" badge={<Badge>Visi</Badge>} />
+          <StatCard icon={<Bed size={21} />} value={stats.capacity} label="Bendra talpa" badge={<Badge tone="green">Vietos</Badge>} />
+          <StatCard icon={<Users size={21} />} value={stats.occupied} label="Užimta vietų" badge={<Badge tone="blue">Gyvena</Badge>} />
+          <StatCard icon={<AlertTriangle size={21} />} value={stats.reserved} label="Rezervuota" badge={<Badge tone="warning">Laukia</Badge>} />
+          <StatCard icon={<CheckCircle2 size={21} />} value={stats.free} label="Laisvų vietų" badge={<Badge tone="green">Laisva</Badge>} />
+        </section>
+
+        {bulkOpen ? (
+          <section className="mb-5 rounded-[26px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center justify-between gap-4">
               <div>
-                <h3 style={styles.modalTitle}>Redaguoti kambarį</h3>
-                <p style={styles.panelText}>Keisk kambario duomenis ir savybes vienoje vietoje.</p>
+                <h2 className="text-2xl font-black tracking-[-0.03em]">Masinis kambarių kūrimas</h2>
+                <p className="mt-1 text-sm font-bold text-slate-500">
+                  Greitai sukurk vienviečius, dviviečius, triviečius ar kitus kambarius.
+                </p>
               </div>
-              <button type="button" style={styles.closeButton} onClick={closeEditModal}>
-                ×
+              <button
+                type="button"
+                onClick={() => setBulkOpen(false)}
+                className="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+              >
+                <X size={17} />
               </button>
             </div>
 
-            <div style={styles.modalGrid}>
-              <label style={styles.field}>
-                <span style={styles.label}>Kambario numeris</span>
-                <input
-                  style={styles.input}
-                  autoFocus
-                  value={editForm.name}
-                  onChange={(e) => setEditForm((prev) => prev ? { ...prev, name: e.target.value } : prev)}
-                />
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Tipas</span>
-                <select
-                  style={styles.input}
-                  value={editForm.room_type}
-                  onChange={(e) => setEditForm((prev) => prev ? { ...prev, room_type: e.target.value as RoomType } : prev)}
-                >
-                  <option value="single">Vienvietis</option>
-                  <option value="double">Dvivietis</option>
-                  <option value="triple">Trivietis</option>
-                  <option value="quad">Keturvietis</option>
-                  <option value="other">Kitas</option>
-                </select>
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Vietų skaičius</span>
-                <input
-                  style={styles.input}
-                  type="number"
-                  min={1}
-                  value={editForm.capacity}
-                  onChange={(e) => setEditForm((prev) => prev ? { ...prev, capacity: Math.max(1, Number(e.target.value || 1)) } : prev)}
-                />
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Aukštas</span>
-                <input
-                  style={styles.input}
-                  type="number"
-                  value={editForm.floor}
-                  onChange={(e) => setEditForm((prev) => prev ? { ...prev, floor: e.target.value } : prev)}
-                />
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Lytis</span>
-                <select
-                  style={styles.input}
-                  value={editForm.gender}
-                  onChange={(e) => setEditForm((prev) => prev ? { ...prev, gender: e.target.value as Gender } : prev)}
-                >
+            <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+              <Field label="Prefiksas">
+                <input className={inputClass} value={bulkForm.prefix} onChange={(event) => setBulkForm((prev) => ({ ...prev, prefix: event.target.value }))} placeholder="Pvz. A-" />
+              </Field>
+              <Field label="Nuo numerio">
+                <input className={inputClass} value={bulkForm.startNumber} onChange={(event) => setBulkForm((prev) => ({ ...prev, startNumber: event.target.value }))} />
+              </Field>
+              <Field label="Aukštas">
+                <input className={inputClass} value={bulkForm.floor} onChange={(event) => setBulkForm((prev) => ({ ...prev, floor: event.target.value }))} />
+              </Field>
+              <Field label="Lytis">
+                <select className={inputClass} value={bulkForm.gender} onChange={(event) => setBulkForm((prev) => ({ ...prev, gender: event.target.value as Gender }))}>
                   <option value="">Nenurodyta</option>
-                  <option value="male">Vyrai</option>
-                  <option value="female">Moterys</option>
+                  <option value="female">Moterims</option>
+                  <option value="male">Vyrams</option>
                   <option value="mixed">Mišrus</option>
                 </select>
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Kvadratūra</span>
-                <input
-                  style={styles.input}
-                  type="number"
-                  step="0.1"
-                  value={editForm.area_m2}
-                  onChange={(e) => setEditForm((prev) => prev ? { ...prev, area_m2: e.target.value } : prev)}
-                />
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Rikiavimo nr.</span>
-                <input
-                  style={styles.input}
-                  type="number"
-                  value={editForm.sort_order}
-                  onChange={(e) => setEditForm((prev) => prev ? { ...prev, sort_order: e.target.value } : prev)}
-                />
-              </label>
+              </Field>
+              <Field label="Rikiavimas nuo">
+                <input className={inputClass} value={bulkForm.startSortOrder} onChange={(event) => setBulkForm((prev) => ({ ...prev, startSortOrder: event.target.value }))} />
+              </Field>
+              <Field label="Kita talpa">
+                <input className={inputClass} value={bulkForm.otherCapacity} onChange={(event) => setBulkForm((prev) => ({ ...prev, otherCapacity: event.target.value }))} />
+              </Field>
             </div>
 
-            <div style={styles.checkboxSection}>
-              <label style={styles.checkbox}><input type="checkbox" checked={editForm.oxygen} onChange={(e) => setEditForm((prev) => prev ? { ...prev, oxygen: e.target.checked } : prev)} /> Deguonis</label>
-              <label style={styles.checkbox}><input type="checkbox" checked={editForm.nursing} onChange={(e) => setEditForm((prev) => prev ? { ...prev, nursing: e.target.checked } : prev)} /> Slauga</label>
-              <label style={styles.checkbox}><input type="checkbox" checked={editForm.wc} onChange={(e) => setEditForm((prev) => prev ? { ...prev, wc: e.target.checked } : prev)} /> WC</label>
-              <label style={styles.checkbox}><input type="checkbox" checked={editForm.shower} onChange={(e) => setEditForm((prev) => prev ? { ...prev, shower: e.target.checked } : prev)} /> Dušas</label>
-              <label style={styles.checkbox}><input type="checkbox" checked={editForm.sink} onChange={(e) => setEditForm((prev) => prev ? { ...prev, sink: e.target.checked } : prev)} /> Kriauklė</label>
-              <label style={styles.checkbox}><input type="checkbox" checked={editForm.functional_bed} onChange={(e) => setEditForm((prev) => prev ? { ...prev, functional_bed: e.target.checked } : prev)} /> Funkcinė lova</label>
-              <label style={styles.checkbox}><input type="checkbox" checked={editForm.wheelchair_accessible} onChange={(e) => setEditForm((prev) => prev ? { ...prev, wheelchair_accessible: e.target.checked } : prev)} /> Pritaikytas neįgaliesiems</label>
-              <label style={styles.checkbox}><input type="checkbox" checked={editForm.is_active} onChange={(e) => setEditForm((prev) => prev ? { ...prev, is_active: e.target.checked } : prev)} /> Aktyvus</label>
+            <div className="mt-4 grid gap-4 md:grid-cols-5">
+              {[
+                ["Vienviečių", "singleCount"],
+                ["Dviviečių", "doubleCount"],
+                ["Triviečių", "tripleCount"],
+                ["Keturviečių", "quadCount"],
+                ["Kitų", "otherCount"],
+              ].map(([label, key]) => (
+                <Field key={key} label={label}>
+                  <input
+                    className={inputClass}
+                    value={bulkForm[key as keyof BulkForm]}
+                    onChange={(event) => setBulkForm((prev) => ({ ...prev, [key]: event.target.value }))}
+                  />
+                </Field>
+              ))}
             </div>
 
-            <label style={styles.field}>
-              <span style={styles.label}>Pastabos</span>
-              <textarea
-                style={styles.textarea}
-                rows={4}
-                value={editForm.notes}
-                onChange={(e) => setEditForm((prev) => prev ? { ...prev, notes: e.target.value } : prev)}
-              />
-            </label>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={bulkCreateRooms}
+                disabled={saving}
+                className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+              >
+                {saving ? "Kuriama..." : "Sukurti kambarius"}
+              </button>
+            </div>
+          </section>
+        ) : null}
 
-            <div style={styles.modalFooter}>
-              <button type="button" style={styles.secondaryButton} onClick={closeEditModal}>
-                Atšaukti
-              </button>
-              <button type="button" style={styles.primaryButton} onClick={saveRoomEdit} disabled={saving}>
-                {saving ? "Saugoma..." : "Išsaugoti pakeitimus"}
-              </button>
+        <section className="mb-5 grid gap-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm lg:grid-cols-[1.4fr_repeat(6,1fr)_auto]">
+          <div className="relative">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className={`${inputClass} pl-11`}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Ieškoti kambario, aukšto, gyventojo..."
+            />
+          </div>
+
+          <select className={inputClass} value={floorFilter} onChange={(event) => setFloorFilter(event.target.value)}>
+            <option value="all">Visi aukštai</option>
+            {floors.map((floor) => (
+              <option key={floor} value={floor}>
+                {floor} aukštas
+              </option>
+            ))}
+          </select>
+
+          <select className={inputClass} value={genderFilter} onChange={(event) => setGenderFilter(event.target.value as Gender | "all")}>
+            <option value="all">Visos lytys</option>
+            <option value="female">Moterims</option>
+            <option value="male">Vyrams</option>
+            <option value="mixed">Mišrus</option>
+            <option value="">Nenurodyta</option>
+          </select>
+
+          <select className={inputClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
+            <option value="all">Visi statusai</option>
+            <option value="free">Laisvas</option>
+            <option value="partial">Dalinai užimtas</option>
+            <option value="occupied">Užimtas</option>
+            <option value="reserved">Rezervuotas</option>
+            <option value="repair">Remontuojamas</option>
+            <option value="inactive">Neaktyvus</option>
+          </select>
+
+          <select
+            className={inputClass}
+            value={featureFilter === "care_suitable" ? "care_suitable" : "all"}
+            onChange={(event) => {
+              if (event.target.value === "care_suitable") setFeatureFilter("care_suitable")
+              else if (featureFilter === "care_suitable") setFeatureFilter("all")
+            }}
+          >
+            <option value="all">Visi pagal priežiūrą</option>
+            <option value="care_suitable">Tinka slaugai</option>
+          </select>
+
+          <select className={inputClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as RoomType | "all")}>
+            <option value="all">Visi tipai</option>
+            <option value="single">Vienvietis</option>
+            <option value="double">Dvivietis</option>
+            <option value="triple">Trivietis</option>
+            <option value="quad">Keturvietis</option>
+            <option value="other">Kitas</option>
+          </select>
+
+          <select className={inputClass} value={featureFilter} onChange={(event) => setFeatureFilter(event.target.value)}>
+            <option value="all">Visi privalumai</option>
+            <option value="care_suitable">Tinka slaugai</option>
+            <option value="wc">WC</option>
+            <option value="shower">Dušas</option>
+            <option value="oxygen">Deguonis</option>
+            <option value="nursing">Slaugai</option>
+            <option value="functional_bed">Funkcinė lova</option>
+            <option value="wheelchair_accessible">Vežimėliui</option>
+          </select>
+
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("")
+              setFloorFilter("all")
+              setGenderFilter("all")
+              setStatusFilter("all")
+              setTypeFilter("all")
+              setFeatureFilter("all")
+            }}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+          >
+            Valyti
+          </button>
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-3">
+          {filteredRooms.map((room) => {
+            const visual = roomVisual(room)
+            const residentsInRoom = residents.filter(
+              (resident) =>
+                matchesRoom(resident, room) &&
+                resident.is_active !== false &&
+                !resident.archived_at
+            )
+            const used = Math.min(room.capacity, room.occupied + room.reserved)
+            const percent = room.capacity ? Math.min((used / room.capacity) * 100, 100) : 0
+
+            return (
+              <article key={room.id} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-5">
+                  <div>
+                    <div className="text-2xl font-black tracking-[-0.04em] text-slate-950">{room.name}</div>
+                    <div className="mt-1 text-sm font-bold text-slate-500">
+                      {room.floor ?? "—"} aukštas · {formatType(room.room_type)} · {formatGender(room.gender)}
+                    </div>
+                  </div>
+                  <Badge tone={visual.tone}>{visual.label}</Badge>
+                </div>
+
+                <div className="p-5">
+                  <div className="mb-4 grid grid-cols-3 gap-3">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-2xl font-black text-slate-950">{room.capacity}</div>
+                      <div className="text-xs font-bold text-slate-500">talpa</div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-2xl font-black text-slate-950">{room.occupied}</div>
+                      <div className="text-xs font-bold text-slate-500">gyvena</div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="text-2xl font-black text-slate-950">{room.reserved}</div>
+                      <div className="text-xs font-bold text-slate-500">rezerv.</div>
+                    </div>
+                  </div>
+
+                  <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className={`h-full rounded-full ${visual.bar}`} style={{ width: `${percent}%` }} />
+                  </div>
+
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {featureList(room).slice(0, 5).map((feature) => (
+                      <span key={feature} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">
+                        {feature}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="grid gap-2">
+                    {residentsInRoom.length ? (
+                      residentsInRoom.slice(0, 3).map((resident) => (
+                        <div key={resident.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          <div>
+                            <div className="text-sm font-black text-slate-950">{residentName(resident)}</div>
+                            <div className="mt-0.5 text-xs font-bold text-slate-500">
+                              {statusLabel(resident.current_status || resident.status)}
+                              {resident.room_reserved_until ? ` · iki ${formatDate(resident.room_reserved_until)}` : ""}
+                            </div>
+                          </div>
+                          <Badge tone={resident.current_status === "arriving_soon" ? "warning" : "green"}>
+                            {statusLabel(resident.current_status || resident.status)}
+                          </Badge>
+                        </div>
+                      ))
+                    ) : room.occupied_by || room.reserved_for ? (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+                        {room.occupied_by ? `Užimta: ${occupiedByLabel(room, residents)}` : `Rezervuota: ${room.reserved_for}`}
+                        {room.reserved_until ? ` · iki ${formatDate(room.reserved_until)}` : ""}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                        Kambarys laisvas arba gyventojai nepriskirti.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => openRoom(room)}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      Detalės
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openRoom(room, "reserve")}
+                      className="rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800"
+                    >
+                      Rezervuoti
+                    </button>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+
+          {!filteredRooms.length ? (
+            <div className="col-span-full rounded-[28px] border border-dashed border-slate-300 bg-white p-10 text-center text-sm font-bold text-slate-500">
+              Pagal pasirinktus filtrus kambarių nerasta.
+            </div>
+          ) : null}
+        </section>
+
+        {selectedRoomId ? (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/45 px-4 py-6">
+            <button
+              type="button"
+              onClick={closeModal}
+              className="fixed right-4 top-4 z-[60] grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-xl hover:bg-slate-50"
+              aria-label="Uždaryti"
+            >
+              <X size={20} />
+            </button>
+            <div className="mx-auto max-w-[1280px] overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+              <div className="sticky top-0 z-20 flex flex-col gap-4 border-b border-slate-200 bg-white p-6 xl:flex-row xl:items-start xl:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-emerald-50 text-2xl font-black text-emerald-700">
+                    {selectedRoomId === "new" ? "+" : selectedRoom?.name}
+                  </div>
+                  <div>
+                    <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                      Kambario detalės
+                    </div>
+                    <h2 className="text-3xl font-black tracking-[-0.04em] text-slate-950">
+                      {selectedRoomId === "new" ? "Naujas kambarys" : modalMode === "reserve" ? `Rezervuoti vietą · ${selectedRoom?.name}` : `Kambarys ${selectedRoom?.name}`}
+                    </h2>
+                    {selectedRoom ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Badge tone={roomVisual(selectedRoom).tone}>{roomVisual(selectedRoom).label}</Badge>
+                        <Badge tone="blue">{selectedRoom.floor ?? "—"} aukštas</Badge>
+                        <Badge>{formatType(selectedRoom.room_type)}</Badge>
+                        <Badge>{formatGender(selectedRoom.gender)}</Badge>
+                        {modalMode === "reserve" ? <Badge tone="warning">Rezervavimo režimas</Badge> : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {selectedRoom && selectedRoomId !== "new" ? (
+                    <button
+                      type="button"
+                      onClick={() => deleteRoom(selectedRoom.id)}
+                      disabled={saving}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 hover:bg-red-100 disabled:opacity-60"
+                    >
+                      <Trash2 size={17} />
+                      Ištrinti
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {modalMode === "reserve" && selectedRoom ? (
+                <div className="p-6">
+                  <div className="mx-auto max-w-3xl">
+                    <Panel
+                      title="Rezervuoti vietą"
+                      action={<Badge tone="warning">Tik rezervacija</Badge>}
+                    >
+                      <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-800">
+                        Pasirink gyventoją, įrašyk rezervacijos datą ir spausk
+                        „Rezervuoti“. Jei gyventojo dar nėra sąraše, pirmiausia sukurk
+                        jį su statusu „Netrukus atvyks“.
+                      </div>
+
+                      <div className="grid gap-4">
+                        <Field label="Kambarys">
+                          <input
+                            className={inputClass}
+                            value={`${selectedRoom.name} · ${selectedRoom.floor ?? "—"} aukštas · ${formatType(selectedRoom.room_type)} · ${formatGender(selectedRoom.gender)}`}
+                            readOnly
+                          />
+                        </Field>
+
+                        <Field label="Gyventojas">
+                          <select
+                            className={inputClass}
+                            value={assignForm.residentId}
+                            onChange={(event) =>
+                              setAssignForm((prev) => ({
+                                ...prev,
+                                residentId: event.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">Pasirinkti gyventoją</option>
+                            {availableResidents.map((resident) => (
+                              <option key={resident.id} value={resident.id}>
+                                {residentName(resident)}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <Field label="Veiksmas">
+                            <select
+                              className={inputClass}
+                              value={assignForm.mode}
+                              onChange={(event) =>
+                                setAssignForm((prev) => ({
+                                  ...prev,
+                                  mode: event.target.value as AssignMode,
+                                }))
+                              }
+                            >
+                              <option value="arriving_soon">
+                                Rezervuoti / netrukus atvyks
+                              </option>
+                              <option value="active">Priskirti kaip gyvenantį</option>
+                              <option value="hospital">Pažymėti ligoninėje</option>
+                              <option value="temporary_leave">Laikinai išvykęs</option>
+                            </select>
+                          </Field>
+
+                          <Field label="Rezervuota iki">
+                            <input
+                              type="date"
+                              className={inputClass}
+                              disabled={assignForm.mode !== "arriving_soon"}
+                              value={assignForm.reservedUntil}
+                              onChange={(event) =>
+                                setAssignForm((prev) => ({
+                                  ...prev,
+                                  reservedUntil: event.target.value,
+                                }))
+                              }
+                            />
+                          </Field>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <button
+                            type="button"
+                            onClick={assignResident}
+                            disabled={saving}
+                            className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                          >
+                            {saving
+                              ? "Saugoma..."
+                              : assignForm.mode === "arriving_soon"
+                                ? "Rezervuoti"
+                                : "Priskirti"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setModalMode("details")}
+                            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                          >
+                            Atidaryti visas detales
+                          </button>
+                        </div>
+                      </div>
+                    </Panel>
+
+                    <div className="mt-5 grid gap-4 md:grid-cols-3">
+                      <CompactRoomInfo label="Talpa" value={selectedRoom.capacity} />
+                      <CompactRoomInfo label="Gyvena" value={selectedRoom.occupied} />
+                      <CompactRoomInfo label="Rezervuota" value={selectedRoom.reserved} />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+              <div className="grid gap-5 p-6 xl:grid-cols-[340px_1fr_340px]">
+                <div className="grid gap-5">
+                  <Panel title="Pagrindinė informacija">
+                    <div className="grid gap-4">
+                      <Field label="Kambario pavadinimas">
+                        <input className={inputClass} value={roomForm.name} onChange={(event) => setRoomForm((prev) => ({ ...prev, name: event.target.value }))} />
+                      </Field>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Aukštas">
+                          <input className={inputClass} value={roomForm.floor} onChange={(event) => setRoomForm((prev) => ({ ...prev, floor: event.target.value }))} />
+                        </Field>
+                        <Field label="Talpa">
+                          <input className={inputClass} value={roomForm.capacity} onChange={(event) => setRoomForm((prev) => ({ ...prev, capacity: event.target.value }))} />
+                        </Field>
+                      </div>
+
+                      <Field label="Tipas">
+                        <select className={inputClass} value={roomForm.room_type} onChange={(event) => setRoomForm((prev) => ({ ...prev, room_type: event.target.value as RoomType, capacity: String(capacityByType(event.target.value as RoomType, toInt(prev.capacity, 1))) }))}>
+                          <option value="single">Vienvietis</option>
+                          <option value="double">Dvivietis</option>
+                          <option value="triple">Trivietis</option>
+                          <option value="quad">Keturvietis</option>
+                          <option value="other">Kitas</option>
+                        </select>
+                      </Field>
+
+                      <Field label="Lytis">
+                        <select className={inputClass} value={roomForm.gender} onChange={(event) => setRoomForm((prev) => ({ ...prev, gender: event.target.value as Gender }))}>
+                          <option value="">Nenurodyta</option>
+                          <option value="female">Moterims</option>
+                          <option value="male">Vyrams</option>
+                          <option value="mixed">Mišrus</option>
+                        </select>
+                      </Field>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Plotas m²">
+                          <input className={inputClass} value={roomForm.area_m2} onChange={(event) => setRoomForm((prev) => ({ ...prev, area_m2: event.target.value }))} />
+                        </Field>
+                        <Field label="Rikiavimas">
+                          <input className={inputClass} value={roomForm.sort_order} onChange={(event) => setRoomForm((prev) => ({ ...prev, sort_order: event.target.value }))} />
+                        </Field>
+                      </div>
+                    </div>
+                  </Panel>
+
+                  <Panel title="Privalumai">
+                    <div className="grid gap-3">
+                      {[
+                        ["oxygen", "Deguonis"],
+                        ["nursing", "Tinka slaugai"],
+                        ["wc", "WC"],
+                        ["shower", "Dušas"],
+                        ["sink", "Kriauklė"],
+                        ["functional_bed", "Funkcinė lova"],
+                        ["wheelchair_accessible", "Pritaikyta vežimėliui"],
+                      ].map(([key, label]) => (
+                        <label key={key} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(roomForm[key as keyof RoomForm])}
+                            onChange={(event) => setRoomForm((prev) => ({ ...prev, [key]: event.target.checked }))}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </Panel>
+
+                  <Panel title="Kambario būsena">
+                    <div className="grid gap-4">
+                      <Field label="Būsena">
+                        <select className={inputClass} value={roomForm.room_status} onChange={(event) => setRoomForm((prev) => ({ ...prev, room_status: event.target.value }))}>
+                          <option value="">Automatinė pagal užimtumą</option>
+                          <option value="reserved">Rezervuotas</option>
+                          <option value="preparing">Ruošiamas</option>
+                          <option value="repair">Remontuojamas</option>
+                          <option value="inactive">Neaktyvus</option>
+                        </select>
+                      </Field>
+                      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={roomForm.is_active}
+                          onChange={(event) => setRoomForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                        />
+                        Kambarys aktyvus
+                      </label>
+                      <Field label="Pastabos">
+                        <textarea className={textareaClass} value={roomForm.notes} onChange={(event) => setRoomForm((prev) => ({ ...prev, notes: event.target.value }))} />
+                      </Field>
+                      <button
+                        type="button"
+                        onClick={saveRoom}
+                        disabled={saving}
+                        className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                      >
+                        {saving ? "Saugoma..." : "Išsaugoti kambarį"}
+                      </button>
+                    </div>
+                  </Panel>
+                </div>
+
+                <div className="grid gap-5">
+                  <Panel
+                    title="Lovos / vietos"
+                    action={selectedRoom ? <Badge tone={roomVisual(selectedRoom).tone}>{roomVisual(selectedRoom).label}</Badge> : null}
+                  >
+                    {selectedRoomId === "new" ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-bold text-slate-500">
+                        Išsaugok kambarį, tada galėsi priskirti ar rezervuoti gyventojus.
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {selectedRoom && roomResidents.length === 0 && (selectedRoom.occupied_by || selectedRoom.reserved_for) ? (
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+                            {selectedRoom.occupied_by ? `Užimta: ${occupiedByLabel(selectedRoom, residents)}` : `Rezervuota: ${selectedRoom.reserved_for}`}
+                            {selectedRoom.reserved_until ? ` · iki ${formatDate(selectedRoom.reserved_until)}` : ""}
+                          </div>
+                        ) : null}
+                        {Array.from({ length: selectedRoom?.capacity || 1 }).map((_, index) => {
+                          const resident = roomResidents[index]
+                          const bedName = `Lova ${String.fromCharCode(65 + index)}`
+
+                          return (
+                            <div key={bedName} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                              <div className="mb-3 flex items-center justify-between gap-3">
+                                <div className="font-black text-slate-950">{bedName}</div>
+                                <Badge tone={resident ? (resident.current_status === "arriving_soon" ? "warning" : "green") : "neutral"}>
+                                  {resident ? statusLabel(resident.current_status || resident.status) : "Laisva"}
+                                </Badge>
+                              </div>
+
+                              {resident ? (
+                                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                                  <div>
+                                    <div className="font-black text-slate-950">{residentName(resident)}</div>
+                                    <div className="mt-1 text-sm font-bold text-slate-500">
+                                      {resident.care_level || "Priežiūros lygis nenurodytas"}
+                                      {resident.room_reserved_until ? ` · Rezervuota iki ${formatDate(resident.room_reserved_until)}` : ""}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Link
+                                      href={`/residents/${resident.id}`}
+                                      className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                                    >
+                                      Kortelė
+                                    </Link>
+                                    {resident.current_status === "arriving_soon" ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => confirmArrival(resident.id)}
+                                        className="rounded-2xl bg-emerald-700 px-3 py-2 text-xs font-black text-white hover:bg-emerald-800"
+                                      >
+                                        Atvyko
+                                      </button>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      onClick={() => releaseResident(resident.id)}
+                                      className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100"
+                                    >
+                                      Atlaisvinti
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-sm font-bold text-slate-500">
+                                  Vieta laisva. Galima priskirti ar rezervuoti gyventoją.
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </Panel>
+
+                  {selectedRoomId !== "new" ? (
+                    <Panel title={modalMode === "reserve" ? "Rezervuoti vietą" : "Priskirti arba rezervuoti vietą"} action={modalMode === "reserve" ? <Badge tone="warning">Aktyvu</Badge> : null}>
+                      <div className="grid gap-4">
+                        {modalMode === "reserve" ? (
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-800">
+                            Pasirink gyventoją, įrašyk rezervacijos datą ir spausk „Rezervuoti“. Jei gyventojo dar nėra sąraše, pirmiausia sukurk jį su statusu „Netrukus atvyks“.
+                          </div>
+                        ) : null}
+                        <Field label="Gyventojas">
+                          <select className={inputClass} value={assignForm.residentId} onChange={(event) => setAssignForm((prev) => ({ ...prev, residentId: event.target.value }))}>
+                            <option value="">Pasirinkti gyventoją</option>
+                            {availableResidents.map((resident) => (
+                              <option key={resident.id} value={resident.id}>
+                                {residentName(resident)}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field label="Veiksmas">
+                            <select className={inputClass} value={assignForm.mode} onChange={(event) => setAssignForm((prev) => ({ ...prev, mode: event.target.value as AssignMode }))}>
+                              <option value="active">Priskirti kaip gyvenantį</option>
+                              <option value="arriving_soon">Rezervuoti / netrukus atvyks</option>
+                              <option value="hospital">Pažymėti ligoninėje</option>
+                              <option value="temporary_leave">Laikinai išvykęs</option>
+                            </select>
+                          </Field>
+
+                          <Field label="Rezervuota iki">
+                            <input
+                              type="date"
+                              className={inputClass}
+                              disabled={assignForm.mode !== "arriving_soon"}
+                              value={assignForm.reservedUntil}
+                              onChange={(event) => setAssignForm((prev) => ({ ...prev, reservedUntil: event.target.value }))}
+                            />
+                          </Field>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={assignResident}
+                          disabled={saving}
+                          className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                        >
+                          {saving ? "Saugoma..." : assignForm.mode === "arriving_soon" ? "Rezervuoti" : "Priskirti"}
+                        </button>
+                      </div>
+                    </Panel>
+                  ) : null}
+
+                  <Panel title="Ryšiai su moduliais">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge tone="blue">Gyventojo kortelė</Badge>
+                      <Badge tone="green">Užduotys ūkiui</Badge>
+                      <Badge tone="neutral">Perdavimo žurnalas</Badge>
+                      <Badge tone="warning">Valymo būsena</Badge>
+                      <Badge tone="neutral">Inventorius</Badge>
+                    </div>
+                  </Panel>
+                </div>
+
+                <div className="grid gap-5">
+                  <Panel title="Greiti veiksmai">
+                    <div className="grid gap-3">
+                      <button
+                        type="button"
+                        onClick={() => updateRoomStatus(null)}
+                        disabled={!selectedRoom || selectedRoomId === "new"}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                      >
+                        <CheckCircle2 size={17} />
+                        Pažymėti kaip paruoštą
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateRoomStatus("preparing")}
+                        disabled={!selectedRoom || selectedRoomId === "new"}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 hover:bg-amber-100 disabled:opacity-60"
+                      >
+                        <Sparkles size={17} />
+                        Ruošiamas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateRoomStatus("repair")}
+                        disabled={!selectedRoom || selectedRoomId === "new"}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 hover:bg-red-100 disabled:opacity-60"
+                      >
+                        <Hammer size={17} />
+                        Uždaryti remontui
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAssignForm((prev) => ({ ...prev, mode: "arriving_soon" }))}
+                        disabled={!selectedRoom || selectedRoomId === "new"}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        <ArrowRightLeft size={17} />
+                        Rezervuoti / perkelti
+                      </button>
+                    </div>
+                  </Panel>
+
+                  <Panel title="Įspėjimai">
+                    <div className="grid gap-3">
+                      {selectedRoom?.reserved ? (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-800">
+                          Kambaryje yra rezervuota vieta. Patikrink atvykimo terminą ir paruošimo būseną.
+                        </div>
+                      ) : null}
+
+                      {selectedRoom && selectedRoom.occupied + selectedRoom.reserved >= selectedRoom.capacity ? (
+                        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold leading-6 text-red-700">
+                          Kambario talpa užpildyta. Naują gyventoją galima priskirti tik atlaisvinus vietą.
+                        </div>
+                      ) : null}
+
+                      {selectedRoom?.room_status === "repair" ? (
+                        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold leading-6 text-red-700">
+                          Kambarys pažymėtas kaip remontuojamas. Naujam gyventojui nenaudoti.
+                        </div>
+                      ) : null}
+
+                      {!selectedRoom || (!selectedRoom.reserved && selectedRoom.occupied + selectedRoom.reserved < selectedRoom.capacity && selectedRoom.room_status !== "repair") ? (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold leading-6 text-emerald-800">
+                          Kritinių įspėjimų nėra.
+                        </div>
+                      ) : null}
+                    </div>
+                  </Panel>
+
+                  <Panel title="Kambario santrauka">
+                    <div className="space-y-3">
+                      <InfoRow label="Sukurta" value={formatDate(selectedRoom?.created_at)} />
+                      <InfoRow label="Užimta" value={`${selectedRoom?.occupied ?? 0} iš ${selectedRoom?.capacity ?? 0}`} />
+                      <InfoRow label="Rezervuota" value={selectedRoom?.reserved ?? 0} />
+                      <InfoRow label="Laisva" value={selectedRoom ? Math.max(selectedRoom.capacity - selectedRoom.occupied - selectedRoom.reserved, 0) : "—"} />
+                      <InfoRow label="Privalumai" value={selectedRoom ? featureList(selectedRoom).join(", ") : "—"} />
+                    </div>
+                  </Panel>
+                </div>
+              </div>
+              )}
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    padding: 24,
-    display: "grid",
-    gap: 20,
-    background: "#f8fafc",
-  },
-  headerRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 16,
-    alignItems: "flex-start",
-    flexWrap: "wrap",
-  },
-  title: {
-    margin: 0,
-    fontSize: 28,
-    fontWeight: 800,
-    color: "#0f172a",
-  },
-  subtitle: {
-    marginTop: 6,
-    color: "#475569",
-    fontSize: 14,
-  },
-  headerActions: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  panel: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 18,
-    padding: 18,
-    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
-  },
-  panelHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 16,
-  },
-  panelTitle: {
-    margin: 0,
-    fontSize: 18,
-    fontWeight: 800,
-    color: "#0f172a",
-  },
-  panelText: {
-    marginTop: 4,
-    marginBottom: 0,
-    color: "#64748b",
-    fontSize: 14,
-  },
-  bulkGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: 12,
-    marginBottom: 12,
-  },
-  bulkCountsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-    gap: 12,
-    marginBottom: 12,
-  },
-  filtersGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: 12,
-    marginBottom: 14,
-  },
-  field: {
-    display: "grid",
-    gap: 6,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: 700,
-    color: "#334155",
-  },
-  input: {
-    width: "100%",
-    border: "1px solid #cbd5e1",
-    borderRadius: 12,
-    padding: "10px 12px",
-    fontSize: 14,
-    color: "#0f172a",
-    background: "#fff",
-    boxSizing: "border-box",
-  },
-  textarea: {
-    width: "100%",
-    border: "1px solid #cbd5e1",
-    borderRadius: 12,
-    padding: "10px 12px",
-    fontSize: 14,
-    color: "#0f172a",
-    background: "#fff",
-    resize: "vertical",
-    boxSizing: "border-box",
-  },
-  previewBox: {
-    marginTop: 8,
-    background: "#ecfdf5",
-    border: "1px solid #a7f3d0",
-    color: "#047857",
-    padding: 12,
-    borderRadius: 12,
-    fontSize: 14,
-  },
-  warningBox: {
-    background: "#fff7ed",
-    border: "1px solid #fed7aa",
-    color: "#c2410c",
-    padding: 12,
-    borderRadius: 12,
-    fontSize: 14,
-    fontWeight: 700,
-  },
-  actionsRow: {
-    display: "flex",
-    justifyContent: "flex-end",
-    marginTop: 12,
-  },
-  primaryButton: {
-    border: "none",
-    borderRadius: 12,
-    padding: "10px 14px",
-    background: "#047857",
-    color: "#ffffff",
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    border: "1px solid #cbd5e1",
-    borderRadius: 12,
-    padding: "10px 14px",
-    background: "#ffffff",
-    color: "#0f172a",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  dangerButton: {
-    border: "none",
-    borderRadius: 12,
-    padding: "10px 14px",
-    background: "#dc2626",
-    color: "#ffffff",
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  secondaryButtonSmall: {
-    border: "1px solid #cbd5e1",
-    borderRadius: 10,
-    padding: "8px 10px",
-    background: "#ffffff",
-    color: "#0f172a",
-    fontWeight: 700,
-    cursor: "pointer",
-    fontSize: 13,
-  },
-  greenSmallButton: {
-    border: "none",
-    borderRadius: 10,
-    padding: "8px 10px",
-    background: "#047857",
-    color: "#ffffff",
-    fontWeight: 800,
-    cursor: "pointer",
-    fontSize: 13,
-  },
-  yellowSmallButton: {
-    border: "1px solid #fde047",
-    borderRadius: 10,
-    padding: "8px 10px",
-    background: "#fef9c3",
-    color: "#854d0e",
-    fontWeight: 800,
-    cursor: "pointer",
-    fontSize: 13,
-  },
-  dangerSmallButton: {
-    border: "none",
-    borderRadius: 10,
-    padding: "8px 10px",
-    background: "#fee2e2",
-    color: "#b91c1c",
-    fontWeight: 800,
-    cursor: "pointer",
-    fontSize: 13,
-  },
-  statsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-    gap: 12,
-  },
-  statCard: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 16,
-    padding: 16,
-    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.04)",
-    textAlign: "left",
-    cursor: "pointer",
-  },
-  statLabel: {
-    color: "#64748b",
-    fontSize: 13,
-    marginBottom: 8,
-    fontWeight: 700,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 850,
-    color: "#0f172a",
-  },
-  legendRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    flexWrap: "wrap",
-    color: "#475569",
-    fontSize: 13,
-    fontWeight: 700,
-    marginBottom: 14,
-  },
-  legendDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 999,
-    border: "1px solid",
-    display: "inline-block",
-  },
-  floorGridWrap: {
-    display: "grid",
-    gap: 18,
-  },
-  floorBlock: {
-    display: "grid",
-    gap: 10,
-  },
-  floorTitle: {
-    margin: 0,
-    color: "#0f172a",
-    fontSize: 18,
-    fontWeight: 850,
-  },
-  roomGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-    gap: 12,
-  },
-  roomCard: {
-    borderRadius: 16,
-    padding: 14,
-    display: "grid",
-    gap: 10,
-    border: "1px solid #e2e8f0",
-  },
-  roomFree: {
-    background: "#dcfce7",
-    border: "1px solid #86efac",
-  },
-  roomReserved: {
-    background: "#fef9c3",
-    border: "1px solid #fde047",
-  },
-  roomOccupied: {
-    background: "#fee2e2",
-    border: "1px solid #fca5a5",
-  },
-  roomPartial: {
-    background: "#ffedd5",
-    border: "1px solid #fdba74",
-  },
-  roomInactive: {
-    background: "#f1f5f9",
-    border: "1px solid #cbd5e1",
-  },
-  roomCardTop: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  roomCardMeta: {
-    color: "#475569",
-    fontSize: 13,
-    fontWeight: 700,
-  },
-  roomResidents: {
-    display: "grid",
-    gap: 6,
-  },
-  residentPill: {
-    background: "rgba(255,255,255,0.72)",
-    border: "1px solid rgba(15,23,42,0.08)",
-    borderRadius: 12,
-    padding: "7px 9px",
-    display: "grid",
-    gap: 2,
-    color: "#0f172a",
-    fontSize: 12,
-    fontWeight: 800,
-  },
-  roomActions: {
-    display: "flex",
-    gap: 7,
-    flexWrap: "wrap",
-  },
-  rowActions: {
-    display: "flex",
-    gap: 7,
-    flexWrap: "wrap",
-  },
-  tableWrap: {
-    width: "100%",
-    overflowX: "auto",
-  },
-  table: {
-    width: "100%",
-    minWidth: 1100,
-    borderCollapse: "collapse",
-  },
-  th: {
-    textAlign: "left",
-    padding: "12px 10px",
-    borderBottom: "1px solid #e2e8f0",
-    color: "#475569",
-    fontSize: 13,
-    fontWeight: 800,
-    background: "#f8fafc",
-    position: "sticky",
-    top: 0,
-  },
-  td: {
-    padding: "12px 10px",
-    borderBottom: "1px solid #e2e8f0",
-    fontSize: 14,
-    color: "#0f172a",
-    verticalAlign: "top",
-  },
-  tdStrong: {
-    padding: "12px 10px",
-    borderBottom: "1px solid #e2e8f0",
-    fontSize: 14,
-    color: "#0f172a",
-    verticalAlign: "top",
-    fontWeight: 800,
-  },
-  metaText: {
-    marginTop: 4,
-    color: "#64748b",
-    fontSize: 12,
-  },
-  link: {
-    color: "#047857",
-    textDecoration: "none",
-    fontWeight: 800,
-  },
-  tagWrap: {
-    display: "flex",
-    gap: 6,
-    flexWrap: "wrap",
-  },
-  tag: {
-    display: "inline-flex",
-    padding: "4px 8px",
-    borderRadius: 999,
-    fontSize: 12,
-    background: "#ecfdf5",
-    color: "#047857",
-    border: "1px solid #a7f3d0",
-    fontWeight: 750,
-  },
-  statusFree: {
-    display: "inline-flex",
-    padding: "4px 8px",
-    borderRadius: 999,
-    fontSize: 12,
-    background: "#dcfce7",
-    color: "#166534",
-    border: "1px solid #bbf7d0",
-    fontWeight: 800,
-  },
-  statusReserved: {
-    display: "inline-flex",
-    padding: "4px 8px",
-    borderRadius: 999,
-    fontSize: 12,
-    background: "#fef9c3",
-    color: "#854d0e",
-    border: "1px solid #fde047",
-    fontWeight: 800,
-  },
-  statusOccupied: {
-    display: "inline-flex",
-    padding: "4px 8px",
-    borderRadius: 999,
-    fontSize: 12,
-    background: "#fee2e2",
-    color: "#b91c1c",
-    border: "1px solid #fecaca",
-    fontWeight: 800,
-  },
-  statusPartial: {
-    display: "inline-flex",
-    padding: "4px 8px",
-    borderRadius: 999,
-    fontSize: 12,
-    background: "#ffedd5",
-    color: "#c2410c",
-    border: "1px solid #fdba74",
-    fontWeight: 800,
-  },
-  statusInactive: {
-    display: "inline-flex",
-    padding: "4px 8px",
-    borderRadius: 999,
-    fontSize: 12,
-    background: "#e2e8f0",
-    color: "#475569",
-    border: "1px solid #cbd5e1",
-    fontWeight: 800,
-  },
-  emptyCell: {
-    padding: 22,
-    textAlign: "center",
-    color: "#64748b",
-    fontSize: 14,
-  },
-  errorBox: {
-    background: "#fef2f2",
-    color: "#b91c1c",
-    border: "1px solid #fecaca",
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 14,
-    fontWeight: 750,
-  },
-  successBox: {
-    background: "#f0fdf4",
-    color: "#166534",
-    border: "1px solid #bbf7d0",
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 14,
-    fontWeight: 750,
-  },
-  modalBackdrop: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(15, 23, 42, 0.45)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    zIndex: 50,
-  },
-  modalCard: {
-    width: "100%",
-    maxWidth: 900,
-    maxHeight: "90vh",
-    overflowY: "auto",
-    background: "#ffffff",
-    borderRadius: 20,
-    padding: 20,
-    boxShadow: "0 20px 60px rgba(15, 23, 42, 0.25)",
-  },
-  modalCardSmall: {
-    width: "100%",
-    maxWidth: 540,
-    maxHeight: "90vh",
-    overflowY: "auto",
-    background: "#ffffff",
-    borderRadius: 20,
-    padding: 20,
-    boxShadow: "0 20px 60px rgba(15, 23, 42, 0.25)",
-  },
-  modalHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    margin: 0,
-    fontSize: 22,
-    fontWeight: 800,
-    color: "#0f172a",
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-    border: "1px solid #cbd5e1",
-    background: "#ffffff",
-    color: "#0f172a",
-    fontSize: 24,
-    lineHeight: 1,
-    cursor: "pointer",
-  },
-  modalGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 12,
-    marginBottom: 16,
-  },
-  checkboxSection: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 10,
-    padding: 14,
-    borderRadius: 14,
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    marginBottom: 16,
-  },
-  checkbox: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontSize: 14,
-    color: "#0f172a",
-  },
-  releaseList: {
-    display: "grid",
-    gap: 8,
-    marginTop: 12,
-  },
-  releaseItem: {
-    border: "1px solid #e2e8f0",
-    background: "#f8fafc",
-    borderRadius: 12,
-    padding: 10,
-    display: "grid",
-    gap: 4,
-  },
-  modalFooter: {
-    position: "sticky",
-    bottom: 0,
-    background: "#ffffff",
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 10,
-    paddingTop: 16,
-    marginTop: 16,
-    borderTop: "1px solid #e2e8f0",
-  },
 }

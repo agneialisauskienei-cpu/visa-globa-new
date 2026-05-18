@@ -1,2196 +1,2698 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'next/navigation'
+import ResidentActivityAttendanceAuto from "@/app/components/residents/ResidentActivityAttendanceAuto";
+import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   ArrowLeft,
-  Calendar,
+  CalendarDays,
   ClipboardList,
-  Contact,
   FileText,
   Home,
-  Package,
+  Lock,
+  PackageMinus,
+  Phone,
   Plus,
-  RefreshCw,
   Save,
+  ShieldAlert,
   Trash2,
   User,
-  UserRoundCheck,
+  Users,
   X,
-} from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentOrganizationId } from '@/lib/current-organization'
-import { getChangedFields, logAudit } from '@/lib/audit'
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
-type TabKey = 'card' | 'contacts' | 'plan' | 'logs' | 'incidents' | 'inventory'
+type ActiveTab =
+  | "kortele"
+  | "kontaktai"
+  | "planas"
+  | "irasai"
+  | "incidentai"
+  | "prekes";
 
 type Resident = {
-  id: string
-  organization_id?: string | null
-  first_name?: string | null
-  last_name?: string | null
-  full_name?: string | null
-  name?: string | null
-  resident_code?: string | null
-  code?: string | null
-  birth_date?: string | null
-  arrival_date?: string | null
-  current_room_id?: string | null
-  department?: string | null
-  assigned_to?: string | null
-  current_status?: string | null
-  status?: string | null
-  archived_at?: string | null
-  room_reserved_until?: string | null
-  phone?: string | null
-  email?: string | null
-  address?: string | null
-  notes?: string | null
-  created_at?: string | null
-}
+  id: string;
+  organization_id?: string | null;
+  resident_code?: string | null;
+  full_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  current_status?: string | null;
+  current_room_id?: string | null;
+  room_id?: string | null;
+  care_level?: string | null;
+  birth_date?: string | null;
+  admission_date?: string | null;
+  arrival_date?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  internal_notes?: string | null;
+  notes?: string | null;
+  assigned_to?: string | null;
+  responsible_employee_name?: string | null;
+};
 
-type Room = {
-  id: string
-  name: string | null
-  floor?: number | null
-}
+type Room = { id: string; name: string | null };
 
-type Profile = {
-  id: string
-  email?: string | null
-  first_name?: string | null
-  last_name?: string | null
-  full_name?: string | null
-}
+type StaffMember = {
+  user_id: string;
+  role: string | null;
+  position: string | null;
+  department: string | null;
+  staff_type: string | null;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+};
 
-type ResidentContact = {
-  id: string
-  organization_id: string
-  resident_id: string
-  full_name: string
-  relationship: string | null
-  phone: string | null
-  email: string | null
-  priority: number | null
-  can_receive_info: boolean | null
-  communication_notes: string | null
-  created_at: string | null
-}
+type ResidentAssignment = {
+  resident_id: string;
+  user_id: string;
+  is_primary: boolean | null;
+};
 
-type CarePlan = {
-  id: string
-  organization_id: string
-  resident_id: string
-  needs: string | null
-  goals: string | null
-  services: string | null
-  responsible_staff: string | null
-  review_date: string | null
-  status: string | null
-  created_at: string | null
-}
+type Contact = {
+  id: string;
+  full_name: string | null;
+  relationship: string | null;
+  phone: string | null;
+  email: string | null;
+  can_receive_info: boolean | null;
+  is_primary: boolean | null;
+};
 
+type IsgpGoal = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  actions: string | null;
+  responsible: string | null;
+  status: string | null;
+  review_date: string | null;
+};
 
-type ResidentTask = {
-  id: string
-  organization_id: string | null
-  title: string
-  description: string | null
-  status: string | null
-  priority: string | null
-  assigned_to: string | null
-  resident_id: string | null
-  care_plan_id: string | null
-  category: string | null
-  department: string | null
-  due_date: string | null
-  completed_at: string | null
-  recurrence_days: number | null
-  created_at: string | null
-}
-
-type DailyLog = {
-  id: string
-  organization_id: string
-  resident_id: string
-  employee_user_id: string | null
-  employee_full_name: string | null
-  activity_type: string | null
-  note: string | null
-  risk_type: string | null
-  services_done: string | null
-  created_at: string | null
-}
+type HandoverEntry = {
+  id: string;
+  category: string | null;
+  note: string | null;
+  needs_follow_up: boolean | null;
+  created_at: string | null;
+};
 
 type Incident = {
-  id: string
-  organization_id: string
-  resident_id: string
-  incident_at: string | null
-  type: string | null
-  observed_by: string | null
-  actions_taken: string | null
-  relatives_informed: boolean | null
-  medics_informed: boolean | null
-  result: string | null
-  created_at: string | null
-}
+  id: string;
+  incident_type: string | null;
+  severity: string | null;
+  description: string | null;
+  action_taken: string | null;
+  occurred_at: string | null;
+};
 
-type InventoryItem = {
-  id: string
-  organization_id: string
-  name: string | null
-  category: string | null
-  subcategory: string | null
-  size: string | null
-  unit: string | null
-  quantity: number | null
-  min_quantity: number | null
-}
+type MedicationLog = {
+  id: string;
+  medication_name: string | null;
+  dose: string | null;
+  taken_at: string | null;
+  notes: string | null;
+};
 
-type InventoryHistory = {
-  id: string
-  item_name: string | null
-  category: string | null
-  subcategory: string | null
-  size: string | null
-  quantity: number | null
-  unit: string | null
-  type: string | null
-  created_at: string | null
-  employee_full_name: string | null
-  notes: string | null
-}
+type ActivityAttendance = {
+  id: string;
+  resident_id?: string | null;
+  session_id?: string | null;
+  status: string | null;
+  note: string | null;
+  activity_title?: string | null;
+  session_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+};
+
+type InventoryIssue = {
+  id: string;
+  item_name: string | null;
+  quantity: number | null;
+  reason: string | null;
+  note: string | null;
+  created_at: string | null;
+};
+
+type CareTab = "slauga" | "rizikos" | "mityba" | "judejimas" | "pastabos";
+
+type CareInfo = {
+  allergies: string;
+  allergy_valid_until: string;
+  nursing_notes: string;
+  fall_risk: boolean;
+  diabetes: boolean;
+  pressure_sore_risk: boolean;
+  choking_risk: boolean;
+  wandering_risk: boolean;
+  risk_valid_until: string;
+  nutrition_type: string;
+  fluid_restriction: string;
+  texture_notes: string;
+  mobility_level: string;
+  transfer_two_staff: boolean;
+  mobility_aid: string;
+  staff_notes: string;
+  updated_by: string;
+  updated_at: string;
+};
 
 const STATUS_OPTIONS = [
-  { value: 'arriving_soon', label: 'Netrukus atvyks' },
-  { value: 'active', label: 'Gyvena' },
-  { value: 'hospital', label: 'Ligoninėje' },
-  { value: 'temporary_leave', label: 'Laikinai išvykęs' },
-  { value: 'deceased', label: 'Mirė' },
-  { value: 'contract_ended', label: 'Nutraukė sutartį' },
-]
+  { value: "netrukus_atvyks", label: "Netrukus atvyks" },
+  { value: "gyvena", label: "Gyvena" },
+  { value: "ligonineje", label: "Ligoninėje" },
+  { value: "laikinai_isvykes", label: "Laikinai išvykęs" },
+  { value: "sutartis_nutraukta", label: "Sutartis nutraukta" },
+  { value: "mire", label: "Miręs" },
+];
 
-const CATEGORY_LABELS: Record<string, string> = {
-  diapers: 'Sauskelnės',
-  bedding: 'Patalynė',
-  cleaning: 'Valymo priemonės',
-  medication: 'Vaistai',
-  uniforms: 'Darbuotojų uniformos',
-  other: 'Kita',
+const CARE_LEVEL_OPTIONS = [
+  { value: "", label: "Nepasirinkta" },
+  { value: "savarankiskas", label: "Savarankiškas" },
+  { value: "daline_slauga", label: "Dalinė slauga" },
+  { value: "slauga", label: "Slauga" },
+  { value: "intensyvi_slauga", label: "Intensyvi slauga" },
+];
+
+function text(value: unknown, fallback = "—") {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
 }
 
-const SUBCATEGORY_LABELS: Record<string, string> = {
-  pants: 'Kelnaitės',
-  tape: 'Juostinės sauskelnės',
-  night: 'Naktinės sauskelnės',
-  insert: 'Įklotai',
-  underpad: 'Paklotai',
-  set: 'Patalynės komplektas',
-  sheet: 'Paklodė',
-  duvet_cover: 'Antklodės užvalkalas',
-  pillowcase: 'Pagalvės užvalkalas',
-  blanket: 'Antklodė',
-  pillow: 'Pagalvė',
-  towel: 'Rankšluostis',
-  spray: 'Purškiklis',
-  liquid: 'Skystis',
-  powder: 'Milteliai',
-  gel: 'Gelis',
-  wipes: 'Servetėlės',
-  disinfectant: 'Dezinfekantas',
-  bags: 'Maišeliai',
-  gloves: 'Pirštinės',
-  tablet: 'Tabletės',
-  capsule: 'Kapsulės',
-  drops: 'Lašai',
-  ointment: 'Tepalas',
-  injection: 'Injekcija',
-  bandage: 'Tvarstis',
-  general: 'Bendra prekė',
-  equipment: 'Įranga',
-  office: 'Kanceliarinės prekės',
-  hygiene: 'Higienos priemonės',
+function isUuid(value?: string | null) {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
-function residentName(resident: Resident | null) {
-  if (!resident) return 'Gyventojas'
-  const fullName = String(resident.full_name || resident.name || '').trim()
-  const firstName = String(resident.first_name || '').trim()
-  const lastName = String(resident.last_name || '').trim()
-  const combined = [firstName, lastName].filter(Boolean).join(' ').trim()
-  return fullName || combined || 'Gyventojas'
+function safeResponsible(value?: string | null) {
+  if (!value || isUuid(value)) return "Nepriskirta";
+  return value;
 }
 
-function profileName(profile: Profile | null) {
-  if (!profile) return '—'
-  const fullName = String(profile.full_name || '').trim()
-  const firstName = String(profile.first_name || '').trim()
-  const lastName = String(profile.last_name || '').trim()
-  const combined = [firstName, lastName].filter(Boolean).join(' ').trim()
-  const email = String(profile.email || '').trim()
-  return fullName || combined || email || '—'
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString('lt-LT')
-}
-
-function toDateInput(value: string | null | undefined) {
-  if (!value) return ''
-  return String(value).slice(0, 10)
-}
-
-function toDateTimeInput(value: string | null | undefined) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 16)
-}
-
-function categoryLabel(value: string | null) {
-  if (!value) return '—'
-  return CATEGORY_LABELS[value] || value
-}
-
-function subcategoryLabel(value: string | null) {
-  if (!value) return '—'
-  return SUBCATEGORY_LABELS[value] || value
-}
-
-function operationLabel(type: string | null) {
-  if (type === 'out') return 'Nurašymas'
-  if (type === 'in') return 'Papildymas'
-  if (type === 'adjustment') return 'Koregavimas'
-  return '—'
-}
-
-function statusLabel(value: string | null | undefined) {
-  return STATUS_OPTIONS.find((item) => item.value === value)?.label || value || '—'
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
 }
 
 
-function taskStatusLabel(value: string | null | undefined) {
-  if (value === 'new') return 'Nauja'
-  if (value === 'assigned') return 'Priskirta'
-  if (value === 'in_progress') return 'Vykdoma'
-  if (value === 'waiting') return 'Laukia informacijos'
-  if (value === 'done') return 'Atlikta'
-  if (value === 'cancelled') return 'Atšaukta'
-  if (value === 'overdue') return 'Pavėluota'
-  return value || '—'
+function firstParamValue(value: unknown) {
+  if (Array.isArray(value)) return value[0] ? String(value[0]) : "";
+  if (typeof value === "string") return value;
+  return "";
 }
 
-function taskPriorityLabel(value: string | null | undefined) {
-  if (value === 'low') return 'Žemas'
-  if (value === 'medium') return 'Vidutinis'
-  if (value === 'high') return 'Aukštas'
-  if (value === 'critical') return 'Kritinis'
-  return value || '—'
+function getResidentIdFromPathname(pathname: string) {
+  const cleanSegments = pathname
+    .split("/")
+    .map((segment) => decodeURIComponent(segment).trim())
+    .filter(Boolean);
+
+  return cleanSegments.find((segment) => isUuid(segment)) || "";
 }
 
-function isTaskOverdue(task: ResidentTask) {
-  if (!task.due_date) return false
-  if (task.status === 'done' || task.status === 'cancelled') return false
-  return new Date(task.due_date).getTime() < Date.now()
+function resolveResidentId(
+  params: Record<string, unknown> | null | undefined,
+  searchParams: URLSearchParams | null,
+) {
+  const candidates = [
+    firstParamValue(params?.id),
+    firstParamValue(params?.residentId),
+    firstParamValue(params?.resident_id),
+    firstParamValue(params?.gyventojasId),
+    firstParamValue(params?.slug),
+    ...Object.values(params || {}).map(firstParamValue),
+    searchParams?.get("id") || "",
+    searchParams?.get("residentId") || "",
+    searchParams?.get("resident_id") || "",
+    searchParams?.get("gyventojasId") || "",
+    typeof window !== "undefined" ? getResidentIdFromPathname(window.location.pathname) : "",
+  ];
+
+  return candidates.find((value) => isUuid(value)) || "";
 }
 
-function planTitle(plan: CarePlan) {
-  return String(plan.goals || plan.needs || plan.services || 'Individualus planas').trim()
+function staffName(member?: StaffMember | null) {
+  if (!member) return "";
+  const full = String(member.full_name || "").trim();
+  if (full) return full;
+  const joined = [member.first_name, member.last_name]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ");
+  return joined || member.email || "";
 }
 
-function isArchivedStatus(status: string | null | undefined) {
-  return status === 'deceased' || status === 'contract_ended'
+function toDateInput(value: unknown) {
+  if (!value) return "";
+  const raw = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
 }
 
-export default function ResidentDetailsPage() {
-  const params = useParams()
-  const residentId = String(params.id || '')
+function statusLabel(status?: string | null) {
+  const raw = String(status || "").toLowerCase();
+  const map: Record<string, string> = {
+    netrukus_atvyks: "Netrukus atvyks",
+    reserved: "Netrukus atvyks",
+    requested: "Netrukus atvyks",
+    gyvena: "Gyvena",
+    active: "Gyvena",
+    ligonineje: "Ligoninėje",
+    hospital: "Ligoninėje",
+    laikinai_isvykes: "Laikinai išvykęs",
+    temporarily_away: "Laikinai išvykęs",
+    sutartis_nutraukta: "Sutartis nutraukta",
+    moved_out: "Išvykęs",
+    mire: "Miręs",
+    inactive: "Neaktyvus",
+    neaktyvus: "Neaktyvus",
+  };
+  return map[raw] || text(status, "Nežinoma");
+}
 
-  const [activeTab, setActiveTab] = useState<TabKey>('card')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
+function careLevelLabel(value?: string | null) {
+  const found = CARE_LEVEL_OPTIONS.find((item) => item.value === value);
+  return found?.label || text(value, "Nepasirinkta");
+}
 
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
-  const [resident, setResident] = useState<Resident | null>(null)
+function normalizeName(resident: Resident | null) {
+  const full = String(resident?.full_name || "").trim();
+  if (full) return full;
+  const joined = [resident?.first_name, resident?.last_name]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean)
+    .join(" ");
+  return joined || "Gyventojas";
+}
 
-  const [rooms, setRooms] = useState<Room[]>([])
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [assignedProfile, setAssignedProfile] = useState<Profile | null>(null)
+function splitName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0)
+    return {
+      first_name: null as string | null,
+      last_name: null as string | null,
+    };
+  if (parts.length === 1)
+    return { first_name: parts[0], last_name: null as string | null };
+  return {
+    first_name: parts.slice(0, -1).join(" "),
+    last_name: parts.slice(-1).join(" "),
+  };
+}
 
-  const [contacts, setContacts] = useState<ResidentContact[]>([])
-  const [carePlans, setCarePlans] = useState<CarePlan[]>([])
-  const [residentTasks, setResidentTasks] = useState<ResidentTask[]>([])
-  const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([])
-  const [incidents, setIncidents] = useState<Incident[]>([])
-  const [inventoryHistory, setInventoryHistory] = useState<InventoryHistory[]>([])
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return `${parts[0]?.[0] || "G"}${parts[1]?.[0] || ""}`.toUpperCase();
+}
 
-  const [residentForm, setResidentForm] = useState({
-    first_name: '',
-    last_name: '',
-    resident_code: '',
-    birth_date: '',
-    arrival_date: '',
-    current_room_id: '',
-    department: '',
-    assigned_to: '',
-    current_status: 'active',
-    room_reserved_until: '',
-    phone: '',
-    email: '',
-    address: '',
-    notes: '',
-  })
+function getReadableError(error: unknown) {
+  if (!error) return "Nepavyko atlikti veiksmo.";
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object") {
+    const maybe = error as {
+      message?: string;
+      details?: string;
+      hint?: string;
+      code?: string;
+    };
+    return [maybe.message, maybe.details, maybe.hint, maybe.code]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  return String(error);
+}
 
-  const [contactForm, setContactForm] = useState({
-    full_name: '',
-    relationship: '',
-    phone: '',
-    email: '',
-    priority: '1',
-    can_receive_info: false,
-    communication_notes: '',
-  })
+function Badge({
+  children,
+  tone = "neutral",
+}: {
+  children: ReactNode;
+  tone?: "green" | "blue" | "warning" | "danger" | "neutral";
+}) {
+  const tones = {
+    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-700",
+    danger: "border-red-200 bg-red-50 text-red-700",
+    neutral: "border-slate-200 bg-slate-50 text-slate-600",
+  };
 
-  const [planForm, setPlanForm] = useState({
-    needs: '',
-    goals: '',
-    services: '',
-    responsible_staff: '',
-    review_date: '',
-  })
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-extrabold ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
 
-  const [dailyLogForm, setDailyLogForm] = useState({
-    activity_type: 'Priežiūra',
-    note: '',
-    risk_type: '',
-    services_done: '',
-  })
+function Card({
+  title,
+  children,
+  action,
+}: {
+  title: string;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-5">
+        <h2 className="text-[17px] font-black tracking-tight text-slate-950">
+          {title}
+        </h2>
+        {action}
+      </div>
+      <div className="px-5 pb-5">{children}</div>
+    </section>
+  );
+}
 
-  const [incidentForm, setIncidentForm] = useState({
-    incident_at: '',
-    type: 'Griuvimas',
-    observed_by: '',
-    actions_taken: '',
-    relatives_informed: false,
-    medics_informed: false,
-    result: '',
-  })
+function InfoNotice({
+  title,
+  children,
+  tone = "green",
+}: {
+  title: string;
+  children: ReactNode;
+  tone?: "green" | "amber" | "blue";
+}) {
+  const tones = {
+    green: "border-emerald-100 bg-emerald-50 text-emerald-900",
+    amber: "border-amber-100 bg-amber-50 text-amber-900",
+    blue: "border-blue-100 bg-blue-50 text-blue-900",
+  };
 
-  const [editingContact, setEditingContact] = useState<ResidentContact | null>(null)
-  const [editingPlan, setEditingPlan] = useState<CarePlan | null>(null)
-  const [editingLog, setEditingLog] = useState<DailyLog | null>(null)
-  const [editingIncident, setEditingIncident] = useState<Incident | null>(null)
+  return (
+    <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
+      <div className="mb-1 flex items-center gap-2 text-sm font-black">
+        <ShieldAlert size={16} />
+        {title}
+      </div>
+      <div className="text-sm font-bold leading-6 opacity-90">{children}</div>
+    </div>
+  );
+}
 
-  const [showIssueModal, setShowIssueModal] = useState(false)
-  const [issueItemId, setIssueItemId] = useState('')
-  const [issueQuantity, setIssueQuantity] = useState('1')
-  const [issueNotes, setIssueNotes] = useState('')
+function InfoRow({
+  label,
+  value,
+  masked,
+}: {
+  label: string;
+  value: ReactNode;
+  masked?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-[120px_1fr] gap-3 text-sm">
+      <div className="font-semibold text-slate-500">{label}</div>
+      <div className="break-words font-extrabold text-slate-800">
+        {masked ? (
+          <span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-500">
+            {value}
+          </span>
+        ) : (
+          value
+        )}
+      </div>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    if (!residentId) return
-    void loadData()
-  }, [residentId])
+function CompactStat({
+  icon,
+  value,
+  label,
+}: {
+  icon: ReactNode;
+  value: ReactNode;
+  label: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-2xl font-black leading-none text-slate-950">
+            {value}
+          </div>
+          <div className="mt-1 text-sm font-bold text-slate-500">{label}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="space-y-2">
+      <span className="block text-sm font-black text-slate-700">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const inputClass =
+  "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50";
+const textareaClass =
+  "min-h-[108px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50";
+
+const emptyContact = {
+  full_name: "",
+  relationship: "",
+  phone: "",
+  email: "",
+  can_receive_info: true,
+  is_primary: false,
+};
+const emptyGoal = {
+  title: "",
+  description: "",
+  actions: "",
+  responsible: "",
+  status: "aktyvus",
+  review_date: "",
+};
+const emptyEntry = { category: "Bendra", note: "", needs_follow_up: false };
+const emptyIncident = {
+  incident_type: "",
+  severity: "vidutinis",
+  description: "",
+  action_taken: "",
+  occurred_at: new Date().toISOString().slice(0, 16),
+};
+const emptyWriteOff = { item_name: "", quantity: "1", reason: "", note: "" };
+
+const emptyCareInfo: CareInfo = {
+  allergies: "",
+  allergy_valid_until: "",
+  nursing_notes: "",
+  fall_risk: false,
+  diabetes: false,
+  pressure_sore_risk: false,
+  choking_risk: false,
+  wandering_risk: false,
+  risk_valid_until: "",
+  nutrition_type: "",
+  fluid_restriction: "",
+  texture_notes: "",
+  mobility_level: "",
+  transfer_two_staff: false,
+  mobility_aid: "",
+  staff_notes: "",
+  updated_by: "",
+  updated_at: "",
+};
+
+const CARE_TABS: Array<{ value: CareTab; label: string }> = [
+  { value: "slauga", label: "Slauga" },
+  { value: "rizikos", label: "Rizikos" },
+  { value: "mityba", label: "Mityba" },
+  { value: "judejimas", label: "Judėjimas" },
+  { value: "pastabos", label: "Pastabos darbuotojams" },
+];
+
+const NUTRITION_OPTIONS = [
+  { value: "", label: "Nepasirinkta" },
+  { value: "iprasta", label: "Įprasta mityba" },
+  { value: "diabetine", label: "Diabetinė mityba" },
+  { value: "trinta", label: "Trinta / minkšta" },
+  { value: "maitinamas", label: "Reikia pagalbos maitinant" },
+  { value: "zondas", label: "Maitinimas per zondą" },
+  { value: "kita", label: "Kita" },
+];
+
+const MOBILITY_OPTIONS = [
+  { value: "", label: "Nepasirinkta" },
+  { value: "savarankiskas", label: "Savarankiškas" },
+  { value: "su_pagalba", label: "Su pagalba" },
+  { value: "vaikstyne", label: "Su vaikštyne / lazdele" },
+  { value: "vezimelis", label: "Vežimėlis" },
+  { value: "gulimas", label: "Gulimas" },
+];
+
+export default function ResidentDetailPage() {
+  const params = useParams<Record<string, string | string[]>>();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const residentId = useMemo(
+    () => resolveResidentId(params, searchParams),
+    [params, searchParams],
+  );
+
+  const [resident, setResident] = useState<Resident | null>(null);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [assignedStaffIds, setAssignedStaffIds] = useState<string[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [goals, setGoals] = useState<IsgpGoal[]>([]);
+  const [entries, setEntries] = useState<HandoverEntry[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [medications, setMedications] = useState<MedicationLog[]>([]);
+  const [activity, setActivity] = useState<ActivityAttendance[]>([]);
+  const [inventory, setInventory] = useState<InventoryIssue[]>([]);
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>("kortele");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [errorText, setErrorText] = useState("");
+  const [successText, setSuccessText] = useState("");
+  const [writeOffOpen, setWriteOffOpen] = useState(false);
+  const [careModalOpen, setCareModalOpen] = useState(false);
+  const [careTab, setCareTab] = useState<CareTab>("slauga");
+
+  const [form, setForm] = useState({
+    full_name: "",
+    resident_code: "",
+    current_status: "gyvena",
+    current_room_id: "",
+    care_level: "",
+    birth_date: "",
+    admission_date: "",
+    phone: "",
+    email: "",
+    address: "",
+    internal_notes: "",
+  });
+
+  const [contactForm, setContactForm] = useState(emptyContact);
+  const [goalForm, setGoalForm] = useState(emptyGoal);
+  const [entryForm, setEntryForm] = useState(emptyEntry);
+  const [incidentForm, setIncidentForm] = useState(emptyIncident);
+  const [writeOffForm, setWriteOffForm] = useState(emptyWriteOff);
+  const [careInfo, setCareInfo] = useState<CareInfo>(emptyCareInfo);
+
+  const residentName = normalizeName(resident);
+
+  const roomLabel = useMemo(() => {
+    const roomId = resident?.current_room_id || resident?.room_id || "";
+    const found = rooms.find((room) => room.id === roomId);
+    return found?.name || text(roomId, "—");
+  }, [resident?.current_room_id, resident?.room_id, rooms]);
+
+  const assignedStaffNames = useMemo(() => {
+    return uniqueValues(assignedStaffIds)
+      .map((id) =>
+        staffName(staffMembers.find((member) => member.user_id === id)),
+      )
+      .filter(Boolean);
+  }, [assignedStaffIds, staffMembers]);
+
+  const responsibleName = assignedStaffNames.length
+    ? assignedStaffNames.join(", ")
+    : safeResponsible(
+        resident?.responsible_employee_name || resident?.assigned_to,
+      );
+
+  const nutritionLabel =
+    NUTRITION_OPTIONS.find((option) => option.value === careInfo.nutrition_type)
+      ?.label || "Nepasirinkta";
+
+  const mobilityLabel =
+    MOBILITY_OPTIONS.find((option) => option.value === careInfo.mobility_level)
+      ?.label || "Nepasirinkta";
+
+  const activeRiskLabels = [
+    careInfo.fall_risk ? "kritimo" : "",
+    careInfo.diabetes ? "diabeto" : "",
+    careInfo.pressure_sore_risk ? "pragulų" : "",
+    careInfo.choking_risk ? "springimo" : "",
+    careInfo.wandering_risk ? "paklydimo" : "",
+  ].filter(Boolean);
+
+  const updateCareInfo = (patch: Partial<CareInfo>) => {
+    setCareInfo((prev) => ({ ...prev, ...patch }));
+  };
+
+  async function safeSelect<T>(
+    table: string,
+    callback: (query: any) => Promise<{ data: T[] | null; error: any }>,
+  ) {
+    try {
+      const query = supabase.from(table).select("*");
+      const { data, error } = await callback(query);
+      if (error) return [];
+      return data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function loadCareInfo(currentResidentId: string) {
+    const storageKey = `resident-care-info:${currentResidentId}`;
+
+    try {
+      const { data, error } = await supabase
+        .from("resident_care_information")
+        .select("*")
+        .eq("resident_id", currentResidentId)
+        .maybeSingle();
+
+      if (!error && data) {
+        setCareInfo({ ...emptyCareInfo, ...(data as Partial<CareInfo>) });
+        return;
+      }
+    } catch {
+      // Lentelė gali būti dar nesukurta – UI vis tiek veikia, o saugojimas turi atsarginį localStorage kelią.
+    }
+
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          setCareInfo({ ...emptyCareInfo, ...JSON.parse(saved) });
+          return;
+        } catch {
+          setCareInfo(emptyCareInfo);
+        }
+      }
+    }
+
+    setCareInfo(emptyCareInfo);
+  }
 
   async function loadData() {
+    if (!residentId) {
+      setLoading(false);
+      setErrorText("Nepavyko nustatyti gyventojo ID iš puslapio adreso. Patikrink, ar šis failas įdėtas į dinaminį maršrutą app/(app)/residents/[id]/page.tsx, o ne į app/(app)/residents/page.tsx.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorText("");
+
     try {
-      setLoading(true)
-      setMessage('')
+      const { data: residentData, error: residentError } = await supabase
+        .from("residents")
+        .select("*")
+        .eq("id", residentId)
+        .single();
 
-      const residentResult = await supabase
-        .from('residents')
-        .select('*')
-        .eq('id', residentId)
-        .maybeSingle()
+      if (residentError) throw residentError;
 
-      if (residentResult.error) throw residentResult.error
+      const nextResident = residentData as Resident;
+      setResident(nextResident);
+      setForm({
+        full_name: normalizeName(nextResident),
+        resident_code: text(nextResident.resident_code, ""),
+        current_status: String(nextResident.current_status || "gyvena"),
+        current_room_id: String(
+          nextResident.current_room_id || nextResident.room_id || "",
+        ),
+        care_level: String(nextResident.care_level || ""),
+        birth_date: toDateInput(nextResident.birth_date),
+        admission_date: toDateInput(
+          nextResident.admission_date || nextResident.arrival_date,
+        ),
+        phone: text(nextResident.phone, ""),
+        email: text(nextResident.email, ""),
+        address: text(nextResident.address, ""),
+        internal_notes: text(
+          nextResident.internal_notes || nextResident.notes,
+          "",
+        ),
+      });
 
-      const residentData = (residentResult.data || null) as Resident | null
-      setResident(residentData)
+      const organizationId = nextResident.organization_id;
+      const roomsQuery = supabase
+        .from("rooms")
+        .select("id,name")
+        .order("name", { ascending: true });
+      const { data: roomData } = organizationId
+        ? await roomsQuery.eq("organization_id", organizationId)
+        : await roomsQuery;
+      setRooms((roomData || []) as Room[]);
 
-      const orgId = residentData?.organization_id || (await getCurrentOrganizationId())
-      setOrganizationId(orgId || null)
+      let staff: StaffMember[] = [];
+      if (organizationId) {
+        const membersResult = await supabase
+          .from("organization_members")
+          .select("user_id, role, position, department, staff_type, is_active")
+          .eq("organization_id", organizationId)
+          .eq("is_active", true);
 
-      if (residentData) {
-        setResidentForm({
-          first_name: residentData.first_name || '',
-          last_name: residentData.last_name || '',
-          resident_code: residentData.resident_code || residentData.code || '',
-          birth_date: toDateInput(residentData.birth_date),
-          arrival_date: toDateInput(residentData.arrival_date),
-          current_room_id: residentData.current_room_id || '',
-          department: residentData.department || '',
-          assigned_to: residentData.assigned_to || '',
-          current_status: residentData.current_status || residentData.status || 'active',
-          room_reserved_until: toDateInput(residentData.room_reserved_until),
-          phone: residentData.phone || '',
-          email: residentData.email || '',
-          address: residentData.address || '',
-          notes: residentData.notes || '',
-        })
-      }
+        const userIds = (membersResult.data || [])
+          .map((member: any) => member.user_id)
+          .filter(Boolean);
 
-      const [
-        historyResult,
-        contactsResult,
-        plansResult,
-        tasksResult,
-        logsResult,
-        incidentsResult,
-        roomsResult,
-        membersResult,
-      ] = await Promise.all([
-        supabase
-          .from('inventory_issue_history_view')
-          .select('id, item_name, category, subcategory, size, quantity, unit, type, created_at, employee_full_name, notes')
-          .eq('resident_id', residentId)
-          .order('created_at', { ascending: false }),
+        let profiles = new Map<string, any>();
 
-        supabase
-          .from('resident_contacts')
-          .select('*')
-          .eq('resident_id', residentId)
-          .order('priority', { ascending: true }),
+        if (userIds.length > 0) {
+          const profilesResult = await supabase
+            .from("profiles")
+            .select("id, full_name, first_name, last_name, email")
+            .in("id", userIds);
 
-        supabase
-          .from('resident_care_plans')
-          .select('*')
-          .eq('resident_id', residentId)
-          .order('created_at', { ascending: false }),
-
-        supabase
-          .from('tasks')
-          .select('id, organization_id, title, description, status, priority, assigned_to, resident_id, care_plan_id, category, department, due_date, completed_at, recurrence_days, created_at')
-          .eq('resident_id', residentId)
-          .order('created_at', { ascending: false }),
-
-        supabase
-          .from('resident_daily_logs')
-          .select('*')
-          .eq('resident_id', residentId)
-          .order('created_at', { ascending: false }),
-
-        supabase
-          .from('resident_incidents')
-          .select('*')
-          .eq('resident_id', residentId)
-          .order('incident_at', { ascending: false }),
-
-        orgId
-          ? supabase.from('rooms').select('id, name, floor').eq('organization_id', orgId)
-          : Promise.resolve({ data: [], error: null }),
-
-        orgId
-          ? supabase.from('organization_members').select('user_id').eq('organization_id', orgId).eq('is_active', true)
-          : Promise.resolve({ data: [], error: null }),
-      ])
-
-      if (historyResult.error) throw historyResult.error
-      if (contactsResult.error) throw contactsResult.error
-      if (plansResult.error) throw plansResult.error
-      if (tasksResult.error) throw tasksResult.error
-      if (logsResult.error) throw logsResult.error
-      if (incidentsResult.error) throw incidentsResult.error
-      if (roomsResult.error) throw roomsResult.error
-      if (membersResult.error) throw membersResult.error
-
-      setInventoryHistory((historyResult.data || []) as InventoryHistory[])
-      setContacts((contactsResult.data || []) as ResidentContact[])
-      setCarePlans((plansResult.data || []) as CarePlan[])
-      setResidentTasks((tasksResult.data || []) as ResidentTask[])
-      setDailyLogs((logsResult.data || []) as DailyLog[])
-      setIncidents((incidentsResult.data || []) as Incident[])
-      setRooms((roomsResult.data || []) as Room[])
-
-      const memberIds = ((membersResult.data || []) as Record<string, unknown>[])
-        .map((item) => String(item.user_id || ''))
-        .filter(Boolean)
-
-      if (memberIds.length > 0) {
-        const profilesResult = await supabase
-          .from('profiles')
-          .select('id, email, first_name, last_name, full_name')
-          .in('id', memberIds)
-
-        if (profilesResult.error) throw profilesResult.error
-
-        const profileList = (profilesResult.data || []) as Profile[]
-        setProfiles(profileList)
-
-        if (residentData?.assigned_to) {
-          setAssignedProfile(profileList.find((profile) => profile.id === residentData.assigned_to) || null)
-        } else {
-          setAssignedProfile(null)
+          profiles = new Map(
+            (profilesResult.data || []).map((profile: any) => [
+              profile.id,
+              profile,
+            ]),
+          );
         }
-      } else {
-        setProfiles([])
-        setAssignedProfile(null)
+
+        staff = (membersResult.data || []).map((member: any) => {
+          const profile = profiles.get(member.user_id);
+
+          return {
+            user_id: member.user_id,
+            role: member.role || null,
+            position: member.position || null,
+            department: member.department || null,
+            staff_type: member.staff_type || null,
+            full_name: profile?.full_name || null,
+            first_name: profile?.first_name || null,
+            last_name: profile?.last_name || null,
+            email: profile?.email || null,
+          };
+        });
       }
 
-      if (orgId) {
-        const itemsResult = await supabase
-          .from('inventory_items')
-          .select('id, organization_id, name, category, subcategory, size, unit, quantity, min_quantity')
-          .eq('organization_id', orgId)
-          .neq('category', 'uniforms')
-          .gt('quantity', 0)
-          .order('name', { ascending: true })
+      setStaffMembers(staff);
 
-        if (itemsResult.error) throw itemsResult.error
-        setInventoryItems((itemsResult.data || []) as InventoryItem[])
-      } else {
-        setInventoryItems([])
+      let nextAssignedIds: string[] = [];
+      try {
+        const assignmentsResult = await supabase
+          .from("resident_assignments")
+          .select("resident_id, user_id, is_primary")
+          .eq("resident_id", residentId);
+
+        if (!assignmentsResult.error) {
+          nextAssignedIds = (
+            (assignmentsResult.data || []) as ResidentAssignment[]
+          )
+            .map((assignment) => assignment.user_id)
+            .filter(Boolean);
+        }
+      } catch {
+        nextAssignedIds = [];
       }
+
+      if (nextResident.assigned_to) {
+        nextAssignedIds = uniqueValues([
+          ...nextAssignedIds,
+          nextResident.assigned_to,
+        ]);
+      }
+
+      setAssignedStaffIds(nextAssignedIds);
+
+      setContacts(
+        await safeSelect<Contact>("resident_contacts", (q) =>
+          q
+            .eq("resident_id", residentId)
+            .order("is_primary", { ascending: false }),
+        ),
+      );
+      setGoals(
+        await safeSelect<IsgpGoal>("resident_isgp_goals", (q) =>
+          q
+            .eq("resident_id", residentId)
+            .order("created_at", { ascending: false }),
+        ),
+      );
+      setEntries(
+        await safeSelect<HandoverEntry>("resident_handover_entries", (q) =>
+          q
+            .eq("resident_id", residentId)
+            .order("created_at", { ascending: false }),
+        ),
+      );
+      setIncidents(
+        await safeSelect<Incident>("resident_incidents", (q) =>
+          q
+            .eq("resident_id", residentId)
+            .order("occurred_at", { ascending: false }),
+        ),
+      );
+      setMedications(
+        await safeSelect<MedicationLog>("medication_logs", (q) =>
+          q
+            .eq("resident_id", residentId)
+            .order("taken_at", { ascending: false })
+            .limit(10),
+        ),
+      );
+      setActivity(
+        await safeSelect<ActivityAttendance>(
+          "resident_activity_attendance_view",
+          (q) =>
+            q
+              .eq("resident_id", residentId)
+              .order("session_date", { ascending: false })
+              .order("start_time", { ascending: false })
+              .limit(10),
+        ),
+      );
+      setInventory(
+        await safeSelect<InventoryIssue>("inventory_issue_history", (q) =>
+          q
+            .eq("resident_id", residentId)
+            .order("created_at", { ascending: false })
+            .limit(20),
+        ),
+      );
+
+      await loadCareInfo(residentId);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko įkelti gyventojo duomenų.')
+      setErrorText(getReadableError(error));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  async function getActorName() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user?.id) return { userId: null, name: null }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('first_name, last_name, full_name, email')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    const record = (profile || {}) as Record<string, unknown>
-    const fullName = String(record.full_name || '').trim()
-    const firstName = String(record.first_name || '').trim()
-    const lastName = String(record.last_name || '').trim()
-    const email = String(record.email || user.email || '').trim()
-
-    return {
-      userId: user.id,
-      name: fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || email || null,
-    }
-  }
+  useEffect(() => {
+    void loadData();
+  }, [residentId]);
 
   async function saveResident() {
+    if (!residentId) return;
+    setSaving(true);
+    setErrorText("");
+    setSuccessText("");
+
     try {
-      if (!resident) return
-
-      setSaving(true)
-      setMessage('')
-
-      const fullName = [residentForm.first_name, residentForm.last_name].filter(Boolean).join(' ').trim()
-      const newStatus = residentForm.current_status
-      const roomId = residentForm.current_room_id || null
-
-      const archivedAt = isArchivedStatus(newStatus)
-        ? resident.archived_at || new Date().toISOString()
-        : null
-
-      let occupiedBy: string | null = null
-      let reservedFor: string | null = null
-      let roomStatus = 'available'
-
-      if (newStatus === 'arriving_soon') {
-        reservedFor = resident.id
-        roomStatus = 'reserved'
-      }
-
-      if (newStatus === 'active' || newStatus === 'hospital' || newStatus === 'temporary_leave') {
-        occupiedBy = resident.id
-        roomStatus = 'occupied'
-      }
-
-      if (isArchivedStatus(newStatus)) {
-        occupiedBy = null
-        reservedFor = null
-        roomStatus = 'available'
-      }
-
-      await supabase
-        .from('rooms')
-        .update({
-          occupied_by: null,
-          reserved_for: null,
-          reserved_until: null,
-          room_status: 'available',
-        })
-        .or(`occupied_by.eq.${resident.id},reserved_for.eq.${resident.id}`)
-
-      if (roomId && !isArchivedStatus(newStatus)) {
-        await supabase
-          .from('rooms')
-          .update({
-            occupied_by: occupiedBy,
-            reserved_for: reservedFor,
-            reserved_until: newStatus === 'arriving_soon' ? residentForm.room_reserved_until || null : null,
-            room_status: roomStatus,
-          })
-          .eq('id', roomId)
-      }
+      const nameParts = splitName(form.full_name);
+      const payload = {
+        full_name: form.full_name.trim() || null,
+        first_name: nameParts.first_name,
+        last_name: nameParts.last_name,
+        resident_code: form.resident_code.trim() || null,
+        current_status: form.current_status || null,
+        current_room_id: form.current_room_id || null,
+        care_level: form.care_level || null,
+        birth_date: form.birth_date || null,
+        admission_date: form.admission_date || null,
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
+        address: form.address.trim() || null,
+        internal_notes: form.internal_notes.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
 
       const { data, error } = await supabase
-        .from('residents')
-        .update({
-          first_name: residentForm.first_name || null,
-          last_name: residentForm.last_name || null,
-          full_name: fullName || null,
-          resident_code: residentForm.resident_code || null,
-          birth_date: residentForm.birth_date || null,
-          arrival_date: residentForm.arrival_date || null,
-          current_room_id: isArchivedStatus(newStatus) ? null : roomId,
-          department: residentForm.department || null,
-          assigned_to: residentForm.assigned_to || null,
-          current_status: newStatus,
-          archived_at: archivedAt,
-          room_reserved_until: newStatus === 'arriving_soon' ? residentForm.room_reserved_until || null : null,
-          phone: residentForm.phone || null,
-          email: residentForm.email || null,
-          address: residentForm.address || null,
-          notes: residentForm.notes || null,
-        })
-        .eq('id', resident.id)
-        .select()
-        .single()
-
-      if (error) throw error
-
-     const beforeResidentForm = {
-  first_name: resident.first_name || '',
-  last_name: resident.last_name || '',
-  resident_code: resident.resident_code || resident.code || '',
-  birth_date: toDateInput(resident.birth_date),
-  arrival_date: toDateInput(resident.arrival_date),
-  current_room_id: resident.current_room_id || '',
-  department: resident.department || '',
-  assigned_to: resident.assigned_to || '',
-  current_status: resident.current_status || resident.status || 'active',
-  room_reserved_until: toDateInput(resident.room_reserved_until),
-  phone: resident.phone || '',
-  email: resident.email || '',
-  address: resident.address || '',
-  notes: resident.notes || '',
-}
-
-const residentChanges = getChangedFields(beforeResidentForm, residentForm)
-
-if (Object.keys(residentChanges).length > 0) {
-  await logAudit({
-    organizationId,
-    tableName: 'residents',
-    recordId: data.id,
-    action: 'update',
-    changes: residentChanges,
-  })
-}
-
-      setMessage('Gyventojo duomenys išsaugoti.')
-      await loadData()
+        .from("residents")
+        .update(payload)
+        .eq("id", residentId)
+        .select("*")
+        .single();
+      if (error) throw error;
+      setResident(data as Resident);
+      setSuccessText("Gyventojo kortelė išsaugota.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko išsaugoti gyventojo.')
+      setErrorText(getReadableError(error));
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
-  async function createContact() {
-    try {
-      if (!organizationId) return
-      if (!contactForm.full_name.trim()) {
-        setMessage('Įvesk kontakto vardą.')
-        return
-      }
+  async function insertRow(
+    table: string,
+    payload: Record<string, unknown>,
+    success: string,
+  ) {
+    if (!residentId) return;
+    setSaving(true);
+    setErrorText("");
+    setSuccessText("");
 
-      setSaving(true)
-      setMessage('')
+    try {
+      const { error } = await supabase.from(table).insert({
+        organization_id: resident?.organization_id || null,
+        resident_id: residentId,
+        ...payload,
+      });
+      if (error) throw error;
+      setSuccessText(success);
+      await loadData();
+    } catch (error) {
+      setErrorText(getReadableError(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteRow(table: string, id: string, success: string) {
+    setSaving(true);
+    setErrorText("");
+    setSuccessText("");
+
+    try {
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) throw error;
+      setSuccessText(success);
+      await loadData();
+    } catch (error) {
+      setErrorText(getReadableError(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addContact() {
+    if (!contactForm.full_name.trim()) {
+      setErrorText("Įrašyk kontakto vardą.");
+      return;
+    }
+
+    await insertRow(
+      "resident_contacts",
+      {
+        full_name: contactForm.full_name.trim(),
+        relationship: contactForm.relationship.trim() || null,
+        phone: contactForm.phone.trim() || null,
+        email: contactForm.email.trim() || null,
+        can_receive_info: contactForm.can_receive_info,
+        is_primary: contactForm.is_primary,
+      },
+      "Kontaktas pridėtas.",
+    );
+    setContactForm(emptyContact);
+  }
+
+  async function addGoal() {
+    if (!goalForm.title.trim()) {
+      setErrorText("Įrašyk ISGP tikslo pavadinimą.");
+      return;
+    }
+
+    await insertRow(
+      "resident_isgp_goals",
+      {
+        title: goalForm.title.trim(),
+        description: goalForm.description.trim() || null,
+        actions: goalForm.actions.trim() || null,
+        responsible: goalForm.responsible.trim() || null,
+        status: goalForm.status || "aktyvus",
+        review_date: goalForm.review_date || null,
+      },
+      "ISGP tikslas pridėtas.",
+    );
+    setGoalForm(emptyGoal);
+  }
+
+  async function addEntry() {
+    if (!entryForm.note.trim()) {
+      setErrorText("Įrašyk perdavimo žurnalo pastabą.");
+      return;
+    }
+
+    await insertRow(
+      "resident_handover_entries",
+      {
+        category: entryForm.category.trim() || "Bendra",
+        note: entryForm.note.trim(),
+        needs_follow_up: entryForm.needs_follow_up,
+      },
+      "Įrašas pridėtas.",
+    );
+    setEntryForm(emptyEntry);
+  }
+
+  async function addIncident() {
+    if (!incidentForm.description.trim()) {
+      setErrorText("Įrašyk incidento aprašymą.");
+      return;
+    }
+
+    await insertRow(
+      "resident_incidents",
+      {
+        incident_type: incidentForm.incident_type.trim() || "Kita",
+        severity: incidentForm.severity || "vidutinis",
+        description: incidentForm.description.trim(),
+        action_taken: incidentForm.action_taken.trim() || null,
+        occurred_at: incidentForm.occurred_at
+          ? new Date(incidentForm.occurred_at).toISOString()
+          : new Date().toISOString(),
+      },
+      "Incidentas pridėtas.",
+    );
+    setIncidentForm(emptyIncident);
+  }
+
+  async function submitWriteOff() {
+    const quantity = Number(writeOffForm.quantity || 0);
+
+    if (!writeOffForm.item_name.trim()) {
+      setErrorText("Įrašyk prekės pavadinimą.");
+      return;
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setErrorText("Kiekis turi būti didesnis nei 0.");
+      return;
+    }
+
+    await insertRow(
+      "inventory_issue_history",
+      {
+        item_name: writeOffForm.item_name.trim(),
+        quantity,
+        reason: writeOffForm.reason.trim() || "Nurašyta gyventojui",
+        note: writeOffForm.note.trim() || null,
+      },
+      "Prekė nurašyta.",
+    );
+    setWriteOffOpen(false);
+    setWriteOffForm(emptyWriteOff);
+  }
+
+  async function saveCareInfo() {
+    if (!residentId) return;
+    setSaving(true);
+    setErrorText("");
+    setSuccessText("");
+
+    const nextCareInfo: CareInfo = {
+      ...careInfo,
+      updated_by: responsibleName || "Darbuotojas",
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const payload = {
+        organization_id: resident?.organization_id || null,
+        resident_id: residentId,
+        ...nextCareInfo,
+      };
 
       const { data, error } = await supabase
-        .from('resident_contacts')
-        .insert({
-          organization_id: organizationId,
-          resident_id: residentId,
-          full_name: contactForm.full_name.trim(),
-          relationship: contactForm.relationship || null,
-          phone: contactForm.phone || null,
-          email: contactForm.email || null,
-          priority: Number(contactForm.priority || 1),
-          can_receive_info: contactForm.can_receive_info,
-          communication_notes: contactForm.communication_notes || null,
-        })
-        .select()
-        .single()
+        .from("resident_care_information")
+        .upsert(payload, { onConflict: "resident_id" })
+        .select("*")
+        .single();
 
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_contacts',
-        recordId: data.id,
-        action: 'insert',
-        changes: contactForm,
-      })
-
-      setContactForm({
-        full_name: '',
-        relationship: '',
-        phone: '',
-        email: '',
-        priority: '1',
-        can_receive_info: false,
-        communication_notes: '',
-      })
-
-      await loadData()
+      if (error) throw error;
+      setCareInfo({ ...emptyCareInfo, ...(data as Partial<CareInfo>) });
+      setSuccessText("Priežiūros informacija išsaugota.");
+      setCareModalOpen(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko pridėti kontakto.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function updateContact() {
-    try {
-      if (!editingContact) return
-      setSaving(true)
-      setMessage('')
-
-      const { error } = await supabase
-        .from('resident_contacts')
-        .update({
-          full_name: editingContact.full_name || null,
-          relationship: editingContact.relationship || null,
-          phone: editingContact.phone || null,
-          email: editingContact.email || null,
-          priority: editingContact.priority || 1,
-          can_receive_info: Boolean(editingContact.can_receive_info),
-          communication_notes: editingContact.communication_notes || null,
-        })
-        .eq('id', editingContact.id)
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_contacts',
-        recordId: editingContact.id,
-        action: 'update',
-        changes: editingContact,
-      })
-
-      setEditingContact(null)
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko atnaujinti kontakto.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function deleteContact(id: string) {
-    if (!confirm('Ar tikrai ištrinti kontaktą?')) return
-
-    try {
-      setSaving(true)
-      setMessage('')
-
-      const deleted = contacts.find((item) => item.id === id) || null
-      const { error } = await supabase.from('resident_contacts').delete().eq('id', id)
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_contacts',
-        recordId: id,
-        action: 'delete',
-        changes: deleted,
-      })
-
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko ištrinti kontakto.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function createCarePlan() {
-    try {
-      if (!organizationId) return
-      setSaving(true)
-      setMessage('')
-
-      const { data, error } = await supabase
-        .from('resident_care_plans')
-        .insert({
-          organization_id: organizationId,
-          resident_id: residentId,
-          needs: planForm.needs || null,
-          goals: planForm.goals || null,
-          services: planForm.services || null,
-          responsible_staff: planForm.responsible_staff || null,
-          review_date: planForm.review_date || null,
-          status: 'active',
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_care_plans',
-        recordId: data.id,
-        action: 'insert',
-        changes: planForm,
-      })
-
-      setPlanForm({
-        needs: '',
-        goals: '',
-        services: '',
-        responsible_staff: '',
-        review_date: '',
-      })
-
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko pridėti plano.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function updatePlan() {
-    try {
-      if (!editingPlan) return
-      setSaving(true)
-      setMessage('')
-
-      const { error } = await supabase
-        .from('resident_care_plans')
-        .update({
-          needs: editingPlan.needs || null,
-          goals: editingPlan.goals || null,
-          services: editingPlan.services || null,
-          responsible_staff: editingPlan.responsible_staff || null,
-          review_date: editingPlan.review_date || null,
-          status: editingPlan.status || 'active',
-        })
-        .eq('id', editingPlan.id)
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_care_plans',
-        recordId: editingPlan.id,
-        action: 'update',
-        changes: editingPlan,
-      })
-
-      setEditingPlan(null)
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko atnaujinti plano.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function deletePlan(id: string) {
-    if (!confirm('Ar tikrai ištrinti planą?')) return
-
-    try {
-      setSaving(true)
-      setMessage('')
-
-      const deleted = carePlans.find((item) => item.id === id) || null
-      const { error } = await supabase.from('resident_care_plans').delete().eq('id', id)
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_care_plans',
-        recordId: id,
-        action: 'delete',
-        changes: deleted,
-      })
-
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko ištrinti plano.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function createDailyLog() {
-    try {
-      if (!organizationId) return
-      const actor = await getActorName()
-
-      setSaving(true)
-      setMessage('')
-
-      const { data, error } = await supabase
-        .from('resident_daily_logs')
-        .insert({
-          organization_id: organizationId,
-          resident_id: residentId,
-          employee_user_id: actor.userId,
-          employee_full_name: actor.name,
-          activity_type: dailyLogForm.activity_type || null,
-          note: dailyLogForm.note || null,
-          risk_type: dailyLogForm.risk_type || null,
-          services_done: dailyLogForm.services_done || null,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_daily_logs',
-        recordId: data.id,
-        action: 'insert',
-        changes: dailyLogForm,
-      })
-
-      setDailyLogForm({
-        activity_type: 'Priežiūra',
-        note: '',
-        risk_type: '',
-        services_done: '',
-      })
-
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko pridėti įrašo.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function updateDailyLog() {
-    try {
-      if (!editingLog) return
-      setSaving(true)
-      setMessage('')
-
-      const { error } = await supabase
-        .from('resident_daily_logs')
-        .update({
-          activity_type: editingLog.activity_type || null,
-          note: editingLog.note || null,
-          risk_type: editingLog.risk_type || null,
-          services_done: editingLog.services_done || null,
-        })
-        .eq('id', editingLog.id)
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_daily_logs',
-        recordId: editingLog.id,
-        action: 'update',
-        changes: editingLog,
-      })
-
-      setEditingLog(null)
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko atnaujinti įrašo.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function deleteDailyLog(id: string) {
-    if (!confirm('Ar tikrai ištrinti įrašą?')) return
-
-    try {
-      setSaving(true)
-      setMessage('')
-
-      const deleted = dailyLogs.find((item) => item.id === id) || null
-      const { error } = await supabase.from('resident_daily_logs').delete().eq('id', id)
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_daily_logs',
-        recordId: id,
-        action: 'delete',
-        changes: deleted,
-      })
-
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko ištrinti įrašo.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function createIncident() {
-    try {
-      if (!organizationId) return
-      setSaving(true)
-      setMessage('')
-
-      const { data, error } = await supabase
-        .from('resident_incidents')
-        .insert({
-          organization_id: organizationId,
-          resident_id: residentId,
-          incident_at: incidentForm.incident_at || new Date().toISOString(),
-          type: incidentForm.type || null,
-          observed_by: incidentForm.observed_by || null,
-          actions_taken: incidentForm.actions_taken || null,
-          relatives_informed: incidentForm.relatives_informed,
-          medics_informed: incidentForm.medics_informed,
-          result: incidentForm.result || null,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_incidents',
-        recordId: data.id,
-        action: 'insert',
-        changes: incidentForm,
-      })
-
-      setIncidentForm({
-        incident_at: '',
-        type: 'Griuvimas',
-        observed_by: '',
-        actions_taken: '',
-        relatives_informed: false,
-        medics_informed: false,
-        result: '',
-      })
-
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko pridėti incidento.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function updateIncident() {
-    try {
-      if (!editingIncident) return
-      setSaving(true)
-      setMessage('')
-
-      const { error } = await supabase
-        .from('resident_incidents')
-        .update({
-          incident_at: editingIncident.incident_at || null,
-          type: editingIncident.type || null,
-          observed_by: editingIncident.observed_by || null,
-          actions_taken: editingIncident.actions_taken || null,
-          relatives_informed: Boolean(editingIncident.relatives_informed),
-          medics_informed: Boolean(editingIncident.medics_informed),
-          result: editingIncident.result || null,
-        })
-        .eq('id', editingIncident.id)
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_incidents',
-        recordId: editingIncident.id,
-        action: 'update',
-        changes: editingIncident,
-      })
-
-      setEditingIncident(null)
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko atnaujinti incidento.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function deleteIncident(id: string) {
-    if (!confirm('Ar tikrai ištrinti incidentą?')) return
-
-    try {
-      setSaving(true)
-      setMessage('')
-
-      const deleted = incidents.find((item) => item.id === id) || null
-      const { error } = await supabase.from('resident_incidents').delete().eq('id', id)
-
-      if (error) throw error
-
-      await logAudit({
-        organizationId,
-        tableName: 'resident_incidents',
-        recordId: id,
-        action: 'delete',
-        changes: deleted,
-      })
-
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko ištrinti incidento.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function issueItem() {
-    try {
-      if (!resident) return
-
-      const selectedItem = inventoryItems.find((item) => item.id === issueItemId)
-      const quantity = Number(issueQuantity || 0)
-
-      if (!selectedItem) {
-        setMessage('Pasirink prekę.')
-        return
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          `resident-care-info:${residentId}`,
+          JSON.stringify(nextCareInfo),
+        );
       }
-
-      if (Number.isNaN(quantity) || quantity <= 0) {
-        setMessage('Kiekis turi būti didesnis už 0.')
-        return
-      }
-
-      const currentQuantity = Number(selectedItem.quantity || 0)
-
-      if (quantity > currentQuantity) {
-        setMessage(`Sandėlyje yra tik ${currentQuantity} ${selectedItem.unit || 'vnt.'}.`)
-        return
-      }
-
-      setSaving(true)
-      setMessage('')
-
-      const actor = await getActorName()
-      const newQuantity = currentQuantity - quantity
-
-      const { error: updateError } = await supabase
-        .from('inventory_items')
-        .update({
-          quantity: newQuantity,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', selectedItem.id)
-
-      if (updateError) throw updateError
-
-      const { data: historyData, error: historyError } = await supabase
-        .from('inventory_issue_history')
-        .insert({
-          organization_id: selectedItem.organization_id,
-          item_id: selectedItem.id,
-          item_name: selectedItem.name,
-          category: selectedItem.category,
-          subcategory: selectedItem.subcategory,
-          size: selectedItem.size,
-          unit: selectedItem.unit,
-          resident_id: resident.id,
-          resident_code: residentName(resident),
-          employee_user_id: actor.userId,
-          employee_full_name: actor.name,
-          quantity,
-          type: 'out',
-          notes: issueNotes.trim() || null,
-        })
-        .select()
-        .single()
-
-      if (historyError) throw historyError
-
-      await logAudit({
-        organizationId,
-        tableName: 'inventory_issue_history',
-        recordId: historyData.id,
-        action: 'insert',
-        changes: {
-          item_id: selectedItem.id,
-          item_name: selectedItem.name,
-          quantity,
-          resident_id: resident.id,
-          resident_name: residentName(resident),
-          employee: actor.name,
-          notes: issueNotes,
-        },
-      })
-
-      setShowIssueModal(false)
-      setIssueItemId('')
-      setIssueQuantity('1')
-      setIssueNotes('')
-      setMessage('Prekė nurašyta gyventojui.')
-      await loadData()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Nepavyko nurašyti prekės.')
+      setCareInfo(nextCareInfo);
+      setSuccessText(
+        "Priežiūros informacija išsaugota naršyklėje. Jei nori saugoti DB, sukurk lentelę resident_care_information.",
+      );
+      setCareModalOpen(false);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
-  const currentRoom = useMemo(() => {
-    if (!resident?.current_room_id) return null
-    return rooms.find((room) => room.id === resident.current_room_id) || null
-  }, [resident, rooms])
+  const tabs: { value: ActiveTab; label: string; icon: ReactNode }[] = [
+    { value: "kortele", label: "Kortelė", icon: <User size={17} /> },
+    { value: "kontaktai", label: "Kontaktai", icon: <Users size={17} /> },
+    { value: "planas", label: "Planas", icon: <FileText size={17} /> },
+    { value: "irasai", label: "Įrašai", icon: <ClipboardList size={17} /> },
+    {
+      value: "incidentai",
+      label: "Incidentai",
+      icon: <AlertTriangle size={17} />,
+    },
+    { value: "prekes", label: "Prekės", icon: <PackageMinus size={17} /> },
+  ];
 
-  const issuedTotal = useMemo(
-    () =>
-      inventoryHistory
-        .filter((item) => item.type === 'out')
-        .reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-    [inventoryHistory]
-  )
-
-  const monthIssuedTotal = useMemo(() => {
-    const now = new Date()
-    return inventoryHistory
-      .filter((item) => {
-        if (item.type !== 'out' || !item.created_at) return false
-        const date = new Date(item.created_at)
-        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
-      })
-      .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
-  }, [inventoryHistory])
-
-  const monthlyByCategory = useMemo(() => {
-    const now = new Date()
-    const map = new Map<string, number>()
-
-    inventoryHistory.forEach((item) => {
-      if (item.type !== 'out' || !item.created_at) return
-      const date = new Date(item.created_at)
-      if (date.getMonth() !== now.getMonth() || date.getFullYear() !== now.getFullYear()) return
-
-      const key = categoryLabel(item.category)
-      map.set(key, (map.get(key) || 0) + Number(item.quantity || 0))
-    })
-
-    return Array.from(map.entries()).map(([category, quantity]) => ({ category, quantity }))
-  }, [inventoryHistory])
-
-  const carePlanTaskStats = useMemo(() => {
-    const map = new Map<string, { total: number; done: number; overdue: number; active: number }>()
-
-    carePlans.forEach((plan) => {
-      map.set(plan.id, { total: 0, done: 0, overdue: 0, active: 0 })
-    })
-
-    residentTasks.forEach((task) => {
-      if (!task.care_plan_id) return
-      const current = map.get(task.care_plan_id) || { total: 0, done: 0, overdue: 0, active: 0 }
-      current.total += 1
-      if (task.status === 'done') current.done += 1
-      else if (isTaskOverdue(task)) current.overdue += 1
-      else current.active += 1
-      map.set(task.care_plan_id, current)
-    })
-
-    return map
-  }, [carePlans, residentTasks])
-
-  if (loading) return <div style={styles.page}>Kraunama...</div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f5f7f4] px-4 py-8 lg:px-8">
+        <div className="mx-auto max-w-[1520px] rounded-[28px] border border-slate-200 bg-white p-8 text-sm font-black text-slate-500 shadow-sm">
+          Kraunama gyventojo kortelė...
+        </div>
+      </div>
+    );
+  }
 
   if (!resident) {
     return (
-      <div style={styles.page}>
-        <Link href="/residents" style={styles.back}>
-          <ArrowLeft size={16} />
-          Grįžti į gyventojus
-        </Link>
-        <div style={styles.empty}>Gyventojas nerastas.</div>
+      <div className="min-h-screen bg-[#f5f7f4] px-4 py-8 lg:px-8">
+        <div className="mx-auto max-w-[1520px] rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
+          <button
+            type="button"
+            onClick={() => router.push("/residents")}
+            className="mb-5 inline-flex items-center gap-2 text-sm font-black text-emerald-700"
+          >
+            <ArrowLeft size={18} />
+            Grįžti į gyventojus
+          </button>
+          <h1 className="text-2xl font-black text-slate-950">
+            Gyventojas nerastas
+          </h1>
+          {errorText ? (
+            <p className="mt-3 text-sm font-bold text-red-700">{errorText}</p>
+          ) : null}
+        </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.headerTop}>
-        <Link href="/residents" style={styles.back}>
-          <ArrowLeft size={16} />
-          Grįžti į gyventojus
-        </Link>
+    <div className="min-h-screen bg-[#f5f7f4] px-4 py-5 text-slate-950 lg:px-8">
+      <div className="mx-auto max-w-[1520px]">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => router.push("/residents")}
+            className="inline-flex items-center gap-2 rounded-xl px-1 py-2 text-sm font-black text-emerald-700 hover:text-emerald-900"
+          >
+            <ArrowLeft size={18} />
+            Grįžti į gyventojus
+          </button>
 
-        <button type="button" onClick={() => setShowIssueModal(true)} style={styles.primaryButton}>
-          <Plus size={16} />
-          Nurašyti prekę
-        </button>
-      </div>
-
-      {message ? <div style={styles.message}>{message}</div> : null}
-
-      <section style={styles.hero}>
-        <div style={styles.heroIcon}>
-          <User size={28} />
-        </div>
-
-        <div>
-          <div style={styles.eyebrow}>Gyventojo kortelė</div>
-          <h1 style={styles.title}>{residentName(resident)}</h1>
-          <p style={styles.subtitle}>
-            {resident.resident_code || resident.code || 'Be vidinio ID'} · {statusLabel(resident.current_status || resident.status)}
-          </p>
-        </div>
-      </section>
-
-      <section style={styles.stats}>
-        <Stat icon={<Package size={18} />} value={inventoryHistory.length} label="Sandėlio judėjimų" />
-        <Stat icon={<Calendar size={18} />} value={issuedTotal} label="Išduota iš viso" />
-        <Stat icon={<Calendar size={18} />} value={monthIssuedTotal} label="Išduota šį mėnesį" />
-        <Stat icon={<Home size={18} />} value={currentRoom?.name || '—'} label="Kambarys" />
-        <Stat icon={<UserRoundCheck size={18} />} value={profileName(assignedProfile)} label="Atsakingas darbuotojas" />
-      </section>
-
-      <nav style={styles.tabs}>
-        <TabButton active={activeTab === 'card'} onClick={() => setActiveTab('card')} icon={<User size={16} />} label="Kortelė" />
-        <TabButton active={activeTab === 'contacts'} onClick={() => setActiveTab('contacts')} icon={<Contact size={16} />} label="Kontaktai" />
-        <TabButton active={activeTab === 'plan'} onClick={() => setActiveTab('plan')} icon={<FileText size={16} />} label="Planas" />
-        <TabButton active={activeTab === 'logs'} onClick={() => setActiveTab('logs')} icon={<ClipboardList size={16} />} label="Įrašai" />
-        <TabButton active={activeTab === 'incidents'} onClick={() => setActiveTab('incidents')} icon={<AlertTriangle size={16} />} label="Incidentai" />
-        <TabButton active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} icon={<Package size={16} />} label="Prekės" />
-      </nav>
-
-      {activeTab === 'card' ? (
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <h2 style={styles.sectionTitle}>Pagrindinė informacija</h2>
-            <button type="button" onClick={() => void saveResident()} disabled={saving} style={styles.primaryButton}>
-              <Save size={16} />
-              {saving ? 'Saugoma...' : 'Išsaugoti'}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={saveResident}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-60"
+            >
+              <Save size={17} />
+              {saving ? "Saugoma..." : "Išsaugoti"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setWriteOffOpen(true)}
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800"
+            >
+              <Plus size={18} />
+              Nurašyti prekę
             </button>
           </div>
+        </div>
 
-          <div style={styles.formGrid}>
-            <Field label="Vardas">
-              <input value={residentForm.first_name} onChange={(e) => setResidentForm({ ...residentForm, first_name: e.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="Pavardė">
-              <input value={residentForm.last_name} onChange={(e) => setResidentForm({ ...residentForm, last_name: e.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="Vidinis gyventojo ID">
-              <input value={residentForm.resident_code} onChange={(e) => setResidentForm({ ...residentForm, resident_code: e.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="Gimimo data">
-              <input type="date" value={residentForm.birth_date} onChange={(e) => setResidentForm({ ...residentForm, birth_date: e.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="Atvykimo data">
-              <input type="date" value={residentForm.arrival_date} onChange={(e) => setResidentForm({ ...residentForm, arrival_date: e.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="Statusas">
-              <select value={residentForm.current_status} onChange={(e) => setResidentForm({ ...residentForm, current_status: e.target.value })} style={styles.input}>
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Kambarys">
-              <select value={residentForm.current_room_id} onChange={(e) => setResidentForm({ ...residentForm, current_room_id: e.target.value })} style={styles.input}>
-                <option value="">Nepriskirta</option>
-                {rooms.map((room) => (
-                  <option key={room.id} value={room.id}>{room.name || room.id}</option>
-                ))}
-              </select>
-            </Field>
-
-            {residentForm.current_status === 'arriving_soon' ? (
-              <Field label="Rezervuota iki">
-                <input
-                  type="date"
-                  value={residentForm.room_reserved_until}
-                  onChange={(e) => setResidentForm({ ...residentForm, room_reserved_until: e.target.value })}
-                  style={styles.input}
-                />
-              </Field>
-            ) : null}
-
-            <Field label="Skyrius">
-              <input value={residentForm.department} onChange={(e) => setResidentForm({ ...residentForm, department: e.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="Atsakingas darbuotojas">
-              <select value={residentForm.assigned_to} onChange={(e) => setResidentForm({ ...residentForm, assigned_to: e.target.value })} style={styles.input}>
-                <option value="">Nepriskirta</option>
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>{profileName(profile)}</option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Telefonas">
-              <input value={residentForm.phone} onChange={(e) => setResidentForm({ ...residentForm, phone: e.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="El. paštas">
-              <input value={residentForm.email} onChange={(e) => setResidentForm({ ...residentForm, email: e.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="Adresas">
-              <input value={residentForm.address} onChange={(e) => setResidentForm({ ...residentForm, address: e.target.value })} style={styles.input} />
-            </Field>
-
-            <label style={{ ...styles.field, gridColumn: '1 / -1' }}>
-              <span>Pastabos</span>
-              <textarea value={residentForm.notes} onChange={(e) => setResidentForm({ ...residentForm, notes: e.target.value })} style={styles.textarea} />
-            </label>
+        {errorText ? (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {errorText}
           </div>
-        </section>
-      ) : null}
-
-      {activeTab === 'contacts' ? (
-        <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>Kontaktai ir atstovai</h2>
-
-          <div style={styles.formGrid}>
-            <Field label="Vardas, pavardė">
-              <input value={contactForm.full_name} onChange={(e) => setContactForm({ ...contactForm, full_name: e.target.value })} style={styles.input} />
-            </Field>
-            <Field label="Ryšys">
-              <input value={contactForm.relationship} onChange={(e) => setContactForm({ ...contactForm, relationship: e.target.value })} placeholder="Pvz. dukra, globėjas" style={styles.input} />
-            </Field>
-            <Field label="Telefonas">
-              <input value={contactForm.phone} onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} style={styles.input} />
-            </Field>
-            <Field label="El. paštas">
-              <input value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} style={styles.input} />
-            </Field>
-            <Field label="Prioritetas">
-              <input type="number" min="1" value={contactForm.priority} onChange={(e) => setContactForm({ ...contactForm, priority: e.target.value })} style={styles.input} />
-            </Field>
-            <label style={styles.checkboxRow}>
-              <input type="checkbox" checked={contactForm.can_receive_info} onChange={(e) => setContactForm({ ...contactForm, can_receive_info: e.target.checked })} />
-              Gali gauti informaciją
-            </label>
-            <label style={{ ...styles.field, gridColumn: '1 / -1' }}>
-              <span>Bendravimo pastabos</span>
-              <textarea value={contactForm.communication_notes} onChange={(e) => setContactForm({ ...contactForm, communication_notes: e.target.value })} style={styles.textarea} />
-            </label>
+        ) : null}
+        {successText ? (
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+            {successText}
           </div>
+        ) : null}
 
-          <button type="button" onClick={() => void createContact()} disabled={saving} style={styles.primaryButton}>
-            <Plus size={16} />
-            Pridėti kontaktą
-          </button>
-
-          {contacts.length === 0 ? (
-            <div style={styles.empty}>Kontaktų dar nėra.</div>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Kontaktas</th>
-                  <th style={styles.th}>Ryšys</th>
-                  <th style={styles.th}>Telefonas / el. paštas</th>
-                  <th style={styles.th}>Leidimas</th>
-                  <th style={styles.th}>Pastabos</th>
-                  <th style={styles.th}>Veiksmai</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contacts.map((contact) => (
-                  <tr key={contact.id}>
-                    <td style={styles.tdBold}>{contact.full_name}</td>
-                    <td style={styles.td}>{contact.relationship || '—'}</td>
-                    <td style={styles.td}>{contact.phone || contact.email || '—'}</td>
-                    <td style={styles.td}>{contact.can_receive_info ? 'Taip' : 'Ne'}</td>
-                    <td style={styles.td}>{contact.communication_notes || '—'}</td>
-                    <td style={styles.td}>
-                      <RowActions onEdit={() => setEditingContact(contact)} onDelete={() => void deleteContact(contact.id)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      ) : null}
-
-      {activeTab === 'plan' ? (
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <div>
-              <h2 style={styles.sectionTitle}>Individualus socialinės globos planas</h2>
-              <p style={styles.sectionHint}>
-                Čia planas susiejamas su užduotimis: kiekvienam plano punktui gali matyti aktyvias, atliktas ir vėluojančias užduotis.
-              </p>
+        <section className="mb-5 rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="grid gap-5 lg:grid-cols-[1fr_380px] lg:items-center">
+            <div className="flex items-center gap-5">
+              <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-emerald-50 text-3xl font-black text-emerald-700">
+                {initials(residentName)}
+              </div>
+              <div className="min-w-0">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Gyventojo kortelė
+                </div>
+                <h1 className="truncate text-4xl font-black tracking-[-0.04em] text-slate-950">
+                  {residentName}
+                </h1>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge tone="neutral">
+                    {text(resident.resident_code, "Be kodo")}
+                  </Badge>
+                  <Badge
+                    tone={
+                      statusLabel(resident.current_status) === "Gyvena"
+                        ? "green"
+                        : "blue"
+                    }
+                  >
+                    {statusLabel(resident.current_status)}
+                  </Badge>
+                  <Badge tone="blue">Kambarys {roomLabel}</Badge>
+                  <Badge tone="warning">
+                    {careLevelLabel(resident.care_level)}
+                  </Badge>
+                </div>
+              </div>
             </div>
 
-            <Link href="/tasks" style={styles.secondaryLink}>
-              <ClipboardList size={16} />
-              Atidaryti užduotis
-            </Link>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm">
+              <div className="mb-2 flex items-center gap-2 font-black text-slate-700">
+                <ShieldAlert size={17} className="text-amber-600" />
+                BDAR saugi peržiūra
+              </div>
+              <p className="leading-6 text-slate-600">
+                Rodomi tik darbui būtini duomenys. Jautri informacija maskuojama
+                arba rodoma tik pagal teises.
+              </p>
+            </div>
           </div>
+        </section>
 
-          <div style={styles.formGrid}>
-            <Field label="Poreikiai">
-              <textarea value={planForm.needs} onChange={(e) => setPlanForm({ ...planForm, needs: e.target.value })} style={styles.textarea} />
-            </Field>
-            <Field label="Tikslai">
-              <textarea value={planForm.goals} onChange={(e) => setPlanForm({ ...planForm, goals: e.target.value })} style={styles.textarea} />
-            </Field>
-            <Field label="Numatytos paslaugos">
-              <textarea value={planForm.services} onChange={(e) => setPlanForm({ ...planForm, services: e.target.value })} style={styles.textarea} />
-            </Field>
-            <Field label="Atsakingi darbuotojai">
-              <input value={planForm.responsible_staff} onChange={(e) => setPlanForm({ ...planForm, responsible_staff: e.target.value })} style={styles.input} />
-            </Field>
-            <Field label="Peržiūros data">
-              <input type="date" value={planForm.review_date} onChange={(e) => setPlanForm({ ...planForm, review_date: e.target.value })} style={styles.input} />
-            </Field>
-          </div>
+        <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <CompactStat
+            icon={<PackageMinus size={20} />}
+            value={inventory.length}
+            label="Sandėlio judėjimų"
+          />
+          <CompactStat
+            icon={<CalendarDays size={20} />}
+            value={medications.length}
+            label="Vaistų įrašų"
+          />
+          <CompactStat
+            icon={<CalendarDays size={20} />}
+            value={activity.length}
+            label="Veiklų įrašų"
+          />
+          <CompactStat
+            icon={<Home size={20} />}
+            value={roomLabel}
+            label="Kambarys"
+          />
+          <CompactStat
+            icon={<User size={20} />}
+            value={responsibleName}
+            label="Atsakingas darbuotojas"
+          />
+        </div>
 
-          <button type="button" onClick={() => void createCarePlan()} disabled={saving} style={styles.primaryButton}>
-            <Plus size={16} />
-            Pridėti planą
-          </button>
+        <div className="mb-5 flex flex-wrap gap-2 rounded-[22px] border border-slate-200 bg-white p-2 shadow-sm">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.value;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setActiveTab(tab.value)}
+                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition ${isActive ? "border border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
 
-          {carePlans.length === 0 ? (
-            <div style={styles.empty}>Planų dar nėra.</div>
-          ) : (
-            <div style={styles.planGrid}>
-              {carePlans.map((plan) => {
-                const tasksForPlan = residentTasks.filter((task) => task.care_plan_id === plan.id)
-                const stats = carePlanTaskStats.get(plan.id) || { total: 0, done: 0, overdue: 0, active: 0 }
-                const progress = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0
+        {activeTab === "kortele" ? (
+          <div className="grid gap-5 2xl:grid-cols-[320px_minmax(0,1fr)_340px] xl:grid-cols-1">
+            <div className="grid gap-5">
+              <Card
+                title="Pagrindinė info"
+                action={<Badge tone="neutral">BDAR</Badge>}
+              >
+                <div className="space-y-3">
+                  <InfoRow label="Kodas" value={text(resident.resident_code)} />
+                  <InfoRow
+                    label="Statusas"
+                    value={statusLabel(resident.current_status)}
+                  />
+                  <InfoRow label="Gimimo data" value={text(form.birth_date)} />
+                  <InfoRow
+                    label="Atvykimas"
+                    value={text(form.admission_date)}
+                  />
+                  <InfoRow label="Telefonas" value={text(form.phone)} />
+                  <InfoRow label="Asmens kodas" value="•••••••••••" masked />
+                </div>
+              </Card>
 
-                return (
-                  <article key={plan.id} style={styles.planCard}>
-                    <div style={styles.planHeader}>
-                      <div>
-                        <div style={styles.eyebrow}>Plano punktas</div>
-                        <h3 style={styles.planTitle}>{planTitle(plan)}</h3>
-                        <p style={styles.planMeta}>
-                          Peržiūra: {plan.review_date || '—'} · Statusas: {plan.status || '—'}
-                        </p>
-                      </div>
-
-                      <RowActions onEdit={() => setEditingPlan(plan)} onDelete={() => void deletePlan(plan.id)} />
-                      <Link
-                        href={`/tasks?resident_id=${resident?.id || ''}&care_plan_id=${plan.id}`}
-                        style={styles.primaryButton}
+              <Card
+                title="Kontaktai"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("kontaktai")}
+                    className="text-xs font-black text-emerald-700"
+                  >
+                    Pildyti
+                  </button>
+                }
+              >
+                {contacts.length ? (
+                  <div className="space-y-3">
+                    {contacts.slice(0, 2).map((contact) => (
+                      <div
+                        key={contact.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
                       >
-                        <Plus size={14} />
-                        Nauja užduotis
-                      </Link>
-                    </div>
-
-                    <div style={styles.planDetailsGrid}>
-                      <InfoBlock label="Poreikiai" value={plan.needs || '—'} />
-                      <InfoBlock label="Tikslai" value={plan.goals || '—'} />
-                      <InfoBlock label="Paslaugos" value={plan.services || '—'} />
-                      <InfoBlock label="Atsakingi" value={plan.responsible_staff || '—'} />
-                    </div>
-
-                    <div style={styles.planTaskSummary}>
-                      <div style={styles.progressHeader}>
-                        <strong>Plano užduotys</strong>
-                        <span>{progress}% atlikta</span>
-                      </div>
-                      <div style={styles.progressTrack}>
-                        <div style={{ ...styles.progressFill, width: `${progress}%` }} />
-                      </div>
-
-                      <div style={styles.taskStats}>
-                        <span>Viso: {stats.total}</span>
-                        <span>Aktyvios: {stats.active}</span>
-                        <span>Vėluoja: {stats.overdue}</span>
-                        <span>Atlikta: {stats.done}</span>
-                      </div>
-                    </div>
-
-                    {tasksForPlan.length === 0 ? (
-                      <div style={styles.emptySmall}>
-                        Šiam planui užduočių nėra. Sukurk užduotį modulyje „Užduotys“ ir pasirink šį individualų planą.
-                      </div>
-                    ) : (
-                      <div style={styles.taskList}>
-                        {tasksForPlan.map((task) => {
-                          const assigned = profiles.find((profile) => profile.id === task.assigned_to)
-                          const overdue = isTaskOverdue(task)
-
-                          return (
-                            <div key={task.id} style={styles.taskItem}>
-                              <div>
-                                <strong>{task.title}</strong>
-                                <div style={styles.meta}>
-                                  {task.category || '—'} · Terminas: {formatDate(task.due_date)} · Atsakingas: {profileName(assigned)}
-                                </div>
-                              </div>
-
-                              <div style={styles.taskBadges}>
-                                <span style={{ ...styles.taskBadge, ...(overdue ? styles.badgeOverdue : task.status === 'done' ? styles.badgeDone : styles.badgeActive) }}>
-                                  {overdue ? 'Pavėluota' : taskStatusLabel(task.status)}
-                                </span>
-                                <span style={{ ...styles.taskBadge, ...(task.priority === 'critical' || task.priority === 'high' ? styles.badgePriorityHigh : styles.badgePriority) }}>
-                                  {taskPriorityLabel(task.priority)}
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </article>
-                )
-              })}
-
-              {residentTasks.filter((task) => !task.care_plan_id).length > 0 ? (
-                <article style={styles.planCard}>
-                  <div style={styles.planHeader}>
-                    <div>
-                      <div style={styles.eyebrow}>Nesusietos užduotys</div>
-                      <h3 style={styles.planTitle}>Užduotys be individualaus plano</h3>
-                      <p style={styles.planMeta}>Šias užduotis verta priskirti konkrečiam planui.</p>
-                    </div>
-                  </div>
-
-                  <div style={styles.taskList}>
-                    {residentTasks.filter((task) => !task.care_plan_id).map((task) => (
-                      <div key={task.id} style={styles.taskItem}>
-                        <div>
-                          <strong>{task.title}</strong>
-                          <div style={styles.meta}>{task.category || '—'} · Terminas: {formatDate(task.due_date)}</div>
+                        <div className="font-black text-slate-900">
+                          {text(contact.full_name, "Kontaktas")}
                         </div>
-                        <span style={{ ...styles.taskBadge, ...(isTaskOverdue(task) ? styles.badgeOverdue : styles.badgeActive) }}>
-                          {isTaskOverdue(task) ? 'Pavėluota' : taskStatusLabel(task.status)}
-                        </span>
+                        <div className="mt-1 text-sm font-bold text-slate-500">
+                          {text(contact.relationship)}
+                        </div>
+                        <div className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-700">
+                          <Phone size={15} />
+                          {text(contact.phone)}
+                        </div>
                       </div>
                     ))}
                   </div>
-                </article>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                    Kontaktų dar nėra.
+                  </div>
+                )}
+              </Card>
+
+              <Card title="Apgyvendinimas">
+                <div className="space-y-3">
+                  <InfoRow label="Kambarys" value={roomLabel} />
+                  <InfoRow
+                    label="Priežiūra"
+                    value={careLevelLabel(resident.care_level)}
+                  />
+                  <InfoRow label="Atsakingas" value={responsibleName} />
+                </div>
+              </Card>
+            </div>
+
+            <div className="grid gap-5">
+              <section className="rounded-[26px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="mb-5 flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-black tracking-[-0.03em]">
+                      Redaguojama kortelės santrauka
+                    </h2>
+                    <p className="mt-1 text-sm font-bold text-slate-500">
+                      Naujo gyventojo kūrimo forma neliečiama.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={saveResident}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800 disabled:opacity-60"
+                  >
+                    <Save size={17} />
+                    {saving ? "Saugoma..." : "Išsaugoti"}
+                  </button>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Vardas ir pavardė">
+                    <input
+                      className={inputClass}
+                      value={form.full_name}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          full_name: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Vidinis gyventojo ID">
+                    <input
+                      className={inputClass}
+                      value={form.resident_code}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          resident_code: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Statusas">
+                    <select
+                      className={inputClass}
+                      value={form.current_status}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          current_status: event.target.value,
+                        }))
+                      }
+                    >
+                      {STATUS_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Kambarys">
+                    <select
+                      className={inputClass}
+                      value={form.current_room_id}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          current_room_id: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Nepriskirta</option>
+                      {rooms.map((room) => (
+                        <option key={room.id} value={room.id}>
+                          {room.name || room.id}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Gimimo data">
+                    <input
+                      type="date"
+                      className={inputClass}
+                      value={form.birth_date}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          birth_date: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Atvykimo data">
+                    <input
+                      type="date"
+                      className={inputClass}
+                      value={form.admission_date}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          admission_date: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Priežiūros lygis">
+                    <select
+                      className={inputClass}
+                      value={form.care_level}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          care_level: event.target.value,
+                        }))
+                      }
+                    >
+                      {CARE_LEVEL_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Telefonas">
+                    <input
+                      className={inputClass}
+                      value={form.phone}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          phone: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+
+                  <Field label="El. paštas">
+                    <input
+                      className={inputClass}
+                      value={form.email}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          email: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Adresas">
+                    <input
+                      className={inputClass}
+                      value={form.address}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          address: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                </div>
+
+                <div className="mt-4">
+                  <Field label="Praktinės pastabos darbuotojams">
+                    <textarea
+                      className={textareaClass}
+                      value={form.internal_notes}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          internal_notes: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                </div>
+              </section>
+
+              <Card
+                title="ISGP santrauka"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("planas")}
+                    className="text-xs font-black text-emerald-700"
+                  >
+                    Pildyti planą
+                  </button>
+                }
+              >
+                {goals.length ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {goals.slice(0, 4).map((goal) => (
+                      <div
+                        key={goal.id}
+                        className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"
+                      >
+                        <div className="font-black text-emerald-900">
+                          {text(goal.title)}
+                        </div>
+                        <p className="mt-1 text-sm font-bold leading-6 text-emerald-800">
+                          {text(goal.actions || goal.description)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                    ISGP tikslų dar nėra. Eik į „Planas“ ir pridėk.
+                  </div>
+                )}
+              </Card>
+
+              <ResidentActivityAttendanceAuto />
+            </div>
+
+            <div className="grid gap-5">
+              <Card
+                title="Priežiūros / rizikų santrauka"
+                action={<Badge tone="danger">Ribota</Badge>}
+              >
+                <div className="space-y-4">
+                  <InfoNotice title="Kur pildyti?" tone="amber">
+                    Ši kortelė rodo tik trumpą perspėjimų santrauką. Alergijos,
+                    mityba, judėjimas ir priežiūros rizikos pildomos atskirame
+                    lange, kad ISGP planas nesimaišytų su slaugos informacija.
+                  </InfoNotice>
+
+                  <div className="space-y-3">
+                    <InfoRow
+                      label="Alergijos"
+                      value={
+                        careInfo.allergies ? careInfo.allergies : "Neįrašyta"
+                      }
+                    />
+                    <InfoRow
+                      label="Kritinės rizikos"
+                      value={
+                        activeRiskLabels.length
+                          ? activeRiskLabels.join(", ")
+                          : incidents.length
+                            ? `${incidents.length} incidentų įraš.`
+                            : "Nėra pažymėtų"
+                      }
+                    />
+                    <InfoRow label="Mityba" value={nutritionLabel} />
+                    <InfoRow label="Judėjimas" value={mobilityLabel} />
+                  </div>
+
+                  {careInfo.transfer_two_staff ? (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-black text-red-800">
+                      Reikia 2 darbuotojų perkėlimui.
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCareTab("slauga");
+                      setCareModalOpen(true);
+                    }}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800"
+                  >
+                    <ShieldAlert size={17} />
+                    Atidaryti priežiūros informaciją
+                  </button>
+                </div>
+              </Card>
+
+              <Card
+                title="Vaistai"
+                action={<Badge tone="blue">Iš vaistų modulio</Badge>}
+              >
+                <div className="grid gap-3">
+                  {medications.length ? (
+                    medications.slice(0, 4).map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                      >
+                        <div>
+                          <div className="font-black">
+                            {text(log.medication_name)}
+                          </div>
+                          <div className="text-sm font-bold text-slate-500">
+                            {text(log.dose)} · {text(log.taken_at)}
+                          </div>
+                        </div>
+                        <Badge tone="green">Įrašyta</Badge>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                      Vaistų įrašų dar nėra.
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              <Card
+                title="Perdavimo žurnalas"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("irasai")}
+                    className="text-xs font-black text-emerald-700"
+                  >
+                    Pildyti
+                  </button>
+                }
+              >
+                <div className="grid gap-3">
+                  {entries.length ? (
+                    entries.slice(0, 3).map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                      >
+                        <div className="text-xs font-black text-slate-500">
+                          {toDateInput(entry.created_at)}
+                        </div>
+                        <div>
+                          <div className="text-sm font-black text-slate-950">
+                            {text(entry.category)}
+                          </div>
+                          <p className="mt-1 text-sm font-bold leading-5 text-slate-600">
+                            {text(entry.note)}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                      Perdavimo įrašų dar nėra.
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === "kontaktai" ? (
+          <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
+            <Card title="Pridėti kontaktą">
+              <div className="grid gap-4">
+                <Field label="Vardas, pavardė">
+                  <input
+                    className={inputClass}
+                    value={contactForm.full_name}
+                    onChange={(e) =>
+                      setContactForm((p) => ({
+                        ...p,
+                        full_name: e.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Ryšys">
+                  <input
+                    className={inputClass}
+                    value={contactForm.relationship}
+                    onChange={(e) =>
+                      setContactForm((p) => ({
+                        ...p,
+                        relationship: e.target.value,
+                      }))
+                    }
+                    placeholder="Dukra, sūnus, globėjas..."
+                  />
+                </Field>
+                <Field label="Telefonas">
+                  <input
+                    className={inputClass}
+                    value={contactForm.phone}
+                    onChange={(e) =>
+                      setContactForm((p) => ({ ...p, phone: e.target.value }))
+                    }
+                  />
+                </Field>
+                <Field label="El. paštas">
+                  <input
+                    className={inputClass}
+                    value={contactForm.email}
+                    onChange={(e) =>
+                      setContactForm((p) => ({ ...p, email: e.target.value }))
+                    }
+                  />
+                </Field>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={contactForm.can_receive_info}
+                    onChange={(e) =>
+                      setContactForm((p) => ({
+                        ...p,
+                        can_receive_info: e.target.checked,
+                      }))
+                    }
+                  />{" "}
+                  Leidžiama informuoti
+                </label>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={contactForm.is_primary}
+                    onChange={(e) =>
+                      setContactForm((p) => ({
+                        ...p,
+                        is_primary: e.target.checked,
+                      }))
+                    }
+                  />{" "}
+                  Pagrindinis kontaktas
+                </label>
+                <button
+                  type="button"
+                  onClick={addContact}
+                  disabled={saving}
+                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white"
+                >
+                  Pridėti kontaktą
+                </button>
+              </div>
+            </Card>
+
+            <Card
+              title="Kontaktų sąrašas"
+              action={<Badge tone="neutral">BDAR</Badge>}
+            >
+              <div className="grid gap-3 md:grid-cols-2">
+                {contacts.length ? (
+                  contacts.map((contact) => (
+                    <div
+                      key={contact.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="text-lg font-black text-slate-950">
+                          {text(contact.full_name, "Kontaktas")}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            deleteRow(
+                              "resident_contacts",
+                              contact.id,
+                              "Kontaktas pašalintas.",
+                            )
+                          }
+                          className="rounded-xl p-2 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        <InfoRow
+                          label="Ryšys"
+                          value={text(contact.relationship)}
+                        />
+                        <InfoRow
+                          label="Telefonas"
+                          value={text(contact.phone)}
+                        />
+                        <InfoRow
+                          label="El. paštas"
+                          value={text(contact.email)}
+                        />
+                        <InfoRow
+                          label="Informuoti"
+                          value={
+                            contact.can_receive_info
+                              ? "Leidžiama"
+                              : "Nerodyti / nėra sutikimo"
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm font-bold text-slate-500">
+                    Kontaktų dar nėra.
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "planas" ? (
+          <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
+            <Card title="Pridėti ISGP tikslą">
+              <div className="grid gap-4">
+                <Field label="Tikslas">
+                  <input
+                    className={inputClass}
+                    value={goalForm.title}
+                    onChange={(e) =>
+                      setGoalForm((p) => ({ ...p, title: e.target.value }))
+                    }
+                  />
+                </Field>
+                <Field label="Aprašymas">
+                  <textarea
+                    className={textareaClass}
+                    value={goalForm.description}
+                    onChange={(e) =>
+                      setGoalForm((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Veiksmai">
+                  <textarea
+                    className={textareaClass}
+                    value={goalForm.actions}
+                    onChange={(e) =>
+                      setGoalForm((p) => ({ ...p, actions: e.target.value }))
+                    }
+                  />
+                </Field>
+                <Field label="Atsakingas">
+                  <input
+                    className={inputClass}
+                    value={goalForm.responsible}
+                    onChange={(e) =>
+                      setGoalForm((p) => ({
+                        ...p,
+                        responsible: e.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Peržiūros data">
+                  <input
+                    type="date"
+                    className={inputClass}
+                    value={goalForm.review_date}
+                    onChange={(e) =>
+                      setGoalForm((p) => ({
+                        ...p,
+                        review_date: e.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <button
+                  type="button"
+                  onClick={addGoal}
+                  disabled={saving}
+                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white"
+                >
+                  Pridėti tikslą
+                </button>
+              </div>
+            </Card>
+
+            <Card title="ISGP tikslai">
+              <div className="grid gap-3 md:grid-cols-2">
+                {goals.length ? (
+                  goals.map((goal) => (
+                    <div
+                      key={goal.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <div className="font-black text-slate-950">
+                          {text(goal.title)}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            deleteRow(
+                              "resident_isgp_goals",
+                              goal.id,
+                              "Tikslas pašalintas.",
+                            )
+                          }
+                          className="rounded-xl p-2 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+                      <p className="text-sm font-bold leading-6 text-slate-600">
+                        {text(goal.description)}
+                      </p>
+                      <p className="mt-2 text-sm font-bold leading-6 text-emerald-800">
+                        {text(goal.actions)}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Badge tone="blue">
+                          {text(goal.status, "Aktyvus")}
+                        </Badge>
+                        {goal.review_date ? (
+                          <Badge tone="warning">
+                            Peržiūra {goal.review_date}
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm font-bold text-slate-500">
+                    ISGP tikslų dar nėra.
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "irasai" ? (
+          <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
+            <Card title="Naujas perdavimo įrašas">
+              <div className="grid gap-4">
+                <Field label="Kategorija">
+                  <input
+                    className={inputClass}
+                    value={entryForm.category}
+                    onChange={(e) =>
+                      setEntryForm((p) => ({ ...p, category: e.target.value }))
+                    }
+                  />
+                </Field>
+                <Field label="Pastaba">
+                  <textarea
+                    className={textareaClass}
+                    value={entryForm.note}
+                    onChange={(e) =>
+                      setEntryForm((p) => ({ ...p, note: e.target.value }))
+                    }
+                  />
+                </Field>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={entryForm.needs_follow_up}
+                    onChange={(e) =>
+                      setEntryForm((p) => ({
+                        ...p,
+                        needs_follow_up: e.target.checked,
+                      }))
+                    }
+                  />{" "}
+                  Reikia tęstinio veiksmo
+                </label>
+                <button
+                  type="button"
+                  onClick={addEntry}
+                  disabled={saving}
+                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white"
+                >
+                  Pridėti įrašą
+                </button>
+              </div>
+            </Card>
+
+            <Card title="Perdavimo žurnalas">
+              <div className="grid gap-3">
+                {entries.length ? (
+                  entries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[140px_1fr_auto]"
+                    >
+                      <div className="text-sm font-black text-slate-500">
+                        {text(entry.created_at)}
+                      </div>
+                      <div>
+                        <div className="font-black text-slate-950">
+                          {text(entry.category)}
+                        </div>
+                        <div className="mt-1 text-sm font-bold leading-6 text-slate-600">
+                          {text(entry.note)}
+                        </div>
+                        {entry.needs_follow_up ? (
+                          <Badge tone="warning">Reikia veiksmo</Badge>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          deleteRow(
+                            "resident_handover_entries",
+                            entry.id,
+                            "Įrašas pašalintas.",
+                          )
+                        }
+                        className="rounded-xl p-2 text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 size={17} />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm font-bold text-slate-500">
+                    Įrašų dar nėra.
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "incidentai" ? (
+          <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
+            <Card
+              title="Naujas incidentas"
+              action={<Badge tone="danger">Ribota</Badge>}
+            >
+              <div className="grid gap-4">
+                <Field label="Tipas">
+                  <input
+                    className={inputClass}
+                    value={incidentForm.incident_type}
+                    onChange={(e) =>
+                      setIncidentForm((p) => ({
+                        ...p,
+                        incident_type: e.target.value,
+                      }))
+                    }
+                    placeholder="Kritimas, konfliktas, vaistų klaida..."
+                  />
+                </Field>
+                <Field label="Rimčiai">
+                  <select
+                    className={inputClass}
+                    value={incidentForm.severity}
+                    onChange={(e) =>
+                      setIncidentForm((p) => ({
+                        ...p,
+                        severity: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="zemas">Žemas</option>
+                    <option value="vidutinis">Vidutinis</option>
+                    <option value="aukstas">Aukštas</option>
+                    <option value="kritinis">Kritinis</option>
+                  </select>
+                </Field>
+                <Field label="Įvykio laikas">
+                  <input
+                    type="datetime-local"
+                    className={inputClass}
+                    value={incidentForm.occurred_at}
+                    onChange={(e) =>
+                      setIncidentForm((p) => ({
+                        ...p,
+                        occurred_at: e.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Aprašymas">
+                  <textarea
+                    className={textareaClass}
+                    value={incidentForm.description}
+                    onChange={(e) =>
+                      setIncidentForm((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Atlikti veiksmai">
+                  <textarea
+                    className={textareaClass}
+                    value={incidentForm.action_taken}
+                    onChange={(e) =>
+                      setIncidentForm((p) => ({
+                        ...p,
+                        action_taken: e.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <button
+                  type="button"
+                  onClick={addIncident}
+                  disabled={saving}
+                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white"
+                >
+                  Pridėti incidentą
+                </button>
+              </div>
+            </Card>
+
+            <Card title="Incidentai ir rizikos">
+              <div className="grid gap-3">
+                {incidents.length ? (
+                  incidents.map((incident) => (
+                    <div
+                      key={incident.id}
+                      className="rounded-2xl border border-amber-200 bg-amber-50 p-4"
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-black text-amber-900">
+                            {text(incident.incident_type, "Incidentas")}
+                          </div>
+                          <div className="text-sm font-bold text-amber-800">
+                            {text(incident.occurred_at)} ·{" "}
+                            {text(incident.severity)}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            deleteRow(
+                              "resident_incidents",
+                              incident.id,
+                              "Incidentas pašalintas.",
+                            )
+                          }
+                          className="rounded-xl p-2 text-red-600 hover:bg-red-100"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+                      <p className="text-sm font-bold leading-6 text-amber-900">
+                        {text(incident.description)}
+                      </p>
+                      {incident.action_taken ? (
+                        <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                          Veiksmai: {incident.action_taken}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm font-bold text-slate-500">
+                    Incidentų nėra.
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === "prekes" ? (
+          <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
+            <Card
+              title="Prekės ir išdavimai"
+              action={
+                <button
+                  type="button"
+                  onClick={() => setWriteOffOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white hover:bg-emerald-800"
+                >
+                  <Plus size={17} />
+                  Nurašyti prekę
+                </button>
+              }
+            >
+              <div className="grid gap-3">
+                {inventory.length ? (
+                  inventory.map((item) => (
+                    <div
+                      key={item.id}
+                      className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_110px_160px]"
+                    >
+                      <div>
+                        <div className="font-black text-slate-950">
+                          {text(item.item_name)}
+                        </div>
+                        <div className="mt-1 text-sm font-bold text-slate-500">
+                          {text(item.reason)} · {text(item.note)}
+                        </div>
+                      </div>
+                      <div className="font-black text-slate-950">
+                        {text(item.quantity)} vnt.
+                      </div>
+                      <div className="text-sm font-bold text-slate-500">
+                        {text(item.created_at)}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-bold leading-6 text-slate-500">
+                    Prekių nurašymų dar nėra.
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card title="Prekių santrauka">
+              <div className="space-y-3">
+                <InfoRow label="Išduota iš viso" value={inventory.length} />
+                <InfoRow
+                  label="Šį mėnesį"
+                  value={
+                    inventory.filter(
+                      (i) =>
+                        String(i.created_at || "").slice(0, 7) ===
+                        new Date().toISOString().slice(0, 7),
+                    ).length
+                  }
+                />
+                <InfoRow
+                  label="Paskutinis veiksmas"
+                  value={inventory[0]?.created_at || "—"}
+                />
+              </div>
+            </Card>
+          </div>
+        ) : null}
+      </div>
+
+      {careModalOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+              <div>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <Badge tone="danger">Ribota prieiga</Badge>
+                  <Badge tone="neutral">Atskira nuo ISGP</Badge>
+                </div>
+                <h2 className="text-2xl font-black tracking-[-0.03em] text-slate-950">
+                  Priežiūros informacija
+                </h2>
+                <p className="mt-1 text-sm font-bold text-slate-500">
+                  {residentName} · pildoma tik darbui būtina slaugos, rizikų,
+                  mitybos ir judėjimo informacija.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCareModalOpen(false)}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex flex-wrap gap-2">
+                {CARE_TABS.map((tab) => {
+                  const isActive = careTab === tab.value;
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setCareTab(tab.value)}
+                      className={`rounded-2xl px-4 py-2.5 text-sm font-black transition ${isActive ? "bg-emerald-700 text-white shadow-sm" : "bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"}`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="overflow-y-auto p-6">
+              {careTab === "slauga" ? (
+                <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+                  <div className="grid gap-4">
+                    <Field label="Alergijos">
+                      <textarea
+                        className={textareaClass}
+                        value={careInfo.allergies}
+                        onChange={(event) =>
+                          updateCareInfo({ allergies: event.target.value })
+                        }
+                        placeholder="Pvz., penicilinas, lateksas, maisto produktai..."
+                      />
+                    </Field>
+                    <Field label="Alergijų / perspėjimo galiojimo peržiūra">
+                      <input
+                        type="date"
+                        className={inputClass}
+                        value={careInfo.allergy_valid_until}
+                        onChange={(event) =>
+                          updateCareInfo({
+                            allergy_valid_until: event.target.value,
+                          })
+                        }
+                      />
+                    </Field>
+                    <Field label="Slaugos pastabos">
+                      <textarea
+                        className={textareaClass}
+                        value={careInfo.nursing_notes}
+                        onChange={(event) =>
+                          updateCareInfo({ nursing_notes: event.target.value })
+                        }
+                        placeholder="Trumpai: ką būtina žinoti pamainai."
+                      />
+                    </Field>
+                  </div>
+                  <InfoNotice title="Svarbu" tone="blue">
+                    Čia nėra ISGP tikslai. Čia rašoma praktinė priežiūros
+                    informacija, kurią turi greitai pamatyti slauga ir atsakingi
+                    darbuotojai.
+                  </InfoNotice>
+                </div>
+              ) : null}
+
+              {careTab === "rizikos" ? (
+                <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {[
+                      ["fall_risk", "Kritimo rizika"],
+                      ["diabetes", "Diabetas"],
+                      ["pressure_sore_risk", "Pragulų rizika"],
+                      ["choking_risk", "Springimo rizika"],
+                      ["wandering_risk", "Išėjimo / paklydimo rizika"],
+                    ].map(([key, label]) => (
+                      <label
+                        key={key}
+                        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-800"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={Boolean(careInfo[key as keyof CareInfo])}
+                          onChange={(event) =>
+                            updateCareInfo({
+                              [key]: event.target.checked,
+                            } as Partial<CareInfo>)
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                    <Field label="Rizikų peržiūros data">
+                      <input
+                        type="date"
+                        className={inputClass}
+                        value={careInfo.risk_valid_until}
+                        onChange={(event) =>
+                          updateCareInfo({
+                            risk_valid_until: event.target.value,
+                          })
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <InfoNotice title="Alert badge logika" tone="amber">
+                    Pažymėtos rizikos rodomos kortelės santraukoje kaip greiti
+                    perspėjimai. Detalūs incidentai lieka „Incidentai“ skiltyje.
+                  </InfoNotice>
+                </div>
+              ) : null}
+
+              {careTab === "mityba" ? (
+                <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Maitinimas">
+                      <select
+                        className={inputClass}
+                        value={careInfo.nutrition_type}
+                        onChange={(event) =>
+                          updateCareInfo({ nutrition_type: event.target.value })
+                        }
+                      >
+                        {NUTRITION_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Skysčių ribojimas">
+                      <input
+                        className={inputClass}
+                        value={careInfo.fluid_restriction}
+                        onChange={(event) =>
+                          updateCareInfo({
+                            fluid_restriction: event.target.value,
+                          })
+                        }
+                        placeholder="Pvz., iki 1,5 l / para arba nėra"
+                      />
+                    </Field>
+                    <div className="md:col-span-2">
+                      <Field label="Tekstūra / dietos pastabos">
+                        <textarea
+                          className={textareaClass}
+                          value={careInfo.texture_notes}
+                          onChange={(event) =>
+                            updateCareInfo({
+                              texture_notes: event.target.value,
+                            })
+                          }
+                          placeholder="Pvz., trintas maistas, vengti riešutų, stebėti apetitą..."
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                  <InfoNotice
+                    title="Mityba nėra socialinis tikslas"
+                    tone="blue"
+                  >
+                    ISGP gali turėti savarankiškumo ar integracijos tikslus, o
+                    čia laikoma praktinė mitybos saugos informacija pamainai.
+                  </InfoNotice>
+                </div>
+              ) : null}
+
+              {careTab === "judejimas" ? (
+                <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Mobilumas">
+                      <select
+                        className={inputClass}
+                        value={careInfo.mobility_level}
+                        onChange={(event) =>
+                          updateCareInfo({ mobility_level: event.target.value })
+                        }
+                      >
+                        {MOBILITY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Pagalbinė priemonė">
+                      <input
+                        className={inputClass}
+                        value={careInfo.mobility_aid}
+                        onChange={(event) =>
+                          updateCareInfo({ mobility_aid: event.target.value })
+                        }
+                        placeholder="Vaikštynė, lazdelė, vežimėlis..."
+                      />
+                    </Field>
+                    <label className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-black text-red-800 md:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={careInfo.transfer_two_staff}
+                        onChange={(event) =>
+                          updateCareInfo({
+                            transfer_two_staff: event.target.checked,
+                          })
+                        }
+                      />
+                      Reikia 2 darbuotojų perkėlimui
+                    </label>
+                  </div>
+                  <InfoNotice title="Saugumo perspėjimas" tone="amber">
+                    Jei pažymėta, kad reikia 2 darbuotojų, perspėjimas visada
+                    matomas santraukoje, kad pamaina nepraleistų rizikos.
+                  </InfoNotice>
+                </div>
+              ) : null}
+
+              {careTab === "pastabos" ? (
+                <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
+                  <Field label="Pastabos darbuotojams">
+                    <textarea
+                      className="min-h-[220px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+                      value={careInfo.staff_notes}
+                      onChange={(event) =>
+                        updateCareInfo({ staff_notes: event.target.value })
+                      }
+                      placeholder="Praktinės instrukcijos pamainai, ko nepamiršti, ką stebėti..."
+                    />
+                  </Field>
+                  <div className="grid gap-4">
+                    <InfoNotice title="Kas atnaujino" tone="green">
+                      {careInfo.updated_at
+                        ? `${careInfo.updated_by || "Darbuotojas"} · ${new Date(careInfo.updated_at).toLocaleString("lt-LT")}`
+                        : "Dar neatnaujinta."}
+                    </InfoNotice>
+                    <InfoNotice title="BDAR" tone="blue">
+                      Rašyk tik tai, kas būtina priežiūrai ir pamainos darbui.
+                      Dokumentų kopijų ar perteklinių jautrių duomenų čia
+                      nekeliame.
+                    </InfoNotice>
+                  </div>
+                </div>
               ) : null}
             </div>
-          )}
-        </section>
-      ) : null}
 
-      {activeTab === 'logs' ? (
-        <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>Kasdienės veiklos / įrašai</h2>
-
-          <div style={styles.formGrid}>
-            <Field label="Veiklos tipas">
-              <select value={dailyLogForm.activity_type} onChange={(e) => setDailyLogForm({ ...dailyLogForm, activity_type: e.target.value })} style={styles.input}>
-                <option>Priežiūra</option>
-                <option>Higiena</option>
-                <option>Maitinimas</option>
-                <option>Socialinė veikla</option>
-                <option>Stebėjimas</option>
-                <option>Kita</option>
-              </select>
-            </Field>
-            <Field label="Rizika / incidentas">
-              <input value={dailyLogForm.risk_type} onChange={(e) => setDailyLogForm({ ...dailyLogForm, risk_type: e.target.value })} style={styles.input} />
-            </Field>
-            <Field label="Atliktos paslaugos">
-              <input value={dailyLogForm.services_done} onChange={(e) => setDailyLogForm({ ...dailyLogForm, services_done: e.target.value })} style={styles.input} />
-            </Field>
-            <label style={{ ...styles.field, gridColumn: '1 / -1' }}>
-              <span>Trumpas įrašas</span>
-              <textarea value={dailyLogForm.note} onChange={(e) => setDailyLogForm({ ...dailyLogForm, note: e.target.value })} style={styles.textarea} />
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-6 py-4">
+              <div className="text-xs font-bold text-slate-500">
+                ISGP tikslai lieka „Planas“ skiltyje; ši informacija skirta
+                priežiūros saugai ir pamainos perspėjimams.
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCareModalOpen(false)}
+                  className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                >
+                  Atšaukti
+                </button>
+                <button
+                  type="button"
+                  onClick={saveCareInfo}
+                  disabled={saving}
+                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                >
+                  {saving ? "Saugoma..." : "Išsaugoti priežiūros informaciją"}
+                </button>
+              </div>
+            </div>
           </div>
-
-          <button type="button" onClick={() => void createDailyLog()} disabled={saving} style={styles.primaryButton}>
-            <Plus size={16} />
-            Pridėti įrašą
-          </button>
-
-          {dailyLogs.length === 0 ? (
-            <div style={styles.empty}>Įrašų dar nėra.</div>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Data</th>
-                  <th style={styles.th}>Tipas</th>
-                  <th style={styles.th}>Įrašas</th>
-                  <th style={styles.th}>Darbuotojas</th>
-                  <th style={styles.th}>Rizika</th>
-                  <th style={styles.th}>Veiksmai</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dailyLogs.map((log) => (
-                  <tr key={log.id}>
-                    <td style={styles.tdBold}>{formatDate(log.created_at)}</td>
-                    <td style={styles.td}>{log.activity_type || '—'}</td>
-                    <td style={styles.td}>{log.note || '—'}</td>
-                    <td style={styles.td}>{log.employee_full_name || '—'}</td>
-                    <td style={styles.td}>{log.risk_type || '—'}</td>
-                    <td style={styles.td}>
-                      <RowActions onEdit={() => setEditingLog(log)} onDelete={() => void deleteDailyLog(log.id)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      ) : null}
-
-      {activeTab === 'incidents' ? (
-        <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>Incidentai</h2>
-
-          <div style={styles.formGrid}>
-            <Field label="Data ir laikas">
-              <input type="datetime-local" value={incidentForm.incident_at} onChange={(e) => setIncidentForm({ ...incidentForm, incident_at: e.target.value })} style={styles.input} />
-            </Field>
-            <Field label="Tipas">
-              <select value={incidentForm.type} onChange={(e) => setIncidentForm({ ...incidentForm, type: e.target.value })} style={styles.input}>
-                <option>Griuvimas</option>
-                <option>Konfliktas</option>
-                <option>Pablogėjusi būklė</option>
-                <option>Dingimas</option>
-                <option>Savižalos rizika</option>
-                <option>Kita</option>
-              </select>
-            </Field>
-            <Field label="Kas pastebėjo">
-              <input value={incidentForm.observed_by} onChange={(e) => setIncidentForm({ ...incidentForm, observed_by: e.target.value })} style={styles.input} />
-            </Field>
-            <label style={styles.checkboxRow}>
-              <input type="checkbox" checked={incidentForm.relatives_informed} onChange={(e) => setIncidentForm({ ...incidentForm, relatives_informed: e.target.checked })} />
-              Informuoti artimieji
-            </label>
-            <label style={styles.checkboxRow}>
-              <input type="checkbox" checked={incidentForm.medics_informed} onChange={(e) => setIncidentForm({ ...incidentForm, medics_informed: e.target.checked })} />
-              Informuoti medikai
-            </label>
-            <label style={{ ...styles.field, gridColumn: '1 / -1' }}>
-              <span>Kokių veiksmų imtasi</span>
-              <textarea value={incidentForm.actions_taken} onChange={(e) => setIncidentForm({ ...incidentForm, actions_taken: e.target.value })} style={styles.textarea} />
-            </label>
-            <label style={{ ...styles.field, gridColumn: '1 / -1' }}>
-              <span>Rezultatas</span>
-              <textarea value={incidentForm.result} onChange={(e) => setIncidentForm({ ...incidentForm, result: e.target.value })} style={styles.textarea} />
-            </label>
-          </div>
-
-          <button type="button" onClick={() => void createIncident()} disabled={saving} style={styles.primaryButton}>
-            <Plus size={16} />
-            Pridėti incidentą
-          </button>
-
-          {incidents.length === 0 ? (
-            <div style={styles.empty}>Incidentų nėra.</div>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Data</th>
-                  <th style={styles.th}>Tipas</th>
-                  <th style={styles.th}>Pastebėjo</th>
-                  <th style={styles.th}>Veiksmai</th>
-                  <th style={styles.th}>Informuoti</th>
-                  <th style={styles.th}>Rezultatas</th>
-                  <th style={styles.th}>Veiksmai</th>
-                </tr>
-              </thead>
-              <tbody>
-                {incidents.map((incident) => (
-                  <tr key={incident.id}>
-                    <td style={styles.tdBold}>{formatDate(incident.incident_at)}</td>
-                    <td style={styles.td}>{incident.type || '—'}</td>
-                    <td style={styles.td}>{incident.observed_by || '—'}</td>
-                    <td style={styles.td}>{incident.actions_taken || '—'}</td>
-                    <td style={styles.td}>{[incident.relatives_informed ? 'artimieji' : '', incident.medics_informed ? 'medikai' : ''].filter(Boolean).join(', ') || '—'}</td>
-                    <td style={styles.td}>{incident.result || '—'}</td>
-                    <td style={styles.td}>
-                      <RowActions onEdit={() => setEditingIncident(incident)} onDelete={() => void deleteIncident(incident.id)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      ) : null}
-
-      {activeTab === 'inventory' ? (
-        <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>Išduotos prekės</h2>
-
-          <div style={styles.categoryGrid}>
-            {monthlyByCategory.length === 0 ? (
-              <div style={styles.empty}>Šį mėnesį nurašymų nėra.</div>
-            ) : (
-              monthlyByCategory.map((item) => (
-                <div key={item.category} style={styles.categoryCard}>
-                  <strong>{item.quantity}</strong>
-                  <span>{item.category}</span>
-                </div>
-              ))
-            )}
-          </div>
-
-          {inventoryHistory.length === 0 ? (
-            <div style={styles.empty}>Prekių istorijos dar nėra.</div>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Prekė</th>
-                  <th style={styles.th}>Kategorija</th>
-                  <th style={styles.th}>Kiekis</th>
-                  <th style={styles.th}>Operacija</th>
-                  <th style={styles.th}>Kas atliko</th>
-                  <th style={styles.th}>Data</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inventoryHistory.map((item) => (
-                  <tr key={item.id}>
-                    <td style={styles.tdBold}>
-                      {item.item_name || '—'}
-                      <div style={styles.sub}>
-                        {subcategoryLabel(item.subcategory)}
-                        {item.size ? ` • ${item.size}` : ''}
-                        {item.notes ? ` • ${item.notes}` : ''}
-                      </div>
-                    </td>
-                    <td style={styles.td}>{categoryLabel(item.category)}</td>
-                    <td style={styles.td}>{Number(item.quantity || 0)} {item.unit || 'vnt.'}</td>
-                    <td style={styles.td}>{operationLabel(item.type)}</td>
-                    <td style={styles.td}>{item.employee_full_name || '—'}</td>
-                    <td style={styles.td}>{formatDate(item.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      ) : null}
-
-      {showIssueModal ? (
-        <Modal title="Nurašyti prekę" subtitle={residentName(resident)} onClose={() => setShowIssueModal(false)}>
-          <Field label="Prekė">
-            <select value={issueItemId} onChange={(e) => setIssueItemId(e.target.value)} style={styles.input}>
-              <option value="">Pasirink prekę</option>
-              {inventoryItems.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} — {Number(item.quantity || 0)} {item.unit || 'vnt.'}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Kiekis">
-            <input type="number" min="1" value={issueQuantity} onChange={(e) => setIssueQuantity(e.target.value)} style={styles.input} />
-          </Field>
-          <Field label="Pastaba">
-            <input value={issueNotes} onChange={(e) => setIssueNotes(e.target.value)} placeholder="Pvz. išduota pagal poreikį" style={styles.input} />
-          </Field>
-          <div style={styles.modalActions}>
-            <button type="button" onClick={() => setShowIssueModal(false)} style={styles.cancelButton}>Atšaukti</button>
-            <button type="button" onClick={() => void issueItem()} disabled={saving} style={styles.primaryButton}>
-              {saving ? 'Saugoma...' : 'Nurašyti'}
-            </button>
-          </div>
-        </Modal>
-      ) : null}
-
-      {editingContact ? (
-        <Modal title="Redaguoti kontaktą" subtitle={editingContact.full_name} onClose={() => setEditingContact(null)}>
-          <Field label="Vardas, pavardė">
-            <input value={editingContact.full_name || ''} onChange={(e) => setEditingContact({ ...editingContact, full_name: e.target.value })} style={styles.input} />
-          </Field>
-          <Field label="Ryšys">
-            <input value={editingContact.relationship || ''} onChange={(e) => setEditingContact({ ...editingContact, relationship: e.target.value })} style={styles.input} />
-          </Field>
-          <Field label="Telefonas">
-            <input value={editingContact.phone || ''} onChange={(e) => setEditingContact({ ...editingContact, phone: e.target.value })} style={styles.input} />
-          </Field>
-          <Field label="El. paštas">
-            <input value={editingContact.email || ''} onChange={(e) => setEditingContact({ ...editingContact, email: e.target.value })} style={styles.input} />
-          </Field>
-          <Field label="Prioritetas">
-            <input type="number" min="1" value={editingContact.priority || 1} onChange={(e) => setEditingContact({ ...editingContact, priority: Number(e.target.value || 1) })} style={styles.input} />
-          </Field>
-          <label style={styles.checkboxRow}>
-            <input type="checkbox" checked={Boolean(editingContact.can_receive_info)} onChange={(e) => setEditingContact({ ...editingContact, can_receive_info: e.target.checked })} />
-            Gali gauti informaciją
-          </label>
-          <Field label="Pastabos">
-            <textarea value={editingContact.communication_notes || ''} onChange={(e) => setEditingContact({ ...editingContact, communication_notes: e.target.value })} style={styles.textarea} />
-          </Field>
-          <div style={styles.modalActions}>
-            <button type="button" onClick={() => setEditingContact(null)} style={styles.cancelButton}>Atšaukti</button>
-            <button type="button" onClick={() => void updateContact()} disabled={saving} style={styles.primaryButton}>Išsaugoti</button>
-          </div>
-        </Modal>
-      ) : null}
-
-      {editingPlan ? (
-        <Modal title="Redaguoti planą" subtitle="Individualus socialinės globos planas" onClose={() => setEditingPlan(null)}>
-          <Field label="Poreikiai">
-            <textarea value={editingPlan.needs || ''} onChange={(e) => setEditingPlan({ ...editingPlan, needs: e.target.value })} style={styles.textarea} />
-          </Field>
-          <Field label="Tikslai">
-            <textarea value={editingPlan.goals || ''} onChange={(e) => setEditingPlan({ ...editingPlan, goals: e.target.value })} style={styles.textarea} />
-          </Field>
-          <Field label="Paslaugos">
-            <textarea value={editingPlan.services || ''} onChange={(e) => setEditingPlan({ ...editingPlan, services: e.target.value })} style={styles.textarea} />
-          </Field>
-          <Field label="Atsakingi darbuotojai">
-            <input value={editingPlan.responsible_staff || ''} onChange={(e) => setEditingPlan({ ...editingPlan, responsible_staff: e.target.value })} style={styles.input} />
-          </Field>
-          <Field label="Peržiūros data">
-            <input type="date" value={toDateInput(editingPlan.review_date)} onChange={(e) => setEditingPlan({ ...editingPlan, review_date: e.target.value })} style={styles.input} />
-          </Field>
-          <Field label="Statusas">
-            <select value={editingPlan.status || 'active'} onChange={(e) => setEditingPlan({ ...editingPlan, status: e.target.value })} style={styles.input}>
-              <option value="active">Aktyvus</option>
-              <option value="archived">Archyvuotas</option>
-              <option value="completed">Užbaigtas</option>
-            </select>
-          </Field>
-          <div style={styles.modalActions}>
-            <button type="button" onClick={() => setEditingPlan(null)} style={styles.cancelButton}>Atšaukti</button>
-            <button type="button" onClick={() => void updatePlan()} disabled={saving} style={styles.primaryButton}>Išsaugoti</button>
-          </div>
-        </Modal>
-      ) : null}
-
-      {editingLog ? (
-        <Modal title="Redaguoti įrašą" subtitle={formatDate(editingLog.created_at)} onClose={() => setEditingLog(null)}>
-          <Field label="Veiklos tipas">
-            <select value={editingLog.activity_type || 'Priežiūra'} onChange={(e) => setEditingLog({ ...editingLog, activity_type: e.target.value })} style={styles.input}>
-              <option>Priežiūra</option>
-              <option>Higiena</option>
-              <option>Maitinimas</option>
-              <option>Socialinė veikla</option>
-              <option>Stebėjimas</option>
-              <option>Kita</option>
-            </select>
-          </Field>
-          <Field label="Rizika">
-            <input value={editingLog.risk_type || ''} onChange={(e) => setEditingLog({ ...editingLog, risk_type: e.target.value })} style={styles.input} />
-          </Field>
-          <Field label="Atliktos paslaugos">
-            <input value={editingLog.services_done || ''} onChange={(e) => setEditingLog({ ...editingLog, services_done: e.target.value })} style={styles.input} />
-          </Field>
-          <Field label="Įrašas">
-            <textarea value={editingLog.note || ''} onChange={(e) => setEditingLog({ ...editingLog, note: e.target.value })} style={styles.textarea} />
-          </Field>
-          <div style={styles.modalActions}>
-            <button type="button" onClick={() => setEditingLog(null)} style={styles.cancelButton}>Atšaukti</button>
-            <button type="button" onClick={() => void updateDailyLog()} disabled={saving} style={styles.primaryButton}>Išsaugoti</button>
-          </div>
-        </Modal>
-      ) : null}
-
-      {editingIncident ? (
-        <Modal title="Redaguoti incidentą" subtitle={editingIncident.type || 'Incidentas'} onClose={() => setEditingIncident(null)}>
-          <Field label="Data ir laikas">
-            <input type="datetime-local" value={toDateTimeInput(editingIncident.incident_at)} onChange={(e) => setEditingIncident({ ...editingIncident, incident_at: e.target.value })} style={styles.input} />
-          </Field>
-          <Field label="Tipas">
-            <select value={editingIncident.type || 'Griuvimas'} onChange={(e) => setEditingIncident({ ...editingIncident, type: e.target.value })} style={styles.input}>
-              <option>Griuvimas</option>
-              <option>Konfliktas</option>
-              <option>Pablogėjusi būklė</option>
-              <option>Dingimas</option>
-              <option>Savižalos rizika</option>
-              <option>Kita</option>
-            </select>
-          </Field>
-          <Field label="Kas pastebėjo">
-            <input value={editingIncident.observed_by || ''} onChange={(e) => setEditingIncident({ ...editingIncident, observed_by: e.target.value })} style={styles.input} />
-          </Field>
-          <label style={styles.checkboxRow}>
-            <input type="checkbox" checked={Boolean(editingIncident.relatives_informed)} onChange={(e) => setEditingIncident({ ...editingIncident, relatives_informed: e.target.checked })} />
-            Informuoti artimieji
-          </label>
-          <label style={styles.checkboxRow}>
-            <input type="checkbox" checked={Boolean(editingIncident.medics_informed)} onChange={(e) => setEditingIncident({ ...editingIncident, medics_informed: e.target.checked })} />
-            Informuoti medikai
-          </label>
-          <Field label="Veiksmai">
-            <textarea value={editingIncident.actions_taken || ''} onChange={(e) => setEditingIncident({ ...editingIncident, actions_taken: e.target.value })} style={styles.textarea} />
-          </Field>
-          <Field label="Rezultatas">
-            <textarea value={editingIncident.result || ''} onChange={(e) => setEditingIncident({ ...editingIncident, result: e.target.value })} style={styles.textarea} />
-          </Field>
-          <div style={styles.modalActions}>
-            <button type="button" onClick={() => setEditingIncident(null)} style={styles.cancelButton}>Atšaukti</button>
-            <button type="button" onClick={() => void updateIncident()} disabled={saving} style={styles.primaryButton}>Išsaugoti</button>
-          </div>
-        </Modal>
-      ) : null}
-    </div>
-  )
-}
-
-
-function InfoBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={styles.infoBlock}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  )
-}
-
-function Modal({ title, subtitle, children, onClose }: { title: string; subtitle?: string; children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div style={styles.modalBackdrop} onClick={onClose}>
-      <div style={styles.modalCard} onClick={(event) => event.stopPropagation()}>
-        <div style={styles.modalHeader}>
-          <div>
-            <h2 style={styles.modalTitle}>{title}</h2>
-            {subtitle ? <p style={styles.modalSubtitle}>{subtitle}</p> : null}
-          </div>
-          <button type="button" onClick={onClose} style={styles.iconButton}>
-            <X size={18} />
-          </button>
         </div>
-        {children}
-      </div>
+      ) : null}
+
+      {writeOffOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 py-6">
+          <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+              <div>
+                <h2 className="text-2xl font-black tracking-[-0.03em] text-slate-950">
+                  Nurašyti prekę gyventojui
+                </h2>
+                <p className="mt-1 text-sm font-bold text-slate-500">
+                  {residentName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWriteOffOpen(false)}
+                className="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid gap-4 p-6">
+              <Field label="Prekės pavadinimas">
+                <input
+                  className={inputClass}
+                  value={writeOffForm.item_name}
+                  onChange={(event) =>
+                    setWriteOffForm((prev) => ({
+                      ...prev,
+                      item_name: event.target.value,
+                    }))
+                  }
+                  placeholder="Pvz., sauskelnės, higienos priemonė..."
+                />
+              </Field>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Kiekis">
+                  <input
+                    type="number"
+                    min="1"
+                    className={inputClass}
+                    value={writeOffForm.quantity}
+                    onChange={(event) =>
+                      setWriteOffForm((prev) => ({
+                        ...prev,
+                        quantity: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+
+                <Field label="Priežastis">
+                  <input
+                    className={inputClass}
+                    value={writeOffForm.reason}
+                    onChange={(event) =>
+                      setWriteOffForm((prev) => ({
+                        ...prev,
+                        reason: event.target.value,
+                      }))
+                    }
+                    placeholder="Nurašyta gyventojui"
+                  />
+                </Field>
+              </div>
+
+              <Field label="Pastaba">
+                <textarea
+                  className={textareaClass}
+                  value={writeOffForm.note}
+                  onChange={(event) =>
+                    setWriteOffForm((prev) => ({
+                      ...prev,
+                      note: event.target.value,
+                    }))
+                  }
+                  placeholder="Nebūtina"
+                />
+              </Field>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setWriteOffOpen(false)}
+                  className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                >
+                  Atšaukti
+                </button>
+                <button
+                  type="button"
+                  onClick={submitWriteOff}
+                  disabled={saving}
+                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                >
+                  {saving ? "Saugoma..." : "Nurašyti"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
-  )
-}
-
-function RowActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
-  return (
-    <div style={styles.rowActions}>
-      <button type="button" onClick={onEdit} style={styles.smallButton}>Redaguoti</button>
-      <button type="button" onClick={onDelete} style={styles.dangerButton}>
-        <Trash2 size={14} />
-        Trinti
-      </button>
-    </div>
-  )
-}
-
-function Stat({ icon, value, label }: { icon: React.ReactNode; value: string | number; label: string }) {
-  return (
-    <div style={styles.statCard}>
-      {icon}
-      <div>
-        <strong style={styles.statNumber}>{value}</strong>
-        <span style={styles.statLabel}>{label}</span>
-      </div>
-    </div>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label style={styles.field}>
-      <span>{label}</span>
-      {children}
-    </label>
-  )
-}
-
-function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
-  return (
-    <button type="button" onClick={onClick} style={{ ...styles.tabButton, ...(active ? styles.activeTab : {}) }}>
-      {icon}
-      {label}
-    </button>
-  )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { padding: 24, display: 'grid', gap: 18 },
-  headerTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  back: { display: 'inline-flex', alignItems: 'center', gap: 8, color: '#047857', textDecoration: 'none', fontSize: 14, fontWeight: 900 },
-  primaryButton: { border: 'none', background: '#047857', color: '#ffffff', borderRadius: 13, padding: '11px 13px', fontSize: 13, fontWeight: 900, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 },
-  hero: { display: 'flex', alignItems: 'center', gap: 16, background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', border: '1px solid #e5e7eb', borderRadius: 24, padding: 22 },
-  heroIcon: { width: 58, height: 58, borderRadius: 18, background: '#ecfdf5', color: '#047857', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  eyebrow: { color: '#047857', fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' },
-  title: { margin: '4px 0', color: '#0f172a', fontSize: 34, fontWeight: 950 },
-  subtitle: { margin: 0, color: '#64748b', fontSize: 15, fontWeight: 700 },
-  message: { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 16, padding: 13, fontSize: 14, fontWeight: 800 },
-  stats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  statCard: { display: 'flex', alignItems: 'center', gap: 12, background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 18, padding: 16, minWidth: 0 },
-  statNumber: { display: 'block', color: '#0f172a', fontSize: 20, fontWeight: 950, wordBreak: 'break-word' },
-  statLabel: { display: 'block', color: '#64748b', fontSize: 12, fontWeight: 850 },
-  tabs: { display: 'flex', gap: 8, overflowX: 'auto', background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 18, padding: 8 },
-  tabButton: { border: 'none', background: 'transparent', color: '#64748b', borderRadius: 13, padding: '10px 12px', fontSize: 13, fontWeight: 900, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' },
-  activeTab: { background: '#ecfdf5', color: '#047857' },
-  card: { background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 22, padding: 20, display: 'grid', gap: 14, overflowX: 'auto' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' },
-  sectionTitle: { margin: 0, color: '#0f172a', fontSize: 22, fontWeight: 950 },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  field: { display: 'grid', gap: 6, color: '#334155', fontSize: 12, fontWeight: 850 },
-  input: { width: '100%', border: '1px solid #d1d5db', borderRadius: 13, padding: '10px 11px', fontSize: 14, boxSizing: 'border-box' },
-  textarea: { width: '100%', minHeight: 96, border: '1px solid #d1d5db', borderRadius: 13, padding: '10px 11px', fontSize: 14, boxSizing: 'border-box', resize: 'vertical' },
-  checkboxRow: { display: 'flex', alignItems: 'center', gap: 9, color: '#334155', fontSize: 13, fontWeight: 850 },
-  categoryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 },
-  categoryCard: { background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 16, padding: 14, display: 'grid', gap: 5, color: '#047857' },
-  empty: { padding: 22, border: '1px dashed #cbd5e1', borderRadius: 16, color: '#64748b', textAlign: 'center', fontSize: 14, fontWeight: 750 },
-  table: { width: '100%', minWidth: 920, borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '12px 10px', borderBottom: '1px solid #e5e7eb', color: '#475569', fontWeight: 900 },
-  td: { padding: '14px 10px', borderBottom: '1px solid #f1f5f9', color: '#334155', fontWeight: 650, verticalAlign: 'top' },
-  tdBold: { padding: '14px 10px', borderBottom: '1px solid #f1f5f9', color: '#0f172a', fontWeight: 900, verticalAlign: 'top' },
-  sub: { marginTop: 4, color: '#64748b', fontSize: 12, fontWeight: 650 },
-  rowActions: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  smallButton: { background: '#f1f5f9', color: '#0f172a', border: 'none', padding: '7px 10px', borderRadius: 10, cursor: 'pointer', fontWeight: 800 },
-  dangerButton: { background: '#fee2e2', color: '#b91c1c', border: 'none', padding: '7px 10px', borderRadius: 10, cursor: 'pointer', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6 },
-  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 100 },
-  modalCard: { width: '100%', maxWidth: 620, maxHeight: '92vh', overflow: 'auto', background: '#ffffff', borderRadius: 22, padding: 20, display: 'grid', gap: 16 },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', gap: 12 },
-  modalTitle: { margin: 0, fontSize: 22, fontWeight: 950, color: '#0f172a' },
-  modalSubtitle: { margin: '4px 0 0', color: '#64748b', fontSize: 14, fontWeight: 750 },
-  iconButton: { width: 38, height: 38, borderRadius: 12, border: '1px solid #d1d5db', background: '#ffffff', cursor: 'pointer' },
-  modalActions: { display: 'flex', justifyContent: 'flex-end', gap: 10 },
-  cancelButton: { border: 'none', background: '#f1f5f9', color: '#0f172a', borderRadius: 13, padding: '11px 13px', fontSize: 13, fontWeight: 900, cursor: 'pointer' },
-
-  sectionHint: { margin: '6px 0 0', color: '#64748b', fontSize: 13, fontWeight: 700 },
-  secondaryLink: { border: '1px solid #a7f3d0', background: '#ecfdf5', color: '#047857', borderRadius: 13, padding: '10px 13px', fontSize: 13, fontWeight: 900, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none' },
-  planGrid: { display: 'grid', gap: 14 },
-  planCard: { border: '1px solid #e5e7eb', borderRadius: 18, padding: 16, background: '#ffffff', display: 'grid', gap: 14 },
-  planHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  planTitle: { margin: '4px 0', color: '#0f172a', fontSize: 18, fontWeight: 950 },
-  planMeta: { margin: 0, color: '#64748b', fontSize: 13, fontWeight: 750 },
-  planDetailsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
-  infoBlock: { background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 14, padding: 12, display: 'grid', gap: 5, color: '#334155', fontSize: 12, fontWeight: 800 },
-  planTaskSummary: { background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 14, padding: 12, display: 'grid', gap: 9 },
-  progressHeader: { display: 'flex', justifyContent: 'space-between', gap: 10, color: '#0f172a', fontSize: 13, fontWeight: 900 },
-  progressTrack: { height: 9, background: '#e5e7eb', borderRadius: 999, overflow: 'hidden' },
-  progressFill: { height: '100%', background: '#047857', borderRadius: 999 },
-  taskStats: { display: 'flex', gap: 8, flexWrap: 'wrap', color: '#64748b', fontSize: 12, fontWeight: 800 },
-  emptySmall: { padding: 14, border: '1px dashed #cbd5e1', borderRadius: 14, color: '#64748b', fontSize: 13, fontWeight: 750 },
-  taskList: { display: 'grid', gap: 8 },
-  taskItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 14, padding: 12 },
-  taskBadges: { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  taskBadge: { display: 'inline-flex', borderRadius: 999, padding: '5px 9px', fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap' },
-  badgeActive: { background: '#ecfdf5', color: '#047857' },
-  badgeDone: { background: '#dcfce7', color: '#166534' },
-  badgeOverdue: { background: '#fee2e2', color: '#b91c1c' },
-  badgePriority: { background: '#fef9c3', color: '#854d0e' },
-  badgePriorityHigh: { background: '#ffedd5', color: '#c2410c' },
-
+  );
 }

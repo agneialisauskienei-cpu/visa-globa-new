@@ -1,59 +1,53 @@
-'use client'
+"use client"
 
-import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
-import { NotificationProvider } from '@/components/providers/NotificationProvider'
-import Sidebar from '@/components/navigation/Sidebar'
+import type { ReactNode } from "react"
+import { useEffect, useState } from "react"
+import { NotificationProvider } from "@/components/providers/NotificationProvider"
+import AppSidebar from "@/components/layout/AppSidebar"
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [isDesktop, setIsDesktop] = useState(false)
 
   useEffect(() => {
-    const checkScreen = () => {
+    function update() {
       setIsDesktop(window.innerWidth >= 1024)
     }
 
-    checkScreen()
-    window.addEventListener('resize', checkScreen)
+    update()
+    window.addEventListener("resize", update)
 
-    return () => {
-      window.removeEventListener('resize', checkScreen)
-    }
+    return () => window.removeEventListener("resize", update)
   }, [])
 
   return (
     <NotificationProvider>
-      <div
-        style={{
-          minHeight: '100vh',
-          background: '#f8fafc',
-          display: isDesktop ? 'grid' : 'block',
-          gridTemplateColumns: isDesktop ? '300px minmax(0, 1fr)' : undefined,
-        }}
-      >
-        {isDesktop ? (
-          <aside
-            style={{
-              minHeight: '100vh',
-              position: 'sticky',
-              top: 0,
-              alignSelf: 'start',
-            }}
-          >
-            <Sidebar />
-          </aside>
-        ) : null}
+      <div style={styles.shell}>
+        {isDesktop ? <AppSidebar /> : null}
 
-        <main
-          style={{
-            minWidth: 0,
-            width: '100%',
-            overflowX: 'hidden',
-          }}
-        >
-          {children}
+        <main style={styles.main}>
+          <div style={styles.content}>{children}</div>
         </main>
       </div>
     </NotificationProvider>
   )
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  shell: {
+    minHeight: "100vh",
+    display: "flex",
+    background: "#f8fafc",
+  },
+  main: {
+    flex: 1,
+    minWidth: 0,
+    padding: "24px 28px",
+    boxSizing: "border-box",
+  },
+  content: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    margin: "0 auto",
+  },
 }

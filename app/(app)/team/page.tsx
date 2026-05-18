@@ -1,13 +1,16 @@
 "use client";
 
-import DocumentAcknowledgementsModule from "./components/DocumentAcknowledgements/DocumentAcknowledgementsModule";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowRight,
   BadgeCheck,
   BriefcaseBusiness,
   CalendarDays,
+  CheckCircle2,
   ClipboardCheck,
+  ClipboardList,
+  Edit3,
   FileText,
   GraduationCap,
   PackageCheck,
@@ -16,17 +19,33 @@ import {
   Search,
   ShieldCheck,
   Umbrella,
+  UserCog,
   UserPlus,
   Users,
   X,
-  Edit3,
 } from "lucide-react";
+
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import ScheduleBlock from "./components/Schedule/ScheduleBlock";
+import { getCurrentOrganizationId } from "@/lib/current-organization";
+import { getReadableError } from "@/lib/errors";
 import CandidatesModule from "./components/Candidates/CandidatesModule";
 import TrainingModule from "./components/Trainings/TrainingModule";
+import DocumentAcknowledgementsModule from "./components/DocumentAcknowledgements/DocumentAcknowledgementsModule";
+import StaffTypesModule from "./components/StaffTypes/StaffTypesModule";
+import ScheduleBlock from "./components/Schedule/ScheduleBlock";
 import VacationRequests from "./components/Vacations/VacationRequests";
-import { getCurrentOrganizationId } from "@/lib/current-organization";
+
+type TabKey =
+  | "overview"
+  | "employees"
+  | "access"
+  | "docs"
+  | "trainings"
+  | "vacations"
+  | "schedule"
+  | "candidates"
+  | "invites";
 
 type Employee = {
   user_id: string;
@@ -34,68 +53,46 @@ type Employee = {
   first_name?: string | null;
   last_name?: string | null;
   full_name?: string | null;
+  phone?: string | null;
+  birth_date?: string | null;
   role?: string | null;
   legacy_role?: string | null;
   position?: string | null;
   department?: string | null;
   staff_type?: string | null;
+  contract_number?: string | null;
+  employment_start_date?: string | null;
+  termination_date?: string | null;
+  is_archived?: boolean | null;
+  archived_at?: string | null;
+  archive_reason?: string | null;
+  extra_permissions?: string[] | null;
   professional_license_number?: string | null;
   professional_license_valid_until?: string | null;
   occupational_health_valid_until?: string | null;
   is_active?: boolean | null;
+  created_at?: string | null;
 };
 
-type Credential = {
+type Candidate = {
   id: string;
-  employee_id: string;
-  type: string;
-  number: string | null;
-  issuer: string | null;
-  issued_at: string | null;
-  expires_at: string | null;
-  note: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  desired_role: string | null;
+  status: string | null;
+  experience: string | null;
+  notes?: string | null;
+  created_at: string | null;
 };
 
-type Training = {
+type Invite = {
   id: string;
-  employee_id: string;
-  title: string;
-  category: string | null;
-  hours: number | null;
-  provider: string | null;
-  completed_at: string | null;
-  expires_at: string | null;
-  certificate_no: string | null;
-  mandatory: boolean | null;
-};
-
-type TrainingCatalog = {
-  id: string;
-  name: string;
-  category: string;
-  mandatory: boolean | number | null;
-  valid_for_months: number | null;
-  hours: number | null;
-  applies_to: string | null;
-  reminder_30: boolean | number | null;
-  reminder_7: boolean | number | null;
-};
-
-type TrainingRequirement = {
-  id: string;
-  position: string;
-  training_id: string;
-  required: boolean | number | null;
-};
-
-type TrainingComplianceRow = {
-  employee: Employee;
-  training: TrainingCatalog;
-  status: "valid" | "missing" | "expired" | "expiring";
-  completed_at: string | null;
-  expires_at: string | null;
-  hours: number;
-  verified_by: string | null;
+  email: string | null;
+  role: string | null;
+  status: string | null;
+  created_at: string | null;
 };
 
 type VacationRequest = {
@@ -110,163 +107,298 @@ type VacationRequest = {
   created_at: string | null;
 };
 
-type Candidate = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string | null;
-  phone: string | null;
-  desired_role: string | null;
-  status: string | null;
-  experience: string | null;
-  created_at: string | null;
-};
-
 type ScheduleEntry = {
-  id: string;
+  id?: string;
   employee_id: string;
   date: string;
-  start_datetime: string | null;
-  end_datetime: string | null;
-  status: string | null;
-  note: string | null;
+  start_datetime?: string | null;
+  end_datetime?: string | null;
+  status?: string | null;
+  note?: string | null;
 };
 
-type DocumentRequirement = {
+type VacationForm = {
+  employee_id: string;
+  type: string;
+  start_date: string;
+  end_date: string;
+  start_time?: string;
+  end_time?: string;
+  note: string;
+};
+
+type VacationFilterKey = "all" | "submitted" | "approved" | "rejected" | "risk" | "history";
+
+type AbsenceType = { value: string; label: string; code: string };
+
+type Training = {
   id: string;
+  employee_id: string;
+  title: string;
+  completed_at: string | null;
+  expires_at: string | null;
+  hours: number | null;
+};
+
+type Credential = {
+  id: string;
+  employee_id: string;
+  type: string;
+  number: string | null;
+  expires_at: string | null;
+};
+
+type NewEmployeeForm = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  position: string;
+  department: string;
+  staff_type: string;
   role: string;
-  document_type: string;
-  required: boolean | number | null;
-  collect_copy_allowed: boolean | number | null;
-  retention_note: string | null;
-  sort_order: number | null;
+  notes: string;
+  send_invite: boolean;
+  candidate_id: string;
 };
 
-type DocumentVerification = {
-  id: string;
-  employee_id: string;
-  document_type: string;
-  evidence_mode: string | null;
-  reference_no_masked: string | null;
-  issuer: string | null;
-  valid_from: string | null;
-  valid_until: string | null;
-  result: string | null;
-  verified_by: string;
-  verified_at: string | null;
-  no_copy_stored: boolean | number | null;
-  legal_basis: string | null;
-  note: string | null;
+type EditForm = {
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  birth_date: string;
+  position: string;
+  department: string;
+  staff_type: string;
+  role: string;
+  contract_number: string;
+  employment_start_date: string;
+  termination_date: string;
+  is_archived: boolean;
+  archive_reason: string;
+  professional_license_number: string;
+  professional_license_valid_until: string;
+  occupational_health_valid_until: string;
+  extra_permissions: string[];
+  is_active: boolean;
 };
 
-type DocumentAcknowledgement = {
-  id: string;
-  organization_id: string;
-  employee_id: string;
-  document_title: string;
-  document_type: string | null;
-  document_version: string | null;
-  document_file_path?: string | null;
-  document_file_name?: string | null;
-  document_sha256?: string | null;
-  status: string | null;
-  assigned_by?: string | null;
-  assigned_at: string | null;
-  viewed_at?: string | null;
-  acknowledged_at: string | null;
-  acknowledged_ip?: string | null;
-  acknowledged_user_agent?: string | null;
-  due_date: string | null;
-  note: string | null;
-};
+const STAFF_TYPES = [
+  {
+    value: "social_worker",
+    label: "Socialinis darbuotojas",
+    desc: "Gyventojai, užduotys, perdavimo žurnalai",
+    permissions: ["residents.view_basic", "tasks.view", "tasks.create", "handover.view", "handover.create"],
+  },
+  {
+    value: "nurse",
+    label: "Slaugytojas / medikas",
+    desc: "Gyventojai, medicina, perdavimo žurnalai",
+    permissions: ["residents.view_basic", "medicine.view", "tasks.view", "tasks.create", "handover.view", "handover.create"],
+  },
+  {
+    value: "doctor",
+    label: "Gydytojas",
+    desc: "Gyventojai, medicina, perdavimo žurnalai",
+    permissions: ["residents.view_basic", "medicine.view", "tasks.view", "tasks.create", "handover.view", "handover.create"],
+  },
+  {
+    value: "activity_specialist",
+    label: "Užimtumo specialistas",
+    desc: "Gyventojai, veiklos, užduotys",
+    permissions: ["residents.view_basic", "activities.manage", "tasks.view", "tasks.create"],
+  },
+  {
+    value: "maintenance",
+    label: "Ūkis",
+    desc: "Ūkio užduotys, kambariai, sandėliai",
+    permissions: ["tasks.view", "tasks.create", "rooms.view", "inventory.view"],
+  },
+  {
+    value: "administration",
+    label: "Administracija",
+    desc: "Administracinis darbuotojas",
+    permissions: ["dashboard.view", "tasks.view", "tasks.create"],
+  },
+  {
+    value: "care_worker",
+    label: "Priežiūros darbuotojas",
+    desc: "Bendras darbuotojo tipas",
+    permissions: ["dashboard.view", "tasks.view", "tasks.create"],
+  },
+];
 
-type AuditLog = {
-  id: string;
-  actor: string | null;
-  action: string;
-  entity_type: string;
-  entity_id: string | null;
-  details: string | null;
-  created_at: string | null;
-};
+const EXTRA_PERMISSIONS = [
+  { value: "residents.view_basic", label: "Gyventojai" },
+  { value: "medicine.view", label: "Medicina" },
+  { value: "handover.view", label: "Perdavimo žurnalai" },
+  { value: "handover.create", label: "Kurti perdavimo įrašus" },
+  { value: "activities.manage", label: "Veiklos / užimtumas" },
+  { value: "rooms.view", label: "Kambariai" },
+  { value: "inventory.view", label: "Sandėliai" },
+  { value: "tasks.manage", label: "Valdyti visas užduotis" },
+  { value: "employees.view", label: "Darbuotojai" },
+  { value: "reports.view", label: "Ataskaitos" },
+];
 
-type PersonnelInventoryItem = {
-  id: string;
-  name: string;
-  category: string | null;
-  serial_no: string | null;
-  size: string | null;
-  status: string | null;
-};
-
-type PersonnelInventoryAssignment = {
-  id: string;
-  employee_id: string;
-  item_id: string;
-  assigned_at: string;
-  returned_at: string | null;
-  condition_out: string | null;
-  condition_in: string | null;
-  note: string | null;
-};
-
-type TabKey =
-  | "overview"
-  | "employees"
-  | "schedule"
-  | "vacations"
-  | "docs"
-  | "documentChecks"
-  | "trainings"
-  | "inventory"
-  | "acknowledgements"
-  | "candidates";
-
-const tabs: Array<{ key: TabKey; label: string; icon: any }> = [
+const tabs: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
   { key: "overview", label: "Apžvalga", icon: ShieldCheck },
   { key: "employees", label: "Darbuotojai", icon: Users },
   { key: "schedule", label: "Grafikas", icon: CalendarDays },
-  { key: "vacations", label: "Atostogos", icon: Umbrella },
-  { key: "docs", label: "Pažymos / licencijos", icon: FileText },
-  { key: "documentChecks", label: "Dokumentų patikrinimai", icon: BadgeCheck },
-  { key: "trainings", label: "Mokymai", icon: GraduationCap },
-  { key: "inventory", label: "Daiktai", icon: PackageCheck },
-  { key: "acknowledgements", label: "Susipažinimai", icon: ClipboardCheck },
+  { key: "vacations", label: "Neatvykimai", icon: Umbrella },
   { key: "candidates", label: "Kandidatai", icon: UserPlus },
+  { key: "access", label: "Pareigos ir teisės", icon: UserCog },
+  { key: "trainings", label: "Mokymai", icon: GraduationCap },
+  { key: "docs", label: "Dokumentai", icon: FileText },
 ];
 
-function today() {
-  return toDateInput(new Date());
+const absenceTypes: AbsenceType[] = [
+  { value: "annual_leave", label: "Kasmetinės atostogos", code: "A" },
+  { value: "sick_leave", label: "Nedarbingumas", code: "L" },
+  { value: "training", label: "Mokymai / komandiruotė", code: "M" },
+  { value: "short_leave", label: "Trumpas išvykimas", code: "TI" },
+  { value: "unpaid_leave", label: "Nemokamos atostogos", code: "NA" },
+  { value: "other", label: "Kita", code: "K" },
+];
+
+const initialNewEmployeeForm: NewEmployeeForm = {
+  first_name: "",
+  last_name: "",
+  email: "",
+  phone: "",
+  position: "",
+  department: "",
+  staff_type: "",
+  role: "employee",
+  notes: "",
+  send_invite: true,
+  candidate_id: "",
+};
+
+function fmt(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("lt-LT");
 }
 
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
+
+function normalizeDateInput(value?: string | null) {
+  if (!value) return "";
+
+  const raw = String(value).trim();
+
+  if (!raw) return "";
+
+  const isoDate = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+
+  if (isoDate) return isoDate[1];
+
+  const parsed = new Date(raw);
+
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function isRealBirthDate(value?: string | null) {
+  const normalized = normalizeDateInput(value);
+
+  if (!normalized) return true;
+
+  const date = new Date(`${normalized}T00:00:00`);
+  const min = new Date("1900-01-01T00:00:00");
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
+  return !Number.isNaN(date.getTime()) && date >= min && date <= today;
+}
+
+function removeUndefinedValues<T extends Record<string, unknown>>(payload: T) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined),
+  ) as T;
+}
+
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function monthLabel(date: Date) {
+  return date.toLocaleDateString("lt-LT", { month: "long", year: "numeric" });
+}
+
+function toDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function datesBetween(start: string, end: string) {
+  const rows: string[] = [];
+  const current = new Date(`${start}T00:00:00`);
+  const last = new Date(`${end}T00:00:00`);
+
+  while (current <= last) {
+    rows.push(toDateInput(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return rows;
 }
 
 function daysBetween(start: string, end: string) {
   if (!start || !end) return 0;
-  const a = new Date(`${start}T00:00:00`);
-  const b = new Date(`${end}T00:00:00`);
-  return Math.max(0, Math.floor((b.getTime() - a.getTime()) / 86400000) + 1);
+  const days = datesBetween(start, end).length;
+  return Math.max(1, days);
 }
 
-function fmt(value?: string | null) {
-  if (!value) return "—";
+function absenceTypeMeta(type?: string | null): AbsenceType {
+  return absenceTypes.find((item) => item.value === type) || absenceTypes[0];
+}
+
+function absenceStatusLabel(status?: string | null) {
+  if (status === "approved") return "Patvirtinta";
+  if (status === "rejected") return "Atmesta";
+  if (status === "pending") return "Laukia";
+  return "Pateikta";
+}
+
+function timeLabel(value?: string | null) {
+  if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("lt-LT");
+  return date.toLocaleTimeString("lt-LT", { hour: "2-digit", minute: "2-digit" });
 }
 
 function employeeName(employee?: Employee | null) {
   if (!employee) return "Darbuotojas";
+
   const full = String(employee.full_name || "").trim();
+
+  if (full) return full;
+
   const combined = [employee.first_name, employee.last_name]
     .filter(Boolean)
     .join(" ")
     .trim();
-  return full || combined || employee.email || "Darbuotojas";
+
+  if (combined) return combined;
+
+  if (employee.position?.trim()) return employee.position.trim();
+
+  return "Darbuotojas";
 }
 
 function employeeRole(employee?: Employee | null) {
@@ -277,4391 +409,2277 @@ function employeeRole(employee?: Employee | null) {
     employee?.department,
     employee?.role,
   ];
+
   for (const value of candidates) {
     const raw = String(value || "").trim();
     const normalized = raw.toLowerCase();
+
     if (!raw) continue;
-    if (
-      ["admin", "employee", "administratorius", "darbuotojas"].includes(
-        normalized,
-      )
-    )
-      continue;
+    if (["admin", "employee", "administratorius", "darbuotojas"].includes(normalized)) continue;
+
     return raw;
   }
+
   return "";
 }
 
-const absenceTypes = [
-  { value: "annual", label: "Kasmetinės atostogos", code: "A" },
-  { value: "unpaid", label: "Nemokamos atostogos", code: "NA" },
-  { value: "mother_day", label: "Mamadienis", code: "M" },
-  { value: "father_day", label: "Tėvadienis", code: "T" },
-  { value: "sick", label: "Liga", code: "L" },
-  { value: "temporary_leave", label: "Trumpas išvykimas", code: "TI" },
-];
+function staffTypeLabel(value?: string | null) {
+  return STAFF_TYPES.find((item) => item.value === value)?.label || "Nepasirinkta";
+}
 
-function absenceTypeMeta(type?: string | null) {
-  return (
-    absenceTypes.find((item) => item.value === type || item.code === type) ||
-    absenceTypes[0]
+function normalizeExtraPermissions(value: unknown) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).map(String);
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+
+      if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function staffPermissions(staffType?: string | null) {
+  return STAFF_TYPES.find((item) => item.value === staffType)?.permissions || ["dashboard.view", "tasks.view", "tasks.create"];
+}
+
+function mergedPermissions(employee: Employee | EditForm) {
+  return Array.from(
+    new Set([
+      ...staffPermissions(employee.staff_type),
+      ...normalizeExtraPermissions(employee.extra_permissions),
+    ]),
   );
-}
-
-function absenceStatusLabel(status?: string | null) {
-  const raw = String(status || "submitted").toLowerCase();
-  if (["approved", "confirmed", "patvirtinta"].includes(raw))
-    return "Patvirtinta";
-  if (
-    ["rejected", "cancelled", "canceled", "atmesta", "atšaukta"].includes(raw)
-  )
-    return "Atmesta";
-  return "Laukia patvirtinimo";
-}
-
-function vacationScheduleStatus(type?: string | null) {
-  const meta = absenceTypeMeta(type);
-  if (meta.value === "temporary_leave") return null;
-  if (meta.value === "unpaid") return "UNPAID_LEAVE";
-  if (meta.value === "mother_day") return "MOTHER_DAY";
-  if (meta.value === "father_day") return "FATHER_DAY";
-  if (meta.value === "sick") return "SICK";
-  return "VACATION";
 }
 
 function isExpiring(value?: string | null) {
   if (!value) return false;
+
   const date = new Date(`${value}T00:00:00`);
-  const limit = addDays(new Date(), 45);
+  const limit = new Date();
+  limit.setDate(limit.getDate() + 45);
+
   return date <= limit;
 }
 
-function maskReferenceNo(value: string) {
-  const clean = String(value || "").replace(/\s+/g, "");
-  if (!clean) return "";
-  return `****${clean.slice(-4)}`;
+function candidateName(candidate: Candidate) {
+  return [candidate.first_name, candidate.last_name].filter(Boolean).join(" ").trim() || candidate.email || "Kandidatas";
 }
 
-function hasSensitiveWords(value: string) {
-  const text = String(value || "").toLowerCase();
-  const blocked = [
-    "diagnoz",
-    "liga",
-    "teist",
-    "relig",
-    "polit",
-    "partija",
-    "profesinė sąjunga",
-    "profsąjunga",
-    "orientacija",
-    "sveikatos istorija",
-  ];
-  return blocked.some((word) => text.includes(word));
+function employeeProfilePhone(profile: Partial<Employee>) {
+  return typeof profile.phone === "string" ? profile.phone : null;
 }
 
-function verificationStatusLabel(status: string) {
-  if (status === "ok") return "Patikrinta";
-  if (status === "expiring") return "Greitai baigsis";
-  if (status === "expired") return "Pasibaigė";
-  if (status === "missing") return "Trūksta";
-  return status;
-}
-
-function calculateTrainingExpiry(
-  completedAt: string,
-  validMonths?: number | null,
-) {
-  if (!completedAt || !validMonths) return "";
-  const date = new Date(`${completedAt}T00:00:00`);
-  date.setMonth(date.getMonth() + Number(validMonths));
-  return date.toISOString().slice(0, 10);
-}
-
-function isUuid(value?: string | null) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    String(value || ""),
-  );
-}
-
-function trainingStatusLabel(status: string) {
-  if (status === "valid") return "Galioja";
-  if (status === "expiring") return "Greitai baigsis";
-  if (status === "expired") return "Pasibaigė";
-  if (status === "missing") return "Trūksta";
-  return status;
-}
-
-function trainingStatusStyle(status: string) {
-  if (status === "valid") return styles.statusGood;
-  if (status === "expiring") return styles.statusWarn;
-  if (status === "expired") return styles.statusBad;
-  if (status === "missing") return styles.statusBad;
-  return styles.badge;
-}
-
-function normalizePosition(value?: string | null) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
-
-function normalizeTrainingKey(value?: string | null) {
-  return String(value || "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
-}
-
-function requirementMatchesEmployee(position: string, employee: Employee) {
-  const req = normalizePosition(position);
-  if (!req || req === "visi" || req === "all") return true;
-
-  const employeeText = [
-    employee.position,
-    employee.role,
-    employee.legacy_role,
-    employee.staff_type,
-    employee.department,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (req.includes("slaug")) return employeeText.includes("slaug");
-  if (req.includes("social")) return employeeText.includes("social");
-  if (req.includes("virtuv") || req.includes("maist"))
-    return employeeText.includes("virtuv") || employeeText.includes("maist");
-  if (req.includes("ūk") || req.includes("uk") || req.includes("techn"))
-    return (
-      employeeText.includes("ūk") ||
-      employeeText.includes("uk") ||
-      employeeText.includes("techn")
-    );
-  if (req.includes("admin")) return employeeText.includes("admin");
-
-  return employeeText.includes(req);
-}
-
-function employeeMap(employees: Employee[]) {
-  return new Map(employees.map((employee) => [employee.user_id, employee]));
-}
-
-function toDateInput(date: Date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 10);
-}
-
-function addMonths(date: Date, amount: number) {
-  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
-}
-
-function monthDays(date: Date) {
-  const start = new Date(date.getFullYear(), date.getMonth(), 1);
-  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  const days: Date[] = [];
-
-  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    days.push(new Date(d));
-  }
-
-  return days;
-}
-
-function monthLabel(date: Date) {
-  return new Intl.DateTimeFormat("lt-LT", {
-    year: "numeric",
-    month: "long",
-  }).format(date);
-}
-
-function scheduleCode(entry?: ScheduleEntry | null) {
-  if (!entry) return "";
-  if (entry.status === "VACATION") return "A";
-  if (entry.status === "UNPAID_LEAVE") return "NA";
-  if (entry.status === "MOTHER_DAY") return "M";
-  if (entry.status === "FATHER_DAY") return "T";
-  if (entry.status === "SICK") return "L";
-  if (entry.status === "OFF") return "P";
-  if (entry.status === "WORK") {
-    const start = entry.start_datetime ? new Date(entry.start_datetime) : null;
-    const end = entry.end_datetime ? new Date(entry.end_datetime) : null;
-
-    if (
-      start &&
-      end &&
-      !Number.isNaN(start.getTime()) &&
-      !Number.isNaN(end.getTime())
-    ) {
-      return `${String(start.getHours()).padStart(2, "0")}-${String(end.getHours()).padStart(2, "0")}`;
-    }
-
-    return "D";
-  }
-
-  return entry.status || "";
-}
-
-function scheduleHours(entry: ScheduleEntry) {
-  if (entry.status !== "WORK" || !entry.start_datetime || !entry.end_datetime)
-    return 0;
-
-  const start = new Date(entry.start_datetime);
-  const end = new Date(entry.end_datetime);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
-
-  let diff = (end.getTime() - start.getTime()) / 3600000;
-  if (diff < 0) diff += 24;
-  return Math.max(0, diff);
-}
-
-function normalizeScheduleCode(value: unknown) {
-  const raw = String(value ?? "")
-    .trim()
-    .toUpperCase();
-
-  if (!raw)
-    return {
-      status: "",
-      start: null as string | null,
-      end: null as string | null,
-    };
-  if (["A", "ATOSTOGOS", "VACATION"].includes(raw))
-    return { status: "VACATION", start: "00:00", end: "23:59" };
-  if (["L", "LIGA", "SICK"].includes(raw))
-    return { status: "SICK", start: "00:00", end: "23:59" };
-  if (["P", "POILSIS", "OFF"].includes(raw))
-    return { status: "OFF", start: "00:00", end: "23:59" };
-  if (["D", "WORK"].includes(raw))
-    return { status: "WORK", start: "08:00", end: "16:00" };
-
-  const match = raw.match(
-    /^(\d{1,2})(?::?(\d{2}))?\s*[-–]\s*(\d{1,2})(?::?(\d{2}))?$/,
-  );
-
-  if (match) {
-    const sh = String(match[1]).padStart(2, "0");
-    const sm = String(match[2] || "00").padStart(2, "0");
-    const eh = String(match[3]).padStart(2, "0");
-    const em = String(match[4] || "00").padStart(2, "0");
-    return { status: "WORK", start: `${sh}:${sm}`, end: `${eh}:${em}` };
-  }
-
-  return {
-    status: raw,
-    start: null as string | null,
-    end: null as string | null,
-  };
+function employeeProfileBirthDate(profile: Partial<Employee>) {
+  return normalizeDateInput(profile.birth_date);
 }
 
 export default function TeamPage() {
+  const searchParams = useSearchParams();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentUserName, setCurrentUserName] = useState("HR");
   const [tab, setTab] = useState<TabKey>("overview");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [trainingDetailsEmployeeId, setTrainingDetailsEmployeeId] = useState<
-    string | null
-  >(null);
-  const [trainingEntryEmployee, setTrainingEntryEmployee] =
-    useState<Employee | null>(null);
-  const [trainingEmployeesPage, setTrainingEmployeesPage] = useState(1);
-  const [editForm, setEditForm] = useState({
-    first_name: "",
-    last_name: "",
-    full_name: "",
-    email: "",
-    position: "",
-    department: "",
-    professional_license_number: "",
-    professional_license_valid_until: "",
-    occupational_health_valid_until: "",
-  });
-  const [scheduleMonth, setScheduleMonth] = useState(
-    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-  );
 
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [credentials, setCredentials] = useState<Credential[]>([]);
-  const [trainings, setTrainings] = useState<Training[]>([]);
-  const [trainingCatalog, setTrainingCatalog] = useState<TrainingCatalog[]>([]);
-  const [trainingRequirements, setTrainingRequirements] = useState<
-    TrainingRequirement[]
-  >([]);
-  const [vacations, setVacations] = useState<VacationRequest[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
-  const [documentRequirements, setDocumentRequirements] = useState<
-    DocumentRequirement[]
-  >([]);
-  const [documentVerifications, setDocumentVerifications] = useState<
-    DocumentVerification[]
-  >([]);
-  const [documentAcknowledgements, setDocumentAcknowledgements] = useState<
-    DocumentAcknowledgement[]
-  >([]);
-  const [auditLog, setAuditLog] = useState<AuditLog[]>([]);
-  const [personnelInventory, setPersonnelInventory] = useState<
-    PersonnelInventoryItem[]
-  >([]);
-  const [personnelAssignments, setPersonnelAssignments] = useState<
-    PersonnelInventoryAssignment[]
-  >([]);
-
-  const [credentialForm, setCredentialForm] = useState({
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [vacations, setVacations] = useState<VacationRequest[]>([]);
+  const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
+  const [scheduleMonth, setScheduleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [vacationFilter, setVacationFilter] = useState<VacationFilterKey>("all");
+  const [vacationForm, setVacationForm] = useState<VacationForm>({
     employee_id: "",
-    type: "",
-    number: "",
-    issuer: "",
-    issued_at: "",
-    expires_at: "",
-    note: "",
-  });
-
-  const [trainingForm, setTrainingForm] = useState({
-    employee_id: "",
-    title: "",
-    training_id: "",
-    category: "",
-    hours: "1",
-    provider: "",
-    completed_at: today(),
-    expires_at: "",
-    certificate_no: "",
-    verified_by: "",
-  });
-
-  const [catalogForm, setCatalogForm] = useState({
-    name: "",
-    category: "Visiems darbuotojams",
-    mandatory: true,
-    valid_for_months: "12",
-    hours: "1",
-    applies_to: "VISI",
-  });
-
-  const [trainingRequirementForm, setTrainingRequirementForm] = useState({
-    position: "VISI",
-    training_id: "",
-  });
-
-  const [vacationFilter, setVacationFilter] = useState<
-    "all" | "submitted" | "approved" | "rejected" | "risk" | "history"
-  >("all");
-
-  const [vacationForm, setVacationForm] = useState({
-    employee_id: "",
-    type: "annual",
-    start_date: today(),
-    end_date: today(),
+    type: "annual_leave",
+    start_date: toDateInput(new Date()),
+    end_date: toDateInput(new Date()),
     start_time: "",
     end_time: "",
     note: "",
   });
+  const [trainings, setTrainings] = useState<Training[]>([]);
+  const [credentials, setCredentials] = useState<Credential[]>([]);
 
-  const [candidateForm, setCandidateForm] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone: "",
-    desired_role: "",
-    experience: "",
-    education: "",
-    licenses: "",
-    consent: false,
-  });
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createModalMessage, setCreateModalMessage] = useState("");
+  const [newEmployeeForm, setNewEmployeeForm] = useState<NewEmployeeForm>(initialNewEmployeeForm);
 
-  const [scheduleForm, setScheduleForm] = useState({
-    employee_id: "",
-    date: today(),
-    start_datetime: `${today()}T08:00`,
-    end_datetime: `${today()}T16:00`,
-    status: "WORK",
-    note: "",
-  });
-
-  const [verificationForm, setVerificationForm] = useState({
-    employee_id: "",
-    document_type: "Sveikatos pažyma",
-    evidence_mode: "seen_original",
-    reference_no: "",
-    issuer: "",
-    valid_from: "",
-    valid_until: "",
-    verified_by: "",
-    no_copy_stored: true,
-    seen_confirmed: false,
-    minimal_data_confirmed: false,
-    note: "",
-  });
-
-  const [requirementForm, setRequirementForm] = useState({
-    role: "VISI",
-    document_type: "",
-    validity_months: "12",
-    required: true,
-    retention_note: "",
-  });
-
-  const [inventoryForm, setInventoryForm] = useState({
-    name: "",
-    category: "",
-    serial_no: "",
-    size: "",
-  });
-
-  const [assignmentForm, setAssignmentForm] = useState({
-    employee_id: "",
-    item_id: "",
-    condition_out: "",
-    note: "",
-  });
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
 
   useEffect(() => {
     void loadAll();
   }, []);
 
+  useEffect(() => {
+    if (searchParams.get("newEmployee") === "1") {
+      setCreateModalMessage("");
+      setTab("employees");
+      setShowCreateModal(true);
+    }
+  }, [searchParams]);
+
   async function loadAll() {
+    setLoading(true);
+    setMessage("");
+
     try {
-      setLoading(true);
-      setMessage("");
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) throw userError;
-
-      setCurrentUserId(user?.id || null);
-
-      if (user?.id) {
-        const profileResult = await supabase
-          .from("profiles")
-          .select("full_name, first_name, last_name, email")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (!profileResult.error && profileResult.data) {
-          const profile = profileResult.data as any;
-          const displayName =
-            String(profile.full_name || "").trim() ||
-            [profile.first_name, profile.last_name]
-              .filter(Boolean)
-              .join(" ")
-              .trim() ||
-            profile.email ||
-            "HR";
-
-          setCurrentUserName(displayName);
-        } else {
-          setCurrentUserName("HR");
-        }
-      } else {
-        setCurrentUserName("HR");
-      }
-
       const orgId = await getCurrentOrganizationId();
-      setOrganizationId(orgId);
 
       if (!orgId) {
-        setMessage("Nepavyko nustatyti organizacijos.");
+        setMessage("Nepavyko nustatyti įstaigos.");
+        setLoading(false);
         return;
       }
 
-      const members = await supabase
-        .from("organization_members")
-        .select(
-          "user_id, role, legacy_role, position, department, staff_type, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active",
-        )
-        .eq("organization_id", orgId)
-        .eq("is_active", true);
+      setOrganizationId(orgId);
 
-      if (members.error) throw members.error;
+      const [
+        employeesResult,
+        candidatesResult,
+        invitesResult,
+        trainingsResult,
+        credentialsResult,
+      ] = await Promise.all([
+        supabase
+          .from("organization_members")
+          .select(
+            "user_id, role, legacy_role, position, department, staff_type, contract_number, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
+          )
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("candidates")
+          .select("id, first_name, last_name, email, phone, desired_role, status, experience, notes, created_at")
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("organization_invites")
+          .select("id, email, role, status, created_at")
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("personnel_trainings")
+          .select("id, employee_id, title, completed_at, expires_at, hours")
+          .eq("organization_id", orgId)
+          .order("completed_at", { ascending: false }),
+        supabase
+          .from("personnel_credentials")
+          .select("id, employee_id, type, number, expires_at")
+          .eq("organization_id", orgId)
+          .order("expires_at", { ascending: true }),
+      ]);
 
-      const memberRows = (members.data || []) as any[];
-      const ids = memberRows.map((row) => row.user_id).filter(Boolean);
+      if (employeesResult.error) throw employeesResult.error;
 
-      let profileMap = new Map<string, any>();
+      const memberRows = ((employeesResult.data as Employee[]) || []).map((employee) => ({
+        ...employee,
+        extra_permissions: normalizeExtraPermissions(employee.extra_permissions),
+      }));
 
-      if (ids.length > 0) {
-        const profiles = await supabase
+      const userIds = memberRows.map((employee) => employee.user_id).filter(Boolean);
+      let profileMap = new Map<string, Partial<Employee>>();
+
+      if (userIds.length > 0) {
+        let profilesResult = await supabase
           .from("profiles")
-          .select("id, email, first_name, last_name, full_name")
-          .in("id", ids);
+          .select("id, email, first_name, last_name, full_name, phone, birth_date")
+          .in("id", userIds);
 
-        if (!profiles.error) {
+        if (profilesResult.error) {
+          profilesResult = await supabase
+            .from("profiles")
+            .select("id, email, first_name, last_name, full_name")
+            .in("id", userIds);
+        }
+
+        if (!profilesResult.error) {
           profileMap = new Map(
-            (profiles.data || []).map((profile: any) => [profile.id, profile]),
+            ((profilesResult.data as Array<Partial<Employee> & { id: string }>) || []).map((profile) => [
+              profile.id,
+              {
+                email: profile.email || null,
+                first_name: profile.first_name || null,
+                last_name: profile.last_name || null,
+                full_name: profile.full_name || null,
+                phone: employeeProfilePhone(profile),
+                birth_date: employeeProfileBirthDate(profile),
+              },
+            ]),
           );
         }
       }
 
-      const employeeRows: Employee[] = memberRows.map((member) => {
-        const profile = profileMap.get(member.user_id) || {};
+      setEmployees(
+        memberRows.map((employee) => {
+          const profile = profileMap.get(employee.user_id) || {};
 
-        return {
-          ...member,
-          email: profile.email || null,
-          first_name: profile.first_name || null,
-          last_name: profile.last_name || null,
-          full_name: profile.full_name || null,
-        };
-      });
-
-      setEmployees(employeeRows);
-
-      await Promise.all([
-        safeLoad("personnel_credentials", setCredentials, orgId, "expires_at"),
-        safeLoad("personnel_trainings", setTrainings, orgId, "completed_at"),
-        safeLoad("training_catalog", setTrainingCatalog, orgId, "name"),
-        safeLoad(
-          "position_training_requirements",
-          setTrainingRequirements,
-          orgId,
-          "position",
-        ),
-        safeLoad(
-          "personnel_vacation_requests",
-          setVacations,
-          orgId,
-          "created_at",
-        ),
-        safeLoad("personnel_candidates", setCandidates, orgId, "created_at"),
-        safeLoad("personnel_schedule_entries", setSchedule, orgId, "date"),
-        safeLoad(
-          "document_requirements",
-          setDocumentRequirements,
-          orgId,
-          "sort_order",
-        ),
-        safeLoad(
-          "document_verifications",
-          setDocumentVerifications,
-          orgId,
-          "verified_at",
-        ),
-        safeLoad(
-          "personnel_document_acknowledgements",
-          setDocumentAcknowledgements,
-          orgId,
-          "assigned_at",
-        ),
-        safeLoad("audit_log", setAuditLog, orgId, "created_at"),
-        safeLoad(
-          "personnel_inventory_items",
-          setPersonnelInventory,
-          orgId,
-          "name",
-        ),
-        safeLoad(
-          "personnel_inventory_assignments",
-          setPersonnelAssignments,
-          orgId,
-          "assigned_at",
-        ),
-      ]);
-
-      if (!credentialForm.employee_id && employeeRows[0]?.user_id) {
-        const first = employeeRows[0].user_id;
-        setCredentialForm((prev) => ({ ...prev, employee_id: first }));
-        setTrainingForm((prev) => ({ ...prev, employee_id: first }));
-        setVacationForm((prev) => ({ ...prev, employee_id: first }));
-        setScheduleForm((prev) => ({ ...prev, employee_id: first }));
-        setVerificationForm((prev) => ({ ...prev, employee_id: first }));
-        setAssignmentForm((prev) => ({ ...prev, employee_id: first }));
-      }
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Nepavyko užkrauti personalo modulio.",
+          return {
+            ...employee,
+            email: String(profile.email || employee.email || "").trim() || employee.email || null,
+            first_name: String(profile.first_name || employee.first_name || "").trim() || employee.first_name || null,
+            last_name: String(profile.last_name || employee.last_name || "").trim() || employee.last_name || null,
+            full_name:
+              String(profile.full_name || employee.full_name || "").trim() ||
+              [profile.first_name || employee.first_name, profile.last_name || employee.last_name]
+                .filter(Boolean)
+                .join(" ")
+                .trim() ||
+              employee.full_name ||
+              null,
+            phone: String(profile.phone || employee.phone || "").trim() || employee.phone || null,
+            birth_date: String(profile.birth_date || employee.birth_date || "").trim() || employee.birth_date || null,
+          };
+        }),
       );
+      if (!candidatesResult.error) setCandidates((candidatesResult.data as Candidate[]) || []);
+      if (!invitesResult.error) setInvites((invitesResult.data as Invite[]) || []);
+
+      const vacationResult = await supabase
+        .from("vacation_requests")
+        .select("id, employee_id, type, start_date, end_date, status, requested_days, note, created_at")
+        .eq("organization_id", orgId)
+        .order("created_at", { ascending: false });
+
+      if (!vacationResult.error) {
+        setVacations(((vacationResult.data as VacationRequest[]) || []).map((request) => ({
+          ...request,
+          start_date: request.start_date || toDateInput(new Date()),
+          end_date: request.end_date || request.start_date || toDateInput(new Date()),
+          status: request.status || "submitted",
+        })));
+      } else {
+        setVacations([]);
+      }
+
+      const scheduleResult = await supabase
+        .from("work_schedule_entries")
+        .select("id, employee_id, date, start_datetime, end_datetime, status, note")
+        .eq("organization_id", orgId)
+        .gte("date", toDateInput(new Date(scheduleMonth.getFullYear(), scheduleMonth.getMonth(), 1)))
+        .lte("date", toDateInput(new Date(scheduleMonth.getFullYear(), scheduleMonth.getMonth() + 1, 0)));
+
+      if (!scheduleResult.error) {
+        setScheduleEntries((scheduleResult.data as ScheduleEntry[]) || []);
+      } else {
+        setScheduleEntries([]);
+      }
+
+      if (!trainingsResult.error) setTrainings((trainingsResult.data as Training[]) || []);
+      if (!credentialsResult.error) setCredentials((credentialsResult.data as Credential[]) || []);
+    } catch (error) {
+      const readable = getReadableError(error);
+
+      if (readable.includes("extra_permissions")) {
+        setMessage("Trūksta DB stulpelio `extra_permissions`. Paleisk SQL: alter table organization_members add column if not exists extra_permissions jsonb default '[]'::jsonb;");
+      } else {
+        setMessage(readable);
+      }
     } finally {
       setLoading(false);
     }
   }
 
-  async function safeLoad(
-    table: string,
-    setter: (rows: any[]) => void,
-    orgId: string,
-    orderColumn: string,
-  ) {
-    const result = await supabase
-      .from(table)
-      .select("*")
-      .eq("organization_id", orgId)
-      .order(orderColumn, { ascending: false });
-
-    if (result.error) {
-      if (table === "personnel_trainings") {
-        setMessage(`Nepavyko nuskaityti mokymu irasu: ${result.error.message}`);
-      }
-      setter([]);
-      return;
-    }
-
-    setter(result.data || []);
-  }
-
-  const map = useMemo(() => employeeMap(employees), [employees]);
-
-  const filteredEmployees = useMemo(() => {
-    const q = query.trim().toLowerCase();
-
-    return employees.filter((employee) => {
-      const text = [
-        employeeName(employee),
-        employee.email,
-        employeeRole(employee),
-        employee.department,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return !q || text.includes(q);
-    });
-  }, [employees, query]);
-
-  const expiringCredentials = useMemo(() => {
-    const fromMember = employees
-      .flatMap((employee) => [
-        employee.occupational_health_valid_until
-          ? {
-              employee_id: employee.user_id,
-              type: "Sveikatos pažyma",
-              number: "—",
-              issuer: "—",
-              issued_at: null,
-              expires_at: employee.occupational_health_valid_until,
-              note: "Iš darbuotojo kortelės",
-              id: `health-${employee.user_id}`,
-            }
-          : null,
-        employee.professional_license_valid_until
-          ? {
-              employee_id: employee.user_id,
-              type: "Profesinė licencija",
-              number: employee.professional_license_number || "—",
-              issuer: "—",
-              issued_at: null,
-              expires_at: employee.professional_license_valid_until,
-              note: "Iš darbuotojo kortelės",
-              id: `license-${employee.user_id}`,
-            }
-          : null,
-      ])
-      .filter(Boolean) as Credential[];
-
-    return [...credentials, ...fromMember]
-      .filter((item) => isExpiring(item.expires_at))
-      .sort((a, b) =>
-        String(a.expires_at || "").localeCompare(String(b.expires_at || "")),
-      )
-      .slice(0, 10);
-  }, [credentials, employees]);
-
-  const pendingVacations = vacations.filter(
-    (item) => item.status === "submitted",
-  );
-  const activeSchedule = schedule
-    .filter((item) => item.date >= today())
-    .slice(0, 10);
-
-  const verificationSummary = useMemo(() => {
-    const rows: Array<{
-      employee: Employee;
-      document_type: string;
-      status: "ok" | "missing" | "expiring" | "expired";
-      valid_until: string | null;
-      verified_by: string | null;
-      no_copy_stored: boolean;
-    }> = [];
-
-    const requirements = documentRequirements.length
-      ? documentRequirements
-      : [
-          {
-            id: "default-health",
-            role: "VISI",
-            document_type: "Sveikatos pažyma",
-            required: true,
-            collect_copy_allowed: false,
-            retention_note: "Kopija nesaugoma",
-            sort_order: 1,
-          },
-          {
-            id: "default-license",
-            role: "SLAUGYTOJAI",
-            document_type: "Profesinė licencija",
-            required: true,
-            collect_copy_allowed: false,
-            retention_note: "Kopija nesaugoma",
-            sort_order: 2,
-          },
-        ];
-
-    for (const employee of employees) {
-      for (const requirement of requirements) {
-        const employeeRoleText = [
-          employeeRole(employee),
-          employee.staff_type,
-          employee.position,
-        ]
-          .join(" ")
-          .toLowerCase();
-        const role = String(requirement.role || "VISI").toLowerCase();
-
-        if (
-          role !== "visi" &&
-          !employeeRoleText.includes(
-            role
-              .replace("slaugytojai", "slaug")
-              .replace("socialiniai", "social"),
-          )
-        )
-          continue;
-
-        const latest = [...documentVerifications]
-          .filter(
-            (verification) =>
-              verification.employee_id === employee.user_id &&
-              verification.document_type === requirement.document_type,
-          )
-          .sort((a, b) =>
-            String(b.verified_at || "").localeCompare(
-              String(a.verified_at || ""),
-            ),
-          )[0];
-
-        if (!latest) {
-          rows.push({
-            employee,
-            document_type: requirement.document_type,
-            status: "missing",
-            valid_until: null,
-            verified_by: null,
-            no_copy_stored: true,
-          });
-          continue;
-        }
-
-        let status: "ok" | "missing" | "expiring" | "expired" = "ok";
-
-        if (latest.valid_until) {
-          const validUntil = new Date(`${latest.valid_until}T00:00:00`);
-          const now = new Date();
-          const limit = addDays(now, 45);
-
-          if (validUntil < now) status = "expired";
-          else if (validUntil <= limit) status = "expiring";
-        }
-
-        rows.push({
-          employee,
-          document_type: requirement.document_type,
-          status,
-          valid_until: latest.valid_until || null,
-          verified_by: latest.verified_by || null,
-          no_copy_stored: Boolean(latest.no_copy_stored),
-        });
-      }
-    }
-
-    return rows;
-  }, [employees, documentRequirements, documentVerifications]);
-
-  const missingDocuments = verificationSummary.filter(
-    (row) => row.status === "missing",
-  ).length;
-  const expiringVerifiedDocuments = verificationSummary.filter(
-    (row) => row.status === "expiring" || row.status === "expired",
-  ).length;
-
-  const effectiveTrainingCatalog = useMemo<TrainingCatalog[]>(() => {
-    if (trainingCatalog.length) return trainingCatalog;
-
-    return [
-      {
-        id: "default-work-safety",
-        name: "Darbų sauga",
-        category: "Visiems darbuotojams",
-        mandatory: true,
-        valid_for_months: 12,
-        hours: 2,
-        applies_to: "VISI",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-fire-safety",
-        name: "Gaisrinė sauga",
-        category: "Visiems darbuotojams",
-        mandatory: true,
-        valid_for_months: 12,
-        hours: 1,
-        applies_to: "VISI",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-bdar",
-        name: "BDAR",
-        category: "Visiems darbuotojams",
-        mandatory: true,
-        valid_for_months: 12,
-        hours: 1,
-        applies_to: "VISI",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-violence",
-        name: "Smurto prevencija",
-        category: "Visiems darbuotojams",
-        mandatory: true,
-        valid_for_months: 12,
-        hours: 2,
-        applies_to: "VISI",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-infection",
-        name: "Infekcijų kontrolė",
-        category: "Visiems darbuotojams",
-        mandatory: true,
-        valid_for_months: 12,
-        hours: 2,
-        applies_to: "VISI",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-first-aid",
-        name: "Pirmoji pagalba",
-        category: "Visiems darbuotojams",
-        mandatory: true,
-        valid_for_months: 24,
-        hours: 4,
-        applies_to: "VISI",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-social-160",
-        name: "160 val. įvadiniai mokymai",
-        category: "Socialinė sritis",
-        mandatory: true,
-        valid_for_months: 0,
-        hours: 160,
-        applies_to: "SOCIALINIAI",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-supervision",
-        name: "Supervizijos / intervizijos",
-        category: "Socialinė sritis",
-        mandatory: true,
-        valid_for_months: 12,
-        hours: 8,
-        applies_to: "SOCIALINIAI",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-license-support",
-        name: "Profesinės licencijos palaikymas",
-        category: "Sveikatos priežiūra",
-        mandatory: true,
-        valid_for_months: 12,
-        hours: 4,
-        applies_to: "SLAUGYTOJAI",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-hygiene",
-        name: "Higienos mokymai",
-        category: "Maisto blokas",
-        mandatory: true,
-        valid_for_months: 24,
-        hours: 2,
-        applies_to: "MAISTO BLOKAS",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-food",
-        name: "Maisto sauga",
-        category: "Maisto blokas",
-        mandatory: true,
-        valid_for_months: 12,
-        hours: 2,
-        applies_to: "MAISTO BLOKAS",
-        reminder_30: true,
-        reminder_7: true,
-      },
-      {
-        id: "default-info-security",
-        name: "Informacijos sauga",
-        category: "Administracija",
-        mandatory: true,
-        valid_for_months: 12,
-        hours: 1,
-        applies_to: "ADMINISTRACIJA",
-        reminder_30: true,
-        reminder_7: true,
-      },
-    ];
-  }, [trainingCatalog]);
-
-  const trainingCompliance = useMemo<TrainingComplianceRow[]>(() => {
-    const rows: TrainingComplianceRow[] = [];
-    const now = new Date();
-    const expiringLimit = addDays(now, 30);
-
-    for (const employee of employees) {
-      const requirements = effectiveTrainingCatalog.filter((training) => {
-        const explicitRequirement = trainingRequirements.find(
-          (req) =>
-            req.training_id === training.id &&
-            requirementMatchesEmployee(req.position, employee),
-        );
-        if (explicitRequirement) return Boolean(explicitRequirement.required);
-        return requirementMatchesEmployee(
-          training.applies_to || "VISI",
-          employee,
-        );
-      });
-
-      for (const requiredTraining of requirements) {
-        const matching = [...trainings]
-          .filter((item) => {
-            const sameCatalog =
-              (item as any).training_id &&
-              (item as any).training_id === requiredTraining.id;
-            const currentTitle = normalizeTrainingKey(item.title);
-            const requiredTitle = normalizeTrainingKey(requiredTraining.name);
-            const sameName =
-              currentTitle === requiredTitle ||
-              currentTitle.includes(requiredTitle) ||
-              requiredTitle.includes(currentTitle);
-            return (
-              item.employee_id === employee.user_id && (sameCatalog || sameName)
-            );
-          })
-          .sort((a, b) =>
-            String(b.completed_at || "").localeCompare(
-              String(a.completed_at || ""),
-            ),
-          )[0];
-
-        if (!matching) {
-          rows.push({
-            employee,
-            training: requiredTraining,
-            status: "missing",
-            completed_at: null,
-            expires_at: null,
-            hours: Number(requiredTraining.hours || 0),
-            verified_by: null,
-          });
-          continue;
-        }
-
-        let expiresAt = matching.expires_at || "";
-        if (
-          !expiresAt &&
-          matching.completed_at &&
-          requiredTraining.valid_for_months
-        ) {
-          expiresAt = calculateTrainingExpiry(
-            matching.completed_at,
-            requiredTraining.valid_for_months,
-          );
-        }
-
-        let status: TrainingComplianceRow["status"] = "valid";
-
-        if (expiresAt) {
-          const exp = new Date(`${expiresAt}T00:00:00`);
-          if (exp < now) status = "expired";
-          else if (exp <= expiringLimit) status = "expiring";
-        }
-
-        rows.push({
-          employee,
-          training: requiredTraining,
-          status,
-          completed_at: matching.completed_at,
-          expires_at: expiresAt || null,
-          hours: Number(matching.hours || requiredTraining.hours || 0),
-          verified_by: (matching as any).verified_by || currentUserName,
-        });
-      }
-    }
-
-    return rows;
-  }, [
-    currentUserName,
-    employees,
-    trainings,
-    effectiveTrainingCatalog,
-    trainingRequirements,
-  ]);
-
-  const trainingMissing = trainingCompliance.filter(
-    (row) => row.status === "missing",
-  ).length;
-  const trainingExpiring = trainingCompliance.filter(
-    (row) => row.status === "expiring" || row.status === "expired",
-  ).length;
-  const trainingNonCompliantEmployees = new Set(
-    trainingCompliance
-      .filter((row) => row.status !== "valid")
-      .map((row) => row.employee.user_id),
-  ).size;
-  const totalTrainingHours = trainings.reduce(
-    (sum, item) => sum + Number(item.hours || 0),
-    0,
-  );
-
-  const trainingReminders = trainingCompliance
-    .filter((row) => row.status === "expiring" || row.status === "expired")
-    .slice(0, 20);
-
-  const trainingComplianceByEmployee = useMemo(() => {
-    return employees.map((employee) => {
-      const rows = trainingCompliance.filter(
-        (row) => row.employee.user_id === employee.user_id,
-      );
-      const missing = rows.filter((row) => row.status === "missing").length;
-      const expiringOrExpired = rows.filter(
-        (row) => row.status === "expiring" || row.status === "expired",
-      ).length;
-      const totalHours = rows.reduce(
-        (sum, row) => sum + Number(row.hours || 0),
-        0,
-      );
-      const status =
-        missing > 0 ? "missing" : expiringOrExpired > 0 ? "expiring" : "valid";
-
-      return { employee, rows, missing, expiringOrExpired, totalHours, status };
-    });
-  }, [employees, trainingCompliance]);
-
-  const selectedTrainingDetails =
-    trainingComplianceByEmployee.find(
-      (item) => item.employee.user_id === trainingDetailsEmployeeId,
-    ) || null;
-  const editingEmployeeTrainingDetails = editingEmployee
-    ? trainingComplianceByEmployee.find(
-        (item) => item.employee.user_id === editingEmployee.user_id,
-      ) || null
-    : null;
-
-  const TRAINING_EMPLOYEES_PAGE_SIZE = 10;
-  const nonCompliantTrainingEmployees = trainingComplianceByEmployee.filter(
-    (item) => item.status !== "valid",
-  );
-  const trainingEmployeesTotalPages = Math.max(
-    1,
-    Math.ceil(
-      nonCompliantTrainingEmployees.length / TRAINING_EMPLOYEES_PAGE_SIZE,
-    ),
-  );
-  const safeTrainingEmployeesPage = Math.min(
-    trainingEmployeesPage,
-    trainingEmployeesTotalPages,
-  );
-  const paginatedTrainingEmployees = nonCompliantTrainingEmployees.slice(
-    (safeTrainingEmployeesPage - 1) * TRAINING_EMPLOYEES_PAGE_SIZE,
-    safeTrainingEmployeesPage * TRAINING_EMPLOYEES_PAGE_SIZE,
-  );
-
-  function openTrainingEntry(
-    employee: Employee,
-    row?: TrainingComplianceRow,
-    options?: { openModal?: boolean },
-  ) {
-    const catalog = row?.training;
-    const completed = trainingForm.completed_at || today();
-    const shouldOpenModal = options?.openModal ?? true;
-    setMessage("");
-
-    if (shouldOpenModal) {
-      setTrainingEntryEmployee(employee);
-    }
-
-    setTrainingForm((prev) => ({
-      ...prev,
-      employee_id: employee.user_id,
-      training_id: catalog?.id || "",
-      title: catalog?.name || prev.title || "",
-      category: catalog?.category || prev.category || "",
-      hours: String(catalog?.hours || prev.hours || 1),
-      completed_at: completed,
-      expires_at: catalog?.valid_for_months
-        ? calculateTrainingExpiry(completed, catalog.valid_for_months)
-        : prev.expires_at,
-      verified_by: prev.verified_by || currentUserName,
-    }));
-  }
-
-  async function addCredential() {
-    if (!organizationId) return;
-    if (!credentialForm.employee_id || !credentialForm.type.trim()) {
-      setMessage("Pasirink darbuotoją ir įvesk dokumento tipą.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const { error } = await supabase.from("personnel_credentials").insert({
-      organization_id: organizationId,
-      ...credentialForm,
-      number: credentialForm.number || null,
-      issuer: credentialForm.issuer || null,
-      issued_at: credentialForm.issued_at || null,
-      expires_at: credentialForm.expires_at || null,
-      note: credentialForm.note || null,
-    });
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setCredentialForm((prev) => ({
-      ...prev,
-      type: "",
-      number: "",
-      issuer: "",
-      issued_at: "",
-      expires_at: "",
-      note: "",
-    }));
-    await loadAll();
-    setMessage("Dokumentas išsaugotas.");
-  }
-
-  async function addTrainingCatalogItem() {
-    if (!organizationId) return;
-    if (!catalogForm.name.trim()) {
-      setMessage("Įvesk mokymo pavadinimą.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const { data, error } = await supabase
-      .from("training_catalog")
-      .insert({
-        organization_id: organizationId,
-        name: catalogForm.name.trim(),
-        category: catalogForm.category,
-        mandatory: catalogForm.mandatory,
-        valid_for_months: Number(catalogForm.valid_for_months || 0),
-        hours: Number(catalogForm.hours || 0),
-        applies_to: catalogForm.applies_to,
-        reminder_30: true,
-        reminder_7: true,
-      })
-      .select("id")
-      .single();
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setTrainingCatalog((prev) => [
-      ...prev,
-      {
-        id: data.id,
-        name: catalogForm.name.trim(),
-        category: catalogForm.category,
-        mandatory: catalogForm.mandatory,
-        valid_for_months: Number(catalogForm.valid_for_months || 0),
-        hours: Number(catalogForm.hours || 0),
-        applies_to: catalogForm.applies_to,
-        reminder_30: true,
-        reminder_7: true,
-      },
-    ]);
-
-    setCatalogForm((prev) => ({ ...prev, name: "" }));
-    setMessage("Mokymas pridėtas į katalogą.");
-  }
-
-  async function addTrainingRequirement() {
-    if (!organizationId) return;
-    if (
-      !trainingRequirementForm.training_id ||
-      !trainingRequirementForm.position.trim()
-    ) {
-      setMessage("Pasirink mokymą ir pareigybę.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const { error } = await supabase
-      .from("position_training_requirements")
-      .insert({
-        organization_id: organizationId,
-        position: trainingRequirementForm.position.trim(),
-        training_id: trainingRequirementForm.training_id,
-        required: true,
-      });
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setTrainingRequirementForm((prev) => ({ ...prev, training_id: "" }));
-    await loadAll();
-    setMessage("Pareigybės mokymo reikalavimas pridėtas.");
-  }
-
-  async function addTraining(employeeIdOverride?: string) {
-    if (!organizationId) return false;
-
-    const employeeId = employeeIdOverride || trainingForm.employee_id;
-
-    if (!employeeId || !trainingForm.title.trim()) {
-      setMessage("Pasirink darbuotoją ir įvesk mokymų pavadinimą.");
-      return false;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const selectedCatalog = effectiveTrainingCatalog.find(
-      (item) => item.id === trainingForm.training_id,
-    );
-    const calculatedExpiry =
-      trainingForm.expires_at ||
-      (trainingForm.completed_at && selectedCatalog?.valid_for_months
-        ? calculateTrainingExpiry(
-            trainingForm.completed_at,
-            selectedCatalog.valid_for_months,
-          )
-        : "");
-    const normalizedHours = Math.max(
-      1,
-      Number(trainingForm.hours || selectedCatalog?.hours || 1),
-    );
-
-    const payload: any = {
-      organization_id: organizationId,
-      employee_id: employeeId,
-      title: selectedCatalog?.name || trainingForm.title.trim(),
-      hours: normalizedHours,
-      category: selectedCatalog?.category || trainingForm.category || null,
-      provider: trainingForm.provider || null,
-      completed_at: trainingForm.completed_at || null,
-      expires_at: calculatedExpiry || null,
-      certificate_no: trainingForm.certificate_no || null,
-      mandatory: true,
-      verified: true,
-      verified_by: trainingForm.verified_by || currentUserName,
-    };
-
-    if (isUuid(trainingForm.training_id)) {
-      payload.training_id = trainingForm.training_id;
-    }
-
-    const { error } = await supabase
-      .from("personnel_trainings")
-      .insert(payload);
-
-    setSaving(false);
-
-    if (error) {
-      if (error.message.toLowerCase().includes("row-level security")) {
-        setMessage(
-          "Nepakanka teisiu issaugoti mokymus. Reikia pataisyti Supabase personnel_trainings INSERT policy.",
-        );
-      } else {
-        setMessage(error.message);
-      }
-      return false;
-    }
-
-    setTrainings((prev) => [
-      { id: "local-" + String(Date.now()), ...payload } as Training,
-      ...prev,
-    ]);
-
-    setTrainingForm((prev) => ({
-      ...prev,
-      employee_id: employeeIdOverride ? employeeIdOverride : prev.employee_id,
-      title: "",
-      training_id: "",
-      category: "",
-      hours: "1",
-      provider: "",
-      completed_at: today(),
-      certificate_no: "",
-      expires_at: "",
-      verified_by: currentUserName,
-    }));
-    await loadAll();
-    setMessage("Mokymai išsaugoti ir priskirti darbuotojui.");
-    return true;
-  }
-
-  async function addVacation() {
-    if (!organizationId) return;
-    if (!vacationForm.employee_id || !vacationForm.start_date) {
-      setMessage("Pasirink darbuotoją ir datą.");
-      return;
-    }
-
-    const isTemporary = vacationForm.type === "temporary_leave";
-    const endDate = isTemporary
-      ? vacationForm.start_date
-      : vacationForm.end_date;
-
-    if (!isTemporary && endDate < vacationForm.start_date) {
-      setMessage("Pabaigos data negali būti ankstesnė už pradžią.");
-      return;
-    }
-
-    if (isTemporary && (!vacationForm.start_time || !vacationForm.end_time)) {
-      setMessage("Trumpam išvykimui nurodyk laiką nuo–iki.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const note = isTemporary
-      ? `${vacationForm.start_time}-${vacationForm.end_time}${vacationForm.note ? ` · ${vacationForm.note}` : ""}`
-      : vacationForm.note || null;
-
-    const { error } = await supabase
-      .from("personnel_vacation_requests")
-      .insert({
-        organization_id: organizationId,
-        employee_id: vacationForm.employee_id,
-        type: vacationForm.type,
-        start_date: vacationForm.start_date,
-        end_date: endDate,
-        status: "submitted",
-        requested_days: isTemporary
-          ? 0
-          : daysBetween(vacationForm.start_date, endDate),
-        note,
-      });
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setVacationForm((prev) => ({
-      ...prev,
-      note: "",
-      start_time: "",
-      end_time: "",
-    }));
-    await loadAll();
-    setMessage("Prašymas pateiktas.");
-  }
-
-  async function approveVacation(id: string) {
-    setSaving(true);
-    setMessage("");
-
-    const request = vacations.find((item) => item.id === id);
-
-    const { error } = await supabase
-      .from("personnel_vacation_requests")
-      .update({
-        status: "approved",
-        decision_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (!error && request && organizationId) {
-      const scheduleStatus = vacationScheduleStatus(request.type);
-      if (!scheduleStatus) {
-        setSaving(false);
-        await loadAll();
-        setMessage(
-          "Trumpas išvykimas patvirtintas kaip vidinė informacija. Tabelis nepakeistas.",
-        );
-        return;
-      }
-
-      const rows = Array.from({
-        length: daysBetween(request.start_date, request.end_date),
-      }).map((_, index) => {
-        const date = new Date(`${request.start_date}T00:00:00`);
-        date.setDate(date.getDate() + index);
-        const day = date.toISOString().slice(0, 10);
-
-        return {
-          organization_id: organizationId,
-          employee_id: request.employee_id,
-          date: day,
-          start_datetime: `${day}T00:00`,
-          end_datetime: `${day}T23:59`,
-          status: scheduleStatus,
-          note: `${absenceTypeMeta(request.type).label} (${absenceTypeMeta(request.type).code})`,
-        };
-      });
-
-      await supabase.from("personnel_schedule_entries").insert(rows);
-    }
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    await loadAll();
-    setMessage("Atostogos patvirtintos ir įrašytos į grafiką.");
-  }
-
-  async function rejectVacation(id: string) {
-    setSaving(true);
-    setMessage("");
-
-    const { error } = await supabase
-      .from("personnel_vacation_requests")
-      .update({
-        status: "rejected",
-        decision_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    await loadAll();
-    setMessage("Prašymas atmestas.");
-  }
-
-  async function addCandidate() {
-    if (!organizationId) return;
-
-    if (!candidateForm.first_name.trim() || !candidateForm.last_name.trim()) {
-      setMessage("Įvesk kandidato vardą ir pavardę.");
-      return;
-    }
-
-    if (!candidateForm.consent) {
-      setMessage("Būtinas kandidato sutikimas dėl duomenų tvarkymo.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const { error } = await supabase.from("personnel_candidates").insert({
-      organization_id: organizationId,
-      first_name: candidateForm.first_name.trim(),
-      last_name: candidateForm.last_name.trim(),
-      email: candidateForm.email || null,
-      phone: candidateForm.phone || null,
-      desired_role: candidateForm.desired_role || null,
-      experience: candidateForm.experience || null,
-      education: candidateForm.education || null,
-      licenses: candidateForm.licenses || null,
-      consent: true,
-      status: "new",
-    });
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setCandidateForm({
-      first_name: "",
-      last_name: "",
-      email: "",
-      phone: "",
-      desired_role: "",
-      experience: "",
-      education: "",
-      licenses: "",
-      consent: false,
-    });
-    await loadAll();
-    setMessage("Kandidatas pridėtas.");
-  }
-
-  async function addSchedule() {
-    if (!organizationId) return;
-    if (
-      !scheduleForm.employee_id ||
-      !scheduleForm.date ||
-      !scheduleForm.start_datetime ||
-      !scheduleForm.end_datetime
-    ) {
-      setMessage("Pasirink darbuotoją ir pamainos laikus.");
-      return;
-    }
-
-    if (scheduleForm.end_datetime <= scheduleForm.start_datetime) {
-      setMessage("Pabaigos laikas turi būti vėlesnis už pradžios laiką.");
-      return;
-    }
-
-    const duration =
-      (new Date(scheduleForm.end_datetime).getTime() -
-        new Date(scheduleForm.start_datetime).getTime()) /
-      36e5;
-
-    if (duration > 12) {
-      setMessage("Pamaina negali būti ilgesnė nei 12 val.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const { error } = await supabase.from("personnel_schedule_entries").insert({
-      organization_id: organizationId,
-      ...scheduleForm,
-      note: scheduleForm.note || null,
-    });
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    await loadAll();
-    setMessage("Pamaina įrašyta.");
-  }
-
-  async function writeAudit(
-    action: string,
-    entityType: string,
-    entityId: string | null,
-    details: string,
-  ) {
-    if (!organizationId) return;
-
-    await supabase.from("audit_log").insert({
-      organization_id: organizationId,
-      actor: "Administratorius",
-      action,
-      entity_type: entityType,
-      entity_id: entityId,
-      details,
-    });
-  }
-
-  async function addDocumentRequirement() {
-    if (!organizationId) return;
-    if (!requirementForm.document_type.trim()) {
-      setMessage("Įvesk dokumento tipą.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const { data, error } = await supabase
-      .from("document_requirements")
-      .insert({
-        organization_id: organizationId,
-        role: requirementForm.role,
-        document_type: requirementForm.document_type.trim(),
-        required: true,
-        collect_copy_allowed: false,
-        retention_note:
-          requirementForm.retention_note ||
-          "Patvirtinu, kad dokumento kopija sistemoje nesaugoma.",
-        sort_order: documentRequirements.length + 1,
-      })
-      .select("id")
-      .single();
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    await writeAudit(
-      "document_requirement_created",
-      "document_requirement",
-      data?.id || null,
-      requirementForm.document_type,
-    );
-    setRequirementForm({
-      role: "VISI",
-      document_type: "",
-      validity_months: "12",
-      required: true,
-      retention_note: "",
-    });
-    await loadAll();
-    setMessage("Dokumento reikalavimas pridėtas.");
-  }
-
-  async function addDocumentVerification() {
-    if (!organizationId) return;
-
-    if (
-      !verificationForm.employee_id ||
-      !verificationForm.document_type.trim()
-    ) {
-      setMessage("Pasirink darbuotoją ir dokumento tipą.");
-      return;
-    }
-
-    if (
-      !verificationForm.seen_confirmed ||
-      !verificationForm.no_copy_stored ||
-      !verificationForm.minimal_data_confirmed
-    ) {
-      setMessage("Pažymėk visus BDAR patvirtinimus.");
-      return;
-    }
-
-    if (hasSensitiveWords(verificationForm.note)) {
-      setMessage(
-        "Pastaboje yra perteklinių / jautrių duomenų. Įrašyk tik būtiną administracinę informaciją.",
-      );
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const { data, error } = await supabase
-      .from("document_verifications")
-      .insert({
-        organization_id: organizationId,
-        employee_id: verificationForm.employee_id,
-        document_type: verificationForm.document_type.trim(),
-        evidence_mode: verificationForm.evidence_mode,
-        reference_no_masked: maskReferenceNo(verificationForm.reference_no),
-        issuer: verificationForm.issuer || null,
-        valid_from: verificationForm.valid_from || null,
-        valid_until: verificationForm.valid_until || null,
-        result: "verified",
-        verified_by: verificationForm.verified_by || "Administratorius",
-        no_copy_stored: true,
-        legal_basis:
-          "Darbo santykių administravimas / teisės aktų reikalavimai",
-        note: verificationForm.note || null,
-      })
-      .select("id")
-      .single();
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    await writeAudit(
-      "document_verified_no_copy",
-      "document_verification",
-      data?.id || null,
-      `${verificationForm.document_type} / kopija nesaugoma`,
-    );
-    setVerificationForm((prev) => ({
-      ...prev,
-      reference_no: "",
-      issuer: "",
-      valid_from: "",
-      valid_until: "",
-      note: "",
-      seen_confirmed: false,
-      minimal_data_confirmed: false,
-    }));
-    await loadAll();
-    setMessage(
-      "Dokumento patikrinimas užregistruotas. Kopija sistemoje nesaugoma.",
-    );
-  }
-
-  async function addPersonnelInventoryItem() {
-    if (!organizationId) return;
-    if (!inventoryForm.name.trim()) {
-      setMessage("Įvesk daikto pavadinimą.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const { error } = await supabase.from("personnel_inventory_items").insert({
-      organization_id: organizationId,
-      name: inventoryForm.name.trim(),
-      category: inventoryForm.category || null,
-      serial_no: inventoryForm.serial_no || null,
-      size: inventoryForm.size || null,
-      status: "available",
-    });
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setInventoryForm({ name: "", category: "", serial_no: "", size: "" });
-    await loadAll();
-    setMessage("Daiktas pridėtas.");
-  }
-
-  async function assignPersonnelInventoryItem() {
-    if (!organizationId) return;
-    if (!assignmentForm.employee_id || !assignmentForm.item_id) {
-      setMessage("Pasirink darbuotoją ir daiktą.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const { error } = await supabase
-      .from("personnel_inventory_assignments")
-      .insert({
-        organization_id: organizationId,
-        employee_id: assignmentForm.employee_id,
-        item_id: assignmentForm.item_id,
-        assigned_at: today(),
-        condition_out: assignmentForm.condition_out || null,
-        note: assignmentForm.note || null,
-      });
-
-    if (!error) {
-      await supabase
-        .from("personnel_inventory_items")
-        .update({ status: "assigned" })
-        .eq("id", assignmentForm.item_id);
-    }
-
-    setSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setAssignmentForm((prev) => ({
-      ...prev,
-      item_id: "",
-      condition_out: "",
-      note: "",
-    }));
-    await loadAll();
-    setMessage("Daiktas priskirtas darbuotojui.");
-  }
-
-  const scheduleDays = useMemo(() => monthDays(scheduleMonth), [scheduleMonth]);
-
-  const scheduleMap = useMemo(() => {
-    const result = new Map<string, ScheduleEntry>();
-
-    for (const item of schedule) {
-      result.set(`${item.employee_id}__${item.date}`, item);
-    }
-
-    return result;
-  }, [schedule]);
-
-  const scheduleGridData = useMemo(() => {
-    return filteredEmployees.map((employee) => [
-      `${employeeName(employee)}\n${employeeRole(employee)}`,
-      ...scheduleDays.map((day) =>
-        scheduleCode(
-          scheduleMap.get(`${employee.user_id}__${toDateInput(day)}`),
-        ),
-      ),
-    ]);
-  }, [filteredEmployees, scheduleDays, scheduleMap]);
-
-  const scheduleNestedHeaders = useMemo(() => {
-    return [
-      [
-        "Darbuotojas",
-        ...scheduleDays.map((day) =>
-          new Intl.DateTimeFormat("lt-LT", { weekday: "short" }).format(day),
-        ),
-      ],
-      [
-        "Darbuotojas",
-        ...scheduleDays.map((day) => String(day.getDate()).padStart(2, "0")),
-      ],
-    ];
-  }, [scheduleDays]);
-
-  const scheduleColumns = useMemo(() => {
-    return [
-      { data: 0, readOnly: true },
-      ...scheduleDays.map(() => ({
-        type: "text",
-        allowInvalid: true,
-      })),
-    ];
-  }, [scheduleDays]);
-
-  const scheduleColWidths = useMemo(
-    () => [260, ...scheduleDays.map(() => 76)],
-    [scheduleDays],
-  );
-
-  const scheduleComplianceRows = useMemo(() => {
-    const monthStart = toDateInput(scheduleDays[0] || scheduleMonth);
-    const monthEnd = toDateInput(
-      scheduleDays[scheduleDays.length - 1] || scheduleMonth,
-    );
-
-    return filteredEmployees.map((employee) => {
-      const employeeEntries = schedule
-        .filter((entry) => entry.employee_id === employee.user_id)
-        .sort((a, b) =>
-          String(a.start_datetime || a.date).localeCompare(
-            String(b.start_datetime || b.date),
-          ),
-        );
-
-      const monthEntries = employeeEntries.filter(
-        (entry) => entry.date >= monthStart && entry.date <= monthEnd,
-      );
-      const plannedHours = monthEntries.reduce(
-        (sum, entry) => sum + scheduleHours(entry),
-        0,
-      );
-
-      let maxSevenDayHours = 0;
-      let maxSevenDayWorkDays = 0;
-
-      for (const day of scheduleDays) {
-        const windowStart = toDateInput(day);
-        const windowEnd = toDateInput(addDays(day, 6));
-        const windowEntries = employeeEntries.filter(
-          (entry) => entry.date >= windowStart && entry.date <= windowEnd,
-        );
-        const windowHours = windowEntries.reduce(
-          (sum, entry) => sum + scheduleHours(entry),
-          0,
-        );
-        const windowWorkDays = new Set(
-          windowEntries
-            .filter((entry) => scheduleHours(entry) > 0)
-            .map((entry) => entry.date),
-        ).size;
-
-        maxSevenDayHours = Math.max(maxSevenDayHours, windowHours);
-        maxSevenDayWorkDays = Math.max(maxSevenDayWorkDays, windowWorkDays);
-      }
-
-      let shortestRestHours: number | null = null;
-      const workEntries = employeeEntries.filter(
-        (entry) =>
-          entry.status === "WORK" && entry.start_datetime && entry.end_datetime,
-      );
-
-      for (let i = 1; i < workEntries.length; i += 1) {
-        const previousEnd = new Date(workEntries[i - 1].end_datetime || "");
-        const nextStart = new Date(workEntries[i].start_datetime || "");
-        if (
-          Number.isNaN(previousEnd.getTime()) ||
-          Number.isNaN(nextStart.getTime())
-        )
-          continue;
-
-        const restHours =
-          (nextStart.getTime() - previousEnd.getTime()) / 3600000;
-        if (restHours >= 0)
-          shortestRestHours =
-            shortestRestHours === null
-              ? restHours
-              : Math.min(shortestRestHours, restHours);
-      }
-
-      const warnings: string[] = [];
-      if (maxSevenDayHours > 52) warnings.push("viršija 52 val. per 7 d.");
-      if (maxSevenDayWorkDays > 6)
-        warnings.push("daugiau nei 6 darbo d. per 7 d.");
-      if (shortestRestHours !== null && shortestRestHours < 11)
-        warnings.push("poilsis tarp pamainų < 11 val.");
-
-      return {
-        employee,
-        plannedHours,
-        maxSevenDayHours,
-        maxSevenDayWorkDays,
-        shortestRestHours,
-        status: warnings.length ? "Reikia tikrinti" : "Gerai",
-        warnings,
-      };
-    });
-  }, [filteredEmployees, schedule, scheduleDays, scheduleMonth]);
-
-  const scheduleWarningRows = useMemo(
-    () => scheduleComplianceRows.filter((row) => row.warnings.length),
-    [scheduleComplianceRows],
-  );
-
   function openEmployeeEditor(employee: Employee) {
-    setTrainingEntryEmployee(null);
-    setTrainingDetailsEmployeeId(null);
     setEditingEmployee(employee);
     setEditForm({
       first_name: employee.first_name || "",
       last_name: employee.last_name || "",
-      full_name: employee.full_name || "",
+      full_name: employee.full_name || employeeName(employee),
       email: employee.email || "",
+      phone: employee.phone || "",
+      birth_date: normalizeDateInput(employee.birth_date),
       position: employee.position || "",
       department: employee.department || "",
+      staff_type: employee.staff_type || "",
+      role: employee.role || "employee",
+      contract_number: employee.contract_number || "",
+      employment_start_date: normalizeDateInput(employee.employment_start_date),
+      termination_date: normalizeDateInput(employee.termination_date),
+      is_archived: employee.is_archived === true,
+      archive_reason: employee.archive_reason || "",
       professional_license_number: employee.professional_license_number || "",
-      professional_license_valid_until:
-        employee.professional_license_valid_until || "",
-      occupational_health_valid_until:
-        employee.occupational_health_valid_until || "",
+      professional_license_valid_until: employee.professional_license_valid_until || "",
+      occupational_health_valid_until: employee.occupational_health_valid_until || "",
+      extra_permissions: normalizeExtraPermissions(employee.extra_permissions),
+      is_active: employee.is_active !== false,
+    });
+  }
+
+  function closeEmployeeEditor() {
+    setEditingEmployee(null);
+    setEditForm(null);
+  }
+
+  async function saveEmployee() {
+    console.log("[TeamPage] saveEmployee called", {
+      organizationId,
+      editingUserId: editingEmployee?.user_id,
+      hasEditForm: Boolean(editForm),
     });
 
-    setCredentialForm((prev) => ({ ...prev, employee_id: employee.user_id }));
-    setTrainingForm((prev) => ({
-      ...prev,
-      employee_id: employee.user_id,
-      title: "",
-      training_id: "",
-      category: "",
-      hours: "1",
-      provider: "",
-      completed_at: today(),
-      expires_at: "",
-      certificate_no: "",
-      verified_by: currentUserName,
-    }));
-  }
-
-  async function saveEmployeeEditor() {
-    if (!editingEmployee || !organizationId) return;
-
-    const cleanFirstName = editForm.first_name.trim();
-    const cleanLastName = editForm.last_name.trim();
-    const cleanFullName =
-      editForm.full_name.trim() ||
-      [cleanFirstName, cleanLastName].filter(Boolean).join(" ").trim();
-    const profilePayload = {
-      first_name: cleanFirstName || null,
-      last_name: cleanLastName || null,
-      full_name: cleanFullName || null,
-    };
-    const previousProfilePayload = {
-      first_name: editingEmployee.first_name || null,
-      last_name: editingEmployee.last_name || null,
-      full_name: editingEmployee.full_name || null,
-    };
-    const memberPayload = {
-      position: editForm.position.trim() || null,
-      department: editForm.department.trim() || null,
-      professional_license_number:
-        editForm.professional_license_number.trim() || null,
-      professional_license_valid_until:
-        editForm.professional_license_valid_until || null,
-      occupational_health_valid_until:
-        editForm.occupational_health_valid_until || null,
-    };
-    const previousMemberPayload = {
-      position: editingEmployee.position || null,
-      department: editingEmployee.department || null,
-      professional_license_number:
-        editingEmployee.professional_license_number || null,
-      professional_license_valid_until:
-        editingEmployee.professional_license_valid_until || null,
-      occupational_health_valid_until:
-        editingEmployee.occupational_health_valid_until || null,
-    };
-
-    try {
-      setSaving(true);
-      setMessage("");
-
-      const profileUpdate = await supabase
-        .from("profiles")
-        .update(profilePayload)
-        .eq("id", editingEmployee.user_id);
-
-      if (profileUpdate.error) {
-        setMessage(profileUpdate.error.message);
-        return;
-      }
-
-      const memberUpdate = await supabase
-        .from("organization_members")
-        .update(memberPayload)
-        .eq("user_id", editingEmployee.user_id)
-        .eq("organization_id", organizationId);
-
-      if (memberUpdate.error) {
-        await supabase
-          .from("profiles")
-          .update(previousProfilePayload)
-          .eq("id", editingEmployee.user_id);
-        setMessage(memberUpdate.error.message);
-        return;
-      }
-
-      await loadAll();
-      setEditingEmployee(null);
-      setMessage("Darbuotojo duomenys išsaugoti.");
-
-      if (typeof window !== "undefined") {
-        window.alert("Darbuotojo duomenys išsaugoti.");
-      }
-    } catch (error) {
-      await supabase
-        .from("organization_members")
-        .update(previousMemberPayload)
-        .eq("user_id", editingEmployee.user_id)
-        .eq("organization_id", organizationId);
-      await supabase
-        .from("profiles")
-        .update(previousProfilePayload)
-        .eq("id", editingEmployee.user_id);
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Nepavyko išsaugoti darbuotojo.",
-      );
-    } finally {
-      setSaving(false);
+    if (!organizationId) {
+      setMessage("Nepavyko nustatyti įstaigos. Perkrauk puslapį arba prisijunk iš naujo.");
+      console.error("[TeamPage] saveEmployee aborted: missing organizationId");
+      return;
     }
-  }
 
-  async function saveScheduleGridChanges(
-    changes: Array<[number, number | string, unknown, unknown]>,
-  ) {
-    if (!organizationId || !changes.length) return;
+    if (!editingEmployee || !editForm) {
+      setMessage("Nepavyko rasti redaguojamo darbuotojo duomenų.");
+      console.error("[TeamPage] saveEmployee aborted: missing editingEmployee or editForm");
+      return;
+    }
+
+    const firstName = editForm.first_name.trim();
+    const lastName = editForm.last_name.trim();
+    const fullName =
+      editForm.full_name.trim() ||
+      [firstName, lastName].filter(Boolean).join(" ").trim();
+
+    if (!firstName || !lastName) {
+      setMessage("Įvesk darbuotojo vardą ir pavardę.");
+      return;
+    }
+
+    if (editForm.birth_date && !isRealBirthDate(editForm.birth_date)) {
+      setMessage("Gimimo data turi būti reali: nuo 1900-01-01 iki šiandienos.");
+      return;
+    }
 
     setSaving(true);
     setMessage("");
 
-    let failedMessage = "";
-
     try {
-      for (const [rowIndex, prop, _oldValue, newValue] of changes) {
-        const colIndex = typeof prop === "number" ? prop : Number(prop);
-        if (!Number.isFinite(colIndex) || colIndex === 0) continue;
+      const memberPayload = removeUndefinedValues({
+        position: editForm.position.trim() || null,
+        department: editForm.department.trim() || null,
+        staff_type: editForm.staff_type || null,
+        role: editForm.role || "employee",
+        contract_number: editForm.contract_number.trim() || null,
+        employment_start_date: editForm.employment_start_date || null,
+        termination_date: editForm.termination_date || null,
+        is_archived: editForm.is_archived,
+        archived_at: editForm.is_archived ? new Date().toISOString() : null,
+        archive_reason: editForm.archive_reason.trim() || null,
+        professional_license_number: editForm.professional_license_number.trim() || null,
+        professional_license_valid_until: editForm.professional_license_valid_until || null,
+        occupational_health_valid_until: editForm.occupational_health_valid_until || null,
+        is_active: editForm.is_archived ? false : editForm.is_active,
+      });
 
-        const employee = filteredEmployees[rowIndex];
-        const day = scheduleDays[colIndex - 1];
-        if (!employee || !day) continue;
+      const profilePayload = removeUndefinedValues({
+        first_name: firstName,
+        last_name: lastName,
+        full_name: fullName || null,
+        email: editForm.email.trim() || null,
+        phone: editForm.phone.trim() || null,
+        birth_date: editForm.birth_date || null,
+      });
 
-        const date = toDateInput(day);
-        const normalized = normalizeScheduleCode(newValue);
+      console.log("[TeamPage] employee save payload", {
+        memberPayload,
+        profilePayload,
+        organizationId,
+        userId: editingEmployee.user_id,
+      });
 
-        const remove = await supabase
-          .from("personnel_schedule_entries")
-          .delete()
-          .eq("organization_id", organizationId)
-          .eq("employee_id", employee.user_id)
-          .eq("date", date);
+      const memberResult = await supabase
+        .from("organization_members")
+        .update(memberPayload)
+        .eq("organization_id", organizationId)
+        .eq("user_id", editingEmployee.user_id);
 
-        if (remove.error) {
-          failedMessage = remove.error.message;
-          break;
-        }
-
-        if (!normalized.status) continue;
-
-        const start = normalized.start ? `${date}T${normalized.start}` : null;
-        let end = normalized.end ? `${date}T${normalized.end}` : null;
-
-        if (start && end && end <= start) {
-          const nextDay = new Date(`${date}T00:00:00`);
-          nextDay.setDate(nextDay.getDate() + 1);
-          end = `${toDateInput(nextDay)}T${normalized.end}`;
-        }
-
-        const insert = await supabase
-          .from("personnel_schedule_entries")
-          .insert({
-            organization_id: organizationId,
-            employee_id: employee.user_id,
-            date,
-            start_datetime: start,
-            end_datetime: end,
-            status: normalized.status,
-          });
-
-        if (insert.error) {
-          failedMessage = insert.error.message;
-          break;
-        }
+      if (memberResult.error) {
+        console.error("[TeamPage] organization_members update failed", memberResult.error);
+        throw memberResult.error;
       }
 
-      if (failedMessage) {
-        const lower = failedMessage.toLowerCase();
-        setMessage(
-          lower.includes("row-level security") ||
-            lower.includes("security policy") ||
-            lower.includes("violates")
-            ? "Grafiko nepavyko išsaugoti: Supabase RLS neleidžia rašyti į personnel_schedule_entries. Reikia pritaikyti pridėtą SQL policy failą."
-            : failedMessage,
-        );
-        return;
+      console.log("[TeamPage] organization_members update ok", {
+        organizationId,
+        userId: editingEmployee.user_id,
+      });
+
+      const savedProfilePayload: Record<string, string | null> = {
+        first_name: firstName,
+        last_name: lastName,
+        full_name: fullName || null,
+        email: editForm.email.trim() || null,
+        phone: editForm.phone.trim() || null,
+        birth_date: editForm.birth_date || null,
+      };
+
+      const profileResult = await supabase.rpc("admin_update_employee_profile", {
+        p_organization_id: organizationId,
+        p_user_id: editingEmployee.user_id,
+        p_first_name: firstName,
+        p_last_name: lastName,
+        p_full_name: fullName || null,
+        p_email: editForm.email.trim() || null,
+        p_phone: editForm.phone.trim() || null,
+        p_birth_date: editForm.birth_date || null,
+      });
+
+      if (profileResult.error) {
+        console.error("[TeamPage] admin_update_employee_profile failed", profileResult.error);
+        throw profileResult.error;
       }
 
-      await loadAll();
-      setMessage("Grafikas atnaujintas.");
+      console.log("[TeamPage] profiles rpc update ok", {
+        userId: editingEmployee.user_id,
+      });
+
+      setEmployees((prev) =>
+        prev.map((employee) =>
+          employee.user_id === editingEmployee.user_id
+            ? {
+                ...employee,
+                ...memberPayload,
+                first_name: firstName,
+                last_name: lastName,
+                full_name: fullName,
+                email: savedProfilePayload.email,
+                phone: savedProfilePayload.phone,
+                birth_date: normalizeDateInput(savedProfilePayload.birth_date),
+              }
+            : employee,
+        ),
+      );
+
+      setMessage((prev) => prev || "Darbuotojo duomenys atnaujinti.");
+      closeEmployeeEditor();
+    } catch (error) {
+      console.error("[TeamPage] saveEmployee failed", error);
+      setMessage(getReadableError(error));
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) return <div style={styles.page}>Kraunama...</div>;
+  async function createEmployee() {
+    if (!organizationId) {
+      setCreateModalMessage("Nepavyko nustatyti įstaigos.");
+      setMessage("Nepavyko nustatyti įstaigos.");
+      return;
+    }
 
-  return (
-    <main style={styles.page}>
-      <section style={styles.hero}>
-        <div>
-          <div style={styles.kicker}>
-            <BriefcaseBusiness size={16} />
-            Personalo modulis
-          </div>
-          <h1 style={styles.title}>Komanda</h1>
-          <p style={styles.subtitle}>
-            Darbuotojų registras, grafikai, pažymos, licencijos, mokymai,
-            atostogos ir kandidatai vienoje vietoje.
+    const firstName = newEmployeeForm.first_name.trim();
+    const lastName = newEmployeeForm.last_name.trim();
+    const email = newEmployeeForm.email.trim();
+    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+    if (!firstName || !lastName) {
+      setCreateModalMessage("Įvesk darbuotojo vardą ir pavardę.");
+      setMessage("Įvesk darbuotojo vardą ir pavardę.");
+      return;
+    }
+
+    if (newEmployeeForm.send_invite && !email) {
+      setCreateModalMessage("Norint siųsti kvietimą, būtinas el. paštas.");
+      setMessage("Norint siųsti kvietimą, būtinas el. paštas.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+    setCreateModalMessage("");
+
+    try {
+      const candidatePayload = {
+        organization_id: organizationId,
+        first_name: firstName,
+        last_name: lastName,
+        email: email || null,
+        phone: newEmployeeForm.phone.trim() || null,
+        desired_role: newEmployeeForm.position.trim() || newEmployeeForm.staff_type.trim() || null,
+        experience: newEmployeeForm.department.trim() || null,
+        notes: newEmployeeForm.notes.trim() || null,
+        status: newEmployeeForm.send_invite ? "invite_pending" : "draft",
+        consent: true,
+      };
+
+      const { data: candidate, error: candidateError } = await supabase
+        .from("candidates")
+        .insert(candidatePayload)
+        .select("id, first_name, last_name, email, phone, desired_role, status, experience, notes, created_at")
+        .single();
+
+      if (candidateError) throw candidateError;
+
+      if (newEmployeeForm.send_invite && email) {
+        const inviteToken = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+        const invitePayload = {
+          organization_id: organizationId,
+          email,
+          role: newEmployeeForm.role || "employee",
+          status: "pending",
+          token: inviteToken,
+        };
+
+        const { data: invite, error: inviteError } = await supabase
+          .from("organization_invites")
+          .insert(invitePayload)
+          .select("id")
+          .single();
+
+        if (inviteError) throw inviteError;
+
+        setInvites((previous) => [
+          {
+            id: invite?.id || crypto.randomUUID(),
+            email,
+            role: invitePayload.role,
+            status: "pending",
+            created_at: new Date().toISOString(),
+          },
+          ...previous,
+        ]);
+      }
+
+      if (candidate) {
+        setCandidates((previous) => [candidate as Candidate, ...previous]);
+      }
+
+      setNewEmployeeForm(initialNewEmployeeForm);
+      setShowCreateModal(false);
+      setCreateModalMessage("");
+      setMessage(
+        `Darbuotojo ruošinys ${fullName} išsaugotas kandidatų sąraše${newEmployeeForm.send_invite ? " ir sukurtas kvietimas" : ""}.`
+      );
+
+      await loadAll();
+      setTab("invites");
+    } catch (error) {
+      const readable = getReadableError(error);
+      setCreateModalMessage(readable || "Nepavyko išsaugoti darbuotojo ruošinio.");
+      setMessage(readable || "Nepavyko išsaugoti darbuotojo ruošinio.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function toggleExtraPermission(permission: string) {
+    if (!editForm) return;
+
+    const exists = editForm.extra_permissions.includes(permission);
+
+    setEditForm({
+      ...editForm,
+      extra_permissions: exists
+        ? editForm.extra_permissions.filter((item) => item !== permission)
+        : [...editForm.extra_permissions, permission],
+    });
+  }
+
+  const filteredEmployees = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    const visibleEmployees = employees.filter((employee) => employee.is_archived !== true);
+
+    if (!q) return visibleEmployees;
+
+    return visibleEmployees.filter((employee) =>
+      [
+        employeeName(employee),
+        employee.email,
+        employeeRole(employee),
+        employee.department,
+        employee.contract_number,
+        employee.staff_type,
+        staffTypeLabel(employee.staff_type),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [employees, query]);
+
+  const employeeMap = useMemo(() => {
+    return new Map(employees.map((employee) => [employee.user_id, employee]));
+  }, [employees]);
+
+  const pendingVacations = vacations.filter((item) => item.status === "submitted" || item.status === "pending");
+  const expiringCredentials = credentials.filter((item) => isExpiring(item.expires_at));
+  const expiringEmployeeDocs = employees.filter(
+    (employee) =>
+      isExpiring(employee.professional_license_valid_until) ||
+      isExpiring(employee.occupational_health_valid_until),
+  );
+  const trainingIssues = employees.filter((employee) => {
+    const employeeTrainings = trainings.filter((item) => item.employee_id === employee.user_id);
+
+    return employeeTrainings.length === 0;
+  });
+  const pendingInvites = invites.filter((invite) => invite.status === "pending");
+  const activeEmployees = employees.filter((employee) => employee.is_archived !== true && employee.is_active !== false);
+  const archivedEmployees = employees.filter((employee) => employee.is_archived === true);
+
+  const scheduleDays = useMemo(() => {
+    const first = new Date(scheduleMonth.getFullYear(), scheduleMonth.getMonth(), 1);
+    const last = new Date(scheduleMonth.getFullYear(), scheduleMonth.getMonth() + 1, 0);
+    const rows: Date[] = [];
+    for (let day = new Date(first); day <= last; day.setDate(day.getDate() + 1)) {
+      rows.push(new Date(day));
+    }
+    return rows;
+  }, [scheduleMonth]);
+
+  const scheduleGridData = useMemo(() => {
+    return activeEmployees.map((employee) =>
+      scheduleDays.map((day) => {
+        const key = toDateInput(day);
+        const entry = scheduleEntries.find((item) => item.employee_id === employee.user_id && item.date === key);
+        if (!entry) return "";
+        if (entry.status) return entry.status;
+        if (entry.start_datetime && entry.end_datetime) {
+          return `${timeLabel(entry.start_datetime)}-${timeLabel(entry.end_datetime)}`;
+        }
+        return entry.note || "";
+      }),
+    );
+  }, [activeEmployees, scheduleDays, scheduleEntries]);
+
+  const scheduleComplianceRows = useMemo(() => {
+    return activeEmployees.map((employee) => ({
+      employee,
+      plannedHours: 0,
+      maxSevenDayHours: 0,
+      maxSevenDayWorkDays: 0,
+      shortestRestHours: null,
+      minWeeklyRestHours: null,
+      averageWeeklyHours: 0,
+      status: "ok",
+      errors: [],
+      warnings: [],
+    }));
+  }, [activeEmployees]);
+
+  const vacationReservations = useMemo(() => {
+    return vacations
+      .filter((request) => request.status === "submitted" || request.status === "pending" || request.status === "approved")
+      .flatMap((request) => datesBetween(request.start_date, request.end_date).map((date) => {
+        const meta = absenceTypeMeta(request.type);
+        return {
+          employee_id: request.employee_id,
+          date,
+          type: request.type || "annual_leave",
+          code: meta.code,
+          label: meta.label,
+          note: request.note,
+          status: request.status,
+        };
+      }));
+  }, [vacations]);
+
+  const trainingComplianceRows = useMemo(() => {
+    return activeEmployees.map((employee) => {
+      const rows = trainings.filter((training) => training.employee_id === employee.user_id);
+      return {
+        employee_id: employee.user_id,
+        status: rows.length ? "ok" : "missing",
+        missingHours: rows.length ? 0 : 1,
+        requiredHours: 1,
+        completedHours: rows.reduce((sum, row) => sum + (row.hours || 0), 0),
+        expiresSoonCount: rows.filter((row) => isExpiring(row.expires_at)).length,
+        expiredCount: rows.filter((row) => Boolean(row.expires_at && new Date(row.expires_at) < new Date())).length,
+        missingTrainings: rows.length ? [] : ["Nėra registruotų mokymų"],
+        expiringTrainings: [],
+        blocking: rows.length === 0,
+      };
+    });
+  }, [activeEmployees, trainings]);
+
+
+
+  async function saveScheduleGridChanges(changes: unknown[]) {
+    console.log("[TeamPage] schedule changes", changes);
+    setMessage("Grafiko pakeitimai pažymėti. DB įrašymas gali būti prijungtas pagal jūsų work_schedule_entries schemą.");
+  }
+
+  function isAnnualVacation(type?: string | null) {
+    return type === "annual_leave";
+  }
+
+  function isTemporaryVacation(type?: string | null) {
+    return type === "short_leave";
+  }
+
+  function vacationEntitlementDays(employee?: Employee | null) {
+    const text = [employee?.position, employee?.role, employee?.legacy_role, employee?.department, employee?.staff_type]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    const variable = /kintam|slenkan|pamain|grafik|sumine|suminė|variable/.test(text);
+    const sixDay = /6\s*d|6\s*dien|šeši|sesi/.test(text);
+    const socialServices = /social|soc\s|globos|individualios priežiūros|individuali priežiūra|priežiūros darbuotoj|slaug|užimtumo|psicholog/.test(text);
+    const extraGuarantee = /negal|vienas augina|nepilnamet|iki 18/.test(text);
+
+    if (socialServices) return sixDay ? 36 : 30;
+    if (extraGuarantee) return sixDay ? 30 : 25;
+    if (variable) return 20;
+    return sixDay ? 24 : 20;
+  }
+
+  function usedAnnualVacationDays(employeeId: string) {
+    return vacations
+      .filter((request) =>
+        request.employee_id === employeeId &&
+        request.status === "approved" &&
+        isAnnualVacation(request.type)
+      )
+      .reduce((sum, request) => sum + (request.requested_days || daysBetween(request.start_date, request.end_date)), 0);
+  }
+
+  function reservedAnnualVacationDays(employeeId: string) {
+    return vacations
+      .filter((request) =>
+        request.employee_id === employeeId &&
+        (request.status === "submitted" || request.status === "pending") &&
+        isAnnualVacation(request.type)
+      )
+      .reduce((sum, request) => sum + (request.requested_days || daysBetween(request.start_date, request.end_date)), 0);
+  }
+
+  async function submitVacationRequest(options?: { allowNegativeBalance?: boolean }) {
+    if (!organizationId) return;
+
+    if (!vacationForm.employee_id) {
+      setMessage("Pasirinkite darbuotoją.");
+      return;
+    }
+
+    if (!vacationForm.start_date || !vacationForm.end_date) {
+      setMessage("Nurodykite neatvykimo pradžios ir pabaigos datą.");
+      return;
+    }
+
+    if (vacationForm.end_date < vacationForm.start_date) {
+      setMessage("Pabaigos data negali būti ankstesnė už pradžios datą.");
+      return;
+    }
+
+    const selectedEmployee = employees.find((employee) => employee.user_id === vacationForm.employee_id);
+    const requestedDays = isTemporaryVacation(vacationForm.type) ? 0 : daysBetween(vacationForm.start_date, vacationForm.end_date);
+    const entitlement = vacationEntitlementDays(selectedEmployee);
+    const used = usedAnnualVacationDays(vacationForm.employee_id);
+    const reserved = reservedAnnualVacationDays(vacationForm.employee_id);
+    const left = Math.max(0, entitlement - used - reserved);
+
+    if (isAnnualVacation(vacationForm.type) && requestedDays > left && !options?.allowNegativeBalance) {
+      const ok = window.confirm(
+        `Darbuotojui trūksta atostogų likučio.\n\nLikutis: ${left} d.\nPrašoma: ${requestedDays} d.\n\nAr leisti atostogas į minusą?`
+      );
+      if (!ok) return;
+    }
+
+    setSaving(true);
+    try {
+      const noteParts = [];
+      if (vacationForm.note) noteParts.push(vacationForm.note);
+      if (isTemporaryVacation(vacationForm.type) && (vacationForm.start_time || vacationForm.end_time)) {
+        noteParts.push(`Laikas: ${vacationForm.start_time || "—"}–${vacationForm.end_time || "—"}`);
+      }
+      if (isAnnualVacation(vacationForm.type) && requestedDays > left) {
+        noteParts.push(`Leista į minusą: prašoma ${requestedDays} d., likutis ${left} d., rezervuota ${reserved} d.`);
+      }
+
+      const payload = {
+        organization_id: organizationId,
+        employee_id: vacationForm.employee_id,
+        type: vacationForm.type,
+        start_date: vacationForm.start_date,
+        end_date: isTemporaryVacation(vacationForm.type) ? vacationForm.start_date : vacationForm.end_date,
+        requested_days: requestedDays,
+        note: noteParts.length ? noteParts.join(" · ") : null,
+        status: "submitted",
+      };
+
+      const { data, error } = await supabase
+        .from("vacation_requests")
+        .insert(payload)
+        .select("id, employee_id, type, start_date, end_date, status, requested_days, note, created_at")
+        .single();
+
+      if (error) throw error;
+
+      const created = {
+        ...(data as VacationRequest),
+        status: (data as VacationRequest).status || "submitted",
+        start_date: (data as VacationRequest).start_date || vacationForm.start_date,
+        end_date: (data as VacationRequest).end_date || vacationForm.end_date,
+      };
+
+      setVacations((current) => [created, ...current]);
+      setVacationForm({
+        employee_id: vacationForm.employee_id,
+        type: "annual_leave",
+        start_date: toDateInput(new Date()),
+        end_date: toDateInput(new Date()),
+        start_time: "",
+        end_time: "",
+        note: "",
+      });
+      setVacationFilter("submitted");
+      setMessage("Prašymas pateiktas vadovo patvirtinimui. Grafike jis rodomas kaip rezervacija.");
+    } catch (error) {
+      const readable = getReadableError(error);
+      if (readable.includes("vacation_requests") || readable.includes("does not exist") || readable.includes("404")) {
+        setMessage("Nerasta vacation_requests lentelė. Paleisk SQL migraciją neatvykimų moduliui.");
+      } else {
+        setMessage(readable);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateVacationStatus(id: string, status: "approved" | "rejected") {
+    setSaving(true);
+    try {
+      const request = vacations.find((item) => item.id === id);
+      const { error } = await supabase.from("vacation_requests").update({ status }).eq("id", id);
+      if (error) throw error;
+
+      if (status === "approved" && request && !isTemporaryVacation(request.type)) {
+        const meta = absenceTypeMeta(request.type);
+        const rows = datesBetween(request.start_date, request.end_date).map((date) => ({
+          organization_id: organizationId,
+          employee_id: request.employee_id,
+          date,
+          status: `absence_${meta.code}`,
+          note: `${meta.label} · patvirtinta${request.note ? ` · ${request.note}` : ""}`,
+        }));
+
+        if (rows.length) {
+          const { error: scheduleError } = await supabase.from("work_schedule_entries").insert(rows);
+          if (scheduleError) {
+            console.warn("[TeamPage] Patvirtinta, bet nepavyko sukurti grafiko įrašų", scheduleError);
+          } else {
+            setScheduleEntries((current) => [
+              ...current,
+              ...rows.map((row) => ({
+                employee_id: row.employee_id,
+                date: row.date,
+                status: row.status,
+                note: row.note,
+              })),
+            ]);
+          }
+        }
+      }
+
+      setVacations((current) => current.map((request) => request.id === id ? { ...request, status } : request));
+      setMessage(status === "approved" ? "Prašymas patvirtintas ir grafike rodomas kaip neatvykimas." : "Prašymas atmestas.");
+    } catch (error) {
+      setMessage(getReadableError(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const dashboardActivity = [
+    {
+      title: "Darbuotojų registras atnaujintas",
+      meta: `${employees.length} darbuotojai sistemoje`,
+    },
+    {
+      title: "Kvietimų modulis paruoštas",
+      meta: `${pendingInvites.length} laukia patvirtinimo`,
+    },
+    {
+      title: "Kvietimai į sistemą",
+      meta: `${pendingInvites.length} laukia patvirtinimo`,
+    },
+    {
+      title: "Dokumentų terminai",
+      meta: `${expiringCredentials.length + expiringEmployeeDocs.length} reikia dėmesio`,
+    },
+  ];
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-slate-950">
+        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" />
+          <p className="mt-4 text-lg font-black text-slate-700">Kraunama...</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Ruošiame personalo modulį.
           </p>
         </div>
+      </main>
+    );
+  }
 
-        <button
-          type="button"
-          style={styles.secondaryButton}
-          onClick={() => void loadAll()}
-        >
-          <RefreshCw size={16} />
-          Atnaujinti
-        </button>
-      </section>
+  return (
+    <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-5">
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
+                <BriefcaseBusiness className="h-7 w-7" />
+              </div>
 
-      {message ? (
-        <div
-          style={
-            message.toLowerCase().includes("klaid") ||
-            message.toLowerCase().includes("nepavyko") ||
-            message.toLowerCase().includes("invalid") ||
-            message.toLowerCase().includes("violates") ||
-            message.toLowerCase().includes("policy") ||
-            message.toLowerCase().includes("security") ||
-            message.toLowerCase().includes("rls")
-              ? styles.error
-              : styles.message
-          }
-        >
-          {message}
-        </div>
-      ) : null}
+              <div>
+                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                  Personalo modulis
+                </p>
+                <h1 className="mt-2 text-4xl font-black tracking-tight">
+                  Komanda
+                </h1>
+                <p className="mt-2 text-lg font-semibold text-slate-500">
+                  Darbuotojų registras, pareigos, dokumentai, mokymai, atostogos ir kandidatai vienoje vietoje.
+                </p>
+              </div>
+            </div>
 
-      <section style={styles.statsGrid}>
-        <Stat
-          title="Darbuotojai"
-          value={employees.length}
-          icon={Users}
-          onClick={() => setTab("employees")}
-        />
-        <Stat
-          title="Laukia atostogų"
-          value={pendingVacations.length}
-          icon={Umbrella}
-          danger={pendingVacations.length > 0}
-          onClick={() => {
-            setVacationFilter("submitted");
-            setTab("vacations");
-          }}
-        />
-        <Stat
-          title="Baigiasi dokumentai"
-          value={expiringCredentials.length + expiringVerifiedDocuments}
-          icon={AlertTriangle}
-          danger={expiringCredentials.length + expiringVerifiedDocuments > 0}
-          onClick={() => setTab("docs")}
-        />
-        <Stat
-          title="Trūksta dokumentų patikrų"
-          value={missingDocuments}
-          icon={BadgeCheck}
-          danger={missingDocuments > 0}
-          onClick={() => setTab("documentChecks")}
-        />
-        <Stat
-          title="Mokymų neatitikimai"
-          value={trainingNonCompliantEmployees}
-          icon={GraduationCap}
-          danger={trainingNonCompliantEmployees > 0}
-          onClick={() => setTab("trainings")}
-        />
-        <Stat
-          title="Artimiausi grafikai"
-          value={activeSchedule.length}
-          icon={CalendarDays}
-          onClick={() => setTab("schedule")}
-        />
-      </section>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void loadAll()}
+                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-extrabold text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.98]"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Atnaujinti
+              </button>
 
-      <section style={styles.tabs}>
-        {tabs.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              style={tab === item.key ? styles.tabActive : styles.tab}
-              onClick={() => setTab(item.key)}
-            >
-              <Icon size={16} />
-              {item.label}
-            </button>
-          );
-        })}
-      </section>
+              <button
+                type="button"
+                onClick={() => setTab("candidates")}
+                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 font-extrabold text-emerald-800 shadow-sm transition hover:bg-emerald-50 active:scale-[0.98]"
+              >
+                <UserPlus className="h-4 w-4" />
+                Kandidatai
+              </button>
 
-      {tab === "overview" ? (
-        <section style={styles.gridTwo}>
-          <Card title="Artimiausi dokumentų terminai">
-            <DataTable
-              columns={[
-                "Darbuotojas",
-                "Tipas",
-                "Nr.",
-                "Galioja iki",
-                "Pastaba",
-              ]}
-              rows={expiringCredentials.map((item) => [
-                employeeName(map.get(item.employee_id)),
-                item.type,
-                item.number || "—",
-                fmt(item.expires_at),
-                item.note || "—",
-              ])}
-              empty="Dokumentų terminų artimiausiu metu nėra."
-            />
-          </Card>
-
-          <Card title="Artimiausi grafiko įrašai">
-            <DataTable
-              columns={[
-                "Data",
-                "Darbuotojas",
-                "Pradžia",
-                "Pabaiga",
-                "Statusas",
-              ]}
-              rows={activeSchedule.map((item) => [
-                fmt(item.date),
-                employeeName(map.get(item.employee_id)),
-                item.start_datetime
-                  ? new Date(item.start_datetime).toLocaleString("lt-LT")
-                  : "—",
-                item.end_datetime
-                  ? new Date(item.end_datetime).toLocaleString("lt-LT")
-                  : "—",
-                item.status || "—",
-              ])}
-              empty="Grafiko įrašų nėra."
-            />
-          </Card>
+              <button
+                type="button"
+                onClick={() => { setCreateModalMessage(""); setShowCreateModal(true); }}
+                className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 font-extrabold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98]"
+              >
+                <Plus className="h-4 w-4" />
+                Naujas darbuotojas
+              </button>
+            </div>
+          </div>
         </section>
-      ) : null}
 
-      {tab === "employees" ? (
-        <Card title="Darbuotojų registras">
-          <div style={styles.searchBox}>
-            <Search size={18} color="#94a3b8" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ieškoti pagal vardą, pareigas, skyrių..."
-              style={styles.searchInput}
-            />
+        {message ? (
+          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5 font-extrabold text-emerald-800">
+            {message}
+          </div>
+        ) : null}
+
+        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            icon={<Users className="h-6 w-6" />}
+            title="Darbuotojai"
+            value={String(activeEmployees.length)}
+            meta={`${employees.length} registre · ${archivedEmployees.length} archyve`}
+            tone="emerald"
+            onClick={() => setTab("employees")}
+          />
+          <StatCard
+            icon={<Umbrella className="h-6 w-6" />}
+            title="Atostogos"
+            value={String(pendingVacations.length)}
+            meta="laukia"
+            tone="amber"
+            onClick={() => setTab("vacations")}
+          />
+          <StatCard
+            icon={<FileText className="h-6 w-6" />}
+            title="Dokumentai"
+            value={String(expiringCredentials.length + expiringEmployeeDocs.length)}
+            meta="baigiasi"
+            tone="rose"
+            onClick={() => setTab("docs")}
+          />
+          <StatCard
+            icon={<GraduationCap className="h-6 w-6" />}
+            title="Mokymai"
+            value={String(trainingIssues.length)}
+            meta="neatitikimai"
+            tone="blue"
+            onClick={() => setTab("trainings")}
+          />
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6">
+            <Card className="min-h-[286px]">
+              <h2 className="text-2xl font-black tracking-tight">Greiti veiksmai</h2>
+              <p className="mt-1 font-semibold text-slate-500">
+                Dažniausiai naudojamos personalo operacijos.
+              </p>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <ActionCard
+                  title="Naujas darbuotojas"
+                  desc="Sukurti darbuotojo įrašą"
+                  onClick={() => { setCreateModalMessage(""); setShowCreateModal(true); }}
+                />
+                <ActionCard
+                  title="Pareigos ir teisės"
+                  desc="Keisti sistemos prieigas"
+                  onClick={() => setTab("access")}
+                />
+                <ActionCard
+                  title="Kandidatai"
+                  desc="Anketos, atranka ir priėmimas į darbą"
+                  onClick={() => setTab("candidates")}
+                />
+                <ActionCard
+                  title="Dokumentai"
+                  desc="Pažymos ir licencijos"
+                  onClick={() => setTab("docs")}
+                />
+              </div>
+            </Card>
+
+            <Card className="min-h-[370px]">
+              <h2 className="text-2xl font-black tracking-tight">Naujausias aktyvumas</h2>
+              <p className="mt-1 font-semibold text-slate-500">
+                Paskutiniai personalo modulio signalai.
+              </p>
+
+              <div className="mt-5 space-y-3">
+                {dashboardActivity.map((item) => (
+                  <ActivityItem key={item.title} title={item.title} meta={item.meta} />
+                ))}
+              </div>
+            </Card>
           </div>
 
-          <div style={styles.employeeGrid}>
-            {filteredEmployees.map((employee) => (
-              <article key={employee.user_id} style={styles.employeeCard}>
-                <div style={styles.avatar}>
-                  {employeeName(employee).slice(0, 2).toUpperCase()}
-                </div>
+          <div className="grid gap-6">
+            <Card className="min-h-[286px]">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h3 style={styles.cardName}>{employeeName(employee)}</h3>
-                  <p style={styles.cardMeta}>{employeeRole(employee)}</p>
-                  <p style={styles.cardMeta}>
-                    {employee.department || "Skyrius nenurodytas"}
+                  <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                    Šiandien
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight">
+                    Personalo santrauka
+                  </h2>
+                  <p className="mt-1 font-semibold text-slate-500">
+                    Svarbiausi darbuotojų ir HR procesų rodikliai.
                   </p>
                 </div>
-                <div style={styles.cardActions}>
-                  <div style={styles.badge}>
-                    {employee.is_active === false ? "Neaktyvus" : "Aktyvus"}
-                  </div>
-                  <button
-                    type="button"
-                    style={styles.iconButton}
-                    onClick={() => openEmployeeEditor(employee)}
-                    title="Redaguoti darbuotoją"
-                  >
-                    <Edit3 size={16} />
-                  </button>
+
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  <ClipboardList className="h-6 w-6" />
                 </div>
-              </article>
-            ))}
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <SummaryCard title="Aktyvūs darbuotojai" value={String(activeEmployees.length)} />
+                <SummaryCard title="Kvietimai" value={String(candidates.length)} />
+                <SummaryCard title="Kvietimai" value={`${pendingInvites.length} laukia`} muted />
+                <SummaryCard title="Atostogos" value={`${pendingVacations.length} laukia`} muted />
+              </div>
+            </Card>
+
+            <Card className="min-h-[370px]">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-extrabold uppercase tracking-widest text-amber-600">
+                    Prioritetai
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight">Reikia dėmesio</h2>
+                  <p className="mt-1 font-semibold text-slate-500">
+                    Dokumentai, mokymai, atostogos ir darbuotojų prieigos.
+                  </p>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                  <AlertTriangle className="h-6 w-6" />
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <PriorityItem
+                  title="Baigiasi dokumentai"
+                  value={`${expiringCredentials.length + expiringEmployeeDocs.length}`}
+                  tone="amber"
+                  onClick={() => setTab("docs")}
+                />
+                <PriorityItem
+                  title="Mokymų neatitikimai"
+                  value={`${trainingIssues.length}`}
+                  tone="rose"
+                  onClick={() => setTab("trainings")}
+                />
+                <PriorityItem
+                  title="Atostogų prašymai"
+                  value={`${pendingVacations.length}`}
+                  tone="blue"
+                  onClick={() => setTab("vacations")}
+                />
+              </div>
+            </Card>
           </div>
-        </Card>
-      ) : null}
-
-      {tab === "schedule" ? (
-        <ScheduleBlock
-          employees={filteredEmployees}
-          schedule={schedule}
-          scheduleMonth={scheduleMonth}
-          setScheduleMonth={setScheduleMonth}
-          scheduleDays={scheduleDays}
-          scheduleGridData={scheduleGridData}
-          scheduleComplianceRows={scheduleComplianceRows}
-          scheduleWarningRows={scheduleWarningRows}
-          saving={saving}
-          addMonths={addMonths}
-          monthLabel={monthLabel}
-          toDateInput={toDateInput}
-          employeeName={employeeName}
-          employeeRole={employeeRole}
-          onSaveGridChanges={saveScheduleGridChanges}
-        />
-      ) : null}
-
-      {tab === "vacations" ? (
-        <VacationRequests
-          employees={employees}
-          requests={vacations}
-          form={vacationForm}
-          saving={saving}
-          absenceTypes={absenceTypes}
-          activeFilter={vacationFilter}
-          onFilterChange={setVacationFilter}
-          onFormChange={setVacationForm}
-          onSubmit={addVacation}
-          onApprove={approveVacation}
-          onReject={rejectVacation}
-          employeeName={employeeName}
-          employeeRole={employeeRole}
-          daysBetween={daysBetween}
-          fmt={fmt}
-          absenceTypeMeta={absenceTypeMeta}
-          absenceStatusLabel={absenceStatusLabel}
-        />
-      ) : null}
-
-      {tab === "docs" ? (
-        <Card title="Pažymos ir licencijos">
-          <div style={styles.formGrid}>
-            <EmployeeSelect
-              value={credentialForm.employee_id}
-              employees={employees}
-              onChange={(value) =>
-                setCredentialForm({ ...credentialForm, employee_id: value })
-              }
-            />
-            <input
-              value={credentialForm.type}
-              onChange={(e) =>
-                setCredentialForm({ ...credentialForm, type: e.target.value })
-              }
-              placeholder="Tipas: sveikatos pažyma, licencija"
-              style={styles.input}
-            />
-            <input
-              value={credentialForm.number}
-              onChange={(e) =>
-                setCredentialForm({ ...credentialForm, number: e.target.value })
-              }
-              placeholder="Numeris"
-              style={styles.input}
-            />
-            <input
-              value={credentialForm.issuer}
-              onChange={(e) =>
-                setCredentialForm({ ...credentialForm, issuer: e.target.value })
-              }
-              placeholder="Išdavė"
-              style={styles.input}
-            />
-            <input
-              type="date"
-              value={credentialForm.issued_at}
-              onChange={(e) =>
-                setCredentialForm({
-                  ...credentialForm,
-                  issued_at: e.target.value,
-                })
-              }
-              style={styles.input}
-            />
-            <input
-              type="date"
-              value={credentialForm.expires_at}
-              onChange={(e) =>
-                setCredentialForm({
-                  ...credentialForm,
-                  expires_at: e.target.value,
-                })
-              }
-              style={styles.input}
-            />
-            <input
-              value={credentialForm.note}
-              onChange={(e) =>
-                setCredentialForm({ ...credentialForm, note: e.target.value })
-              }
-              placeholder="Pastaba"
-              style={styles.input}
-            />
-            <button
-              type="button"
-              style={styles.primaryButton}
-              disabled={saving}
-              onClick={() => void addCredential()}
-            >
-              <Plus size={16} />
-              Išsaugoti
-            </button>
-          </div>
-
-          <DataTable
-            columns={[
-              "Darbuotojas",
-              "Tipas",
-              "Nr.",
-              "Išdavė",
-              "Išduota",
-              "Galioja iki",
-              "Pastaba",
-            ]}
-            rows={credentials.map((item) => [
-              employeeName(map.get(item.employee_id)),
-              item.type,
-              item.number || "—",
-              item.issuer || "—",
-              fmt(item.issued_at),
-              fmt(item.expires_at),
-              item.note || "—",
-            ])}
-            empty="Dokumentų dar nėra."
-          />
-        </Card>
-      ) : null}
-
-      {tab === "trainings" ? (
-        <TrainingModule
-          organizationId={organizationId}
-          employees={employees}
-          currentUserName={currentUserName}
-        />
-      ) : null}
-
-      {tab === "documentChecks" ? (
-        <section style={styles.gridTwo}>
-          <Card title="BDAR saugus dokumento patikrinimas">
-            <div style={styles.notice}>
-              Šis blokas skirtas dokumentų patikrinimo faktui registruoti be
-              dokumento kopijos. Sistema saugo tik: kokį dokumentą darbuotojas
-              parodė, kada jis galioja, kas patikrino ir kad kopija sistemoje
-              nesaugoma.
-            </div>
-
-            <div style={styles.helpBox}>
-              <strong>Kokias datas pildyti?</strong>
-              <span>
-                <b>Galioja nuo</b> — dokumento išdavimo arba galiojimo pradžios
-                data, jei ji matoma dokumente.
-              </span>
-              <span>
-                <b>Galioja iki</b> — dokumento pabaigos data. Pagal ją sistema
-                rodys priminimus ir neatitikimus.
-              </span>
-              <span>
-                Jei dokumentas neturi pabaigos datos, lauką „Galioja iki“ galima
-                palikti tuščią.
-              </span>
-            </div>
-
-            <div style={styles.formGrid}>
-              <EmployeeSelect
-                value={verificationForm.employee_id}
-                employees={employees}
-                onChange={(value) =>
-                  setVerificationForm({
-                    ...verificationForm,
-                    employee_id: value,
-                  })
-                }
-              />
-              <select
-                value={verificationForm.document_type}
-                onChange={(e) =>
-                  setVerificationForm({
-                    ...verificationForm,
-                    document_type: e.target.value,
-                  })
-                }
-                style={styles.input}
-              >
-                {[
-                  ...new Set([
-                    "Sveikatos pažyma",
-                    "Profesinė licencija",
-                    ...documentRequirements.map((item) => item.document_type),
-                  ]),
-                ].map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={verificationForm.evidence_mode}
-                onChange={(e) =>
-                  setVerificationForm({
-                    ...verificationForm,
-                    evidence_mode: e.target.value,
-                  })
-                }
-                style={styles.input}
-              >
-                <option value="seen_original">
-                  Matytas originalas vietoje
-                </option>
-                <option value="checked_register">
-                  Patikrinta oficialiame registre
-                </option>
-                <option value="employee_presented">
-                  Darbuotojas pateikė, kopija nesaugoma
-                </option>
-              </select>
-              <label style={styles.fieldLabel}>
-                <span>Dokumento nr. / paskutiniai 4 simboliai</span>
-                <input
-                  value={verificationForm.reference_no}
-                  onChange={(e) =>
-                    setVerificationForm({
-                      ...verificationForm,
-                      reference_no: e.target.value,
-                    })
-                  }
-                  placeholder="Pvz. 1234"
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Kas išdavė / kur patikrinta</span>
-                <input
-                  value={verificationForm.issuer}
-                  onChange={(e) =>
-                    setVerificationForm({
-                      ...verificationForm,
-                      issuer: e.target.value,
-                    })
-                  }
-                  placeholder="Pvz. registras, įstaiga"
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Galioja nuo</span>
-                <input
-                  type="date"
-                  value={verificationForm.valid_from}
-                  onChange={(e) =>
-                    setVerificationForm({
-                      ...verificationForm,
-                      valid_from: e.target.value,
-                    })
-                  }
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Galioja iki</span>
-                <input
-                  type="date"
-                  value={verificationForm.valid_until}
-                  onChange={(e) =>
-                    setVerificationForm({
-                      ...verificationForm,
-                      valid_until: e.target.value,
-                    })
-                  }
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Kas patikrino</span>
-                <input
-                  value={verificationForm.verified_by}
-                  onChange={(e) =>
-                    setVerificationForm({
-                      ...verificationForm,
-                      verified_by: e.target.value,
-                    })
-                  }
-                  placeholder="Pvz. Vardas Pavardė"
-                  style={styles.input}
-                />
-              </label>
-            </div>
-
-            <div style={styles.checkList}>
-              <label style={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={verificationForm.seen_confirmed}
-                  onChange={(e) =>
-                    setVerificationForm({
-                      ...verificationForm,
-                      seen_confirmed: e.target.checked,
-                    })
-                  }
-                />
-                Patvirtinu, kad dokumentas buvo peržiūrėtas fiziškai arba
-                oficialiame registre
-              </label>
-              <label style={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={verificationForm.no_copy_stored}
-                  onChange={(e) =>
-                    setVerificationForm({
-                      ...verificationForm,
-                      no_copy_stored: e.target.checked,
-                    })
-                  }
-                />
-                Patvirtinu, kad dokumento kopija sistemoje nesaugoma
-              </label>
-              <label style={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={verificationForm.minimal_data_confirmed}
-                  onChange={(e) =>
-                    setVerificationForm({
-                      ...verificationForm,
-                      minimal_data_confirmed: e.target.checked,
-                    })
-                  }
-                />
-                Patvirtinu, kad įrašau tik būtinus duomenis: tipą, galiojimą,
-                patikrinimo faktą ir tikrintoją
-              </label>
-            </div>
-
-            <input
-              value={verificationForm.note}
-              onChange={(e) =>
-                setVerificationForm({
-                  ...verificationForm,
-                  note: e.target.value,
-                })
-              }
-              placeholder="Pastaba, jei būtina. Nerašyti diagnozių, asmens kodo, teistumo ar kitų perteklinių duomenų."
-              style={styles.input}
-            />
-
-            <button
-              type="button"
-              style={styles.primaryButton}
-              disabled={saving}
-              onClick={() => void addDocumentVerification()}
-            >
-              <BadgeCheck size={16} />
-              Registruoti patikrinimą
-            </button>
-          </Card>
-
-          <Card title="Darbuotojų dokumentų reikalavimai">
-            <div style={styles.helpBox}>
-              <strong>Kam skirtas šis blokas?</strong>
-              <span>
-                Čia nustatai taisykles, kokius dokumentus privalo turėti
-                skirtingos pareigybės.
-              </span>
-              <span>
-                Pavyzdžiai: visi darbuotojai turi turėti sveikatos pažymą,
-                slaugytojai — profesinę licenciją, virtuvė — higienos
-                pažymėjimą.
-              </span>
-              <span>
-                Pagal šias taisykles sistema automatiškai rodo: trūksta,
-                galioja, greitai baigsis arba pasibaigė.
-              </span>
-            </div>
-
-            <div style={styles.requirementGrid}>
-              <label style={styles.fieldLabel}>
-                <span>Taikoma kam</span>
-                <select
-                  value={requirementForm.role}
-                  onChange={(e) =>
-                    setRequirementForm({
-                      ...requirementForm,
-                      role: e.target.value,
-                    })
-                  }
-                  style={styles.input}
-                >
-                  <option value="VISI">Visi darbuotojai</option>
-                  <option value="SLAUGYTOJAI">Slaugytojai</option>
-                  <option value="SOCIALINIAI">Socialiniai darbuotojai</option>
-                  <option value="MAISTO BLOKAS">Maisto blokas / virtuvė</option>
-                  <option value="ADMINISTRACIJA">Administracija</option>
-                  <option value="ŪKIS">Ūkio / techniniai darbuotojai</option>
-                </select>
-              </label>
-
-              <label style={styles.fieldLabel}>
-                <span>Dokumentas</span>
-                <input
-                  value={requirementForm.document_type}
-                  onChange={(e) =>
-                    setRequirementForm({
-                      ...requirementForm,
-                      document_type: e.target.value,
-                    })
-                  }
-                  placeholder="Pvz. Sveikatos pažyma"
-                  style={styles.input}
-                />
-              </label>
-
-              <label style={styles.fieldLabel}>
-                <span>Galiojimas mėnesiais</span>
-                <input
-                  type="number"
-                  value={requirementForm.validity_months}
-                  onChange={(e) =>
-                    setRequirementForm({
-                      ...requirementForm,
-                      validity_months: e.target.value,
-                    })
-                  }
-                  placeholder="Pvz. 12"
-                  style={styles.input}
-                />
-              </label>
-
-              <label style={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={requirementForm.required}
-                  onChange={(e) =>
-                    setRequirementForm({
-                      ...requirementForm,
-                      required: e.target.checked,
-                    })
-                  }
-                />
-                Privalomas dokumentas
-              </label>
-
-              <label style={styles.fieldLabel}>
-                <span>Pastaba darbuotojui / administratoriui</span>
-                <input
-                  value={requirementForm.retention_note}
-                  onChange={(e) =>
-                    setRequirementForm({
-                      ...requirementForm,
-                      retention_note: e.target.value,
-                    })
-                  }
-                  placeholder="Pvz. kopija nesaugoma, tikrinama kasmet"
-                  style={styles.input}
-                />
-              </label>
-
-              <button
-                type="button"
-                style={styles.primaryButton}
-                disabled={saving}
-                onClick={() => void addDocumentRequirement()}
-              >
-                <Plus size={16} />
-                Pridėti reikalavimą
-              </button>
-            </div>
-
-            <DataTable
-              columns={[
-                "Taikoma",
-                "Dokumentas",
-                "Privaloma",
-                "Galiojimas",
-                "Kopija",
-                "Pastaba",
-              ]}
-              rows={documentRequirements.map((item: any) => [
-                item.role,
-                item.document_type,
-                item.required ? "Taip" : "Ne",
-                item.validity_months
-                  ? `${item.validity_months} mėn.`
-                  : "Nenustatyta",
-                item.collect_copy_allowed ? "Leidžiama" : "Nesaugoma",
-                item.retention_note || "—",
-              ])}
-              empty="Dokumentų reikalavimų dar nėra."
-            />
-          </Card>
-
-          <Card title="Automatinė dokumentų atitiktis">
-            <div style={styles.miniStats}>
-              <div style={styles.miniStatGood}>
-                Galioja:{" "}
-                {verificationSummary.filter((x) => x.status === "ok").length}
-              </div>
-              <div style={styles.miniStatWarn}>
-                Greitai baigsis:{" "}
-                {
-                  verificationSummary.filter((x) => x.status === "expiring")
-                    .length
-                }
-              </div>
-              <div style={styles.miniStatBad}>
-                Trūksta / pasibaigė:{" "}
-                {
-                  verificationSummary.filter(
-                    (x) => x.status === "missing" || x.status === "expired",
-                  ).length
-                }
-              </div>
-            </div>
-            <DataTable
-              columns={[
-                "Darbuotojas",
-                "Dokumentas",
-                "Statusas",
-                "Galioja iki",
-                "Tikrino",
-                "Kopija",
-              ]}
-              rows={verificationSummary.map((item) => [
-                employeeName(item.employee),
-                item.document_type,
-                <span
-                  key={`${item.employee.user_id}-${item.document_type}`}
-                  style={
-                    item.status === "ok"
-                      ? styles.statusGood
-                      : item.status === "expiring"
-                        ? styles.statusWarn
-                        : styles.statusBad
-                  }
-                >
-                  {verificationStatusLabel(item.status)}
-                </span>,
-                fmt(item.valid_until),
-                item.verified_by || "—",
-                item.no_copy_stored ? "Nesaugoma" : "Rizika",
-              ])}
-              empty="Atitikties įrašų nėra."
-            />
-          </Card>
-
-          <Card title="Patikrinimų ir audito registras">
-            <DataTable
-              columns={[
-                "Darbuotojas",
-                "Dokumentas",
-                "Maskuotas nr.",
-                "Galioja iki",
-                "Tikrino",
-                "Kada",
-                "Pastaba",
-              ]}
-              rows={documentVerifications.map((item) => [
-                employeeName(map.get(item.employee_id)),
-                item.document_type,
-                item.reference_no_masked || "—",
-                fmt(item.valid_until),
-                item.verified_by,
-                fmt(item.verified_at),
-                item.note || "—",
-              ])}
-              empty="Patikrinimų dar nėra."
-            />
-
-            <DataTable
-              columns={[
-                "Laikas",
-                "Vartotojas",
-                "Veiksmas",
-                "Objektas",
-                "Detalės",
-              ]}
-              rows={auditLog
-                .slice(0, 20)
-                .map((item) => [
-                  fmt(item.created_at),
-                  item.actor || "—",
-                  item.action,
-                  item.entity_type,
-                  item.details || "—",
-                ])}
-              empty="Audito įrašų nėra."
-            />
-          </Card>
         </section>
-      ) : null}
 
-      {tab === "inventory" ? (
-        <section style={styles.gridTwo}>
-          <Card title="Darbuotojams priskiriami daiktai">
-            <div style={styles.formGrid}>
-              <input
-                value={inventoryForm.name}
-                onChange={(e) =>
-                  setInventoryForm({ ...inventoryForm, name: e.target.value })
-                }
-                placeholder="Pavadinimas: raktas, kortelė, uniforma"
-                style={styles.input}
-              />
-              <input
-                value={inventoryForm.category}
-                onChange={(e) =>
-                  setInventoryForm({
-                    ...inventoryForm,
-                    category: e.target.value,
-                  })
-                }
-                placeholder="Kategorija"
-                style={styles.input}
-              />
-              <input
-                value={inventoryForm.serial_no}
-                onChange={(e) =>
-                  setInventoryForm({
-                    ...inventoryForm,
-                    serial_no: e.target.value,
-                  })
-                }
-                placeholder="Serija / numeris"
-                style={styles.input}
-              />
-              <input
-                value={inventoryForm.size}
-                onChange={(e) =>
-                  setInventoryForm({ ...inventoryForm, size: e.target.value })
-                }
-                placeholder="Dydis"
-                style={styles.input}
-              />
-              <button
-                type="button"
-                style={styles.primaryButton}
-                disabled={saving}
-                onClick={() => void addPersonnelInventoryItem()}
-              >
-                <Plus size={16} />
-                Pridėti daiktą
-              </button>
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                Moduliai
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                Personalo valdymas
+              </h2>
+              <p className="mt-1 font-semibold text-slate-500">
+                Pasirink modulį, kurį nori tvarkyti.
+              </p>
             </div>
 
-            <DataTable
-              columns={[
-                "Pavadinimas",
-                "Kategorija",
-                "Serija",
-                "Dydis",
-                "Statusas",
-              ]}
-              rows={personnelInventory.map((item) => [
-                item.name,
-                item.category || "—",
-                item.serial_no || "—",
-                item.size || "—",
-                item.status || "available",
-              ])}
-              empty="Daiktų dar nėra."
-            />
-          </Card>
+            <div className="grid w-full gap-3 md:grid-cols-2 xl:grid-cols-4 lg:max-w-5xl">
+              {tabs.map((item) => {
+                const Icon = item.icon;
+                const active = tab === item.key;
 
-          <Card title="Priskirti daiktą darbuotojui">
-            <div style={styles.formGrid}>
-              <EmployeeSelect
-                value={assignmentForm.employee_id}
-                employees={employees}
-                onChange={(value) =>
-                  setAssignmentForm({ ...assignmentForm, employee_id: value })
-                }
-              />
-              <select
-                value={assignmentForm.item_id}
-                onChange={(e) =>
-                  setAssignmentForm({
-                    ...assignmentForm,
-                    item_id: e.target.value,
-                  })
-                }
-                style={styles.input}
-              >
-                <option value="">Pasirinkti daiktą</option>
-                {personnelInventory
-                  .filter((item) => item.status !== "assigned")
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} {item.size || ""}
-                    </option>
-                  ))}
-              </select>
-              <input
-                value={assignmentForm.condition_out}
-                onChange={(e) =>
-                  setAssignmentForm({
-                    ...assignmentForm,
-                    condition_out: e.target.value,
-                  })
-                }
-                placeholder="Būklė perduodant"
-                style={styles.input}
-              />
-              <input
-                value={assignmentForm.note}
-                onChange={(e) =>
-                  setAssignmentForm({ ...assignmentForm, note: e.target.value })
-                }
-                placeholder="Pastaba"
-                style={styles.input}
-              />
-              <button
-                type="button"
-                style={styles.primaryButton}
-                disabled={saving}
-                onClick={() => void assignPersonnelInventoryItem()}
-              >
-                <PackageCheck size={16} />
-                Priskirti
-              </button>
-            </div>
-
-            <DataTable
-              columns={["Darbuotojas", "Daiktas", "Nuo", "Būklė", "Pastaba"]}
-              rows={personnelAssignments.map((item) => {
-                const inv = personnelInventory.find(
-                  (thing) => thing.id === item.item_id,
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setTab(item.key)}
+                    className={`flex items-center gap-3 rounded-2xl border p-4 text-left font-black transition active:scale-[0.99] ${
+                      active
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-200 hover:bg-emerald-50"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                        active ? "bg-white text-emerald-700" : "bg-white text-slate-500"
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    {item.label}
+                  </button>
                 );
-                return [
-                  employeeName(map.get(item.employee_id)),
-                  inv?.name || item.item_id,
-                  fmt(item.assigned_at),
-                  item.condition_out || "—",
-                  item.note || "—",
-                ];
               })}
-              empty="Priskyrimų dar nėra."
-            />
-          </Card>
+            </div>
+          </div>
         </section>
-      ) : null}
 
-      {tab === "acknowledgements" ? (
-        <section style={{ display: "grid", gap: 18 }}>
+        {tab === "overview" && (
+          <section className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <h2 className="text-2xl font-black tracking-tight">Artimiausi dokumentų terminai</h2>
+              <div className="mt-5 space-y-3">
+                {[...expiringCredentials.slice(0, 6), ...expiringEmployeeDocs.slice(0, 6).map((employee) => ({
+                  id: employee.user_id,
+                  employee_id: employee.user_id,
+                  type: "Darbuotojo dokumentai",
+                  number: employee.professional_license_number || "—",
+                  expires_at: employee.professional_license_valid_until || employee.occupational_health_valid_until,
+                } as Credential))].slice(0, 8).map((item) => (
+                  <ActivityItem
+                    key={`${item.id}-${item.type}`}
+                    title={`${employeeName(employeeMap.get(item.employee_id))} · ${item.type}`}
+                    meta={`Galioja iki: ${fmt(item.expires_at)} · Nr.: ${item.number || "—"}`}
+                  />
+                ))}
+                {expiringCredentials.length + expiringEmployeeDocs.length === 0 && (
+                  <EmptyState text="Dokumentų terminų artimiausiu metu nėra." />
+                )}
+              </div>
+            </Card>
+
+            <Card>
+              <h2 className="text-2xl font-black tracking-tight">Kandidatai ir priėmimas</h2>
+              <div className="mt-5 space-y-3">
+                <ActivityItem title="Kandidatų anketos" meta={`${candidates.length} įrašai`} />
+                <ActivityItem title="Laukia kvietimų" meta={`${pendingInvites.length} kvietimai`} />
+                <ActivityItem title="Aktyvūs darbuotojai" meta={`${activeEmployees.length} iš ${employees.length}`} />
+              </div>
+            </Card>
+          </section>
+        )}
+
+        {tab === "employees" && (
+          <Card>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                  Registras
+                </p>
+                <h2 className="mt-1 text-2xl font-black tracking-tight">
+                  Darbuotojų kortelės
+                </h2>
+                <p className="mt-1 font-semibold text-slate-500">
+                  Darbuotojai, pareigos, skyriai ir sistemos prieigos.
+                </p>
+              </div>
+
+              <label className="relative block w-full lg:w-96">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Ieškoti pagal vardą, pareigas, skyrių..."
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
+                />
+              </label>
+            </div>
+
+            {filteredEmployees.length === 0 ? (
+              <EmptyState text="Darbuotojų nerasta." />
+            ) : (
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filteredEmployees.map((employee) => (
+                  <EmployeeCard
+                    key={employee.user_id}
+                    employee={employee}
+                    onEdit={() => openEmployeeEditor(employee)}
+                  />
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {tab === "access" && <StaffTypesModule />}
+
+        {tab === "docs" && (
           <DocumentAcknowledgementsModule
             organizationId={organizationId}
             employees={employees.map((employee) => ({
               id: employee.user_id,
               full_name: employeeName(employee),
-              name: employeeName(employee),
-              role: employeeRole(employee),
+              role: employee.position || employee.role || null,
             }))}
-            acknowledgements={documentAcknowledgements}
-            currentUserId={currentUserId}
+            acknowledgements={[]}
             onRefresh={loadAll}
           />
-        </section>
-      ) : null}
+        )}
 
-      {tab === "candidates" ? (
-        <CandidatesModule
-          organizationId={organizationId}
-          candidates={candidates}
-          onRefresh={loadAll}
-        />
-      ) : null}
+        {tab === "trainings" && <TrainingModule />}
 
-      {trainingEntryEmployee ? (
-        <div style={styles.modalBackdrop}>
-          <div style={styles.modal}>
-            <div style={styles.modalHeader}>
+        {tab === "vacations" && (
+          <VacationRequests
+            employees={activeEmployees}
+            requests={vacations}
+            form={vacationForm}
+            saving={saving}
+            absenceTypes={absenceTypes}
+            activeFilter={vacationFilter}
+            onFilterChange={setVacationFilter}
+            onFormChange={setVacationForm}
+            onSubmit={submitVacationRequest}
+            onApprove={(id) => updateVacationStatus(id, "approved")}
+            onReject={(id) => updateVacationStatus(id, "rejected")}
+            employeeName={employeeName}
+            employeeRole={employeeRole}
+            daysBetween={daysBetween}
+            fmt={fmt}
+            absenceTypeMeta={absenceTypeMeta}
+            absenceStatusLabel={absenceStatusLabel}
+          />
+        )}
+
+        {tab === "schedule" && (
+          <ScheduleBlock
+            employees={activeEmployees}
+            schedule={scheduleEntries}
+            scheduleMonth={scheduleMonth}
+            setScheduleMonth={setScheduleMonth}
+            scheduleDays={scheduleDays}
+            scheduleGridData={scheduleGridData}
+            scheduleComplianceRows={scheduleComplianceRows}
+            scheduleWarningRows={scheduleComplianceRows}
+            vacationReservations={vacationReservations}
+            trainingComplianceRows={trainingComplianceRows}
+            saving={saving}
+            addMonths={addMonths}
+            monthLabel={monthLabel}
+            toDateInput={toDateInput}
+            employeeName={employeeName}
+            employeeRole={employeeRole}
+            onSaveGridChanges={saveScheduleGridChanges}
+          />
+        )}
+
+
+
+        {tab === "candidates" && (
+          <CandidatesModule
+            organizationId={organizationId}
+            candidates={candidates}
+            onRefresh={loadAll}
+          />
+        )}
+
+        {tab === "invites" && (
+          <Card>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h2 style={styles.cardTitle}>Pridėti darbuotojo mokymus</h2>
-                <p style={styles.cardMeta}>
-                  {employeeName(trainingEntryEmployee)} · mokymai bus išsaugoti
-                  darbuotojo kortelėje ir mokymų atitikties bloke
+                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                  Kvietimai
+                </p>
+                <h2 className="mt-1 text-2xl font-black tracking-tight">
+                  Kvietimai prisijungti
+                </h2>
+                <p className="mt-1 font-semibold text-slate-500">
+                  Čia matomi pakviesti darbuotojai. Kai darbuotojas priims kvietimą ir prisijungs, jis bus valdomas darbuotojų registre.
                 </p>
               </div>
-              <button
-                type="button"
-                style={styles.iconButton}
-                onClick={() => setTrainingEntryEmployee(null)}
-                aria-label="Uždaryti"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div style={styles.notice}>
-              BDAR principas: pažymėjimo kopijos nesaugomos. Fiksuojamas tik
-              mokymų faktas, data, galiojimas ir kas patikrino.
-            </div>
-            {message ? (
-              <div
-                style={
-                  message.toLowerCase().includes("klaid") ||
-                  message.toLowerCase().includes("nepavyko") ||
-                  message.toLowerCase().includes("invalid") ||
-                  message.toLowerCase().includes("violates") ||
-                  message.toLowerCase().includes("policy") ||
-                  message.toLowerCase().includes("security") ||
-                  message.toLowerCase().includes("rls")
-                    ? styles.error
-                    : styles.message
-                }
-              >
-                {message}
-              </div>
-            ) : null}
-            <div style={styles.formGrid}>
-              <label style={styles.fieldLabel}>
-                <span>Mokymų pavadinimas</span>
-                <input
-                  value={trainingForm.title}
-                  onChange={(e) =>
-                    setTrainingForm({
-                      ...trainingForm,
-                      employee_id: trainingEntryEmployee.user_id,
-                      title: e.target.value,
-                    })
-                  }
-                  placeholder="Pvz. Darbų sauga"
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Teikėjas</span>
-                <input
-                  value={trainingForm.provider}
-                  onChange={(e) =>
-                    setTrainingForm({
-                      ...trainingForm,
-                      employee_id: trainingEntryEmployee.user_id,
-                      provider: e.target.value,
-                    })
-                  }
-                  placeholder="Kas organizavo mokymus"
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Valandos</span>
-                <input
-                  type="number"
-                  value={trainingForm.hours}
-                  onChange={(e) =>
-                    setTrainingForm({
-                      ...trainingForm,
-                      employee_id: trainingEntryEmployee.user_id,
-                      hours: e.target.value,
-                    })
-                  }
-                  placeholder="Valandos"
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Baigta</span>
-                <input
-                  type="date"
-                  value={trainingForm.completed_at}
-                  onChange={(e) => {
-                    const selected = effectiveTrainingCatalog.find(
-                      (item) => item.id === trainingForm.training_id,
-                    );
-                    setTrainingForm({
-                      ...trainingForm,
-                      employee_id: trainingEntryEmployee.user_id,
-                      completed_at: e.target.value,
-                      expires_at: selected?.valid_for_months
-                        ? calculateTrainingExpiry(
-                            e.target.value,
-                            selected.valid_for_months,
-                          )
-                        : trainingForm.expires_at,
-                    });
-                  }}
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Galioja iki</span>
-                <input
-                  type="date"
-                  value={trainingForm.expires_at}
-                  onChange={(e) =>
-                    setTrainingForm({
-                      ...trainingForm,
-                      employee_id: trainingEntryEmployee.user_id,
-                      expires_at: e.target.value,
-                    })
-                  }
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Patikrino</span>
-                <input
-                  value={trainingForm.verified_by}
-                  onChange={(e) =>
-                    setTrainingForm({
-                      ...trainingForm,
-                      employee_id: trainingEntryEmployee.user_id,
-                      verified_by: e.target.value,
-                    })
-                  }
-                  placeholder="Kas patikrino"
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.fieldLabel}>
-                <span>Pažymėjimo nr. / neprivaloma</span>
-                <input
-                  value={trainingForm.certificate_no}
-                  onChange={(e) =>
-                    setTrainingForm({
-                      ...trainingForm,
-                      employee_id: trainingEntryEmployee.user_id,
-                      certificate_no: e.target.value,
-                    })
-                  }
-                  placeholder="Pažymėjimo nr. / neprivaloma"
-                  style={styles.input}
-                />
-              </label>
-            </div>
-            <div style={styles.modalActions}>
-              <button
-                type="button"
-                style={styles.secondaryButton}
-                onClick={() => setTrainingEntryEmployee(null)}
-              >
-                Atšaukti
-              </button>
-              <button
-                type="button"
-                style={styles.primaryButton}
-                disabled={saving}
-                onClick={async () => {
-                  const saved = await addTraining(
-                    trainingEntryEmployee.user_id,
-                  );
-                  if (saved) setTrainingEntryEmployee(null);
-                }}
-              >
-                <Plus size={16} />
-                {saving ? "Saugoma..." : "Išsaugoti mokymus"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
-      {selectedTrainingDetails ? (
-        <div style={styles.modalBackdrop}>
-          <div style={styles.modal}>
-            <div style={styles.modalHeader}>
-              <div>
-                <h2 style={styles.cardTitle}>Mokymų informacija</h2>
-                <p style={styles.cardMeta}>
-                  {employeeName(selectedTrainingDetails.employee)} · visa mokymų
-                  atitikties informacija
-                </p>
-              </div>
               <button
                 type="button"
-                style={styles.iconButton}
-                onClick={() => setTrainingDetailsEmployeeId(null)}
-                aria-label="Uždaryti"
+                onClick={() => { setCreateModalMessage(""); setShowCreateModal(true); }}
+                className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 font-extrabold text-white shadow-sm transition hover:bg-slate-800"
               >
-                <X size={20} />
+                <Plus className="h-4 w-4" />
+                Naujas kvietimas
               </button>
             </div>
 
-            <DataTable
-              columns={[
-                "Mokymas",
-                "Statusas",
-                "Baigta",
-                "Galioja iki",
-                "Val.",
-                "Patikrino",
-              ]}
-              rows={selectedTrainingDetails.rows.map((row) => [
-                row.training.name,
-                <span
-                  key={`${row.employee.user_id}-${row.training.id}-modal`}
-                  style={trainingStatusStyle(row.status)}
-                >
-                  {trainingStatusLabel(row.status)}
-                </span>,
-                fmt(row.completed_at),
-                fmt(row.expires_at),
-                row.hours,
-                row.verified_by || "—",
-              ])}
-              empty="Mokymų informacijos nėra."
-            />
-          </div>
-        </div>
-      ) : null}
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              {invites.length === 0 && <EmptyState text="Kvietimų nėra." />}
 
-      {editingEmployee ? (
-        <div style={styles.modalBackdrop}>
-          <div style={styles.modal}>
-            <div style={styles.modalHeader}>
-              <div>
-                <h2 style={styles.cardTitle}>Redaguoti darbuotoją</h2>
-                <p style={styles.cardMeta}>
-                  {employeeName(editingEmployee)} · keičiami tik būtini
-                  personalo duomenys
-                </p>
-              </div>
-              <button
-                type="button"
-                style={styles.iconButton}
-                onClick={() => setEditingEmployee(null)}
-              >
-                <X size={18} />
-              </button>
+              {invites.map((invite) => (
+                <article key={invite.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="font-black text-slate-950">{invite.email || "Kvietimas"}</h3>
+                      <p className="mt-1 text-sm font-semibold text-slate-500">
+                        Rolė: {invite.role || "employee"} · Sukurta: {fmt(invite.created_at)}
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-emerald-700">
+                      {invite.status || "pending"}
+                    </span>
+                  </div>
+                </article>
+              ))}
             </div>
+          </Card>
+        )}
+      </div>
 
-            <div style={styles.notice}>
-              Ši forma skirta darbuotojo pareigoms, skyriui ir galiojimų
-              terminams tvarkyti. Pažymėjimų kopijų čia nekeliame — saugome tik
-              faktą, numerį / galiojimą ir kas užregistravo.
-            </div>
+      {showCreateModal && (
+        <Modal
+          title="Naujas darbuotojas"
+          desc="Įveskite pagrindinius duomenis, pareigas ir, jei reikia, išsiųskite kvietimą prisijungti."
+          onClose={() => setShowCreateModal(false)}
+        >
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void createEmployee();
+            }}
+          >
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="text-xl font-black">1. Darbuotojo duomenys</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Čia redaguojami pagrindiniai darbuotojo duomenys. Pavyzdžiai laukeliuose yra tik pagalba — jų trinti nereikia, tiesiog įrašykite tikrą reikšmę.
+              </p>
 
-            <div style={styles.modalSection}>
-              <h3 style={styles.sectionTitle}>1. Darbuotojo duomenys</h3>
-              <div style={styles.modalGrid}>
-                <label style={styles.fieldLabel}>
-                  <span>Vardas</span>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Field label="Vardas">
                   <input
-                    style={styles.input}
-                    value={editForm.first_name}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, first_name: e.target.value })
+                    value={newEmployeeForm.first_name}
+                    onChange={(event) =>
+                      setNewEmployeeForm((prev) => ({ ...prev, first_name: event.target.value }))
                     }
+                    className="input"
                     placeholder="Vardas"
                   />
-                </label>
+                </Field>
 
-                <label style={styles.fieldLabel}>
-                  <span>Pavardė</span>
+                <Field label="Pavardė">
                   <input
-                    style={styles.input}
-                    value={editForm.last_name}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, last_name: e.target.value })
+                    value={newEmployeeForm.last_name}
+                    onChange={(event) =>
+                      setNewEmployeeForm((prev) => ({ ...prev, last_name: event.target.value }))
                     }
+                    className="input"
                     placeholder="Pavardė"
                   />
-                </label>
+                </Field>
 
-                <label style={styles.fieldLabel}>
-                  <span>Rodomas vardas sistemoje</span>
+                <Field label="El. paštas">
                   <input
-                    style={styles.input}
-                    value={editForm.full_name}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, full_name: e.target.value })
+                    value={newEmployeeForm.email}
+                    onChange={(event) =>
+                      setNewEmployeeForm((prev) => ({ ...prev, email: event.target.value }))
                     }
-                    placeholder="Vardenė Pavardenė"
-                  />
-                </label>
-
-                <label style={styles.fieldLabel}>
-                  <span>El. paštas</span>
-                  <input
-                    style={{
-                      ...styles.input,
-                      background: "#f8fafc",
-                      color: "#64748b",
-                    }}
-                    value={editForm.email}
+                    className="input"
+                    type="email"
                     placeholder="vardas@imone.lt"
-                    disabled
                   />
-                </label>
+                </Field>
 
-                <label style={styles.fieldLabel}>
-                  <span>Pareigos</span>
+                <Field label="Telefonas">
                   <input
-                    style={styles.input}
-                    value={editForm.position}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, position: e.target.value })
+                    value={newEmployeeForm.phone}
+                    onChange={(event) =>
+                      setNewEmployeeForm((prev) => ({ ...prev, phone: event.target.value }))
                     }
-                    placeholder="Pvz. slaugytoja, socialinė darbuotoja"
+                    className="input"
+                    placeholder="+370..."
                   />
-                </label>
+                </Field>
 
-                <label style={styles.fieldLabel}>
-                  <span>Skyrius</span>
+                <Field label="Konkrečios pareigos">
                   <input
-                    style={styles.input}
-                    value={editForm.department}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, department: e.target.value })
+                    value={newEmployeeForm.position}
+                    onChange={(event) =>
+                      setNewEmployeeForm((prev) => ({ ...prev, position: event.target.value }))
                     }
-                    placeholder="Pvz. Slauga, Administracija, Virtuvė"
+                    className="input"
+                    placeholder="Pvz., vyr. slaugytoja"
                   />
-                </label>
+                </Field>
+
+                <Field label="Skyrius">
+                  <input
+                    value={newEmployeeForm.department}
+                    onChange={(event) =>
+                      setNewEmployeeForm((prev) => ({ ...prev, department: event.target.value }))
+                    }
+                    className="input"
+                    placeholder="Pvz., Slauga, Ūkis"
+                  />
+                </Field>
+
+                <Field label="Sistemos pareigų tipas">
+                  <select
+                    value={newEmployeeForm.staff_type}
+                    onChange={(event) =>
+                      setNewEmployeeForm((prev) => ({ ...prev, staff_type: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    <option value="">Pasirinkti</option>
+                    {STAFF_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Rolė">
+                  <select
+                    value={newEmployeeForm.role}
+                    onChange={(event) =>
+                      setNewEmployeeForm((prev) => ({ ...prev, role: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    <option value="employee">Darbuotojas</option>
+                    <option value="admin">Administratorius</option>
+                    <option value="owner">Savininkas</option>
+                  </select>
+                </Field>
+
+                <Field label="Pastabos" full>
+                  <textarea
+                    value={newEmployeeForm.notes}
+                    onChange={(event) =>
+                      setNewEmployeeForm((prev) => ({ ...prev, notes: event.target.value }))
+                    }
+                    className="input min-h-28 resize-none"
+                    placeholder="Pastabos apie darbuotoją, kandidatą ar priėmimą..."
+                  />
+                </Field>
               </div>
-            </div>
 
-            <div style={styles.modalSection}>
-              <h3 style={styles.sectionTitle}>
-                2. Licencija ir sveikatos pažyma
-              </h3>
-              <div style={styles.modalGrid}>
-                <label style={styles.fieldLabel}>
-                  <span>Profesinės licencijos numeris</span>
-                  <input
-                    style={styles.input}
-                    value={editForm.professional_license_number}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        professional_license_number: e.target.value,
-                      })
-                    }
-                    placeholder="Pvz. SPL-1234"
-                  />
-                </label>
-
-                <label style={styles.fieldLabel}>
-                  <span>Licencija galioja iki</span>
-                  <input
-                    type="date"
-                    style={styles.input}
-                    value={editForm.professional_license_valid_until}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        professional_license_valid_until: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-
-                <label style={styles.fieldLabel}>
-                  <span>Sveikatos pažyma galioja iki</span>
-                  <input
-                    type="date"
-                    style={styles.input}
-                    value={editForm.occupational_health_valid_until}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        occupational_health_valid_until: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div style={styles.modalSection}>
-              <h3 style={styles.sectionTitle}>3. Mokymų atitiktis</h3>
-              <p style={styles.sectionHint}>
-                Čia matysi, kiek mokymų darbuotojui trūksta, kas jau galioja ir
-                ką galima iškart papildyti tame pačiame lange.
-              </p>
-              <DataTable
-                columns={[
-                  "Mokymas",
-                  "Statusas",
-                  "Baigta",
-                  "Galioja iki",
-                  "Val.",
-                  "Patikrino",
-                  "Veiksmai",
-                ]}
-                rows={(editingEmployeeTrainingDetails?.rows || []).map(
-                  (row) => [
-                    row.training.name,
-                    <span
-                      key={`${row.employee.user_id}-${row.training.id}-editor-status`}
-                      style={trainingStatusStyle(row.status)}
-                    >
-                      {trainingStatusLabel(row.status)}
-                    </span>,
-                    fmt(row.completed_at),
-                    fmt(row.expires_at),
-                    row.hours,
-                    row.verified_by || "—",
-                    <div
-                      key={`${row.employee.user_id}-${row.training.id}-editor-actions`}
-                      style={styles.rowActions}
-                    >
-                      <button
-                        type="button"
-                        style={styles.smallAction}
-                        onClick={() =>
-                          openTrainingEntry(editingEmployee, row, {
-                            openModal: false,
-                          })
-                        }
-                      >
-                        Užpildyti žemiau
-                      </button>
-                    </div>,
-                  ],
-                )}
-                empty="Mokymų informacijos nėra."
-              />
-            </div>
-
-            <div style={styles.modalSection}>
-              <h3 style={styles.sectionTitle}>4. Greitai pridėti mokymus</h3>
-              <p style={styles.sectionHint}>
-                Pilnas mokymų valdymas yra skiltyje „Mokymai“. Čia galima
-                greitai pridėti mokymus konkrečiam darbuotojui.
-              </p>
-              {message ? (
-                <div
-                  style={
-                    message.toLowerCase().includes("klaid") ||
-                    message.toLowerCase().includes("nepavyko") ||
-                    message.toLowerCase().includes("invalid") ||
-                    message.toLowerCase().includes("violates") ||
-                    message.toLowerCase().includes("policy") ||
-                    message.toLowerCase().includes("security") ||
-                    message.toLowerCase().includes("rls")
-                      ? styles.error
-                      : styles.message
+              <label className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 font-extrabold text-emerald-800">
+                <input
+                  type="checkbox"
+                  checked={newEmployeeForm.send_invite}
+                  onChange={(event) =>
+                    setNewEmployeeForm((prev) => ({ ...prev, send_invite: event.target.checked }))
                   }
-                >
-                  {message}
-                </div>
-              ) : null}
+                />
+                Siųsti kvietimą prisijungti prie sistemos, jei nurodytas el. paštas
+              </label>
 
-              <div style={styles.formGrid}>
-                <label style={styles.fieldLabel}>
-                  <span>Mokymų pavadinimas</span>
+              <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-bold leading-6 text-blue-800">
+                Šis veiksmas sukuria kvietimą prisijungti. Darbuotojas į darbuotojų registrą patenka tada,
+                kai priima kvietimą ir susikuria paskyrą. Taip nekuriamas netikras `user_id` organization_members lentelėje.
+              </div>
+            </div>
+
+            {createModalMessage ? (
+              <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 font-extrabold text-rose-700">
+                {createModalMessage}
+              </div>
+            ) : null}
+
+            <ModalFooter
+              saving={saving}
+              onCancel={() => setShowCreateModal(false)}
+              submitText="Sukurti kvietimą"
+            />
+          </form>
+        </Modal>
+      )}
+
+      {editingEmployee && editForm && (
+        <Modal
+          title="Redaguoti darbuotoją"
+          desc="Tvarkykite darbuotojo duomenis, pareigas, dokumentus ir individualias teises."
+          onClose={closeEmployeeEditor}
+        >
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveEmployee();
+            }}
+          >
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="text-xl font-black">1. Darbuotojo duomenys</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Čia redaguojami pagrindiniai darbuotojo duomenys. Pavyzdžiai laukeliuose yra tik pagalba — jų trinti nereikia, tiesiog įrašykite tikrą reikšmę.
+              </p>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Field label="Vardas">
                   <input
-                    value={trainingForm.title}
-                    onChange={(e) =>
-                      setTrainingForm({
-                        ...trainingForm,
-                        employee_id: editingEmployee.user_id,
-                        title: e.target.value,
-                      })
+                    value={editForm.first_name}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, first_name: event.target.value })
                     }
-                    placeholder="Pvz. Darbų sauga"
-                    style={styles.input}
+                    className="input"
                   />
-                </label>
+                </Field>
 
-                <label style={styles.fieldLabel}>
-                  <span>Teikėjas</span>
+                <Field label="Pavardė">
                   <input
-                    value={trainingForm.provider}
-                    onChange={(e) =>
-                      setTrainingForm({
-                        ...trainingForm,
-                        employee_id: editingEmployee.user_id,
-                        provider: e.target.value,
-                      })
+                    value={editForm.last_name}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, last_name: event.target.value })
                     }
-                    placeholder="Kas organizavo mokymus"
-                    style={styles.input}
+                    className="input"
                   />
-                </label>
+                </Field>
 
-                <label style={styles.fieldLabel}>
-                  <span>Valandos</span>
+                <Field label="Rodomas vardas">
+                  <input
+                    value={editForm.full_name}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, full_name: event.target.value })
+                    }
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="El. paštas">
+                  <input
+                    value={editForm.email}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, email: event.target.value })
+                    }
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="Telefonas">
+                  <input
+                    value={editForm.phone}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, phone: event.target.value })
+                    }
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="Gimimo data">
+                  <input
+                    type="date"
+                    min="1900-01-01"
+                    max={new Date().toISOString().slice(0, 10)}
+                    value={editForm.birth_date}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, birth_date: event.target.value })
+                    }
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="Konkrečios pareigos">
+                  <input
+                    value={editForm.position}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, position: event.target.value })
+                    }
+                    className="input"
+                    placeholder="Pvz., vyr. slaugytoja"
+                  />
+                </Field>
+
+                <Field label="Skyrius">
+                  <input
+                    value={editForm.department}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, department: event.target.value })
+                    }
+                    className="input"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="text-xl font-black">2. Darbo sutartis ir statusas</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Šie laukai skirti personalo apskaitai. Po atleidimo darbuotoją galima archyvuoti, kad jis nebesimatytų aktyvių darbuotojų sąraše.
+              </p>
+
+
+              <div className="mt-4 grid gap-4 md:grid-cols-3">
+                <Field label="Etato dydis">
                   <input
                     type="number"
+                    step="0.01"
+                    min="0"
+                    max="2"
+                    value={editForm.employment_rate || 1}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        employment_rate: Number(event.target.value),
+                      })
+                    }
+                    className="input"
+                    placeholder="1.00"
+                  />
+                </Field>
+
+                <Field label="Savaitės valandos">
+                  <input
+                    type="number"
+                    step="1"
                     min="1"
-                    value={trainingForm.hours}
-                    onChange={(e) =>
-                      setTrainingForm({
-                        ...trainingForm,
-                        employee_id: editingEmployee.user_id,
-                        hours: e.target.value,
+                    max="80"
+                    value={editForm.weekly_hours || 40}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        weekly_hours: Number(event.target.value),
                       })
                     }
-                    placeholder="Pvz. 8"
-                    style={styles.input}
+                    className="input"
+                    placeholder="40"
                   />
-                </label>
+                </Field>
 
-                <label style={styles.fieldLabel}>
-                  <span>Baigta</span>
+                <Field label="Darbo tipas">
+                  <select
+                    value={editForm.employment_type || "full_time"}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        employment_type: event.target.value,
+                      })
+                    }
+                    className="input"
+                  >
+                    <option value="full_time">Pilnas etatas</option>
+                    <option value="part_time">Nepilnas etatas</option>
+                    <option value="temporary">Terminuota</option>
+                    <option value="internship">Praktika</option>
+                    <option value="volunteer">Savanoris</option>
+                    <option value="night_only">Naktinis</option>
+                  </select>
+                </Field>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-3">
+                <Field label="Darbo sutarties numeris">
+                  <input
+                    value={editForm.contract_number}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, contract_number: event.target.value })
+                    }
+                    className="input"
+                    placeholder="Pvz., DS-2026-001"
+                  />
+                </Field>
+
+                <Field label="Darbo pradžia">
                   <input
                     type="date"
-                    value={trainingForm.completed_at}
-                    onChange={(e) =>
-                      setTrainingForm({
-                        ...trainingForm,
-                        employee_id: editingEmployee.user_id,
-                        completed_at: e.target.value,
-                      })
+                    value={editForm.employment_start_date}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, employment_start_date: event.target.value })
                     }
-                    style={styles.input}
+                    className="input"
                   />
-                </label>
+                </Field>
 
-                <label style={styles.fieldLabel}>
-                  <span>Galioja iki</span>
+                <Field label="Atleidimo data">
                   <input
                     type="date"
-                    value={trainingForm.expires_at}
-                    onChange={(e) =>
-                      setTrainingForm({
-                        ...trainingForm,
-                        employee_id: editingEmployee.user_id,
-                        expires_at: e.target.value,
+                    value={editForm.termination_date}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        termination_date: event.target.value,
+                        is_active: event.target.value ? false : editForm.is_active,
                       })
                     }
-                    style={styles.input}
+                    className="input"
                   />
-                </label>
+                </Field>
+              </div>
 
-                <label style={styles.fieldLabel}>
-                  <span>Patikrino</span>
-                  <input
-                    value={trainingForm.verified_by}
-                    onChange={(e) =>
-                      setTrainingForm({
-                        ...trainingForm,
-                        employee_id: editingEmployee.user_id,
-                        verified_by: e.target.value,
-                      })
-                    }
-                    placeholder="Kas patikrino"
-                    style={styles.input}
-                  />
-                </label>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditForm({
+                      ...editForm,
+                      is_active: !editForm.is_active,
+                      is_archived: !editForm.is_active ? false : editForm.is_archived,
+                    })
+                  }
+                  className={`rounded-2xl border p-4 text-left font-black transition ${
+                    editForm.is_active
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-slate-200 bg-white text-slate-700"
+                  }`}
+                >
+                  {editForm.is_active ? "Aktyvus darbuotojas" : "Neaktyvus darbuotojas"}
+                  <span className="mt-1 block text-sm font-semibold text-slate-500">
+                    Neaktyvus gali būti atleistas, laikinai sustabdytas arba nebedirbantis.
+                  </span>
+                </button>
 
                 <button
                   type="button"
-                  style={styles.primaryButton}
-                  onClick={() => void addTraining(editingEmployee.user_id)}
-                  disabled={saving}
+                  onClick={() =>
+                    setEditForm({
+                      ...editForm,
+                      is_archived: !editForm.is_archived,
+                      is_active: editForm.is_archived ? editForm.is_active : false,
+                      termination_date: !editForm.is_archived && !editForm.termination_date ? new Date().toISOString().slice(0, 10) : editForm.termination_date,
+                    })
+                  }
+                  className={`rounded-2xl border p-4 text-left font-black transition ${
+                    editForm.is_archived
+                      ? "border-amber-200 bg-amber-50 text-amber-800"
+                      : "border-slate-200 bg-white text-slate-700"
+                  }`}
                 >
-                  <Plus size={16} />
-                  {saving ? "Saugoma..." : "Išsaugoti mokymus"}
+                  {editForm.is_archived ? "Archyvuotas" : "Archyvuoti po atleidimo"}
+                  <span className="mt-1 block text-sm font-semibold text-slate-500">
+                    Archyvuoti darbuotojai neberodomi aktyviame registre, bet lieka istorijoje.
+                  </span>
                 </button>
+              </div>
+
+              <div className="mt-4">
+                <Field label="Archyvavimo / atleidimo pastaba">
+                  <textarea
+                    value={editForm.archive_reason}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, archive_reason: event.target.value })
+                    }
+                    className="input min-h-[90px]"
+                    placeholder="Pvz., darbo sutartis nutraukta darbuotojo prašymu"
+                  />
+                </Field>
               </div>
             </div>
 
-            <div style={styles.modalActions}>
-              <button
-                type="button"
-                style={styles.secondaryButton}
-                onClick={() => setEditingEmployee(null)}
-              >
-                Atšaukti
-              </button>
-              <button
-                type="button"
-                style={styles.primaryButton}
-                onClick={() => void saveEmployeeEditor()}
-                disabled={saving}
-              >
-                Išsaugoti darbuotoją
-              </button>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="text-xl font-black">3. Sistemos pareigos ir teisės</h3>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Field label="Sistemos pareigų tipas">
+                  <select
+                    value={editForm.staff_type}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, staff_type: event.target.value })
+                    }
+                    className="input"
+                  >
+                    <option value="">Pasirinkti</option>
+                    {STAFF_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Rolė">
+                  <select
+                    value={editForm.role}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, role: event.target.value })
+                    }
+                    className="input"
+                  >
+                    <option value="employee">Darbuotojas</option>
+                    <option value="admin">Administratorius</option>
+                    <option value="owner">Savininkas</option>
+                  </select>
+                </Field>
+              </div>
+
+              <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5">
+                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                  Papildomos individualios teisės
+                </p>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {EXTRA_PERMISSIONS.map((permission) => {
+                    const checked = editForm.extra_permissions.includes(permission.value);
+
+                    return (
+                      <button
+                        key={permission.value}
+                        type="button"
+                        onClick={() => toggleExtraPermission(permission.value)}
+                        className={`rounded-2xl border p-4 text-left font-black transition active:scale-[0.99] ${
+                          checked
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                            : "border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-200 hover:bg-emerald-50"
+                        }`}
+                      >
+                        {permission.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm font-extrabold uppercase tracking-widest text-blue-700">
+                    Galutinės aktyvios teisės
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {mergedPermissions(editForm).map((permission) => (
+                      <span
+                        key={permission}
+                        className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-800"
+                      >
+                        {permission}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="text-xl font-black">4. Licencija ir sveikatos pažyma</h3>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-3">
+                <Field label="Profesinės licencijos numeris">
+                  <input
+                    value={editForm.professional_license_number}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, professional_license_number: event.target.value })
+                    }
+                    className="input"
+                    placeholder="Pvz., SPL-1234"
+                  />
+                </Field>
+
+                <Field label="Licencija galioja iki">
+                  <input
+                    type="date"
+                    value={editForm.professional_license_valid_until}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, professional_license_valid_until: event.target.value })
+                    }
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="Sveikatos pažyma galioja iki">
+                  <input
+                    type="date"
+                    value={editForm.occupational_health_valid_until}
+                    onChange={(event) =>
+                      setEditForm({ ...editForm, occupational_health_valid_until: event.target.value })
+                    }
+                    className="input"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <ModalFooter
+              saving={saving}
+              onCancel={closeEmployeeEditor}
+              onSave={() => {
+                void saveEmployee();
+              }}
+              submitText="Išsaugoti"
+            />
+          </form>
+        </Modal>
+      )}
+
+      <style jsx global>{`
+        .input {
+          width: 100%;
+          border-radius: 1rem;
+          border: 1px solid #dbe3ef;
+          background: white;
+          padding: 0.9rem 1rem;
+          font-weight: 800;
+          color: #0f172a;
+          outline: none;
+        }
+
+        .input:focus {
+          border-color: #10b981;
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+        }
+      `}</style>
     </main>
   );
 }
 
-function EmployeeSelect({
-  value,
-  employees,
-  onChange,
+function Card({
+  children,
+  className = "",
 }: {
-  value: string;
-  employees: Employee[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      style={styles.input}
-    >
-      <option value="">Pasirinkti darbuotoją</option>
-      {employees.map((employee) => (
-        <option key={employee.user_id} value={employee.user_id}>
-          {employeeName(employee)} — {employeeRole(employee)}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function Stat({
-  title,
-  value,
-  icon: Icon,
-  danger,
-  onClick,
-}: {
-  title: string;
-  value: number;
-  icon: any;
-  danger?: boolean;
-  onClick?: () => void;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
     <article
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (onClick && (event.key === "Enter" || event.key === " ")) onClick();
-      }}
-      style={{
-        ...(danger ? styles.statDanger : styles.stat),
-        cursor: onClick ? "pointer" : "default",
-      }}
+      className={`rounded-3xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}
     >
-      <div style={styles.statIcon}>
-        <Icon size={20} />
+      {children}
+    </article>
+  );
+}
+
+function StatCard({
+  icon,
+  title,
+  value,
+  meta,
+  tone,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  meta: string;
+  tone: "emerald" | "amber" | "blue" | "rose";
+  onClick?: () => void;
+}) {
+  const toneClass = {
+    emerald: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    blue: "bg-blue-50 text-blue-700",
+    rose: "bg-rose-50 text-rose-700",
+  }[tone];
+
+  const textClass = {
+    emerald: "text-emerald-700",
+    amber: "text-amber-700",
+    blue: "text-blue-700",
+    rose: "text-rose-700",
+  }[tone];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-emerald-200 hover:shadow-md active:scale-[0.99]"
+    >
+      <div className="flex items-center gap-4">
+        <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${toneClass}`}>
+          {icon}
+        </div>
+
+        <div>
+          <p className="font-extrabold text-slate-500">{title}</p>
+          <p className="mt-1 text-4xl font-black">
+            {value} <span className={`text-sm font-bold ${textClass}`}>{meta}</span>
+          </p>
+        </div>
       </div>
+    </button>
+  );
+}
+
+function ActionCard({
+  title,
+  desc,
+  onClick,
+}: {
+  title: string;
+  desc: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
+    >
+      <span>
+        <b>{title}</b>
+        <br />
+        <small className="font-semibold text-slate-500">{desc}</small>
+      </span>
+
+      <ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-emerald-700" />
+    </button>
+  );
+}
+
+function ActivityItem({ title, meta }: { title: string; meta: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm">
+        <CheckCircle2 className="h-5 w-5" />
+      </div>
+
       <div>
-        <div style={styles.statValue}>{value}</div>
-        <div style={styles.statTitle}>{title}</div>
+        <p className="font-black text-slate-900">{title}</p>
+        <p className="text-sm font-semibold text-slate-500">{meta}</p>
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({
+  title,
+  value,
+  muted = false,
+}: {
+  title: string;
+  value: string;
+  muted?: boolean;
+}) {
+  return (
+    <div className={`rounded-2xl p-4 ${muted ? "bg-slate-50" : "bg-emerald-50"}`}>
+      <p className="text-sm font-extrabold text-slate-500">{title}</p>
+      <p className="mt-1 text-lg font-black text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function PriorityItem({
+  title,
+  value,
+  tone,
+  onClick,
+}: {
+  title: string;
+  value: string;
+  tone: "amber" | "rose" | "blue";
+  onClick: () => void;
+}) {
+  const toneClass = {
+    amber: "bg-amber-50 text-amber-700",
+    rose: "bg-rose-50 text-rose-700",
+    blue: "bg-blue-50 text-blue-700",
+  }[tone];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50"
+    >
+      <span className="font-black text-slate-900">{title}</span>
+      <span className={`rounded-full px-3 py-1 text-sm font-black ${toneClass}`}>{value}</span>
+    </button>
+  );
+}
+
+function EmployeeCard({
+  employee,
+  onEdit,
+}: {
+  employee: Employee;
+  onEdit: () => void;
+}) {
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:border-emerald-200 hover:bg-emerald-50">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-lg font-black text-emerald-700 shadow-sm">
+            {employeeName(employee).slice(0, 2).toUpperCase()}
+          </div>
+
+          <div>
+            <h3 className="text-lg font-black text-slate-950">{employeeName(employee)}</h3>
+            <p className="mt-1 text-sm font-bold text-slate-500">
+              {employeeRole(employee) || "Pareigos nenurodytos"}
+            </p>
+            <p className="mt-1 text-sm font-bold text-slate-500">
+              {employee.department || "Skyrius nenurodytas"}
+            </p>
+            {(employee.contract_number || employee.employment_start_date || employee.termination_date) && (
+              <p className="mt-1 text-xs font-bold text-slate-400">
+                {employee.contract_number ? `DS: ${employee.contract_number}` : ""}
+                {employee.employment_start_date ? ` · nuo ${fmt(employee.employment_start_date)}` : ""}
+                {employee.termination_date ? ` · atleistas ${fmt(employee.termination_date)}` : ""}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 active:scale-[0.98]"
+        >
+          <Edit3 className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-emerald-700">
+          {employee.is_archived === true ? "Archyvuotas" : employee.is_active === false ? "Neaktyvus" : "Aktyvus"}
+        </span>
+        <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-slate-600">
+          {staffTypeLabel(employee.staff_type)}
+        </span>
       </div>
     </article>
   );
 }
 
-function Card({
+function ListRow({
   title,
-  children,
+  desc,
+  badge,
 }: {
   title: string;
-  children: React.ReactNode;
+  desc: string;
+  badge: string;
 }) {
   return (
-    <section style={styles.card}>
-      <h2 style={styles.cardTitle}>{title}</h2>
-      {children}
-    </section>
-  );
-}
+    <div className="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+      <div>
+        <p className="font-black text-slate-900">{title}</p>
+        <p className="mt-1 text-sm font-semibold text-slate-500">{desc}</p>
+      </div>
 
-function DataTable({
-  columns,
-  rows,
-  empty,
-}: {
-  columns: string[];
-  rows: Array<Array<React.ReactNode>>;
-  empty: string;
-}) {
-  if (!rows.length) return <div style={styles.empty}>{empty}</div>;
-
-  return (
-    <div style={styles.tableWrap}>
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column} style={styles.th}>
-                {column}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={index}>
-              {row.map((cell, cellIndex) => (
-                <td key={cellIndex} style={styles.td}>
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-slate-700">
+        {badge}
+      </span>
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background: "#f8fafc",
-    padding: 22,
-    color: "#0f172a",
-    display: "grid",
-    gap: 16,
-  },
-  hero: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 24,
-    padding: 24,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 18,
-    boxShadow: "0 16px 36px rgba(15,23,42,.06)",
-  },
-  kicker: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    color: "#047857",
-    fontSize: 12,
-    fontWeight: 950,
-    textTransform: "uppercase",
-    letterSpacing: ".06em",
-  },
-  title: {
-    margin: "6px 0 0",
-    fontSize: 42,
-    fontWeight: 950,
-    letterSpacing: "-.04em",
-  },
-  subtitle: {
-    margin: "8px 0 0",
-    color: "#64748b",
-    fontSize: 15,
-    fontWeight: 700,
-    maxWidth: 900,
-  },
-  message: {
-    background: "#ecfdf5",
-    color: "#047857",
-    border: "1px solid #a7f3d0",
-    borderRadius: 16,
-    padding: 12,
-    fontWeight: 850,
-  },
-  error: {
-    background: "#fef2f2",
-    color: "#b91c1c",
-    border: "1px solid #fecaca",
-    borderRadius: 16,
-    padding: 12,
-    fontWeight: 850,
-  },
-  statsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-    gap: 12,
-  },
-  stat: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 20,
-    padding: 16,
-    display: "flex",
-    gap: 12,
-    alignItems: "center",
-    boxShadow: "0 8px 22px rgba(15,23,42,.045)",
-  },
-  statDanger: {
-    background: "#fff7ed",
-    border: "1px solid #fed7aa",
-    borderRadius: 20,
-    padding: 16,
-    display: "flex",
-    gap: 12,
-    alignItems: "center",
-    boxShadow: "0 8px 22px rgba(15,23,42,.045)",
-  },
-  statIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    background: "#ecfdf5",
-    color: "#047857",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statValue: { fontSize: 26, fontWeight: 950 },
-  statTitle: { color: "#64748b", fontSize: 13, fontWeight: 800 },
-  tabs: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 20,
-    padding: 8,
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  tab: {
-    border: "none",
-    background: "transparent",
-    color: "#64748b",
-    borderRadius: 14,
-    padding: "10px 13px",
-    display: "inline-flex",
-    gap: 8,
-    alignItems: "center",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  tabActive: {
-    border: "none",
-    background: "#047857",
-    color: "#ffffff",
-    borderRadius: 14,
-    padding: "10px 13px",
-    display: "inline-flex",
-    gap: 8,
-    alignItems: "center",
-    fontWeight: 950,
-    cursor: "pointer",
-  },
-  gridTwo: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
-    gap: 16,
-  },
-  gridOne: { display: "grid", gridTemplateColumns: "1fr", gap: 16 },
-  card: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 24,
-    padding: 18,
-    display: "grid",
-    gap: 14,
-    boxShadow: "0 14px 32px rgba(15,23,42,.055)",
-  },
-  cardTitle: { margin: 0, fontSize: 20, fontWeight: 950 },
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-    gap: 10,
-    alignItems: "center",
-  },
-  input: {
-    width: "100%",
-    height: 46,
-    border: "1px solid #cbd5e1",
-    borderRadius: 14,
-    padding: "0 12px",
-    fontSize: 14,
-    boxSizing: "border-box",
-  },
-  primaryButton: {
-    border: "none",
-    background: "#047857",
-    color: "#ffffff",
-    borderRadius: 14,
-    height: 46,
-    padding: "0 14px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    fontWeight: 950,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    border: "1px solid #cbd5e1",
-    background: "#ffffff",
-    color: "#0f172a",
-    borderRadius: 14,
-    height: 44,
-    padding: "0 14px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  rowActions: {
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-  smallActionSecondary: {
-    border: "1px solid #cbd5e1",
-    background: "#ffffff",
-    color: "#0f172a",
-    borderRadius: 12,
-    padding: "8px 10px",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  smallAction: {
-    border: "none",
-    background: "#047857",
-    color: "#ffffff",
-    borderRadius: 12,
-    padding: "8px 10px",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  paginationBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap",
-    color: "#64748b",
-    fontSize: 14,
-    fontWeight: 850,
-  },
-  pageButton: {
-    border: "1px solid #cbd5e1",
-    background: "#ffffff",
-    color: "#0f172a",
-    borderRadius: 12,
-    padding: "8px 12px",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  pageIndicator: { color: "#0f172a", fontWeight: 950 },
-  searchBox: {
-    height: 46,
-    border: "1px solid #cbd5e1",
-    borderRadius: 14,
-    padding: "0 12px",
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-  },
-  searchInput: { border: "none", outline: "none", flex: 1, fontSize: 14 },
-  employeeGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-    gap: 12,
-  },
-  employeeCard: {
-    border: "1px solid #e2e8f0",
-    borderRadius: 18,
-    padding: 14,
-    display: "grid",
-    gridTemplateColumns: "46px 1fr auto",
-    gap: 12,
-    alignItems: "center",
-    background: "#ffffff",
-  },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
-    background: "#ecfdf5",
-    color: "#047857",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: 950,
-  },
-  cardName: { margin: 0, fontSize: 16, fontWeight: 950 },
-  cardMeta: {
-    margin: "3px 0 0",
-    color: "#64748b",
-    fontSize: 13,
-    fontWeight: 750,
-  },
-  badge: {
-    background: "#ecfdf5",
-    color: "#047857",
-    borderRadius: 999,
-    padding: "5px 9px",
-    fontSize: 12,
-    fontWeight: 900,
-  },
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="mt-5 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center font-bold text-slate-500">
+      {text}
+    </div>
+  );
+}
 
-  requirementGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-    gap: 10,
-    alignItems: "end",
-  },
-  miniStats: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-    gap: 10,
-  },
-  miniStatGood: {
-    background: "#dcfce7",
-    color: "#166534",
-    border: "1px solid #86efac",
-    borderRadius: 14,
-    padding: 12,
-    fontWeight: 950,
-  },
-  miniStatWarn: {
-    background: "#fef3c7",
-    color: "#92400e",
-    border: "1px solid #fde68a",
-    borderRadius: 14,
-    padding: 12,
-    fontWeight: 950,
-  },
-  miniStatBad: {
-    background: "#fee2e2",
-    color: "#991b1b",
-    border: "1px solid #fecaca",
-    borderRadius: 14,
-    padding: 12,
-    fontWeight: 950,
-  },
-  fieldLabel: {
-    display: "grid",
-    gap: 6,
-    color: "#475569",
-    fontSize: 12,
-    fontWeight: 900,
-  },
-  helpBox: {
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    borderRadius: 16,
-    padding: 12,
-    display: "grid",
-    gap: 6,
-    color: "#334155",
-    fontSize: 13,
-    fontWeight: 750,
-    lineHeight: 1.45,
-  },
-  notice: {
-    background: "#eff6ff",
-    color: "#1e40af",
-    border: "1px solid #bfdbfe",
-    borderRadius: 16,
-    padding: 12,
-    fontWeight: 800,
-    lineHeight: 1.45,
-  },
-  checkList: {
-    display: "grid",
-    gap: 8,
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    borderRadius: 16,
-    padding: 12,
-  },
-  statusGood: {
-    background: "#dcfce7",
-    color: "#166534",
-    borderRadius: 999,
-    padding: "5px 9px",
-    fontSize: 12,
-    fontWeight: 900,
-    display: "inline-block",
-  },
-  statusWarn: {
-    background: "#fef3c7",
-    color: "#92400e",
-    borderRadius: 999,
-    padding: "5px 9px",
-    fontSize: 12,
-    fontWeight: 900,
-    display: "inline-block",
-  },
-  statusBad: {
-    background: "#fee2e2",
-    color: "#b91c1c",
-    borderRadius: 999,
-    padding: "5px 9px",
-    fontSize: 12,
-    fontWeight: 900,
-    display: "inline-block",
-  },
-  checkbox: {
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-    color: "#334155",
-    fontSize: 13,
-    fontWeight: 800,
-  },
-  tableWrap: {
-    overflowX: "auto",
-    border: "1px solid #e2e8f0",
-    borderRadius: 16,
-  },
-  table: {
-    width: "100%",
-    minWidth: 980,
-    borderCollapse: "collapse",
-    fontSize: 13,
-  },
-  th: {
-    background: "#f8fafc",
-    textAlign: "left",
-    padding: 11,
-    color: "#475569",
-    borderBottom: "1px solid #e2e8f0",
-    whiteSpace: "nowrap",
-  },
-  td: {
-    padding: 11,
-    borderBottom: "1px solid #f1f5f9",
-    color: "#0f172a",
-    verticalAlign: "top",
-    overflowWrap: "anywhere",
-  },
+function Modal({
+  title,
+  desc,
+  children,
+  onClose,
+}: {
+  title: string;
+  desc: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm md:p-4">
+      <section className="max-h-[94vh] w-full max-w-5xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+        <div className="sticky top-0 z-30 flex items-start justify-between gap-4 border-b border-slate-100 bg-white p-4 md:gap-6 md:p-7">
+          <div>
+            <h2 className="text-2xl font-black tracking-tight md:text-4xl">{title}</h2>
+            <p className="mt-2 font-semibold text-slate-500">{desc}</p>
+          </div>
 
-  cardActions: { display: "grid", gap: 8, justifyItems: "end" },
-  iconButton: {
-    width: 36,
-    height: 36,
-    border: "1px solid #cbd5e1",
-    background: "#ffffff",
-    borderRadius: 12,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    color: "#0f172a",
-  },
-  modalBackdrop: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(15,23,42,.55)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 18,
-    zIndex: 80,
-  },
-  modal: {
-    width: "100%",
-    maxWidth: 1100,
-    maxHeight: "92vh",
-    overflowY: "auto",
-    background: "#ffffff",
-    borderRadius: 24,
-    padding: 20,
-    display: "grid",
-    gap: 14,
-    boxShadow: "0 25px 70px rgba(15,23,42,.25)",
-  },
-  modalHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    alignItems: "flex-start",
-  },
-  modalGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-    gap: 10,
-  },
-  sectionTitle: { margin: 0, fontSize: 18, fontWeight: 950, color: "#0f172a" },
-  sectionHint: {
-    margin: "-4px 0 0",
-    color: "#64748b",
-    fontSize: 13,
-    fontWeight: 750,
-    lineHeight: 1.45,
-  },
-  modalSection: {
-    border: "1px solid #e2e8f0",
-    background: "#f8fafc",
-    borderRadius: 18,
-    padding: 14,
-    display: "grid",
-    gap: 12,
-  },
-  modalActions: { display: "flex", justifyContent: "flex-end", gap: 10 },
-  scheduleToolbar: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  monthPill: {
-    height: 44,
-    border: "1px solid #e2e8f0",
-    background: "#f8fafc",
-    borderRadius: 14,
-    padding: "0 16px",
-    display: "inline-flex",
-    alignItems: "center",
-    fontWeight: 950,
-    textTransform: "capitalize",
-  },
-  scheduleLegend: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    color: "#64748b",
-    fontSize: 12,
-    fontWeight: 850,
-  },
-  excelWrap: {
-    border: "1px solid #e2e8f0",
-    borderRadius: 18,
-    overflow: "hidden",
-  },
-  empty: {
-    border: "1px dashed #cbd5e1",
-    borderRadius: 18,
-    padding: 22,
-    textAlign: "center",
-    color: "#64748b",
-    background: "#f8fafc",
-  },
-};
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 active:scale-[0.98] md:h-14 md:w-14"
+            aria-label="Uždaryti"
+          >
+            <X className="h-7 w-7" />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(94vh-104px)] overflow-y-auto p-4 md:max-h-[calc(94vh-132px)] md:p-7">{children}</div>
+      </section>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+  full = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  full?: boolean;
+}) {
+  return (
+    <label className={`block ${full ? "md:col-span-2" : ""}`}>
+      <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function ModalFooter({
+  saving,
+  onCancel,
+  onSave,
+  submitText,
+}: {
+  saving: boolean;
+  onCancel: () => void;
+  onSave?: () => void;
+  submitText: string;
+}) {
+  return (
+    <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="rounded-2xl border border-slate-200 bg-white px-5 py-3 font-black text-slate-700 transition hover:bg-slate-50"
+      >
+        Atšaukti
+      </button>
+
+      <button
+        type={onSave ? "button" : "submit"}
+        onClick={onSave}
+        disabled={saving}
+        className="rounded-2xl bg-slate-950 px-5 py-3 font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
+      >
+        {saving ? "Saugoma..." : submitText}
+      </button>
+    </div>
+  );
+}

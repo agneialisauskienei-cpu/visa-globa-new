@@ -1,282 +1,227 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
-function getReadableError(error: unknown) {
-  if (!error) return 'Nežinoma klaida.'
-  if (error instanceof Error) return error.message
-  if (typeof error === 'object') {
-    const maybe = error as {
-      message?: string
-      details?: string
-      hint?: string
-      code?: string
-    }
-    if (maybe.message) return maybe.message
-    if (maybe.details) return maybe.details
-    if (maybe.hint) return maybe.hint
-    if (maybe.code) return `Klaidos kodas: ${maybe.code}`
-  }
-  return 'Nepavyko įvykdyti veiksmo.'
+type InviteRow = {
+  id: string;
+  organization_id: string;
+  email: string | null;
+  role: string | null;
+  status: string | null;
+  token: string | null;
+};
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
 }
 
-export default function SignupPage() {
-  const router = useRouter()
+function getReadableError(error: unknown) {
+  if (!error) return "Nepavyko įvykdyti veiksmo.";
+  if (error instanceof Error) return error.message;
 
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [organizationCode, setOrganizationCode] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
+  if (typeof error === "object") {
+    const maybe = error as {
+      message?: string;
+      details?: string;
+      hint?: string;
+      code?: string;
+    };
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setMessage('')
+    return [maybe.message, maybe.details, maybe.hint, maybe.code]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  return String(error);
+}
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const token = useMemo(() => searchParams.get("token")?.trim() || "", [searchParams]);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function getInviteByToken(inviteToken: string) {
+    const { data, error } = await supabase
+      .from("organization_invites")
+      .select("id, organization_id, email, role, status, token")
+      .eq("token", inviteToken)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error("Kvietimas nerastas arba nuoroda neteisinga.");
+
+    const invite = data as InviteRow;
+
+    if (invite.status && invite.status !== "pending" && invite.status !== "accepted") {
+      throw new Error("Šis kvietimas nebegalioja.");
+    }
+
+    return invite;
+  }
+
+  async function findExistingUserIdByEmail(normalizedEmail: string) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    if (error) return null;
+
+    return data?.id || null;
+  }
+
+  async function createMembership(invite: InviteRow, userId: string) {
+    const { error: membershipError } = await supabase
+      .from("organization_members")
+      .upsert(
+        {
+          organization_id: invite.organization_id,
+          user_id: userId,
+          role: invite.role || "employee",
+          is_active: true,
+        },
+        { onConflict: "organization_id,user_id" },
+      );
+
+    if (membershipError) throw membershipError;
+
+    const { error: inviteError } = await supabase
+      .from("organization_invites")
+      .update({ status: "accepted" })
+      .eq("id", invite.id);
+
+    if (inviteError) throw inviteError;
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+
+    setSaving(true);
+    setMessage("");
 
     try {
-      const normalizedEmail = email.trim().toLowerCase()
-      const normalizedCode = organizationCode.trim().toUpperCase()
-
-      if (!normalizedCode) {
-        setMessage('Įvesk įstaigos kodą.')
-        setSaving(false)
-        return
+      if (!token) {
+        throw new Error("Registracija galima tik per darbovietės kvietimo nuorodą.");
       }
 
-      const { data: organization, error: organizationError } = await supabase
-        .from('organizations')
-        .select('id, name, invite_code')
-        .eq('invite_code', normalizedCode)
-        .maybeSingle()
+      const invite = await getInviteByToken(token);
+      const normalizedEmail = normalizeEmail(email || invite.email || "");
 
-      if (organizationError) throw organizationError
-
-      if (!organization) {
-        setMessage('Neteisingas įstaigos kodas.')
-        setSaving(false)
-        return
+      if (!normalizedEmail) {
+        throw new Error("Įvesk el. paštą.");
       }
 
-      const authRes = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password,
-      })
-
-      if (authRes.error) throw authRes.error
-
-      const user = authRes.data.user
-
-      if (!user) {
-        setMessage('Nepavyko sukurti paskyros.')
-        setSaving(false)
-        return
+      if (invite.email && normalizeEmail(invite.email) !== normalizedEmail) {
+        throw new Error(`Šis kvietimas skirtas el. paštui ${invite.email}.`);
       }
 
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: user.id,
-        email: normalizedEmail,
-        first_name: firstName.trim() || null,
-        last_name: lastName.trim() || null,
-        full_name: [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || null,
-      })
-
-      if (profileError) throw profileError
-
-      // 1. Tikrinam ar šiam email yra super admin sukurtas kvietimas
-      const { data: invites, error: invitesError } = await supabase
-        .from('organization_invites')
-        .select('id, organization_id, role, accepted')
-        .eq('email', normalizedEmail)
-        .eq('organization_id', organization.id)
-        .eq('accepted', false)
-
-      if (invitesError) throw invitesError
-
-      if ((invites || []).length > 0) {
-        for (const invite of invites || []) {
-          const { error: membershipError } = await supabase
-            .from('organization_members')
-            .upsert({
-              organization_id: invite.organization_id,
-              user_id: user.id,
-              role: invite.role || 'admin',
-              is_active: true,
-            })
-
-          if (membershipError) throw membershipError
-
-          const { error: acceptInviteError } = await supabase
-            .from('organization_invites')
-            .update({ accepted: true })
-            .eq('id', invite.id)
-
-          if (acceptInviteError) throw acceptInviteError
-        }
-
-        router.replace('/login')
-        return
+      if (!password || password.length < 6) {
+        throw new Error("Slaptažodis turi būti bent 6 simbolių.");
       }
 
-      // 2. Jei kvietimo nėra, lieka senas pending approval flow
-      const { error: requestError } = await supabase
-        .from('organization_join_requests')
-        .insert({
-          organization_id: organization.id,
-          user_id: user.id,
+      let userId = await findExistingUserIdByEmail(normalizedEmail);
+
+      if (!userId) {
+        const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: normalizedEmail,
-          first_name: firstName.trim() || null,
-          last_name: lastName.trim() || null,
-          status: 'pending',
-        })
+          password,
+          options: {
+            data: {
+              role: invite.role || "employee",
+            },
+          },
+        });
 
-      if (requestError) throw requestError
+        if (signUpError) throw signUpError;
 
-      router.replace('/pending-approval')
+        userId = authData.user?.id || null;
+      }
+
+      if (!userId) {
+        throw new Error("Nepavyko nustatyti naudotojo paskyros.");
+      }
+
+      await createMembership(invite, userId);
+
+      setMessage("Paskyra aktyvuota. Gali prisijungti.");
+      router.replace("/login");
     } catch (error) {
-      setMessage(getReadableError(error))
+      setMessage(getReadableError(error));
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   return (
-    <main style={styles.page}>
-      <section style={styles.card}>
-        <div style={styles.badge}>Registracija</div>
-        <h1 style={styles.title}>Prisijungimas prie įstaigos</h1>
-        <p style={styles.subtitle}>
-          Įvesk savo duomenis ir įstaigos kodą. Po registracijos paskyrą turės
-          patvirtinti administratorius, nebent tau jau yra sukurtas kvietimas.
-        </p>
+    <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
+      <div className="mx-auto flex min-h-[calc(100vh-48px)] max-w-xl items-center justify-center">
+        <section className="w-full rounded-[32px] border border-slate-200 bg-white p-7 shadow-sm">
+          <div className="mb-6">
+            <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+              Darbovietės kvietimas
+            </p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight">
+              Susikurk prisijungimą
+            </h1>
+            <p className="mt-2 font-semibold leading-6 text-slate-500">
+              Registracija galima tik gavus kvietimą iš įstaigos. Įstaigos kodo pildyti nereikia.
+            </p>
+          </div>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <input
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            placeholder="Vardas"
-            style={styles.input}
-          />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <label className="block">
+              <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">
+                El. paštas
+              </span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="vardas@pastas.lt"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold outline-none transition focus:border-emerald-300 focus:bg-white"
+                required
+              />
+            </label>
 
-          <input
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            placeholder="Pavardė"
-            style={styles.input}
-          />
+            <label className="block">
+              <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">
+                Slaptažodis
+              </span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Bent 6 simboliai"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold outline-none transition focus:border-emerald-300 focus:bg-white"
+                required
+              />
+            </label>
 
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="El. paštas"
-            style={styles.input}
-            required
-          />
+            {message ? (
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 font-bold text-amber-800">
+                {message}
+              </div>
+            ) : null}
 
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Slaptažodis"
-            style={styles.input}
-            required
-          />
-
-          <input
-            value={organizationCode}
-            onChange={(e) => setOrganizationCode(e.target.value.toUpperCase())}
-            placeholder="Įstaigos kodas"
-            style={styles.input}
-            required
-          />
-
-          {message ? <div style={styles.message}>{message}</div> : null}
-
-          <button type="submit" disabled={saving} style={styles.button}>
-            {saving ? 'Kuriama...' : 'Registruotis'}
-          </button>
-        </form>
-      </section>
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full rounded-2xl bg-slate-950 px-5 py-3 font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-60"
+            >
+              {saving ? "Aktyvuojama..." : "Aktyvuoti paskyrą"}
+            </button>
+          </form>
+        </section>
+      </div>
     </main>
-  )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: '#f4f6f4',
-    padding: 24,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 520,
-    background: '#fff',
-    border: '1px solid #dde5de',
-    borderRadius: 28,
-    padding: 28,
-    display: 'grid',
-    gap: 16,
-    boxShadow: '0 12px 28px rgba(48,68,55,0.05)',
-  },
-  badge: {
-    display: 'inline-flex',
-    width: 'fit-content',
-    padding: '7px 12px',
-    borderRadius: 999,
-    background: '#eef4ef',
-    color: '#587561',
-    fontSize: 12,
-    fontWeight: 900,
-  },
-  title: {
-    margin: 0,
-    fontSize: 32,
-    fontWeight: 900,
-    color: '#173120',
-  },
-  subtitle: {
-    margin: 0,
-    fontSize: 15,
-    lineHeight: 1.6,
-    color: '#64756a',
-    fontWeight: 700,
-  },
-  form: {
-    display: 'grid',
-    gap: 12,
-  },
-  input: {
-    width: '100%',
-    boxSizing: 'border-box',
-    borderRadius: 14,
-    border: '1px solid #d8e4da',
-    padding: '12px 14px',
-    fontSize: 14,
-    outline: 'none',
-  },
-  message: {
-    padding: '12px 14px',
-    borderRadius: 14,
-    background: '#fff8f6',
-    border: '1px solid #f1d0c2',
-    color: '#9a3412',
-    fontWeight: 700,
-  },
-  button: {
-    border: 'none',
-    borderRadius: 14,
-    background: '#587561',
-    color: '#fff',
-    padding: '12px 16px',
-    fontWeight: 900,
-    cursor: 'pointer',
-  },
+  );
 }

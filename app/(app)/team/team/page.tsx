@@ -40,6 +40,9 @@ type Employee = {
   professional_license_number?: string | null
   professional_license_valid_until?: string | null
   occupational_health_valid_until?: string | null
+  employment_rate?: number | string | null
+  weekly_hours?: number | string | null
+  employment_type?: string | null
   is_active?: boolean | null
 }
 
@@ -236,6 +239,45 @@ function employeeRole(employee?: Employee | null) {
   return employee?.position || employee?.role || employee?.legacy_role || "—"
 }
 
+function toNumberOrNull(value: unknown) {
+  const normalized = String(value ?? "").replace(",", ".").trim()
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function employmentRate(employee?: Employee | null) {
+  const value = toNumberOrNull(employee?.employment_rate)
+  return value && value > 0 ? value : 1
+}
+
+function weeklyHours(employee?: Employee | null) {
+  const value = toNumberOrNull(employee?.weekly_hours)
+  if (value && value > 0) return value
+  return Math.round(employmentRate(employee) * 40 * 100) / 100
+}
+
+function employmentTypeLabel(value?: string | null) {
+  const labels: Record<string, string> = {
+    full_time: "Pilnas etatas",
+    part_time: "Nepilnas etatas",
+    temporary: "Laikinas darbas",
+    internship: "Praktika",
+    volunteer: "Savanorystė",
+    contract: "Paslaugų sutartis",
+    night_only: "Tik naktinės pamainos",
+  }
+
+  return labels[String(value || "")] || "Nenurodyta"
+}
+
+function employmentSummary(employee?: Employee | null) {
+  if (!employee) return "Etatas nenurodytas"
+  const rate = employmentRate(employee)
+  const hours = weeklyHours(employee)
+  return `${rate.toFixed(2)} et. · ${hours.toFixed(hours % 1 ? 1 : 0)} val./sav.`
+}
+
 function isExpiring(value?: string | null) {
   if (!value) return false
   const date = new Date(`${value}T00:00:00`)
@@ -420,7 +462,9 @@ export default function TeamPage() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [trainingDetailsEmployeeId, setTrainingDetailsEmployeeId] = useState<string | null>(null)
   const [trainingEntryEmployee, setTrainingEntryEmployee] = useState<Employee | null>(null)
-  const [editForm, setEditForm] = useState({ first_name: "", last_name: "", full_name: "", email: "", position: "", department: "", professional_license_number: "", professional_license_valid_until: "", occupational_health_valid_until: "" })
+  const [showNewEmployeeModal, setShowNewEmployeeModal] = useState(false)
+  const [newEmployeeForm, setNewEmployeeForm] = useState({ first_name: "", last_name: "", full_name: "", email: "", position: "", department: "", staff_type: "", role: "employee", employment_rate: "1.00", weekly_hours: "40", employment_type: "full_time" })
+  const [editForm, setEditForm] = useState({ first_name: "", last_name: "", full_name: "", email: "", position: "", department: "", professional_license_number: "", professional_license_valid_until: "", occupational_health_valid_until: "", employment_rate: "1.00", weekly_hours: "40", employment_type: "full_time" })
   const [scheduleMonth, setScheduleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -588,7 +632,7 @@ export default function TeamPage() {
 
       const members = await supabase
         .from("organization_members")
-        .select("user_id, role, legacy_role, position, department, staff_type, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active")
+        .select("user_id, role, legacy_role, position, department, staff_type, professional_license_number, professional_license_valid_until, occupational_health_valid_until, employment_rate, weekly_hours, employment_type, is_active")
         .eq("organization_id", orgId)
         .eq("is_active", true)
 
@@ -630,7 +674,7 @@ export default function TeamPage() {
         safeLoad("training_catalog", setTrainingCatalog, orgId, "name"),
         safeLoad("position_training_requirements", setTrainingRequirements, orgId, "position"),
         safeLoad("personnel_vacation_requests", setVacations, orgId, "created_at"),
-        safeLoad("personnel_candidates", setCandidates, orgId, "created_at"),
+        safeLoad("candidates", setCandidates, orgId, "created_at"),
         safeLoad("personnel_schedule_entries", setSchedule, orgId, "date"),
         safeLoad("document_requirements", setDocumentRequirements, orgId, "sort_order"),
         safeLoad("document_verifications", setDocumentVerifications, orgId, "verified_at"),
@@ -684,6 +728,8 @@ export default function TeamPage() {
         employee.email,
         employeeRole(employee),
         employee.department,
+        employmentSummary(employee),
+        employmentTypeLabel(employee.employment_type),
       ]
         .filter(Boolean)
         .join(" ")
@@ -1209,7 +1255,7 @@ export default function TeamPage() {
     setSaving(true)
     setMessage("")
 
-    const { error } = await supabase.from("personnel_candidates").insert({
+    const { error } = await supabase.from("candidates").insert({
       organization_id: organizationId,
       first_name: candidateForm.first_name.trim(),
       last_name: candidateForm.last_name.trim(),
@@ -1557,6 +1603,9 @@ export default function TeamPage() {
       professional_license_number: employee.professional_license_number || "",
       professional_license_valid_until: employee.professional_license_valid_until || "",
       occupational_health_valid_until: employee.occupational_health_valid_until || "",
+      employment_rate: String(employee.employment_rate ?? "1.00"),
+      weekly_hours: String(employee.weekly_hours ?? weeklyHours(employee)),
+      employment_type: employee.employment_type || "full_time",
     })
 
     setCredentialForm((prev) => ({ ...prev, employee_id: employee.user_id }))
@@ -1573,6 +1622,99 @@ export default function TeamPage() {
       certificate_no: "",
       verified_by: currentUserName,
     }))
+  }
+
+
+  function openNewEmployeeModal() {
+    setMessage("")
+    setNewEmployeeForm({
+      first_name: "",
+      last_name: "",
+      full_name: "",
+      email: "",
+      position: "",
+      department: "",
+      staff_type: "",
+      role: "employee",
+      employment_rate: "1.00",
+      weekly_hours: "40",
+      employment_type: "full_time",
+    })
+    setShowNewEmployeeModal(true)
+  }
+
+  async function createEmployee() {
+    if (!organizationId) return
+
+    const cleanEmail = newEmployeeForm.email.trim().toLowerCase()
+    const cleanFirstName = newEmployeeForm.first_name.trim()
+    const cleanLastName = newEmployeeForm.last_name.trim()
+    const cleanFullName = newEmployeeForm.full_name.trim() || [cleanFirstName, cleanLastName].filter(Boolean).join(" ").trim()
+    const rate = toNumberOrNull(newEmployeeForm.employment_rate) ?? 1
+    const hours = toNumberOrNull(newEmployeeForm.weekly_hours) ?? Math.round(rate * 40 * 100) / 100
+
+    if (!cleanEmail) {
+      setMessage("Įrašyk darbuotojo el. paštą.")
+      return
+    }
+
+    if (rate <= 0 || rate > 2) {
+      setMessage("Etato dydis turi būti nuo 0.01 iki 2.00.")
+      return
+    }
+
+    if (hours <= 0 || hours > 80) {
+      setMessage("Savaitės valandos turi būti nuo 1 iki 80.")
+      return
+    }
+
+    const userId = crypto.randomUUID()
+
+    try {
+      setSaving(true)
+      setMessage("")
+
+      const profileInsert = await supabase.from("profiles").insert({
+        id: userId,
+        email: cleanEmail,
+        first_name: cleanFirstName || null,
+        last_name: cleanLastName || null,
+        full_name: cleanFullName || null,
+      })
+
+      if (profileInsert.error) {
+        setMessage(profileInsert.error.message)
+        return
+      }
+
+      const memberInsert = await supabase.from("organization_members").insert({
+        organization_id: organizationId,
+        user_id: userId,
+        role: newEmployeeForm.role || "employee",
+        position: newEmployeeForm.position.trim() || null,
+        department: newEmployeeForm.department.trim() || null,
+        staff_type: newEmployeeForm.staff_type.trim() || null,
+        employment_rate: rate,
+        weekly_hours: hours,
+        employment_type: newEmployeeForm.employment_type || "full_time",
+        is_active: true,
+      })
+
+      if (memberInsert.error) {
+        await supabase.from("profiles").delete().eq("id", userId)
+        setMessage(memberInsert.error.message)
+        return
+      }
+
+      await writeAudit("employee_created", "organization_member", userId, cleanFullName || cleanEmail)
+      await loadAll()
+      setShowNewEmployeeModal(false)
+      setMessage("Darbuotojas pridėtas.")
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Nepavyko pridėti darbuotojo.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function saveEmployeeEditor() {
@@ -1597,6 +1739,9 @@ export default function TeamPage() {
       professional_license_number: editForm.professional_license_number.trim() || null,
       professional_license_valid_until: editForm.professional_license_valid_until || null,
       occupational_health_valid_until: editForm.occupational_health_valid_until || null,
+      employment_rate: toNumberOrNull(editForm.employment_rate) ?? 1,
+      weekly_hours: toNumberOrNull(editForm.weekly_hours) ?? 40,
+      employment_type: editForm.employment_type || "full_time",
     }
     const previousMemberPayload = {
       position: editingEmployee.position || null,
@@ -1604,6 +1749,9 @@ export default function TeamPage() {
       professional_license_number: editingEmployee.professional_license_number || null,
       professional_license_valid_until: editingEmployee.professional_license_valid_until || null,
       occupational_health_valid_until: editingEmployee.occupational_health_valid_until || null,
+      employment_rate: toNumberOrNull(editingEmployee.employment_rate) ?? 1,
+      weekly_hours: toNumberOrNull(editingEmployee.weekly_hours) ?? 40,
+      employment_type: editingEmployee.employment_type || "full_time",
     }
 
     try {
@@ -1805,7 +1953,11 @@ export default function TeamPage() {
         <Card title="Darbuotojų registras">
           <div style={styles.searchBox}>
             <Search size={18} color="#94a3b8" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ieškoti pagal vardą, pareigas, skyrių..." style={styles.searchInput} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ieškoti pagal vardą, pareigas, skyrių, etatą..." style={styles.searchInput} />
+            <button type="button" style={styles.primaryButton} onClick={openNewEmployeeModal}>
+              <UserPlus size={16} />
+              Naujas darbuotojas
+            </button>
           </div>
 
           <div style={styles.employeeGrid}>
@@ -1816,6 +1968,7 @@ export default function TeamPage() {
                   <h3 style={styles.cardName}>{employeeName(employee)}</h3>
                   <p style={styles.cardMeta}>{employeeRole(employee)}</p>
                   <p style={styles.cardMeta}>{employee.department || "Skyrius nenurodytas"}</p>
+                  <p style={styles.cardMeta}>{employmentSummary(employee)} · {employmentTypeLabel(employee.employment_type)}</p>
                 </div>
                 <div style={styles.cardActions}>
                   <div style={styles.badge}>{employee.is_active === false ? "Neaktyvus" : "Aktyvus"}</div>
@@ -2413,6 +2566,48 @@ export default function TeamPage() {
         </div>
       ) : null}
 
+
+      {showNewEmployeeModal ? (
+        <div style={styles.modalBackdrop}>
+          <div style={styles.modal}>
+            <div style={styles.modalHeader}>
+              <div>
+                <h2 style={styles.cardTitle}>Naujas darbuotojas</h2>
+                <p style={styles.cardMeta}>Įrašomi baziniai darbuotojo duomenys, pareigos ir etato dydis grafikų normoms.</p>
+              </div>
+              <button type="button" style={styles.iconButton} onClick={() => setShowNewEmployeeModal(false)} aria-label="Uždaryti"><X size={18} /></button>
+            </div>
+
+            <div style={styles.notice}>
+              Jei tavo `profiles` lentelė susieta su `auth.users`, darbuotoją geriau kviesti per registracijos / pakvietimo srautą. Ši forma skirta personalo įrašui sukurti sistemoje, o etatas iškart naudojamas grafikų skaičiavimuose.
+            </div>
+
+            {message ? <div style={message.toLowerCase().includes("klaid") || message.toLowerCase().includes("nepavyko") || message.toLowerCase().includes("invalid") || message.toLowerCase().includes("violates") || message.toLowerCase().includes("policy") || message.toLowerCase().includes("security") || message.toLowerCase().includes("rls") ? styles.error : styles.message}>{message}</div> : null}
+
+            <div style={styles.modalSection}>
+              <h3 style={styles.sectionTitle}>1. Darbuotojo duomenys</h3>
+              <div style={styles.modalGrid}>
+                <label style={styles.fieldLabel}><span>Vardas</span><input style={styles.input} value={newEmployeeForm.first_name} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, first_name: e.target.value })} placeholder="Vardas" /></label>
+                <label style={styles.fieldLabel}><span>Pavardė</span><input style={styles.input} value={newEmployeeForm.last_name} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, last_name: e.target.value })} placeholder="Pavardė" /></label>
+                <label style={styles.fieldLabel}><span>Rodomas vardas</span><input style={styles.input} value={newEmployeeForm.full_name} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, full_name: e.target.value })} placeholder="Jei paliksi tuščią, bus vardas + pavardė" /></label>
+                <label style={styles.fieldLabel}><span>El. paštas</span><input type="email" style={styles.input} value={newEmployeeForm.email} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, email: e.target.value })} placeholder="vardas@imone.lt" /></label>
+                <label style={styles.fieldLabel}><span>Pareigos</span><input style={styles.input} value={newEmployeeForm.position} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, position: e.target.value })} placeholder="Pvz. slaugytoja" /></label>
+                <label style={styles.fieldLabel}><span>Skyrius</span><input style={styles.input} value={newEmployeeForm.department} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, department: e.target.value })} placeholder="Pvz. Slauga" /></label>
+                <label style={styles.fieldLabel}><span>Darbuotojo grupė</span><input style={styles.input} value={newEmployeeForm.staff_type} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, staff_type: e.target.value })} placeholder="Pvz. socialinių paslaugų darbuotojas" /></label>
+                <label style={styles.fieldLabel}><span>Rolė sistemoje</span><select style={styles.input} value={newEmployeeForm.role} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, role: e.target.value })}><option value="employee">Darbuotojas</option><option value="admin">Administratorius</option><option value="owner">Savininkas / vadovas</option></select></label>
+                <label style={styles.fieldLabel}><span>Etato dydis</span><input type="number" min="0.01" max="2" step="0.01" style={styles.input} value={newEmployeeForm.employment_rate} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, employment_rate: e.target.value, weekly_hours: String(Math.round((toNumberOrNull(e.target.value) ?? 1) * 40 * 100) / 100), employment_type: (toNumberOrNull(e.target.value) ?? 1) >= 1 ? "full_time" : "part_time" })} placeholder="Pvz. 1.00, 0.75, 0.50" /></label>
+                <label style={styles.fieldLabel}><span>Savaitės valandos</span><input type="number" min="1" max="80" step="0.25" style={styles.input} value={newEmployeeForm.weekly_hours} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, weekly_hours: e.target.value })} placeholder="Pvz. 40, 30, 20" /></label>
+                <label style={styles.fieldLabel}><span>Darbo tipas</span><select style={styles.input} value={newEmployeeForm.employment_type} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, employment_type: e.target.value })}><option value="full_time">Pilnas etatas</option><option value="part_time">Nepilnas etatas</option><option value="temporary">Laikinas darbas</option><option value="internship">Praktika</option><option value="volunteer">Savanorystė</option><option value="contract">Paslaugų sutartis</option><option value="night_only">Tik naktinės pamainos</option></select></label>
+              </div>
+            </div>
+
+            <div style={styles.modalActions}>
+              <button type="button" style={styles.secondaryButton} onClick={() => setShowNewEmployeeModal(false)}>Atšaukti</button>
+              <button type="button" style={styles.primaryButton} disabled={saving} onClick={() => void createEmployee()}><UserPlus size={16} />{saving ? "Saugoma..." : "Sukurti darbuotoją"}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {editingEmployee ? (
         <div style={styles.modalBackdrop}>
           <div style={styles.modal}>
@@ -2466,7 +2661,36 @@ export default function TeamPage() {
             </div>
 
             <div style={styles.modalSection}>
-              <h3 style={styles.sectionTitle}>2. Licencija ir sveikatos pažyma</h3>
+              <h3 style={styles.sectionTitle}>2. Etatas ir darbo norma</h3>
+              <p style={styles.sectionHint}>Šie laukai naudojami grafiko modulyje: mėnesio normai, viršvalandžiams, neatvykimams ir etatų užpildymo statistikai.</p>
+              <div style={styles.modalGrid}>
+                <label style={styles.fieldLabel}>
+                  <span>Etato dydis</span>
+                  <input type="number" min="0.01" max="2" step="0.01" style={styles.input} value={editForm.employment_rate} onChange={(e) => setEditForm({ ...editForm, employment_rate: e.target.value, weekly_hours: String(Math.round((toNumberOrNull(e.target.value) ?? 1) * 40 * 100) / 100) })} placeholder="Pvz. 1.00, 0.75, 0.50" />
+                </label>
+
+                <label style={styles.fieldLabel}>
+                  <span>Savaitės valandos</span>
+                  <input type="number" min="1" max="80" step="0.25" style={styles.input} value={editForm.weekly_hours} onChange={(e) => setEditForm({ ...editForm, weekly_hours: e.target.value })} placeholder="Pvz. 40, 30, 20" />
+                </label>
+
+                <label style={styles.fieldLabel}>
+                  <span>Darbo tipas</span>
+                  <select style={styles.input} value={editForm.employment_type} onChange={(e) => setEditForm({ ...editForm, employment_type: e.target.value })}>
+                    <option value="full_time">Pilnas etatas</option>
+                    <option value="part_time">Nepilnas etatas</option>
+                    <option value="temporary">Laikinas darbas</option>
+                    <option value="internship">Praktika</option>
+                    <option value="volunteer">Savanorystė</option>
+                    <option value="contract">Paslaugų sutartis</option>
+                    <option value="night_only">Tik naktinės pamainos</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div style={styles.modalSection}>
+              <h3 style={styles.sectionTitle}>3. Licencija ir sveikatos pažyma</h3>
               <div style={styles.modalGrid}>
                 <label style={styles.fieldLabel}>
                   <span>Profesinės licencijos numeris</span>
@@ -2486,7 +2710,7 @@ export default function TeamPage() {
             </div>
 
             <div style={styles.modalSection}>
-              <h3 style={styles.sectionTitle}>3. Mokymų atitiktis</h3>
+              <h3 style={styles.sectionTitle}>4. Mokymų atitiktis</h3>
               <p style={styles.sectionHint}>Čia matysi, kiek mokymų darbuotojui trūksta, kas jau galioja ir ką galima iškart papildyti tame pačiame lange.</p>
               <DataTable
                 columns={["Mokymas", "Statusas", "Baigta", "Galioja iki", "Val.", "Patikrino", "Veiksmai"]}
@@ -2508,7 +2732,7 @@ export default function TeamPage() {
             </div>
 
             <div style={styles.modalSection}>
-              <h3 style={styles.sectionTitle}>4. Greitai pridėti mokymus</h3>
+              <h3 style={styles.sectionTitle}>5. Greitai pridėti mokymus</h3>
               <p style={styles.sectionHint}>Pilnas mokymų valdymas yra skiltyje „Mokymai“. Čia galima greitai pridėti mokymus konkrečiam darbuotojui.</p>
               {message ? <div style={message.toLowerCase().includes("klaid") || message.toLowerCase().includes("nepavyko") || message.toLowerCase().includes("invalid") || message.toLowerCase().includes("violates") || message.toLowerCase().includes("policy") || message.toLowerCase().includes("security") || message.toLowerCase().includes("rls") ? styles.error : styles.message}>{message}</div> : null}
 

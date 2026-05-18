@@ -1,70 +1,91 @@
-import type { SystemRole } from '@/lib/app-access'
+import type { Permission } from "@/lib/app-access"
 
 export type AppMenuItem = {
   label: string
   href: string
-  roles: SystemRole[]
+  permission: Permission
+  icon: string
 }
 
 export const APP_MENU: AppMenuItem[] = [
   {
-    label: 'Pagrindinis',
-    href: '/dashboard',
-    roles: ['owner', 'admin', 'employee'],
+    label: "Pagrindinis",
+    href: "/dashboard",
+    permission: "dashboard.view",
+    icon: "home",
   },
   {
-    label: 'Įstaigos',
-    href: '/organizations',
-    roles: ['owner'],
+    label: "Darbuotojai",
+    href: "/team",
+    permission: "employees.view",
+    icon: "users",
   },
   {
-    label: 'Darbuotojai',
-    href: '/employees',
-    roles: ['owner', 'admin'],
+    label: "Užduotys",
+    href: "/tasks",
+    permission: "tasks.view",
+    icon: "tasks",
   },
   {
-    label: 'Gyventojai',
-    href: '/residents',
-    roles: ['owner', 'admin', 'employee'],
+    label: "Mano profilis",
+    href: "/my-profile",
+    permission: "dashboard.view",
+    icon: "user",
   },
   {
-    label: 'Kambariai',
-    href: '/rooms',
-    roles: ['owner', 'admin', 'employee'],
+    label: "Gyventojai",
+    href: "/residents",
+    permission: "residents.view_basic",
+    icon: "resident",
   },
   {
-    label: 'Sandėlis',
-    href: '/inventory',
-    roles: ['owner', 'admin', 'employee'],
-  },
-{
-  label: "Medicina",
-  href: "/medicine",
-  roles: ["admin", "employee"],
-}
-  {
-    label: 'Užklausos',
-    href: '/requests',
-    roles: ['owner', 'admin', 'employee'],
+    label: "Veiklos",
+    href: "/activities",
+    permission: "activities.manage",
+    icon: "tasks",
   },
   {
-    label: 'Kvietimai',
-    href: '/invites',
-    roles: ['owner', 'admin'],
+    label: "Medicina",
+    href: "/medicine",
+    permission: "medicine.view",
+    icon: "heart",
   },
   {
-    label: 'Ataskaitos',
-    href: '/reports',
-    roles: ['owner', 'admin'],
+    label: "Kambariai",
+    href: "/rooms",
+    permission: "rooms.view",
+    icon: "home2",
   },
   {
-    label: 'Nustatymai',
-    href: '/settings',
-    roles: ['owner', 'admin'],
+    label: "Sandėliai",
+    href: "/inventory",
+    permission: "inventory.view",
+    icon: "box",
   },
+  {
+    label: "Perdavimo žurnalai",
+    href: "/handover-logs",
+    permission: "handover.view",
+    icon: "clipboard",
+  },
+  {
+    label: "Užklausos",
+    href: "/requests",
+    permission: "employees.manage",
+    icon: "inbox",
+  },
+ 
+  {
+    label: "Ataskaitos",
+    href: "/reports",
+    permission: "reports.view",
+    icon: "chart",
+  },
+  {
+    label: "Auditas",
+    href: "/audit",
+    permission: "audit.view",
+    icon: "shield",
+  },
+  
 ]
-
-export function getMenuForRole(role: SystemRole | null): AppMenuItem[] {
-  if (!role) return []
-  return APP_MENU.filter((item) => item.roles.includes(role))
-}

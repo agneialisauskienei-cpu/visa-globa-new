@@ -1,1468 +1,2037 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
+  AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   ClipboardList,
-  MessageSquare,
-  Pencil,
-  RefreshCw,
-  RotateCcw,
-  SkipForward,
-  StopCircle,
+  Clock,
+  Camera,
+  Eye,
+  FileText,
+  Hammer,
+  Plus,
+  Repeat,
+  Search,
+  Sparkles,
+  Timer,
+  UserCheck,
+  UserRound,
+  Wrench,
   X,
 } from "lucide-react"
+
+import MobileBottomNav from "@/components/mobile/MobileBottomNav"
+import { getCurrentAccess, hasPermission, type CurrentAccess } from "@/lib/app-access"
+import { getReadableError } from "@/lib/errors"
+import { formatDate, formatDateTime } from "@/lib/format"
+import { ROUTES } from "@/lib/routes"
 import { supabase } from "@/lib/supabase"
-import { getCurrentOrganizationId } from "@/lib/current-organization"
-import { getChangedFields, logAudit } from "@/lib/audit"
 
-type TaskStatus =
-  | "new"
-  | "assigned"
-  | "in_progress"
-  | "waiting"
-  | "done"
-  | "cancelled"
-  | "overdue"
-
-type TaskPriority = "low" | "medium" | "high" | "critical"
-
-type Task = {
+type TaskRow = {
   id: string
-  organization_id: string | null
+  organization_id: string
+  assigned_user_id: string | null
+  created_by_user_id?: string | null
+  resident_id: string | null
   title: string
   description: string | null
-  status: TaskStatus
-  priority: TaskPriority
-  assigned_to: string | null
-  created_by: string | null
-  resident_id: string | null
-  care_plan_id: string | null
-  category: string | null
-  department: string | null
-  due_date: string | null
-  completed_at: string | null
-  created_at: string | null
-  recurrence_days: number | null
-  recurrence_parent_id: string | null
-  recurrence_until: string | null
-}
-
-type Resident = {
-  id: string
-  full_name: string | null
-  first_name: string | null
-  last_name: string | null
-  resident_code: string | null
-  current_room_id: string | null
-}
-
-type CarePlan = {
-  id: string
-  resident_id: string
-  needs: string | null
-  goals: string | null
-  services: string | null
-  responsible_staff: string | null
-  review_date: string | null
+  type: string | null
+  subtype: string | null
   status: string | null
+  priority: string | null
+  due_date: string | null
   created_at: string | null
+  viewed_at?: string | null
+  completed_at?: string | null
+  interval_days: number | null
+  last_done_at: string | null
 }
 
-type Room = {
+type ResidentRow = {
   id: string
-  name: string | null
+  resident_code: string | null
+  full_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  room_number?: string | null
 }
 
-type Profile = {
-  id: string
-  full_name: string | null
-  first_name: string | null
-  last_name: string | null
-  email: string | null
+type EmployeeOption = {
+  user_id: string
+  email?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+  staff_type?: string | null
+  role?: string | null
 }
 
-type TaskComment = {
-  id: string
-  task_id: string
-  user_id: string | null
-  user_name: string | null
-  comment: string | null
-  created_at: string | null
+type NewTaskForm = {
+  title: string
+  description: string
+  type: string
+  subtype: string
+  priority: string
+  status: string
+  due_date: string
+  resident_id: string
+  assigned_user_id: string
+  interval_days: string
+  keep_open: boolean
+  draft_note: string
 }
 
-const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
+const TASK_TYPES = [
+  { value: "maintenance", label: "Ūkis / techninė problema" },
+  { value: "higiena", label: "Higiena" },
+  { value: "slauga", label: "Slauga" },
+  { value: "mobilumas", label: "Mobilumas" },
+  { value: "maitinimas", label: "Maitinimas" },
+  { value: "socialinis", label: "Socialinė priežiūra" },
+  { value: "administration", label: "Administracija" },
+  { value: "kita", label: "Kita" },
+]
+
+
+const PRIORITY_OPTIONS = [
+  { value: "low", label: "Žemas", className: "border-slate-200 bg-slate-50 text-slate-600" },
+  { value: "medium", label: "Vidutinis", className: "border-blue-200 bg-blue-50 text-blue-700" },
+  { value: "high", label: "Aukštas", className: "border-orange-200 bg-orange-50 text-orange-700" },
+  { value: "urgent", label: "Kritinis", className: "border-rose-200 bg-rose-50 text-rose-700" },
+]
+
+const STATUS_OPTIONS = [
   { value: "new", label: "Nauja" },
-  { value: "assigned", label: "Priskirta" },
   { value: "in_progress", label: "Vykdoma" },
-  { value: "waiting", label: "Laukia informacijos" },
-  { value: "done", label: "Atlikta" },
-  { value: "cancelled", label: "Atšaukta" },
-  { value: "overdue", label: "Pavėluota" },
+  { value: "waiting_parts", label: "Laukia dalių" },
+  { value: "done", label: "Užbaigta" },
 ]
 
-const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
-  { value: "low", label: "Žemas" },
-  { value: "medium", label: "Vidutinis" },
-  { value: "high", label: "Aukštas" },
-  { value: "critical", label: "Kritinis" },
+const REPEAT_OPTIONS = [
+  { value: "", label: "Nekartoti", helper: "Vienkartinė užduotis" },
+  { value: "1", label: "Kasdien", helper: "Pvz., kasdienė patikra" },
+  { value: "7", label: "Kas savaitę", helper: "Pvz., maudymas kas 7 d." },
+  { value: "14", label: "Kas 2 savaites", helper: "Pvz., higienos priežiūra" },
+  { value: "30", label: "Kas mėnesį", helper: "Pvz., patikra / papildymas" },
 ]
 
-const CATEGORIES = [
-  "Socialinis darbas",
-  "Slauga",
-  "Dokumentai",
-  "Incidentas",
-  "Užimtumas",
-  "Kontaktas su artimaisiais",
-  "Techninis / ūkio klausimas",
-  "Vadovo pavedimas",
+const TASK_PRESETS = [
+  {
+    label: "Lova",
+    icon: "🛏",
+    title: "Sulūžo lova",
+    type: "maintenance",
+    subtype: "Baldai",
+    priority: "high",
+    description: "Kas neveikia? Kuriame kambaryje? Ar trukdo gyventojui?",
+  },
+  {
+    label: "Elektra",
+    icon: "💡",
+    title: "Reikia pakeisti lemputę",
+    type: "maintenance",
+    subtype: "Elektra",
+    priority: "medium",
+    description: "Kurioje vietoje? Ar patalpa naudojama gyventojų?",
+  },
+  {
+    label: "Santechnika",
+    icon: "🚿",
+    title: "Neveikia dušas",
+    type: "maintenance",
+    subtype: "Santechnika",
+    priority: "high",
+    description: "Kas neveikia? Ar yra vandens nuotėkis? Ar reikia skubaus remonto?",
+  },
+  {
+    label: "Tvarkymas",
+    icon: "🧹",
+    title: "Reikia sutvarkyti / išvalyti",
+    type: "higiena",
+    subtype: "Tvarkymas",
+    priority: "medium",
+    description: "Kuri vieta? Kas turi būti sutvarkyta?",
+  },
+  {
+    label: "Maudymas",
+    icon: "🧼",
+    title: "Maudymas",
+    type: "higiena",
+    subtype: "Asmens higiena",
+    priority: "medium",
+    interval_days: "7",
+    description: "Nuolatinė užduotis: maudymas pagal individualų planą.",
+  },
+  {
+    label: "Vaistai",
+    icon: "💊",
+    title: "Medikamentų papildymas",
+    type: "slauga",
+    subtype: "Medikamentai",
+    priority: "high",
+    description: "Kokių medikamentų trūksta? Iki kada reikia papildyti?",
+  },
 ]
 
-function profileName(profile?: Profile | null) {
-  if (!profile) return "—"
-  const full = String(profile.full_name || "").trim()
-  const first = String(profile.first_name || "").trim()
-  const last = String(profile.last_name || "").trim()
-  const combined = [first, last].filter(Boolean).join(" ").trim()
-  return full || combined || profile.email || "—"
+function getPriorityOption(priority: string | null) {
+  return PRIORITY_OPTIONS.find((item) => item.value === priority) || PRIORITY_OPTIONS[1]
 }
 
-function residentName(resident?: Resident | null, roomsById?: Record<string, string>) {
+function getVisibilityText(type: string, assignedUserId: string) {
+  const viewers = ["Administratoriai"]
+
+  if (type === "maintenance") viewers.push("Ūkis")
+  if (type === "slauga") viewers.push("Slauga")
+  if (type === "higiena") viewers.push("Slauga / higiena")
+  if (type === "socialinis") viewers.push("Socialiniai darbuotojai")
+  if (assignedUserId) viewers.push("Priskirtas darbuotojas")
+
+  return viewers
+}
+
+function getSlaHint(priority: string, dueDate: string) {
+  if (!dueDate) {
+    if (priority === "urgent") return "Kritinei užduočiai rekomenduojamas terminas šiandien."
+    if (priority === "high") return "Aukštam prioritetui rekomenduojamas terminas per 24–48 val."
+    return ""
+  }
+
+  const due = new Date(dueDate)
+  const hours = (due.getTime() - Date.now()) / 36e5
+
+  if (priority === "urgent" && hours <= 24) return "🔥 Skubu: terminas per 24 val."
+  if (priority === "high" && hours <= 48) return "⚠ Aukštas prioritetas: terminas arti."
+  if (hours < 0) return "⚠ Terminas jau praėjęs."
+
+  return ""
+}
+
+
+const initialForm: NewTaskForm = {
+  title: "",
+  description: "",
+  type: "maintenance",
+  subtype: "",
+  priority: "medium",
+  status: "new",
+  due_date: "",
+  resident_id: "",
+  assigned_user_id: "",
+  interval_days: "",
+  keep_open: false,
+  draft_note: "",
+}
+
+function isMaintenanceStaff(staffType?: string | null) {
+  const value = String(staffType || "").trim().toLowerCase()
+
+  return ["maintenance", "ukis", "ūkis", "technician", "techninis"].includes(value)
+}
+
+function canManageAllTasks(access: CurrentAccess | null) {
+  return hasPermission(access, "tasks.manage")
+}
+
+function getTaskStatusLabel(status: string | null) {
+  switch (status) {
+    case "new":
+      return "Nauja"
+    case "in_progress":
+      return "Vykdoma"
+    case "waiting_parts":
+      return "Laukia dalių"
+    case "done":
+      return "Atlikta"
+    case "cancelled":
+      return "Atšaukta"
+    default:
+      return "Nenurodyta"
+  }
+}
+
+function getPriorityLabel(priority: string | null) {
+  switch (priority) {
+    case "low":
+      return "Žemas"
+    case "medium":
+      return "Vidutinis"
+    case "high":
+      return "Aukštas"
+    case "urgent":
+      return "Skubus"
+    default:
+      return "—"
+  }
+}
+
+function getTypeLabel(type: string | null) {
+  if (type === "maintenance") return "Ūkis"
+  if (type === "higiena") return "Higiena"
+  if (type === "slauga") return "Slauga"
+  if (type === "mobilumas") return "Mobilumas"
+  if (type === "maitinimas") return "Maitinimas"
+  if (type === "socialinis") return "Socialinė priežiūra"
+  if (type === "administration") return "Administracija"
+
+  return type || "Kita"
+}
+
+function employeeName(employee: EmployeeOption) {
+  if (employee.full_name?.trim()) return employee.full_name.trim()
+
+  const combined = [employee.first_name, employee.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim()
+
+  return combined || employee.email || "Darbuotojas"
+}
+
+function residentName(resident?: ResidentRow) {
   if (!resident) return "—"
-  const full = String(resident.full_name || "").trim()
-  const first = String(resident.first_name || "").trim()
-  const last = String(resident.last_name || "").trim()
-  const combined = [first, last].filter(Boolean).join(" ").trim()
-  const code = resident.resident_code ? ` · ${resident.resident_code}` : ""
-  const room = resident.current_room_id && roomsById?.[resident.current_room_id] ? ` · ${roomsById[resident.current_room_id]}` : ""
-  return `${full || combined || "Gyventojas"}${code}${room}`
+  if (resident.full_name?.trim()) return resident.full_name.trim()
+
+  const combined = [resident.first_name, resident.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim()
+
+  return combined || resident.resident_code || "Gyventojas"
 }
 
-function carePlanName(plan?: CarePlan | null) {
-  if (!plan) return "—"
-  const title = String(plan.goals || plan.needs || plan.services || "").trim()
-  const status = plan.status ? ` · ${plan.status}` : ""
-  const review = plan.review_date ? ` · peržiūra ${plan.review_date}` : ""
-  return `${title || "Individualus planas"}${status}${review}`
-}
-
-function statusLabel(status: string) {
-  return STATUS_OPTIONS.find((item) => item.value === status)?.label || status
-}
-
-function priorityLabel(priority: string) {
-  return PRIORITY_OPTIONS.find((item) => item.value === priority)?.label || priority
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleString("lt-LT")
-}
-
-function toDateTimeInput(value?: string | null) {
-  if (!value) return ""
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ""
-  return date.toISOString().slice(0, 16)
-}
-
-function toDateInput(value?: string | null) {
-  if (!value) return ""
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ""
-  return date.toISOString().slice(0, 10)
-}
-
-function isOverdue(task: Task) {
+function isTaskLate(task: TaskRow) {
   if (!task.due_date) return false
   if (task.status === "done" || task.status === "cancelled") return false
-  return new Date(task.due_date).getTime() < Date.now()
+
+  const due = new Date(task.due_date)
+
+  if (Number.isNaN(due.getTime())) return false
+
+  return due.getTime() < Date.now()
 }
 
-function addDays(base: string | null, days: number) {
-  const date = base ? new Date(base) : new Date()
-  if (Number.isNaN(date.getTime())) {
-    const fallback = new Date()
-    fallback.setDate(fallback.getDate() + days)
-    return fallback
-  }
-  date.setDate(date.getDate() + days)
-  return date
+function isOpenTask(task: TaskRow) {
+  return task.status !== "done" && task.status !== "cancelled"
 }
 
 export default function TasksPage() {
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [residents, setResidents] = useState<Resident[]>([])
-  const [carePlans, setCarePlans] = useState<CarePlan[]>([])
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [roomsById, setRoomsById] = useState<Record<string, string>>({})
-  const [comments, setComments] = useState<TaskComment[]>([])
+  const router = useRouter()
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingId, setSavingId] = useState<string | null>(null)
   const [message, setMessage] = useState("")
+  const [access, setAccess] = useState<CurrentAccess | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [priorityFilter, setPriorityFilter] = useState("all")
-  const [employeeFilter, setEmployeeFilter] = useState("all")
-  const [residentFilter, setResidentFilter] = useState("all")
-  const [query, setQuery] = useState("")
+  const [tasks, setTasks] = useState<TaskRow[]>([])
+  const [residentsMap, setResidentsMap] = useState<Record<string, ResidentRow>>({})
+  const [allResidents, setAllResidents] = useState<ResidentRow[]>([])
+  const [employees, setEmployees] = useState<EmployeeOption[]>([])
+  const [notificationsCount, setNotificationsCount] = useState(0)
 
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
-  const [commentText, setCommentText] = useState("")
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [typeFilter, setTypeFilter] = useState("")
+  const [viewFilter, setViewFilter] = useState<"my" | "maintenance" | "all">("my")
 
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    status: "assigned" as TaskStatus,
-    priority: "medium" as TaskPriority,
-    assigned_to: "",
-    resident_id: "",
-    care_plan_id: "",
-    category: "Socialinis darbas",
-    department: "",
-    due_date: "",
-    recurrence_days: "",
-    recurrence_until: "",
-  })
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<TaskRow | null>(null)
+  const [form, setForm] = useState<NewTaskForm>(initialForm)
 
   useEffect(() => {
-    void loadAll()
+    void loadData()
   }, [])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
+  async function loadData() {
+    setLoading(true)
+    setMessage("")
 
-    const params = new URLSearchParams(window.location.search)
-    const residentId = params.get("resident_id")
-    const carePlanId = params.get("care_plan_id")
-    const title = params.get("title")
-
-    if (residentId || carePlanId || title) {
-      setForm((prev) => ({
-        ...prev,
-        resident_id: residentId || prev.resident_id,
-        care_plan_id: carePlanId || prev.care_plan_id,
-        title: title || prev.title,
-      }))
-    }
-  }, [])
-
-  async function loadAll() {
     try {
-      setLoading(true)
-      setMessage("")
-
       const {
         data: { user },
       } = await supabase.auth.getUser()
 
-      setCurrentUserId(user?.id || null)
-
-      const orgId = await getCurrentOrganizationId()
-      setOrganizationId(orgId)
-
-      if (!orgId) {
-        setMessage("Nepavyko nustatyti organizacijos.")
+      if (!user) {
+        router.replace(ROUTES.login)
         return
       }
 
-      const [tasksResult, residentsResult, carePlansResult, roomsResult, membersResult, commentsResult] = await Promise.all([
-        supabase
-          .from("tasks")
-          .select("*")
-          .eq("organization_id", orgId)
-          .order("created_at", { ascending: false }),
+      setCurrentUserId(user.id)
 
-        supabase
-          .from("residents")
-          .select("id, full_name, first_name, last_name, resident_code, current_room_id")
-          .eq("organization_id", orgId)
-          .is("archived_at", null),
+      const currentAccess = await getCurrentAccess()
+      setAccess(currentAccess)
 
-        supabase
-          .from("resident_care_plans")
-          .select("id, resident_id, needs, goals, services, responsible_staff, review_date, status, created_at")
-          .eq("organization_id", orgId)
-          .order("created_at", { ascending: false }),
-
-        supabase
-          .from("rooms")
-          .select("id, name")
-          .eq("organization_id", orgId),
-
-        supabase
-          .from("organization_members")
-          .select("user_id")
-          .eq("organization_id", orgId)
-          .eq("is_active", true),
-
-        supabase
-          .from("task_comments")
-          .select("*")
-          .order("created_at", { ascending: false }),
-      ])
-
-      if (tasksResult.error) throw tasksResult.error
-      if (residentsResult.error) throw residentsResult.error
-      if (carePlansResult.error) throw carePlansResult.error
-      if (roomsResult.error) throw roomsResult.error
-      if (membersResult.error) throw membersResult.error
-      if (commentsResult.error) throw commentsResult.error
-
-      setTasks((tasksResult.data || []) as Task[])
-      setResidents((residentsResult.data || []) as Resident[])
-      setCarePlans((carePlansResult.data || []) as CarePlan[])
-      setComments((commentsResult.data || []) as TaskComment[])
-
-      setRoomsById(
-        Object.fromEntries(((roomsResult.data || []) as Room[]).map((room) => [room.id, room.name || "Kambarys"]))
-      )
-
-      const memberIds = ((membersResult.data || []) as { user_id: string }[])
-        .map((item) => item.user_id)
-        .filter(Boolean)
-
-      if (memberIds.length > 0) {
-        const profilesResult = await supabase
-          .from("profiles")
-          .select("id, full_name, first_name, last_name, email")
-          .in("id", memberIds)
-
-        if (profilesResult.error) throw profilesResult.error
-        setProfiles((profilesResult.data || []) as Profile[])
-      } else {
-        setProfiles([])
+      if (!hasPermission(currentAccess, "tasks.view")) {
+        setMessage("Neturite teisės matyti užduočių.")
+        setLoading(false)
+        return
       }
+
+      if (!currentAccess.organizationId) {
+        setMessage("Nepavyko nustatyti įstaigos.")
+        setLoading(false)
+        return
+      }
+
+      const { data: notifications, error: notificationsError } = await supabase
+        .from("notifications")
+        .select("id, is_read")
+        .eq("user_id", user.id)
+        .eq("is_read", false)
+
+      if (!notificationsError) setNotificationsCount((notifications || []).length)
+
+      const canManage = canManageAllTasks(currentAccess)
+      const maintenance = isMaintenanceStaff(currentAccess.staffType)
+
+      let query = supabase
+        .from("employee_tasks")
+        .select(`
+          id,
+          organization_id,
+          assigned_user_id,
+          created_by_user_id,
+          resident_id,
+          title,
+          description,
+          type,
+          subtype,
+          status,
+          priority,
+          due_date,
+          created_at,
+          viewed_at,
+          completed_at,
+          interval_days,
+          last_done_at
+        `)
+        .eq("organization_id", currentAccess.organizationId)
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false })
+
+      if (!canManage) {
+        if (maintenance) {
+          query = query.or(
+            `assigned_user_id.eq.${user.id},created_by_user_id.eq.${user.id},type.eq.maintenance`
+          )
+        } else {
+          query = query.or(
+            `assigned_user_id.eq.${user.id},created_by_user_id.eq.${user.id}`
+          )
+        }
+      }
+
+      const { data: tasksData, error: tasksError } = await query
+
+      if (tasksError) throw tasksError
+
+      const typedTasks = (tasksData as TaskRow[]) || []
+      setTasks(typedTasks)
+
+      const { data: residentsData, error: residentsError } = await supabase
+        .from("residents")
+        .select("id, resident_code, full_name, first_name, last_name, room_number")
+        .eq("organization_id", currentAccess.organizationId)
+        .order("resident_code")
+
+      if (!residentsError) {
+        const residents = (residentsData as ResidentRow[]) || []
+        const map: Record<string, ResidentRow> = {}
+
+        for (const resident of residents) {
+          map[resident.id] = resident
+        }
+
+        setAllResidents(residents)
+        setResidentsMap(map)
+      } else {
+        setAllResidents([])
+        setResidentsMap({})
+      }
+
+      const { data: membersData, error: membersError } = await supabase
+        .from("organization_members")
+        .select("user_id, staff_type, role")
+        .eq("organization_id", currentAccess.organizationId)
+        .eq("is_active", true)
+
+      if (membersError) throw membersError
+
+      const members = (membersData as EmployeeOption[]) || []
+      const userIds = members
+        .map((member) => member.user_id)
+        .filter((value): value is string => Boolean(value))
+
+      let profilesMap: Record<string, Partial<EmployeeOption>> = {}
+
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, email, first_name, last_name, full_name")
+          .in("id", userIds)
+
+        profilesMap = Object.fromEntries(
+          ((profilesData as Array<{
+            id: string
+            email?: string | null
+            first_name?: string | null
+            last_name?: string | null
+            full_name?: string | null
+          }>) || []).map((profile) => [
+            profile.id,
+            {
+              email: profile.email,
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              full_name: profile.full_name,
+            },
+          ])
+        )
+      }
+
+      const mergedEmployees = members
+        .map((member) => ({
+          ...member,
+          ...(profilesMap[member.user_id] || {}),
+        }))
+        .sort((a, b) => employeeName(a).localeCompare(employeeName(b), "lt"))
+
+      setEmployees(mergedEmployees)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nepavyko įkelti užduočių.")
+      const readable = getReadableError(error)
+
+      if (readable.includes("created_by_user_id")) {
+        setMessage(
+          "Užduočių lentelėje trūksta stulpelio created_by_user_id. Pridėkite jį, kad darbuotojai matytų savo sukurtas užduotis."
+        )
+      } else {
+        setMessage(readable)
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  async function getCurrentUserName() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user?.id) return { id: null, name: null }
-
-    const profile = profiles.find((item) => item.id === user.id)
-
-    return {
-      id: user.id,
-      name: profileName(profile) || user.email || null,
-    }
-  }
-
-  function fallbackAssignee() {
-    if (form.assigned_to) return form.assigned_to
-    if (currentUserId && profiles.some((profile) => profile.id === currentUserId)) return currentUserId
-    return profiles[0]?.id || currentUserId || null
-  }
-
-  function filteredCarePlansForResident(residentId: string | null | undefined) {
-    if (!residentId) return []
-    return carePlans.filter((plan) => plan.resident_id === residentId)
-  }
-
   async function createTask() {
+    if (!access?.organizationId || !currentUserId) {
+      setMessage("Nepavyko nustatyti naudotojo arba įstaigos.")
+      return
+    }
+
+    const cleanTitle = form.title.trim()
+
+    if (!cleanTitle) {
+      setMessage("Įveskite užduoties pavadinimą.")
+      return
+    }
+
+    setSaving(true)
+    setMessage("")
+
     try {
-      if (!organizationId) return
-      if (!form.title.trim()) {
-        setMessage("Įvesk užduoties pavadinimą.")
-        return
-      }
-
-      const assignedTo = fallbackAssignee()
-
-      if (!assignedTo) {
-        setMessage("Nepavyko nustatyti atsakingo darbuotojo. Pridėk aktyvų darbuotoją į įstaigą.")
-        return
-      }
-
-      setSaving(true)
-      setMessage("")
-
-      const actor = await getCurrentUserName()
-
       const payload = {
-        organization_id: organizationId,
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        status: form.status,
-        priority: form.priority,
-        assigned_to: assignedTo,
-        created_by: actor.id || assignedTo,
+        organization_id: access.organizationId,
+        assigned_user_id: form.assigned_user_id || null,
+        created_by_user_id: currentUserId,
         resident_id: form.resident_id || null,
-        care_plan_id: form.care_plan_id || null,
-        category: form.category || null,
-        department: form.department.trim() || null,
+        title: cleanTitle,
+        description: form.description.trim() || null,
+        type: form.type || "kita",
+        subtype: form.subtype.trim() || null,
+        status: form.status || "new",
+        priority: form.priority || "medium",
         due_date: form.due_date || null,
-        completed_at: form.status === "done" ? new Date().toISOString() : null,
-        recurrence_days: form.recurrence_days ? Number(form.recurrence_days) : null,
-        recurrence_parent_id: null,
-        recurrence_until: form.recurrence_until || null,
+        interval_days: form.interval_days ? Number(form.interval_days) : null,
+        viewed_at: null,
+        completed_at: null,
+        last_done_at: null,
       }
 
-      const { data, error } = await supabase.from("tasks").insert(payload).select().single()
+      const { error } = await supabase.from("employee_tasks").insert(payload)
+
       if (error) throw error
 
-      const resident = residents.find((item) => item.id === form.resident_id)
-      const employee = profiles.find((item) => item.id === assignedTo)
-      const plan = carePlans.find((item) => item.id === form.care_plan_id)
+      if (form.keep_open) {
+        setForm((previous) => ({
+          ...initialForm,
+          keep_open: previous.keep_open,
+        }))
+        setMessage("Užduotis sukurta. Forma palikta atidaryta kitai užduočiai.")
+      } else {
+        setShowCreateModal(false)
+        setForm(initialForm)
+        setMessage("Užduotis sukurta.")
+      }
 
-      await logAudit({
-        organizationId,
-        tableName: "tasks",
-        recordId: data.id,
-        action: "insert",
-        changes: {
-          Pavadinimas: payload.title,
-          Kategorija: payload.category,
-          Prioritetas: priorityLabel(payload.priority),
-          Statusas: statusLabel(payload.status),
-          Gyventojas: resident ? residentName(resident, roomsById) : "—",
-          "Individualus planas": plan ? carePlanName(plan) : "—",
-          Atsakingas: employee ? profileName(employee) : "—",
-          Terminas: payload.due_date || "—",
-          Kartojimas: payload.recurrence_days ? `Kas ${payload.recurrence_days} d.` : "—",
-          "Kartoti iki": payload.recurrence_until || "—",
-        },
-      })
-
-      setForm({
-        title: "",
-        description: "",
-        status: "assigned",
-        priority: "medium",
-        assigned_to: "",
-        resident_id: "",
-        care_plan_id: "",
-        category: "Socialinis darbas",
-        department: "",
-        due_date: "",
-        recurrence_days: "",
-        recurrence_until: "",
-      })
-
-      setMessage("Užduotis sukurta.")
-      await loadAll()
+      await loadData()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nepavyko sukurti užduoties.")
+      const readable = getReadableError(error)
+
+      if (readable.includes("created_by_user_id")) {
+        setMessage(
+          "Nepavyko sukurti: employee_tasks lentelėje trūksta created_by_user_id stulpelio. Paleiskite pridėtą SQL migraciją."
+        )
+      } else {
+        setMessage(readable)
+      }
     } finally {
       setSaving(false)
     }
   }
 
-  async function createNextRecurringTask(task: Task) {
-    if (!organizationId) return
-    if (!task.recurrence_days || task.recurrence_days <= 0) return
+  async function updateTaskStatus(task: TaskRow, status: string) {
+    setSavingId(task.id)
+    setMessage("")
 
-    const nextDueDate = addDays(task.due_date, task.recurrence_days)
-    const until = task.recurrence_until ? new Date(task.recurrence_until) : null
-
-    if (until && nextDueDate.getTime() > until.getTime()) {
-      await logAudit({
-        organizationId,
-        tableName: "tasks",
-        recordId: task.id,
-        action: "update",
-        changes: {
-          Veiksmas: "Kartojimas nebetęsiamas, nes pasiekta pabaigos data",
-          "Kita data": nextDueDate.toISOString(),
-          "Kartoti iki": task.recurrence_until,
-        },
-      })
-      return
-    }
-
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert({
-        organization_id: organizationId,
-        title: task.title,
-        description: task.description,
-        status: "assigned",
-        priority: task.priority,
-        assigned_to: task.assigned_to || currentUserId || profiles[0]?.id || null,
-        created_by: task.created_by || currentUserId || task.assigned_to,
-        resident_id: task.resident_id,
-        care_plan_id: task.care_plan_id,
-        category: task.category,
-        department: task.department,
-        due_date: nextDueDate.toISOString(),
-        completed_at: null,
-        recurrence_days: task.recurrence_days,
-        recurrence_parent_id: task.recurrence_parent_id || task.id,
-        recurrence_until: task.recurrence_until,
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-
-    const resident = residents.find((item) => item.id === task.resident_id)
-    const employee = profiles.find((item) => item.id === task.assigned_to)
-    const plan = carePlans.find((item) => item.id === task.care_plan_id)
-
-    await logAudit({
-      organizationId,
-      tableName: "tasks",
-      recordId: data.id,
-      action: "insert",
-      changes: {
-        Veiksmas: "Automatiškai sukurta pasikartojanti užduotis",
-        Pavadinimas: task.title,
-        Gyventojas: resident ? residentName(resident, roomsById) : "—",
-        "Individualus planas": plan ? carePlanName(plan) : "—",
-        Atsakingas: employee ? profileName(employee) : "—",
-        Kartojimas: `Kas ${task.recurrence_days} d.`,
-        Terminas: nextDueDate.toISOString(),
-      },
-    })
-  }
-
-  async function updateTask(taskBefore: Task, taskAfter: Task) {
     try {
-      if (!organizationId) return
-      setSaving(true)
-      setMessage("")
+      const completedAt = status === "done" ? new Date().toISOString() : task.last_done_at
 
-      const payload = {
-        title: taskAfter.title.trim(),
-        description: taskAfter.description?.trim() || null,
-        status: taskAfter.status,
-        priority: taskAfter.priority,
-        assigned_to: taskAfter.assigned_to || currentUserId || profiles[0]?.id || null,
-        resident_id: taskAfter.resident_id || null,
-        care_plan_id: taskAfter.care_plan_id || null,
-        category: taskAfter.category || null,
-        department: taskAfter.department?.trim() || null,
-        due_date: taskAfter.due_date || null,
-        completed_at: taskAfter.status === "done" ? taskAfter.completed_at || new Date().toISOString() : null,
-        recurrence_days: taskAfter.recurrence_days || null,
-        recurrence_until: taskAfter.recurrence_until || null,
+      const payload: Partial<TaskRow> = {
+        status,
+        completed_at: status === "done" ? completedAt : task.completed_at,
+        last_done_at: completedAt,
       }
 
       const { error } = await supabase
-        .from("tasks")
+        .from("employee_tasks")
         .update(payload)
-        .eq("id", taskAfter.id)
-        .eq("organization_id", organizationId)
+        .eq("id", task.id)
 
       if (error) throw error
 
-      const beforeReadable = readableTask(taskBefore)
-      const afterReadable = readableTask({ ...taskAfter, ...payload })
-      const changes = getChangedFields(beforeReadable, afterReadable)
+      if (
+        status === "done" &&
+        task.interval_days &&
+        task.interval_days > 0 &&
+        task.due_date &&
+        access?.organizationId
+      ) {
+        const currentDue = new Date(task.due_date)
 
-      if (Object.keys(changes).length > 0) {
-        await logAudit({
-          organizationId,
-          tableName: "tasks",
-          recordId: taskAfter.id,
-          action: "update",
-          changes,
-        })
+        if (!Number.isNaN(currentDue.getTime())) {
+          const nextDue = new Date(currentDue)
+          nextDue.setDate(nextDue.getDate() + task.interval_days)
+
+          const { error: recurringError } = await supabase.from("employee_tasks").insert({
+            organization_id: access.organizationId,
+            assigned_user_id: task.assigned_user_id,
+            created_by_user_id: task.created_by_user_id || currentUserId,
+            resident_id: task.resident_id,
+            title: task.title,
+            description: task.description,
+            type: task.type,
+            subtype: task.subtype,
+            status: "new",
+            priority: task.priority,
+            due_date: nextDue.toISOString(),
+            interval_days: task.interval_days,
+            viewed_at: null,
+            completed_at: null,
+            last_done_at: null,
+          })
+
+          if (recurringError) throw recurringError
+        }
       }
 
-      setEditingTask(null)
-      setMessage("Užduotis atnaujinta.")
-      await loadAll()
+      await loadData()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nepavyko atnaujinti užduoties.")
+      setMessage(getReadableError(error))
     } finally {
-      setSaving(false)
+      setSavingId(null)
     }
   }
 
-  async function completeTask(task: Task, createNext = true) {
-    const updated = {
-      ...task,
-      status: "done" as TaskStatus,
-      completed_at: new Date().toISOString(),
-    }
+  async function openTaskDetails(task: TaskRow) {
+    setSelectedTask(task)
 
-    await updateTask(task, updated)
+    if (task.viewed_at) return
 
-    if (createNext) {
-      await createNextRecurringTask(task)
-      await loadAll()
-    }
-  }
-
-  async function skipOneOccurrence(task: Task) {
-    if (!confirm("Ar tikrai praleisti šį kartą? Užduotis bus pažymėta atlikta, bet kita nebus sukurta.")) return
-
-    await completeTask(task, false)
-
-    if (organizationId) {
-      await logAudit({
-        organizationId,
-        tableName: "tasks",
-        recordId: task.id,
-        action: "update",
-        changes: {
-          Veiksmas: "Praleistas vienas pasikartojimas",
-          Pavadinimas: task.title,
-        },
-      })
-    }
-  }
-
-  async function stopRecurrence(task: Task) {
-    if (!organizationId) return
-    if (!confirm("Ar tikrai nutraukti šios užduoties kartojimą?")) return
-
-    const updated = {
-      ...task,
-      recurrence_days: null,
-      recurrence_until: null,
-    }
-
-    await updateTask(task, updated)
-
-    await logAudit({
-      organizationId,
-      tableName: "tasks",
-      recordId: task.id,
-      action: "update",
-      changes: {
-        Veiksmas: "Nutrauktas užduoties kartojimas",
-        Pavadinimas: task.title,
-      },
-    })
-  }
-
-  async function updateTaskStatus(task: Task, nextStatus: TaskStatus) {
-    if (nextStatus === "done") {
-      await completeTask(task, true)
-      return
-    }
-
-    const updated = {
-      ...task,
-      status: nextStatus,
-      completed_at: null,
-    }
-
-    await updateTask(task, updated)
-  }
-
-  async function updateTaskAssignee(task: Task, assignedTo: string) {
-    const updated = {
-      ...task,
-      assigned_to: assignedTo || currentUserId || profiles[0]?.id || null,
-    }
-
-    await updateTask(task, updated)
-  }
-
-  async function addComment() {
     try {
-      if (!selectedTask || !commentText.trim()) return
-      setSaving(true)
-      setMessage("")
+      const viewedAt = new Date().toISOString()
 
-      const actor = await getCurrentUserName()
-
-      const { error } = await supabase.from("task_comments").insert({
-        task_id: selectedTask.id,
-        user_id: actor.id,
-        user_name: actor.name,
-        comment: commentText.trim(),
-      })
+      const { error } = await supabase
+        .from("employee_tasks")
+        .update({ viewed_at: viewedAt })
+        .eq("id", task.id)
 
       if (error) throw error
 
-      await logAudit({
-        organizationId,
-        tableName: "tasks",
-        recordId: selectedTask.id,
-        action: "update",
-        changes: {
-          Komentaras: commentText.trim(),
-        },
-      })
+      setTasks((previous) =>
+        previous.map((item) =>
+          item.id === task.id
+            ? {
+                ...item,
+                viewed_at: viewedAt,
+              }
+            : item
+        )
+      )
 
-      setCommentText("")
-      await loadAll()
+      setSelectedTask((previous) =>
+        previous?.id === task.id
+          ? {
+              ...previous,
+              viewed_at: viewedAt,
+            }
+          : previous
+      )
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Nepavyko pridėti komentaro.")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  function readableTask(task: Partial<Task>) {
-    const resident = residents.find((item) => item.id === task.resident_id)
-    const assigned = profiles.find((item) => item.id === task.assigned_to)
-    const plan = carePlans.find((item) => item.id === task.care_plan_id)
-
-    return {
-      Pavadinimas: task.title || "",
-      Aprašymas: task.description || "",
-      Statusas: statusLabel(task.status || "new"),
-      Prioritetas: priorityLabel(task.priority || "medium"),
-      Atsakingas: assigned ? profileName(assigned) : "—",
-      Gyventojas: resident ? residentName(resident, roomsById) : "—",
-      "Individualus planas": plan ? carePlanName(plan) : "—",
-      Kategorija: task.category || "—",
-      Skyrius: task.department || "—",
-      Terminas: task.due_date || "—",
-      Kartojimas: task.recurrence_days ? `Kas ${task.recurrence_days} d.` : "—",
-      "Kartoti iki": task.recurrence_until || "—",
+      setMessage(getReadableError(error))
     }
   }
 
   const filteredTasks = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = search.trim().toLowerCase()
+    const canManage = canManageAllTasks(access)
+    const maintenance = isMaintenanceStaff(access?.staffType)
 
-    return tasks.filter((task) => {
-      const resident = residents.find((item) => item.id === task.resident_id)
-      const assigned = profiles.find((item) => item.id === task.assigned_to)
-      const plan = carePlans.find((item) => item.id === task.care_plan_id)
-      const effectiveStatus = isOverdue(task) ? "overdue" : task.status
+    let rows = [...tasks]
 
-      if (statusFilter !== "all" && effectiveStatus !== statusFilter) return false
-      if (priorityFilter !== "all" && task.priority !== priorityFilter) return false
-      if (employeeFilter !== "all" && task.assigned_to !== employeeFilter) return false
-      if (residentFilter !== "all" && task.resident_id !== residentFilter) return false
+    if (viewFilter === "my" && currentUserId) {
+      rows = rows.filter(
+        (task) =>
+          task.assigned_user_id === currentUserId ||
+          task.created_by_user_id === currentUserId ||
+          canManage
+      )
 
-      if (!q) return true
-
-      return [
-        task.title,
-        task.category,
-        task.department,
-        statusLabel(effectiveStatus),
-        priorityLabel(task.priority),
-        residentName(resident, roomsById),
-        profileName(assigned),
-        carePlanName(plan),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    })
-  }, [tasks, residents, carePlans, profiles, roomsById, query, statusFilter, priorityFilter, employeeFilter, residentFilter])
-
-  const stats = useMemo(() => {
-    return {
-      all: tasks.length,
-      critical: tasks.filter((task) => task.priority === "critical").length,
-      overdue: tasks.filter((task) => isOverdue(task)).length,
-      done: tasks.filter((task) => task.status === "done").length,
-      recurring: tasks.filter((task) => Boolean(task.recurrence_days)).length,
+      if (canManage) rows = [...tasks]
     }
-  }, [tasks])
 
-  const criticalActiveTasks = useMemo(() => {
-    return tasks
-      .filter((task) => task.status !== "done" && task.status !== "cancelled")
-      .filter((task) => task.priority === "critical" || isOverdue(task))
-      .slice(0, 8)
-  }, [tasks])
+    if (viewFilter === "maintenance") {
+      rows = rows.filter((task) => task.type === "maintenance")
+    }
 
-  const calendarGroups = useMemo(() => {
+    if (viewFilter === "all" && !canManage && !maintenance) {
+      rows = rows.filter(
+        (task) =>
+          task.assigned_user_id === currentUserId ||
+          task.created_by_user_id === currentUserId
+      )
+    }
+
+    if (statusFilter) {
+      rows = rows.filter((task) => task.status === statusFilter)
+    }
+
+    if (typeFilter) {
+      rows = rows.filter((task) => task.type === typeFilter)
+    }
+
+    if (q) {
+      rows = rows.filter((task) => {
+        const resident = task.resident_id ? residentsMap[task.resident_id] : undefined
+
+        return [
+          task.title,
+          task.description,
+          task.type,
+          task.subtype,
+          residentName(resident),
+          resident?.room_number,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      })
+    }
+
+    return rows
+  }, [
+    tasks,
+    search,
+    statusFilter,
+    typeFilter,
+    viewFilter,
+    currentUserId,
+    access,
+    residentsMap,
+  ])
+
+  const openTasks = tasks.filter(isOpenTask)
+  const lateTasks = tasks.filter(isTaskLate)
+  const maintenanceTasks = tasks.filter((task) => task.type === "maintenance")
+  const myTasks = tasks.filter(
+    (task) =>
+      task.assigned_user_id === currentUserId ||
+      task.created_by_user_id === currentUserId
+  )
+
+  const viewedTasks = tasks.filter((task) => Boolean(task.viewed_at))
+  const unseenTasks = tasks.filter((task) => !task.viewed_at && isOpenTask(task))
+  const completedTasks = tasks.filter((task) => task.status === "done" || Boolean(task.completed_at || task.last_done_at))
+  const recurringTasks = tasks.filter((task) => task.interval_days && task.interval_days > 0)
+  const urgentTasks = tasks.filter((task) => (task.priority === "urgent" || task.priority === "high") && isOpenTask(task))
+  const todayTasks = tasks.filter((task) => {
+    if (!task.due_date || !isOpenTask(task)) return false
+
+    const due = new Date(task.due_date)
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
 
-    const limit = new Date(today)
-    limit.setDate(limit.getDate() + 14)
+    return (
+      due.getFullYear() === today.getFullYear() &&
+      due.getMonth() === today.getMonth() &&
+      due.getDate() === today.getDate()
+    )
+  })
 
-    const groups = new Map<string, Task[]>()
+  const waitingPartsTasks = tasks.filter((task) => task.status === "waiting_parts")
+  const employeesMap = useMemo(() => {
+    const map: Record<string, EmployeeOption> = {}
 
-    tasks
-      .filter((task) => task.due_date && task.status !== "done" && task.status !== "cancelled")
-      .filter((task) => {
-        const date = new Date(String(task.due_date))
-        return date >= today && date <= limit
-      })
-      .sort((a, b) => new Date(String(a.due_date)).getTime() - new Date(String(b.due_date)).getTime())
-      .forEach((task) => {
-        const key = new Date(String(task.due_date)).toLocaleDateString("lt-LT")
-        groups.set(key, [...(groups.get(key) || []), task])
-      })
+    for (const employee of employees) {
+      map[employee.user_id] = employee
+    }
 
-    return Array.from(groups.entries())
-  }, [tasks])
+    return map
+  }, [employees])
+  const operationalTotal = Math.max(1, tasks.length)
+  const completionRate = Math.round((completedTasks.length / operationalTotal) * 100)
+  const viewedRate = Math.round((viewedTasks.length / operationalTotal) * 100)
+  const overdueRate = Math.round((lateTasks.length / operationalTotal) * 100)
+  const recurringRate = Math.round((recurringTasks.length / operationalTotal) * 100)
 
-  const createCarePlanOptions = filteredCarePlansForResident(form.resident_id)
-  const editCarePlanOptions = filteredCarePlansForResident(editingTask?.resident_id)
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-slate-950">
+        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" />
+          <p className="mt-4 text-lg font-black text-slate-700">Kraunama...</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Ruošiame užduočių sąrašą.
+          </p>
+        </div>
+      </main>
+    )
+  }
 
-  if (loading) return <div style={styles.page}>Kraunama...</div>
+  const canCreate = hasPermission(access, "tasks.create")
+  const canManage = canManageAllTasks(access)
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <div style={styles.heroIcon}>
-          <ClipboardList size={28} />
-        </div>
-
-        <div>
-          <div style={styles.eyebrow}>Darbo organizavimas</div>
-          <h1 style={styles.title}>Užduotys</h1>
-          <p style={styles.subtitle}>Darbuotojų užduotys, terminai, komentarai, planai ir pasikartojimai.</p>
-        </div>
-
-        <button type="button" onClick={() => void loadAll()} style={styles.refreshButton}>
-          <RefreshCw size={16} />
-          Atnaujinti
-        </button>
-      </div>
-
-      {message ? <div style={styles.message}>{message}</div> : null}
-
-      <section style={styles.stats}>
-        <Stat label="Visos" value={stats.all} />
-        <Stat label="Kritinės" value={stats.critical} danger />
-        <Stat label="Pavėluotos" value={stats.overdue} warning />
-        <Stat label="Atliktos" value={stats.done} />
-        <Stat label="Periodinės" value={stats.recurring} />
-      </section>
-
-      {criticalActiveTasks.length > 0 ? (
-        <section style={styles.alertCard}>
-          <div style={styles.cardHeader}>
-            <h2 style={styles.sectionTitle}>Kritinės ir vėluojančios</h2>
-            <span style={styles.alertCount}>{criticalActiveTasks.length}</span>
-          </div>
-
-          <div style={styles.alertList}>
-            {criticalActiveTasks.map((task) => {
-              const resident = residents.find((item) => item.id === task.resident_id)
-              const assigned = profiles.find((item) => item.id === task.assigned_to)
-
-              return (
-                <div key={task.id} style={styles.alertItem}>
-                  <div>
-                    <strong>{task.title}</strong>
-                    <div style={styles.meta}>
-                      {residentName(resident, roomsById)} · {profileName(assigned)} · {formatDate(task.due_date)}
-                    </div>
-                  </div>
-                  <span style={{ ...styles.badge, ...priorityStyle(task.priority) }}>
-                    {isOverdue(task) ? "Pavėluota" : priorityLabel(task.priority)}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      ) : null}
-
-      {calendarGroups.length > 0 ? (
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <h2 style={styles.sectionTitle}>Artimiausių 14 dienų kalendorius</h2>
-            <span style={styles.meta}>Pagal užduočių terminus</span>
-          </div>
-
-          <div style={styles.calendarGrid}>
-            {calendarGroups.map(([date, items]) => (
-              <div key={date} style={styles.calendarDay}>
-                <strong>{date}</strong>
-                <div style={styles.calendarTasks}>
-                  {items.map((task) => {
-                    const resident = residents.find((item) => item.id === task.resident_id)
-                    return (
-                      <div key={task.id} style={styles.calendarTask}>
-                        <span>{task.title}</span>
-                        <small>{residentName(resident, roomsById)}</small>
-                      </div>
-                    )
-                  })}
-                </div>
+    <main className="min-h-screen bg-slate-50 p-4 pb-28 text-slate-950 sm:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-5">
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
+                <ClipboardList className="h-7 w-7" />
               </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
-      <section style={styles.card}>
-        <div style={styles.cardHeader}>
-          <h2 style={styles.sectionTitle}>Nauja užduotis</h2>
-          <button type="button" style={styles.primaryButton} onClick={() => void createTask()} disabled={saving}>
-            {saving ? "Saugoma..." : "Sukurti užduotį"}
-          </button>
-        </div>
-
-        <div style={styles.formGrid}>
-          <Field label="Pavadinimas">
-            <input style={styles.input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          </Field>
-
-          <Field label="Kategorija">
-            <select style={styles.input} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-              {CATEGORIES.map((category) => (
-                <option key={category}>{category}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Prioritetas">
-            <select style={styles.input} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}>
-              {PRIORITY_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Statusas">
-            <select style={styles.input} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TaskStatus })}>
-              {STATUS_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Atsakingas darbuotojas">
-            <select style={styles.input} value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}>
-              <option value="">Automatiškai / nepriskirta</option>
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>{profileName(profile)}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Gyventojas">
-            <select
-              style={styles.input}
-              value={form.resident_id}
-              onChange={(e) => setForm({ ...form, resident_id: e.target.value, care_plan_id: "" })}
-            >
-              <option value="">Bendra įstaigos užduotis</option>
-              {residents.map((resident) => (
-                <option key={resident.id} value={resident.id}>{residentName(resident, roomsById)}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Individualus planas">
-            <select
-              style={styles.input}
-              value={form.care_plan_id}
-              onChange={(e) => setForm({ ...form, care_plan_id: e.target.value })}
-              disabled={!form.resident_id || createCarePlanOptions.length === 0}
-            >
-              <option value="">Nesusieta</option>
-              {createCarePlanOptions.map((plan) => (
-                <option key={plan.id} value={plan.id}>{carePlanName(plan)}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Skyrius / aukštas">
-            <input style={styles.input} value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
-          </Field>
-
-          <Field label="Terminas">
-            <input type="datetime-local" style={styles.input} value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
-          </Field>
-
-          <Field label="Kartoti kas kiek dienų">
-            <input
-              type="number"
-              min="1"
-              style={styles.input}
-              value={form.recurrence_days}
-              onChange={(e) => setForm({ ...form, recurrence_days: e.target.value })}
-              placeholder="Pvz. 7"
-            />
-          </Field>
-
-          <Field label="Kartoti iki">
-            <input
-              type="date"
-              style={styles.input}
-              value={form.recurrence_until}
-              onChange={(e) => setForm({ ...form, recurrence_until: e.target.value })}
-            />
-          </Field>
-
-          <label style={{ ...styles.field, gridColumn: "1 / -1" }}>
-            <span>Aprašymas</span>
-            <textarea
-              style={styles.textarea}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Trumpai, be perteklinės jautrios informacijos."
-            />
-          </label>
-        </div>
-      </section>
-
-      <section style={styles.card}>
-        <h2 style={styles.sectionTitle}>Filtrai</h2>
-
-        <div style={styles.filters}>
-          <Field label="Paieška">
-            <input style={styles.input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ieškoti pagal užduotį, gyventoją, darbuotoją..." />
-          </Field>
-
-          <Field label="Statusas">
-            <select style={styles.input} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="all">Visi</option>
-              {STATUS_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Prioritetas">
-            <select style={styles.input} value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
-              <option value="all">Visi</option>
-              {PRIORITY_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Darbuotojas">
-            <select style={styles.input} value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)}>
-              <option value="all">Visi</option>
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>{profileName(profile)}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Gyventojas">
-            <select style={styles.input} value={residentFilter} onChange={(e) => setResidentFilter(e.target.value)}>
-              <option value="all">Visi</option>
-              {residents.map((resident) => (
-                <option key={resident.id} value={resident.id}>{residentName(resident, roomsById)}</option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      </section>
-
-      <section style={styles.card}>
-        <div style={styles.cardHeader}>
-          <h2 style={styles.sectionTitle}>Užduočių sąrašas</h2>
-          <div style={styles.meta}>Rodoma: {filteredTasks.length}</div>
-        </div>
-
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Užduotis</th>
-                <th style={styles.th}>Gyventojas / planas</th>
-                <th style={styles.th}>Prioritetas</th>
-                <th style={styles.th}>Statusas</th>
-                <th style={styles.th}>Terminas</th>
-                <th style={styles.th}>Kartojimas</th>
-                <th style={styles.th}>Atsakingas</th>
-                <th style={styles.th}>Veiksmai</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filteredTasks.map((task) => {
-                const resident = residents.find((item) => item.id === task.resident_id)
-                const assigned = profiles.find((item) => item.id === task.assigned_to)
-                const plan = carePlans.find((item) => item.id === task.care_plan_id)
-                const effectiveStatus = isOverdue(task) ? "overdue" : task.status
-
-                return (
-                  <tr key={task.id}>
-                    <td style={styles.tdBold}>
-                      {task.title}
-                      <div style={styles.meta}>{task.category || "—"}</div>
-                    </td>
-                    <td style={styles.td}>
-                      <strong>{residentName(resident, roomsById)}</strong>
-                      <div style={styles.meta}>{plan ? carePlanName(plan) : "Planas nesusietas"}</div>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={{ ...styles.badge, ...priorityStyle(task.priority) }}>
-                        {priorityLabel(task.priority)}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <select
-                        style={styles.smallSelect}
-                        value={effectiveStatus}
-                        onChange={(e) => void updateTaskStatus(task, e.target.value as TaskStatus)}
-                      >
-                        {STATUS_OPTIONS.map((item) => (
-                          <option key={item.value} value={item.value}>{item.label}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td style={styles.td}>{formatDate(task.due_date)}</td>
-                    <td style={styles.td}>
-                      {task.recurrence_days ? (
-                        <span style={styles.recurrenceBadge}>
-                          <RotateCcw size={13} />
-                          Kas {task.recurrence_days} d.
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                      {task.recurrence_until ? <div style={styles.meta}>Iki {formatDate(task.recurrence_until)}</div> : null}
-                    </td>
-                    <td style={styles.td}>
-                      <select
-                        style={styles.smallSelect}
-                        value={task.assigned_to || ""}
-                        onChange={(e) => void updateTaskAssignee(task, e.target.value)}
-                      >
-                        <option value="">Automatiškai</option>
-                        {profiles.map((profile) => (
-                          <option key={profile.id} value={profile.id}>{profileName(profile)}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={styles.rowActions}>
-                        {task.status !== "done" ? (
-                          <button type="button" style={styles.successButton} onClick={() => void completeTask(task, true)}>
-                            <CheckCircle2 size={15} />
-                            Atlikta
-                          </button>
-                        ) : null}
-
-                        {task.recurrence_days && task.status !== "done" ? (
-                          <button type="button" style={styles.warningButton} onClick={() => void skipOneOccurrence(task)}>
-                            <SkipForward size={15} />
-                            Praleisti
-                          </button>
-                        ) : null}
-
-                        {task.recurrence_days ? (
-                          <button type="button" style={styles.dangerSoftButton} onClick={() => void stopRecurrence(task)}>
-                            <StopCircle size={15} />
-                            Nutraukti
-                          </button>
-                        ) : null}
-
-                        <button type="button" style={styles.secondaryButton} onClick={() => setEditingTask(task)}>
-                          <Pencil size={15} />
-                          Redaguoti
-                        </button>
-
-                        <button type="button" style={styles.secondaryButton} onClick={() => setSelectedTask(task)}>
-                          <MessageSquare size={15} />
-                          Komentarai
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-
-              {filteredTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={styles.empty}>Užduočių nėra.</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {editingTask ? (
-        <div style={styles.modalBackdrop} onClick={() => setEditingTask(null)}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <h2 style={styles.sectionTitle}>Redaguoti užduotį</h2>
-              <button type="button" style={styles.iconButton} onClick={() => setEditingTask(null)}>
-                <X size={18} />
-              </button>
+              <div>
+                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                  Užduotys
+                </p>
+                <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                  {canManage ? "Visos užduotys" : "Mano užduotys"}
+                </h1>
+                <p className="mt-2 text-base font-semibold text-slate-500 sm:text-lg">
+                  Darbuotojai mato jiems priskirtas ir jų sukurtas užduotis.
+                  Ūkis mato technines užduotis.
+                </p>
+              </div>
             </div>
 
-            <div style={styles.formGrid}>
-              <Field label="Pavadinimas">
-                <input style={styles.input} value={editingTask.title} onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })} />
-              </Field>
+            {canCreate ? (
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 font-black text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98]"
+              >
+                <Plus className="h-5 w-5" />
+                Sukurti užduotį
+              </button>
+            ) : null}
+          </div>
+        </section>
 
-              <Field label="Kategorija">
-                <select style={styles.input} value={editingTask.category || ""} onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}>
-                  {CATEGORIES.map((category) => (
-                    <option key={category}>{category}</option>
-                  ))}
-                </select>
-              </Field>
+        {message ? (
+          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5 font-extrabold text-amber-800">
+            {message}
+          </div>
+        ) : null}
 
-              <Field label="Prioritetas">
-                <select style={styles.input} value={editingTask.priority} onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value as TaskPriority })}>
-                  {PRIORITY_OPTIONS.map((item) => (
-                    <option key={item.value} value={item.value}>{item.label}</option>
-                  ))}
-                </select>
-              </Field>
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                Operacinis dashboardas
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                Užduočių situacija
+              </h2>
+              <p className="mt-1 font-semibold text-slate-500">
+                Greitai matosi vėlavimai, neperžiūrėtos užduotys, periodinės procedūros ir atlikimo progresas.
+              </p>
+            </div>
 
-              <Field label="Statusas">
-                <select style={styles.input} value={editingTask.status} onChange={(e) => setEditingTask({ ...editingTask, status: e.target.value as TaskStatus })}>
-                  {STATUS_OPTIONS.map((item) => (
-                    <option key={item.value} value={item.value}>{item.label}</option>
-                  ))}
-                </select>
-              </Field>
+            <div className="flex flex-wrap gap-2">
+              <DashboardPill label="Šiandien" value={todayTasks.length} tone="blue" />
+              <DashboardPill label="Skubios" value={urgentTasks.length} tone="rose" />
+              <DashboardPill label="Laukia dalių" value={waitingPartsTasks.length} tone="amber" />
+            </div>
+          </div>
 
-              <Field label="Atsakingas darbuotojas">
-                <select style={styles.input} value={editingTask.assigned_to || ""} onChange={(e) => setEditingTask({ ...editingTask, assigned_to: e.target.value || null })}>
-                  <option value="">Automatiškai</option>
-                  {profiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>{profileName(profile)}</option>
-                  ))}
-                </select>
-              </Field>
+          <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <CircleStat
+              title="Atlikimo progresas"
+              value={completedTasks.length}
+              total={operationalTotal}
+              percent={completionRate}
+              tone="emerald"
+              helper="Atliktos užduotys"
+            />
+            <CircleStat
+              title="Peržiūrėjimas"
+              value={viewedTasks.length}
+              total={operationalTotal}
+              percent={viewedRate}
+              tone="blue"
+              helper="Darbuotojai jau pamatė"
+            />
+            <CircleStat
+              title="Vėlavimai"
+              value={lateTasks.length}
+              total={operationalTotal}
+              percent={overdueRate}
+              tone="rose"
+              helper="Praėjęs terminas"
+            />
+            <CircleStat
+              title="Periodinės"
+              value={recurringTasks.length}
+              total={operationalTotal}
+              percent={recurringRate}
+              tone="amber"
+              helper="Kartojamos užduotys"
+            />
+          </div>
+        </section>
 
-              <Field label="Gyventojas">
-                <select
-                  style={styles.input}
-                  value={editingTask.resident_id || ""}
-                  onChange={(e) => setEditingTask({ ...editingTask, resident_id: e.target.value || null, care_plan_id: null })}
-                >
-                  <option value="">Bendra įstaigos užduotis</option>
-                  {residents.map((resident) => (
-                    <option key={resident.id} value={resident.id}>{residentName(resident, roomsById)}</option>
-                  ))}
-                </select>
-              </Field>
+        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-6">
+          <StatCard
+            icon={<UserRound className="h-6 w-6" />}
+            title="Mano"
+            value={String(canManage ? tasks.length : myTasks.length)}
+            meta="užduočių"
+            tone="emerald"
+          />
+          <StatCard
+            icon={<Clock className="h-6 w-6" />}
+            title="Atviros"
+            value={String(openTasks.length)}
+            meta="vykdomos"
+            tone="blue"
+          />
+          <StatCard
+            icon={<Eye className="h-6 w-6" />}
+            title="Nepamatytos"
+            value={String(unseenTasks.length)}
+            meta="reikia dėmesio"
+            tone="amber"
+          />
+          <StatCard
+            icon={<CheckCircle2 className="h-6 w-6" />}
+            title="Įvykdytos"
+            value={String(completedTasks.length)}
+            meta="atliktos"
+            tone="emerald"
+          />
+          <StatCard
+            icon={<Wrench className="h-6 w-6" />}
+            title="Ūkis"
+            value={String(maintenanceTasks.length)}
+            meta="techninės"
+            tone="slate"
+          />
+          <StatCard
+            icon={<AlertTriangle className="h-6 w-6" />}
+            title="Vėluoja"
+            value={String(lateTasks.length)}
+            meta="užduočių"
+            tone="rose"
+          />
+        </section>
 
-              <Field label="Individualus planas">
-                <select
-                  style={styles.input}
-                  value={editingTask.care_plan_id || ""}
-                  onChange={(e) => setEditingTask({ ...editingTask, care_plan_id: e.target.value || null })}
-                  disabled={!editingTask.resident_id || editCarePlanOptions.length === 0}
-                >
-                  <option value="">Nesusieta</option>
-                  {editCarePlanOptions.map((plan) => (
-                    <option key={plan.id} value={plan.id}>{carePlanName(plan)}</option>
-                  ))}
-                </select>
-              </Field>
+        <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
+          <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                  Sąrašas
+                </p>
+                <h2 className="mt-1 text-2xl font-black tracking-tight">
+                  Užduočių kortelės
+                </h2>
+                <p className="mt-1 font-semibold text-slate-500">
+                  Paspausk užduotį, kad pamatytum daugiau informacijos.
+                </p>
+              </div>
 
-              <Field label="Skyrius / aukštas">
-                <input style={styles.input} value={editingTask.department || ""} onChange={(e) => setEditingTask({ ...editingTask, department: e.target.value })} />
-              </Field>
-
-              <Field label="Terminas">
+              <label className="relative block w-full md:w-80">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="datetime-local"
-                  style={styles.input}
-                  value={toDateTimeInput(editingTask.due_date)}
-                  onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value || null })}
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Ieškoti užduoties..."
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
                 />
-              </Field>
-
-              <Field label="Kartoti kas kiek dienų">
-                <input
-                  type="number"
-                  min="1"
-                  style={styles.input}
-                  value={editingTask.recurrence_days || ""}
-                  onChange={(e) => setEditingTask({ ...editingTask, recurrence_days: e.target.value ? Number(e.target.value) : null })}
-                />
-              </Field>
-
-              <Field label="Kartoti iki">
-                <input
-                  type="date"
-                  style={styles.input}
-                  value={toDateInput(editingTask.recurrence_until)}
-                  onChange={(e) => setEditingTask({ ...editingTask, recurrence_until: e.target.value || null })}
-                />
-              </Field>
-
-              <label style={{ ...styles.field, gridColumn: "1 / -1" }}>
-                <span>Aprašymas</span>
-                <textarea style={styles.textarea} value={editingTask.description || ""} onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })} />
               </label>
             </div>
 
-            <div style={styles.modalActions}>
-              <button type="button" style={styles.secondaryButton} onClick={() => setEditingTask(null)}>
-                Atšaukti
-              </button>
-              <button type="button" style={styles.primaryButton} onClick={() => void updateTask(tasks.find((t) => t.id === editingTask.id) || editingTask, editingTask)} disabled={saving}>
-                <CheckCircle2 size={16} />
-                Išsaugoti
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <Select
+                value={viewFilter}
+                onChange={(value) => setViewFilter(value as "my" | "maintenance" | "all")}
+              >
+                <option value="my">Mano vaizdas</option>
+                <option value="maintenance">Ūkio užduotys</option>
+                <option value="all">Visos leidžiamos</option>
+              </Select>
+
+              <Select value={statusFilter} onChange={setStatusFilter}>
+                <option value="">Visi statusai</option>
+                <option value="new">Nauja</option>
+                <option value="in_progress">Vykdoma</option>
+                <option value="waiting_parts">Laukia dalių</option>
+                <option value="done">Atlikta</option>
+                <option value="cancelled">Atšaukta</option>
+              </Select>
+
+              <Select value={typeFilter} onChange={setTypeFilter}>
+                <option value="">Visi tipai</option>
+                {TASK_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </Select>
+
+              <button
+                type="button"
+                onClick={() => void loadData()}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-black text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]"
+              >
+                Atnaujinti
               </button>
             </div>
-          </div>
-        </div>
-      ) : null}
 
-      {selectedTask ? (
-        <div style={styles.modalBackdrop} onClick={() => setSelectedTask(null)}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div>
-                <h2 style={styles.sectionTitle}>{selectedTask.title}</h2>
-                <p style={styles.subtitle}>{selectedTask.description || "Aprašymo nėra."}</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <TaskSegmentCard
+                title="Mano užduotys"
+                value={myTasks.length}
+                helper="Priskirtos arba sukurtos man"
+                tone="emerald"
+                onClick={() => setViewFilter("my")}
+              />
+              <TaskSegmentCard
+                title="Techninės / ūkio"
+                value={maintenanceTasks.length}
+                helper="Ūkio darbai ir gedimai"
+                tone="amber"
+                onClick={() => setViewFilter("maintenance")}
+              />
+              <TaskSegmentCard
+                title="Periodinės"
+                value={recurringTasks.length}
+                helper="Maudymas, patikros, priežiūra"
+                tone="blue"
+                onClick={() => {
+                  setViewFilter("all")
+                  setStatusFilter("")
+                  setTypeFilter("")
+                }}
+              />
+              <TaskSegmentCard
+                title="Pavėluotos"
+                value={lateTasks.length}
+                helper="Praėję terminai"
+                tone="rose"
+                onClick={() => {
+                  setViewFilter("all")
+                  setStatusFilter("")
+                }}
+              />
+            </div>
+
+            {filteredTasks.length === 0 ? (
+              <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+                <ClipboardList className="mx-auto h-10 w-10 text-slate-400" />
+                <p className="mt-4 text-lg font-black text-slate-700">
+                  Užduočių nėra
+                </p>
+                <p className="mt-1 font-semibold text-slate-500">
+                  Sukurk naują užduotį arba pakeisk filtrus.
+                </p>
               </div>
-              <button type="button" style={styles.iconButton} onClick={() => setSelectedTask(null)}>
-                <X size={18} />
-              </button>
-            </div>
+            ) : (
+              <div className="mt-6 grid gap-4">
+                {filteredTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    resident={task.resident_id ? residentsMap[task.resident_id] : undefined}
+                    assignedEmployee={task.assigned_user_id ? employeesMap[task.assigned_user_id] : undefined}
+                    saving={savingId === task.id}
+                    onClick={() => void openTaskDetails(task)}
+                    onStatusChange={(status) => void updateTaskStatus(task, status)}
+                  />
+                ))}
+              </div>
+            )}
+          </article>
 
-            <div style={styles.commentList}>
-              {comments.filter((item) => item.task_id === selectedTask.id).length === 0 ? (
-                <div style={styles.empty}>Komentarų nėra.</div>
-              ) : (
-                comments.filter((item) => item.task_id === selectedTask.id).map((comment) => (
-                  <div key={comment.id} style={styles.comment}>
-                    <strong>{comment.user_name || "Naudotojas"}</strong>
-                    <span>{formatDate(comment.created_at)}</span>
-                    <p>{comment.comment}</p>
+          <aside className="grid content-start gap-6">
+            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-extrabold uppercase tracking-widest text-amber-700">
+                    Greitas kūrimas
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight">
+                    Pranešti problemai
+                  </h2>
+                </div>
+
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+                  <Hammer className="h-6 w-6" />
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-3">
+                {[
+                  { title: "Sulūžo lova", type: "maintenance", interval: "", hint: "Sukurti ūkio užduotį" },
+                  { title: "Neveikia lemputė", type: "maintenance", interval: "", hint: "Sukurti ūkio užduotį" },
+                  { title: "Maudymas", type: "higiena", interval: "7", hint: "Nuolatinė užduotis kas 7 d." },
+                  { title: "Nagų / plaukų priežiūra", type: "higiena", interval: "14", hint: "Nuolatinė užduotis kas 14 d." },
+                  { title: "Kambario patikra", type: "socialinis", interval: "7", hint: "Nuolatinė užduotis kas 7 d." },
+                ].map((item) => (
+                  <button
+                    key={item.title}
+                    type="button"
+                    onClick={() => {
+                      setForm({
+                        ...initialForm,
+                        title: item.title,
+                        type: item.type,
+                        priority: item.title === "Sulūžo lova" ? "high" : "medium",
+                        interval_days: item.interval,
+                      })
+                      setShowCreateModal(true)
+                    }}
+                    className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
+                  >
+                    <span>
+                      <b>{item.title}</b>
+                      <br />
+                      <small className="font-semibold text-slate-500">
+                        {item.hint}
+                      </small>
+                    </span>
+
+                    <ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-emerald-700" />
+                  </button>
+                ))}
+              </div>
+            </article>
+
+            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-black">Matomumo taisyklės</h2>
+              <div className="mt-4 space-y-3 text-sm font-semibold text-slate-600">
+                <p>• Admin / owner mato visas užduotis.</p>
+                <p>• Darbuotojas mato jam priskirtas ir jo sukurtas užduotis.</p>
+                <p>• Ūkio darbuotojas mato technines ūkio užduotis.</p>
+              </div>
+            </article>
+          </aside>
+        </section>
+      </div>
+
+      {showCreateModal && (
+        <Modal
+          title="Sukurti užduotį"
+          desc="Greitai registruokite problemą, paskirkite atsakingą žmogų ir nustatykite terminą."
+          onClose={() => setShowCreateModal(false)}
+        >
+          <form
+            className="space-y-6"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void createTask()
+            }}
+          >
+            <section className="rounded-3xl border border-emerald-100 bg-emerald-50/50 p-5">
+              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-emerald-700">
+                <Sparkles className="h-4 w-4" />
+                Greiti šablonai
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {TASK_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() =>
+                      setForm((previous) => ({
+                        ...previous,
+                        title: preset.title,
+                        type: preset.type,
+                        subtype: preset.subtype,
+                        priority: preset.priority,
+                        description: preset.description,
+                        interval_days: preset.interval_days || previous.interval_days,
+                      }))
+                    }
+                    className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 active:scale-[0.98]"
+                  >
+                    <span className="mr-1">{preset.icon}</span>
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="grid gap-5 md:grid-cols-2">
+                <Field label="Pavadinimas" full>
+                  <input
+                    value={form.title}
+                    onChange={(event) => {
+                      const value = event.target.value
+
+                      setForm((previous) => {
+                        const lower = value.toLowerCase()
+                        const suggestion: Partial<NewTaskForm> = {}
+
+                        if (lower.includes("lova")) {
+                          suggestion.type = "maintenance"
+                          suggestion.subtype = "Baldai"
+                          suggestion.priority = "high"
+                        } else if (lower.includes("duš") || lower.includes("kriauk")) {
+                          suggestion.type = "maintenance"
+                          suggestion.subtype = "Santechnika"
+                          suggestion.priority = "high"
+                        } else if (lower.includes("lemput") || lower.includes("elektr")) {
+                          suggestion.type = "maintenance"
+                          suggestion.subtype = "Elektra"
+                          suggestion.priority = "medium"
+                        } else if (lower.includes("maud")) {
+                          suggestion.type = "higiena"
+                          suggestion.subtype = "Asmens higiena"
+                          suggestion.priority = "medium"
+                          suggestion.interval_days = previous.interval_days || "7"
+                        }
+
+                        return {
+                          ...previous,
+                          ...suggestion,
+                          title: value,
+                        }
+                      })
+                    }}
+                    className="input text-lg"
+                    placeholder="Pvz., sulūžo lova 203 kambaryje"
+                  />
+                  {form.subtype ? (
+                    <p className="mt-2 text-sm font-bold text-emerald-700">
+                      🤖 Pasiūlyta: {getTypeLabel(form.type)} · {form.subtype}
+                    </p>
+                  ) : null}
+                </Field>
+
+                <Field label="Prioritetas" full>
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    {PRIORITY_OPTIONS.map((priority) => (
+                      <button
+                        key={priority.value}
+                        type="button"
+                        onClick={() =>
+                          setForm((previous) => ({
+                            ...previous,
+                            priority: priority.value,
+                          }))
+                        }
+                        className={`rounded-2xl border px-4 py-3 text-sm font-black transition active:scale-[0.98] ${
+                          priority.className
+                        } ${form.priority === priority.value ? "ring-4 ring-emerald-100" : ""}`}
+                      >
+                        {priority.label}
+                      </button>
+                    ))}
                   </div>
-                ))
-              )}
+                  {getSlaHint(form.priority, form.due_date) ? (
+                    <p className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-black text-amber-800">
+                      {getSlaHint(form.priority, form.due_date)}
+                    </p>
+                  ) : null}
+                </Field>
+
+                <Field label="Tipas">
+                  <select
+                    value={form.type}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        type: event.target.value,
+                      }))
+                    }
+                    className="input"
+                  >
+                    {TASK_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Statusas">
+                  <select
+                    value={form.status}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        status: event.target.value,
+                      }))
+                    }
+                    className="input"
+                  >
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Gyventojas">
+                  <select
+                    value={form.resident_id}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        resident_id: event.target.value,
+                      }))
+                    }
+                    className="input"
+                  >
+                    <option value="">Pasirinkti gyventoją (nebūtina)</option>
+                    {allResidents.map((resident) => (
+                      <option key={resident.id} value={resident.id}>
+                        {residentName(resident)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Priskirti darbuotojui">
+                  <select
+                    value={form.assigned_user_id}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        assigned_user_id: event.target.value,
+                      }))
+                    }
+                    className="input"
+                  >
+                    <option value="">Pasirinkti darbuotoją (nebūtina)</option>
+                    {employees.map((employee) => (
+                      <option key={employee.user_id} value={employee.user_id}>
+                        {employeeName(employee)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Terminas">
+                  <input
+                    type="datetime-local"
+                    value={form.due_date}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        due_date: event.target.value,
+                      }))
+                    }
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="Papildoma kategorija">
+                  <input
+                    value={form.subtype}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        subtype: event.target.value,
+                      }))
+                    }
+                    className="input"
+                    placeholder="Pvz., baldai, elektra, santechnika"
+                  />
+                </Field>
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Repeat className="h-5 w-5 text-emerald-700" />
+                <h3 className="text-xl font-black">Pasikartojimas</h3>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {REPEAT_OPTIONS.map((option) => (
+                  <button
+                    key={option.value || "none"}
+                    type="button"
+                    onClick={() =>
+                      setForm((previous) => ({
+                        ...previous,
+                        interval_days: option.value,
+                      }))
+                    }
+                    className={`rounded-2xl border p-4 text-left transition active:scale-[0.98] ${
+                      form.interval_days === option.value
+                        ? "border-emerald-300 bg-emerald-50 ring-4 ring-emerald-50"
+                        : "border-slate-200 bg-slate-50 hover:bg-white"
+                    }`}
+                  >
+                    <b className="block text-sm">{option.label}</b>
+                    <span className="mt-1 block text-xs font-bold text-slate-500">
+                      {option.helper}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="grid gap-5 lg:grid-cols-2">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <Eye className="h-5 w-5 text-slate-600" />
+                  <h3 className="text-lg font-black">Kas matys?</h3>
+                </div>
+                <div className="space-y-2">
+                  {getVisibilityText(form.type, form.assigned_user_id).map((viewer) => (
+                    <div
+                      key={viewer}
+                      className="flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-700"
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      {viewer}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-slate-600" />
+                  <h3 className="text-lg font-black">Nuotrauka</h3>
+                </div>
+                <p className="text-sm font-semibold text-slate-500">
+                  Vėliau čia galima prijungti foto / screenshot įkėlimą. Dokumentų kelti nereikia.
+                </p>
+                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm font-black text-slate-400">
+                  📷 Foto zona / preview
+                </div>
+              </div>
+            </section>
+
+            <Field label="Aprašymas">
+              <textarea
+                value={form.description}
+                onChange={(event) =>
+                  setForm((previous) => ({
+                    ...previous,
+                    description: event.target.value,
+                  }))
+                }
+                className="input min-h-36 resize-none"
+                placeholder="Trumpai aprašyk problemą arba užduotį..."
+              />
+              <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+                <b className="text-slate-700">Padeda kokybiškam aprašymui:</b>
+                <br />
+                • Kas neveikia?
+                <br />
+                • Kurioje vietoje?
+                <br />
+                • Ar trukdo gyventojams?
+                <br />
+                • Ar reikia skubaus reagavimo?
+              </div>
+            </Field>
+
+            <div className="sticky bottom-0 z-10 -mx-7 -mb-7 border-t border-slate-100 bg-white/95 p-5 backdrop-blur">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <label className="flex items-center gap-2 text-sm font-black text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={form.keep_open}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        keep_open: event.target.checked,
+                      }))
+                    }
+                  />
+                  Sukūrus palikti formą atidarytą
+                </label>
+
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="btn-secondary"
+                  >
+                    Atšaukti
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((previous) => ({
+                        ...previous,
+                        draft_note: "draft",
+                      }))
+                    }
+                    className="btn-secondary"
+                  >
+                    Išsaugoti juodraštį
+                  </button>
+                  <button type="submit" disabled={saving} className="btn-primary bg-emerald-700 hover:bg-emerald-800">
+                    {saving ? "Kuriama..." : "Sukurti užduotį"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {selectedTask && (
+        <Modal
+          title={selectedTask.title}
+          desc="Užduoties informacija"
+          onClose={() => setSelectedTask(null)}
+        >
+          <div className="space-y-5">
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <DetailBox label="Statusas" value={getTaskStatusLabel(selectedTask.status)} />
+                <DetailBox label="Tipas" value={getTypeLabel(selectedTask.type)} />
+                <DetailBox label="Prioritetas" value={getPriorityLabel(selectedTask.priority)} />
+                <DetailBox label="Terminas" value={formatDateTime(selectedTask.due_date)} />
+                <DetailBox
+                  label="Gyventojas"
+                  value={residentName(
+                    selectedTask.resident_id
+                      ? residentsMap[selectedTask.resident_id]
+                      : undefined
+                  )}
+                />
+                <DetailBox label="Sukurta" value={formatDate(selectedTask.created_at)} />
+                <DetailBox
+                  label="Priskirta"
+                  value={
+                    selectedTask.assigned_user_id && employeesMap[selectedTask.assigned_user_id]
+                      ? employeeName(employeesMap[selectedTask.assigned_user_id])
+                      : "Nepriskirta"
+                  }
+                />
+                <DetailBox label="Pamatė" value={formatDateTime(selectedTask.viewed_at || null)} />
+                <DetailBox label="Įvykdė" value={formatDateTime(selectedTask.completed_at || selectedTask.last_done_at || null)} />
+                <DetailBox label="Kartojimas" value={selectedTask.interval_days ? `Kas ${selectedTask.interval_days} d.` : "Nekartojama"} />
+              </div>
             </div>
 
-            <textarea
-              style={styles.textarea}
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Komentaras..."
-            />
+            {selectedTask.description ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                <p className="text-sm font-extrabold uppercase tracking-widest text-slate-400">
+                  Aprašymas
+                </p>
+                <p className="mt-2 whitespace-pre-wrap font-semibold text-slate-700">
+                  {selectedTask.description}
+                </p>
+              </div>
+            ) : null}
 
-            <div style={styles.modalActions}>
-              <button type="button" style={styles.secondaryButton} onClick={() => setSelectedTask(null)}>
-                Uždaryti
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => void updateTaskStatus(selectedTask, "in_progress")}
+                className="btn-secondary"
+              >
+                Pažymėti vykdoma
               </button>
-              <button type="button" style={styles.primaryButton} onClick={() => void addComment()} disabled={saving}>
-                Pridėti komentarą
+              <button
+                type="button"
+                onClick={() => void updateTaskStatus(selectedTask, "waiting_parts")}
+                className="btn-secondary"
+              >
+                Laukia dalių
+              </button>
+              <button
+                type="button"
+                onClick={() => void updateTaskStatus(selectedTask, "done")}
+                className="btn-primary"
+              >
+                Pažymėti atlikta
               </button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      <MobileBottomNav notificationsCount={notificationsCount} />
+
+      <style jsx>{`
+        .input {
+          width: 100%;
+          border-radius: 1rem;
+          border: 1px solid #dbe3ef;
+          background: white;
+          padding: 0.9rem 1rem;
+          font-weight: 800;
+          color: #0f172a;
+          outline: none;
+        }
+
+        .input:focus {
+          border-color: #10b981;
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+        }
+
+        .btn-primary {
+          border-radius: 1rem;
+          background: #047857;
+          padding: 0.85rem 1.35rem;
+          font-weight: 900;
+          color: white;
+          transition: transform 0.15s ease, background 0.15s ease;
+        }
+
+        .btn-primary:hover {
+          background: #065f46;
+        }
+
+        .btn-primary:active {
+          transform: scale(0.98);
+        }
+
+        .btn-primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .btn-secondary {
+          border-radius: 1rem;
+          border: 1px solid #dbe3ef;
+          background: white;
+          padding: 0.85rem 1.35rem;
+          font-weight: 900;
+          color: #334155;
+          transition: transform 0.15s ease, background 0.15s ease;
+        }
+
+        .btn-secondary:hover {
+          background: #f8fafc;
+        }
+
+        .btn-secondary:active {
+          transform: scale(0.98);
+        }
+      `}</style>
+    </main>
+  )
+}
+
+
+function CircleStat({
+  title,
+  value,
+  total,
+  percent,
+  tone,
+  helper,
+}: {
+  title: string
+  value: number
+  total: number
+  percent: number
+  tone: "emerald" | "blue" | "amber" | "rose"
+  helper: string
+}) {
+  const color = {
+    emerald: "#047857",
+    blue: "#2563eb",
+    amber: "#d97706",
+    rose: "#e11d48",
+  }[tone]
+
+  const bg = {
+    emerald: "bg-emerald-50 text-emerald-800",
+    blue: "bg-blue-50 text-blue-800",
+    amber: "bg-amber-50 text-amber-800",
+    rose: "bg-rose-50 text-rose-800",
+  }[tone]
+
+  const radius = 42
+  const circumference = 2 * Math.PI * radius
+  const safePercent = Math.max(0, Math.min(100, percent || 0))
+  const strokeDashoffset = circumference - (safePercent / 100) * circumference
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+      <div className="flex items-center gap-5">
+        <div className="relative h-28 w-28 shrink-0">
+          <svg viewBox="0 0 100 100" className="h-28 w-28 -rotate-90">
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="none"
+              stroke="#e2e8f0"
+              strokeWidth="9"
+            />
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="none"
+              stroke={color}
+              strokeWidth="9"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <b className="text-2xl font-black">{safePercent}%</b>
+            <span className="text-xs font-black text-slate-400">{value}/{total}</span>
+          </div>
         </div>
-      ) : null}
+
+        <div className="min-w-0">
+          <p className="text-lg font-black text-slate-950">{title}</p>
+          <p className="mt-1 text-sm font-bold text-slate-500">{helper}</p>
+          <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-black ${bg}`}>
+            {value} įrašai
+          </span>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function DashboardPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: number
+  tone: "blue" | "amber" | "rose"
+}) {
+  const toneClass = {
+    blue: "border-blue-100 bg-blue-50 text-blue-700",
+    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    rose: "border-rose-100 bg-rose-50 text-rose-700",
+  }[tone]
+
+  return (
+    <div className={`rounded-2xl border px-4 py-3 font-black ${toneClass}`}>
+      {label}: {value}
     </div>
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function TaskSegmentCard({
+  title,
+  value,
+  helper,
+  tone,
+  onClick,
+}: {
+  title: string
+  value: number
+  helper: string
+  tone: "emerald" | "amber" | "blue" | "rose"
+  onClick: () => void
+}) {
+  const toneClass = {
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    amber: "border-amber-100 bg-amber-50 text-amber-800",
+    blue: "border-blue-100 bg-blue-50 text-blue-800",
+    rose: "border-rose-100 bg-rose-50 text-rose-800",
+  }[tone]
+
   return (
-    <label style={styles.field}>
-      <span>{label}</span>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-3xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClass}`}
+    >
+      <span className="text-3xl font-black">{value}</span>
+      <p className="mt-1 font-black">{title}</p>
+      <p className="mt-1 text-xs font-bold opacity-75">{helper}</p>
+    </button>
+  )
+}
+
+function Select({
+  value,
+  onChange,
+  children,
+}: {
+  value: string
+  onChange: (value: string) => void
+  children: React.ReactNode
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-black text-slate-700 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
+    >
+      {children}
+    </select>
+  )
+}
+
+function StatCard({
+  icon,
+  title,
+  value,
+  meta,
+  tone,
+}: {
+  icon: React.ReactNode
+  title: string
+  value: string
+  meta: string
+  tone: "emerald" | "amber" | "blue" | "rose" | "slate"
+}) {
+  const toneClass = {
+    emerald: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    blue: "bg-blue-50 text-blue-700",
+    rose: "bg-rose-50 text-rose-700",
+    slate: "bg-slate-50 text-slate-700",
+  }[tone]
+
+  const textClass = {
+    emerald: "text-emerald-700",
+    amber: "text-amber-700",
+    blue: "text-blue-700",
+    rose: "text-rose-700",
+    slate: "text-slate-700",
+  }[tone]
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
+      <div className="flex items-center gap-4">
+        <div
+          className={`flex h-14 w-14 items-center justify-center rounded-2xl ${toneClass}`}
+        >
+          {icon}
+        </div>
+
+        <div>
+          <p className="font-extrabold text-slate-500">{title}</p>
+          <p className="mt-1 text-4xl font-black">
+            {value}{" "}
+            <span className={`text-sm font-bold ${textClass}`}>{meta}</span>
+          </p>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function TaskCard({
+  task,
+  resident,
+  assignedEmployee,
+  saving,
+  onClick,
+  onStatusChange,
+}: {
+  task: TaskRow
+  resident?: ResidentRow
+  assignedEmployee?: EmployeeOption
+  saving: boolean
+  onClick: () => void
+  onStatusChange: (status: string) => void
+}) {
+  const late = isTaskLate(task)
+
+  return (
+    <article
+      className={`rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        task.status === "done"
+          ? "border-emerald-100 bg-emerald-50"
+          : late
+            ? "border-rose-100 bg-rose-50"
+            : "border-slate-200 bg-slate-50"
+      }`}
+    >
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <button type="button" onClick={onClick} className="flex-1 text-left">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-black text-slate-950">{task.title}</h3>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-slate-500">
+                  {getTypeLabel(task.type)}
+                </span>
+                <span className={`rounded-full border px-3 py-1 text-xs font-black ${getPriorityOption(task.priority).className}`}>
+                  {getPriorityLabel(task.priority)}
+                </span>
+              </div>
+            </div>
+
+            <span
+              className={`rounded-full bg-white px-3 py-1 text-sm font-black ${
+                late ? "text-rose-700" : "text-slate-700"
+              }`}
+            >
+              {late ? "Vėluoja" : getTaskStatusLabel(task.status)}
+            </span>
+            {!task.viewed_at ? (
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-black text-amber-700">
+                Nepamatyta
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <InfoPill label="Gyventojas" value={residentName(resident)} />
+            <InfoPill label="Priskirta" value={assignedEmployee ? employeeName(assignedEmployee) : "Nepriskirta"} />
+            <InfoPill label="Terminas" value={formatDateTime(task.due_date)} />
+            <InfoPill label="Kartojimas" value={task.interval_days ? `Kas ${task.interval_days} d.` : "—"} />
+            <InfoPill label="Pamatė" value={formatDateTime(task.viewed_at || null)} />
+            <InfoPill label="Įvykdė" value={formatDateTime(task.completed_at || task.last_done_at || null)} />
+          </div>
+        </button>
+
+        <div className="flex shrink-0 flex-wrap gap-2 md:flex-col">
+          {task.status !== "done" ? (
+            <>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onStatusChange("in_progress")}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+              >
+                Vykdoma
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onStatusChange("done")}
+                className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
+              >
+                Atlikta
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => onStatusChange("in_progress")}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              Grąžinti
+            </button>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white px-4 py-3">
+      <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 font-black text-slate-800">{value || "—"}</p>
+    </div>
+  )
+}
+
+function Modal({
+  title,
+  desc,
+  children,
+  onClose,
+}: {
+  title: string
+  desc: string
+  children: React.ReactNode
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-4">
+      <section className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
+        <div className="sticky top-0 z-20 flex items-start justify-between gap-6 border-b border-slate-100 bg-white/95 p-6 backdrop-blur sm:p-7">
+          <div>
+            <h2 className="text-3xl font-black tracking-tight md:text-5xl">
+              {title}
+            </h2>
+            <p className="mt-2 font-semibold text-slate-500">{desc}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 active:scale-[0.98]"
+            aria-label="Uždaryti"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="p-6 sm:p-7">{children}</div>
+      </section>
+    </div>
+  )
+}
+
+function Field({
+  label,
+  children,
+  full = false,
+}: {
+  label: string
+  children: React.ReactNode
+  full?: boolean
+}) {
+  return (
+    <label className={`block ${full ? "md:col-span-2" : ""}`}>
+      <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">
+        {label}
+      </span>
       {children}
     </label>
   )
 }
 
-function Stat({ label, value, danger, warning }: { label: string; value: number; danger?: boolean; warning?: boolean }) {
+function DetailBox({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ ...styles.stat, ...(danger ? styles.statDanger : warning ? styles.statWarning : {}) }}>
-      <div style={styles.statValue}>{value}</div>
-      <div style={styles.statLabel}>{label}</div>
+    <div className="rounded-2xl bg-white p-4">
+      <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
+        {label}
+      </p>
+      <p className="mt-2 break-words font-black text-slate-900">{value || "—"}</p>
     </div>
   )
-}
-
-function priorityStyle(priority: TaskPriority): React.CSSProperties {
-  if (priority === "critical") return { background: "#fee2e2", color: "#b91c1c" }
-  if (priority === "high") return { background: "#ffedd5", color: "#c2410c" }
-  if (priority === "medium") return { background: "#fef9c3", color: "#854d0e" }
-  return { background: "#dcfce7", color: "#166534" }
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { padding: 24, display: "grid", gap: 18, background: "#f8fafc" },
-  header: {
-    display: "grid",
-    gridTemplateColumns: "58px 1fr auto",
-    gap: 16,
-    alignItems: "center",
-    background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: 24,
-    padding: 22,
-  },
-  heroIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
-    background: "#ecfdf5",
-    color: "#047857",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  eyebrow: {
-    color: "#047857",
-    fontSize: 12,
-    fontWeight: 900,
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-  },
-  title: { margin: 0, fontSize: 34, fontWeight: 950, color: "#0f172a" },
-  subtitle: { margin: "6px 0 0", color: "#64748b", fontSize: 14, fontWeight: 700 },
-  refreshButton: {
-    border: "1px solid #a7f3d0",
-    background: "#ecfdf5",
-    color: "#047857",
-    borderRadius: 13,
-    padding: "10px 13px",
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: "pointer",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 7,
-  },
-  message: { padding: 12, borderRadius: 12, background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#047857", fontWeight: 800 },
-  stats: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 },
-  stat: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 16 },
-  statDanger: { background: "#fff1f2", borderColor: "#fecdd3" },
-  statWarning: { background: "#fff7ed", borderColor: "#fed7aa" },
-  statValue: { fontSize: 28, fontWeight: 900, color: "#0f172a" },
-  statLabel: { color: "#64748b", fontWeight: 800, fontSize: 13 },
-  card: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, padding: 18, display: "grid", gap: 14 },
-  cardHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  sectionTitle: { margin: 0, fontSize: 20, fontWeight: 900, color: "#0f172a" },
-  formGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 },
-  filters: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 },
-  field: { display: "grid", gap: 6, color: "#334155", fontSize: 13, fontWeight: 800 },
-  input: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "10px 12px", fontSize: 14, boxSizing: "border-box" },
-  textarea: { width: "100%", minHeight: 90, border: "1px solid #cbd5e1", borderRadius: 12, padding: 12, fontSize: 14, boxSizing: "border-box" },
-  primaryButton: { border: "none", borderRadius: 12, padding: "10px 14px", background: "#047857", color: "#fff", fontWeight: 900, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 },
-  secondaryButton: { border: "1px solid #cbd5e1", borderRadius: 12, padding: "8px 12px", background: "#fff", color: "#0f172a", fontWeight: 800, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 },
-  successButton: { border: "none", borderRadius: 12, padding: "8px 12px", background: "#047857", color: "#fff", fontWeight: 900, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 },
-  warningButton: { border: "1px solid #fde047", borderRadius: 12, padding: "8px 12px", background: "#fef9c3", color: "#854d0e", fontWeight: 900, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 },
-  dangerSoftButton: { border: "none", borderRadius: 12, padding: "8px 12px", background: "#fee2e2", color: "#b91c1c", fontWeight: 900, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 },
-  tableWrap: { overflowX: "auto" },
-  table: { width: "100%", minWidth: 1180, borderCollapse: "collapse" },
-  th: { textAlign: "left", padding: 12, borderBottom: "1px solid #e2e8f0", color: "#475569", fontWeight: 900 },
-  td: { padding: 12, borderBottom: "1px solid #f1f5f9", color: "#334155", verticalAlign: "top" },
-  tdBold: { padding: 12, borderBottom: "1px solid #f1f5f9", color: "#0f172a", fontWeight: 900, verticalAlign: "top" },
-  meta: { marginTop: 4, color: "#64748b", fontSize: 12, fontWeight: 700 },
-  badge: { display: "inline-flex", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 900 },
-  recurrenceBadge: { display: "inline-flex", alignItems: "center", gap: 5, borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 900, background: "#ecfdf5", color: "#047857" },
-  smallSelect: { border: "1px solid #cbd5e1", borderRadius: 10, padding: "7px 9px", background: "#fff", fontWeight: 700 },
-  empty: { padding: 24, textAlign: "center", color: "#64748b" },
-  rowActions: { display: "flex", gap: 8, flexWrap: "wrap" },
-  modalBackdrop: { position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 50 },
-  modal: { width: "100%", maxWidth: 880, maxHeight: "92vh", overflow: "auto", background: "#fff", borderRadius: 20, padding: 20, display: "grid", gap: 14 },
-  modalHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  iconButton: { width: 38, height: 38, borderRadius: 12, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer" },
-  commentList: { display: "grid", gap: 8, maxHeight: 280, overflowY: "auto" },
-  comment: { border: "1px solid #e2e8f0", background: "#f8fafc", borderRadius: 12, padding: 12 },
-  modalActions: { display: "flex", justifyContent: "flex-end", gap: 10 },
-
-  alertCard: { background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 18, padding: 18, display: "grid", gap: 14 },
-  alertCount: { background: "#be123c", color: "#fff", borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 900 },
-  alertList: { display: "grid", gap: 8 },
-  alertItem: { background: "#fff", border: "1px solid #fecdd3", borderRadius: 14, padding: 12, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" },
-  calendarGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 },
-  calendarDay: { border: "1px solid #e2e8f0", borderRadius: 14, padding: 12, background: "#f8fafc", display: "grid", gap: 8 },
-  calendarTasks: { display: "grid", gap: 6 },
-  calendarTask: { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 9, display: "grid", gap: 3, color: "#0f172a", fontSize: 13, fontWeight: 800 },
-
 }

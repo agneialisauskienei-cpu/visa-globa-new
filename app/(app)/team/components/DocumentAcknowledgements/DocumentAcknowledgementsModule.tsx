@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { supabase } from "@/lib/supabase"
 import {
   AlertTriangle,
@@ -19,6 +19,7 @@ type EmployeeOption = {
   full_name?: string | null
   name?: string | null
   role?: string | null
+  department?: string | null
 }
 
 type AcknowledgementRecord = {
@@ -189,7 +190,10 @@ export default function DocumentAcknowledgementsModule({
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const [employeeId, setEmployeeId] = useState("")
+  const [recipientMode, setRecipientMode] = useState<"all" | "department" | "employees">("employees")
+  const [selectedDepartment, setSelectedDepartment] = useState("")
+  const [employeeSearch, setEmployeeSearch] = useState("")
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([])
   const [documentTitle, setDocumentTitle] = useState("")
   const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0])
   const [documentVersion, setDocumentVersion] = useState("1.0")
@@ -197,6 +201,11 @@ export default function DocumentAcknowledgementsModule({
   const [dueDate, setDueDate] = useState("")
   const [note, setNote] = useState("")
   const [confirmationRequired, setConfirmationRequired] = useState(true)
+
+  const [localAcknowledgements, setLocalAcknowledgements] = useState<AcknowledgementRecord[]>(acknowledgements)
+  const [loadingAcknowledgements, setLoadingAcknowledgements] = useState(false)
+
+  const activeAcknowledgements = acknowledgements.length ? acknowledgements : localAcknowledgements
 
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{
@@ -211,8 +220,99 @@ export default function DocumentAcknowledgementsModule({
   const [signedUrl, setSignedUrl] = useState<string | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
 
+  useEffect(() => {
+    setLocalAcknowledgements(acknowledgements)
+  }, [acknowledgements])
+
+  async function loadAcknowledgements() {
+    if (!organizationId) {
+      setLocalAcknowledgements([])
+      return
+    }
+
+    setLoadingAcknowledgements(true)
+
+    const { data, error } = await supabase
+      .from("personnel_document_acknowledgements")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("assigned_at", { ascending: false })
+
+    setLoadingAcknowledgements(false)
+
+    if (error) {
+      setMessage({
+        type: "error",
+        text: "Nepavyko užkrauti susipažinimų sąrašo.",
+        details: error.message,
+      })
+      return
+    }
+
+    setLocalAcknowledgements((data || []) as AcknowledgementRecord[])
+  }
+
+  useEffect(() => {
+    void loadAcknowledgements()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId])
+
+  const departments = useMemo(() => {
+    return Array.from(
+      new Set(
+        employees
+          .map((employee) => employee.department?.trim())
+          .filter((department): department is string => Boolean(department)),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "lt"))
+  }, [employees])
+
+  const filteredEmployees = useMemo(() => {
+    const query = employeeSearch.trim().toLowerCase()
+
+    return employees.filter((employee) => {
+      const haystack = [
+        employee.full_name,
+        employee.name,
+        employee.role,
+        employee.department,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+
+      return !query || haystack.includes(query)
+    })
+  }, [employeeSearch, employees])
+
+  const targetEmployeeIds = useMemo(() => {
+    if (recipientMode === "all") return employees.map((employee) => employee.id)
+
+    if (recipientMode === "department") {
+      if (!selectedDepartment) return []
+      return employees
+        .filter((employee) => employee.department === selectedDepartment)
+        .map((employee) => employee.id)
+    }
+
+    return selectedEmployeeIds
+  }, [employees, recipientMode, selectedDepartment, selectedEmployeeIds])
+
+  const selectedEmployeeSet = useMemo(() => new Set(selectedEmployeeIds), [selectedEmployeeIds])
+
+  const selectedEmployeesLabel = useMemo(() => {
+    const count = targetEmployeeIds.length
+
+    if (recipientMode === "all") return `Visi darbuotojai (${count})`
+    if (recipientMode === "department") {
+      return selectedDepartment ? `${selectedDepartment} (${count})` : "Skyrius nepasirinktas"
+    }
+
+    return count === 1 ? "1 pasirinktas darbuotojas" : `${count} pasirinkta darbuotojų`
+  }, [recipientMode, selectedDepartment, targetEmployeeIds.length])
+
   const counts = useMemo(() => {
-    return acknowledgements.reduce(
+    return activeAcknowledgements.reduce(
       (acc, item) => {
         if (item.status === "acknowledged") acc.acknowledged += 1
         else if (isOverdue(item.due_date, item.status)) acc.overdue += 1
@@ -222,7 +322,7 @@ export default function DocumentAcknowledgementsModule({
       },
       { acknowledged: 0, viewed: 0, pending: 0, overdue: 0 },
     )
-  }, [acknowledgements])
+  }, [activeAcknowledgements])
 
   async function uploadPdf(fileHash: string) {
     if (!organizationId) throw new Error("Nenustatyta organizacija.")
@@ -251,7 +351,12 @@ export default function DocumentAcknowledgementsModule({
     setMessage(null)
 
     if (!organizationId) return setMessage({ type: "error", text: "Nenustatyta organizacija." })
-    if (!employeeId) return setMessage({ type: "error", text: "Pasirink darbuotoją." })
+    if (!targetEmployeeIds.length) {
+      return setMessage({
+        type: "error",
+        text: "Pasirink gavėjus: visus darbuotojus, skyrių arba konkrečius darbuotojus.",
+      })
+    }
     if (!documentTitle.trim()) return setMessage({ type: "error", text: "Įrašyk dokumento pavadinimą." })
     if (!selectedFile) {
       return setMessage({
@@ -272,23 +377,34 @@ export default function DocumentAcknowledgementsModule({
       const fileHash = await sha256(selectedFile)
       const uploaded = await uploadPdf(fileHash)
 
+      const assignedAt = new Date().toISOString()
+      const rows = targetEmployeeIds.map((targetEmployeeId) => ({
+        organization_id: organizationId,
+        employee_id: targetEmployeeId,
+        document_title: documentTitle.trim(),
+        document_type: documentType,
+        document_version: documentVersion.trim() || null,
+        document_file_path: uploaded.path,
+        document_file_name: uploaded.fileName,
+        document_sha256: fileHash,
+        status,
+        assigned_by: currentUserId || null,
+        assigned_at: assignedAt,
+        viewed_at: null,
+        acknowledged_at: null,
+        due_date: dueDate || null,
+        note: [
+          note.trim() || null,
+          `Gavėjai: ${selectedEmployeesLabel}`,
+          status === "sent" ? `Išsiųsta: ${formatDateTime(assignedAt)}` : `Juodraštis: ${formatDateTime(assignedAt)}`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      }))
+
       const { error } = await supabase
         .from("personnel_document_acknowledgements")
-        .insert({
-          organization_id: organizationId,
-          employee_id: employeeId,
-          document_title: documentTitle.trim(),
-          document_type: documentType,
-          document_version: documentVersion.trim() || null,
-          document_file_path: uploaded.path,
-          document_file_name: uploaded.fileName,
-          document_sha256: fileHash,
-          status,
-          assigned_by: currentUserId || null,
-          assigned_at: new Date().toISOString(),
-          due_date: dueDate || null,
-          note: note.trim() || null,
-        })
+        .insert(rows)
 
       if (error) {
         setMessage({
@@ -303,8 +419,8 @@ export default function DocumentAcknowledgementsModule({
         type: "success",
         text:
           status === "sent"
-            ? "PDF dokumentas priskirtas. Peržiūra ir patvirtinimas registruojami su laiko žymomis."
-            : "PDF dokumentas išsaugotas kaip juodraštis.",
+            ? `PDF dokumentas išsiųstas susipažinimui: ${targetEmployeeIds.length} gavėjų. Peržiūra ir patvirtinimas registruojami su laiko žymomis.`
+            : `PDF dokumentas išsaugotas kaip juodraštis: ${targetEmployeeIds.length} gavėjų.`,
       })
 
       setDocumentTitle("")
@@ -314,7 +430,11 @@ export default function DocumentAcknowledgementsModule({
       setDueDate("")
       setNote("")
       setConfirmationRequired(true)
+      setSelectedEmployeeIds([])
+      setSelectedDepartment("")
+      setEmployeeSearch("")
 
+      await loadAcknowledgements()
       await onRefresh?.()
     } catch (error) {
       setMessage({
@@ -452,22 +572,124 @@ export default function DocumentAcknowledgementsModule({
           </p>
 
           <div className="mt-5 grid gap-5">
-            <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Darbuotojas</span>
-              <select
-                value={employeeId}
-                onChange={(event) => setEmployeeId(event.target.value)}
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-              >
-                <option value="">Pasirinkti darbuotoją</option>
-                {employees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.full_name || employee.name || employee.id}
-                    {employee.role ? ` — ${employee.role}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="text-sm font-black text-slate-600">Kam siųsti susipažinimui</span>
+                  <p className="mt-1 text-xs font-bold text-slate-400">{selectedEmployeesLabel}</p>
+                </div>
+
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                  {targetEmployeeIds.length} gav.
+                </span>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-3">
+                <RecipientModeButton active={recipientMode === "all"} onClick={() => setRecipientMode("all")}>
+                  Visi
+                </RecipientModeButton>
+                <RecipientModeButton
+                  active={recipientMode === "department"}
+                  onClick={() => setRecipientMode("department")}
+                >
+                  Pagal skyrių
+                </RecipientModeButton>
+                <RecipientModeButton
+                  active={recipientMode === "employees"}
+                  onClick={() => setRecipientMode("employees")}
+                >
+                  Pagal darbuotoją
+                </RecipientModeButton>
+              </div>
+
+              {recipientMode === "department" ? (
+                <label className="block space-y-2">
+                  <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">Skyrius</span>
+                  <select
+                    value={selectedDepartment}
+                    onChange={(event) => setSelectedDepartment(event.target.value)}
+                    className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                  >
+                    <option value="">Pasirinkti skyrių</option>
+                    {departments.map((department) => (
+                      <option key={department} value={department}>
+                        {department} — {employees.filter((employee) => employee.department === department).length}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              {recipientMode === "employees" ? (
+                <div className="space-y-3">
+                  <input
+                    value={employeeSearch}
+                    onChange={(event) => setEmployeeSearch(event.target.value)}
+                    placeholder="Ieškoti pagal vardą, pareigas ar skyrių"
+                    className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                  />
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEmployeeIds(filteredEmployees.map((employee) => employee.id))}
+                      className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      Pasirinkti matomus
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEmployeeIds([])}
+                      className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      Išvalyti
+                    </button>
+                  </div>
+
+                  <div className="max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                    {filteredEmployees.length ? (
+                      filteredEmployees.map((employee) => {
+                        const checked = selectedEmployeeSet.has(employee.id)
+
+                        return (
+                          <label
+                            key={employee.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-2xl bg-white px-3 py-2 hover:bg-emerald-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => {
+                                setSelectedEmployeeIds((current) => {
+                                  if (event.target.checked) {
+                                    return Array.from(new Set([...current, employee.id]))
+                                  }
+
+                                  return current.filter((id) => id !== employee.id)
+                                })
+                              }}
+                              className="mt-1 h-5 w-5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                            />
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-black text-slate-800">
+                                {employee.full_name || employee.name || employee.id}
+                              </span>
+                              <span className="block truncate text-xs font-bold text-slate-400">
+                                {[employee.role, employee.department].filter(Boolean).join(" · ") || "—"}
+                              </span>
+                            </span>
+                          </label>
+                        )
+                      })
+                    ) : (
+                      <div className="px-3 py-8 text-center text-sm font-bold text-slate-500">
+                        Darbuotojų nerasta.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
@@ -628,8 +850,12 @@ export default function DocumentAcknowledgementsModule({
           </p>
 
           <div className="mt-5 space-y-3">
-            {acknowledgements.length ? (
-              acknowledgements.map((item) => {
+            {loadingAcknowledgements ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 px-4 py-10 text-center font-bold text-slate-500">
+                Kraunamas susipažinimų sąrašas...
+              </div>
+            ) : activeAcknowledgements.length ? (
+              activeAcknowledgements.map((item) => {
                 const meta = statusMeta(item)
 
                 return (
@@ -650,6 +876,9 @@ export default function DocumentAcknowledgementsModule({
 
                         <div className="mt-1 text-sm font-bold text-slate-500">
                           {employeeName(employees, item.employee_id)}
+                          {employees.find((employee) => employee.id === item.employee_id)?.department
+                            ? ` · ${employees.find((employee) => employee.id === item.employee_id)?.department}`
+                            : ""}
                         </div>
 
                         <div className="mt-2 grid gap-2 text-xs font-bold text-slate-500 sm:grid-cols-2">
@@ -659,6 +888,8 @@ export default function DocumentAcknowledgementsModule({
                           <div>Versija: {item.document_version || "—"}</div>
                           <div>Terminas: {formatDate(item.due_date)}</div>
                           <div>Išsiųsta: {formatDateTime(item.assigned_at)}</div>
+                          <div>Perskaityta: {formatDateTime(effectiveViewedAt(item))}</div>
+                          <div>Susipažinta: {formatDateTime(item.acknowledged_at)}</div>
                         </div>
 
                         {item.document_file_name ? (
@@ -736,8 +967,10 @@ export default function DocumentAcknowledgementsModule({
               <AuditBox label="Dokumento tipas" value={detailsItem.document_type || "—"} />
               <AuditBox label="Versija" value={detailsItem.document_version || "—"} />
               <AuditBox label="Failas" value={detailsItem.document_file_name || "—"} />
+              <AuditBox label="Būsena" value={statusMeta(detailsItem).label} />
               <AuditBox label="Terminas" value={formatDate(detailsItem.due_date)} />
               <AuditBox label="Išsiųsta" value={formatDateTime(detailsItem.assigned_at)} />
+              <AuditBox label="Išsiuntė" value={detailsItem.assigned_by || "—"} />
               <AuditBox label="Peržiūrėta" value={formatDateTime(effectiveViewedAt(detailsItem))} />
               <AuditBox label="Patvirtinta" value={formatDateTime(detailsItem.acknowledged_at)} />
               <AuditBox label="IP" value={detailsItem.acknowledged_ip || "—"} />
@@ -862,6 +1095,31 @@ export default function DocumentAcknowledgementsModule({
         </div>
       ) : null}
     </section>
+  )
+}
+
+function RecipientModeButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "min-h-11 rounded-2xl px-3 text-sm font-black transition",
+        active
+          ? "bg-emerald-700 text-white shadow-sm"
+          : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+      ].join(" ")}
+    >
+      {children}
+    </button>
   )
 }
 
