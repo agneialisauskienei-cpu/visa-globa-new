@@ -747,12 +747,16 @@ export default function TeamPage() {
       editForm.full_name.trim() ||
       [firstName, lastName].filter(Boolean).join(" ").trim();
 
+    console.log("[TeamPage] validation", { firstName, lastName, fullName, birth_date: editForm.birth_date });
+
     if (!firstName || !lastName) {
+      console.error("[TeamPage] saveEmployee aborted: missing firstName or lastName");
       setMessage("Įvesk darbuotojo vardą ir pavardę.");
       return;
     }
 
     if (editForm.birth_date && !isRealBirthDate(editForm.birth_date)) {
+      console.error("[TeamPage] saveEmployee aborted: invalid birth date", editForm.birth_date);
       setMessage("Gimimo data turi būti reali: nuo 1900-01-01 iki šiandienos.");
       return;
     }
@@ -878,8 +882,11 @@ export default function TeamPage() {
     const email = newEmployeeForm.email.trim();
     const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
+    console.log("[TeamPage] validation", { firstName, lastName, fullName, birth_date: editForm.birth_date });
+
     if (!firstName || !lastName) {
       setCreateModalMessage("Įvesk darbuotojo vardą ir pavardę.");
+      console.error("[TeamPage] saveEmployee aborted: missing firstName or lastName");
       setMessage("Įvesk darbuotojo vardą ir pavardę.");
       return;
     }
