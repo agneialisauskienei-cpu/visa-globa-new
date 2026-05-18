@@ -739,9 +739,10 @@ export default function HandoverLogsPage() {
                 <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input"><option value="all">Visi prioritetai</option>{PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
                 <select value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="input"><option value="all">Visos pamainos</option>{SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
                 <div className="flex min-w-0 flex-wrap gap-2">
-                  <FilterToggle active={unreadOnly} onClick={() => setUnreadOnly((v) => !v)}>Nepatvirtinti</FilterToggle>
+                  <FilterToggle active={!includeArchived && !unreadOnly} onClick={() => { setIncludeArchived(false); setUnreadOnly(false); }}>Visi aktyvūs</FilterToggle>
+                  <FilterToggle active={unreadOnly} onClick={() => { setIncludeArchived(false); setUnreadOnly((v) => !v); }}>Nepatvirtinti</FilterToggle>
                   <FilterToggle active={importantOnly} onClick={() => setImportantOnly((v) => !v)}>Svarbūs</FilterToggle>
-                  <FilterToggle active={includeArchived} onClick={() => setIncludeArchived((v) => !v)}>Archyvas</FilterToggle>
+                  <FilterToggle active={includeArchived} onClick={() => { setUnreadOnly(false); setIncludeArchived((v) => !v); }}>Archyvas</FilterToggle>
                 </div>
               </div>
             </article>
