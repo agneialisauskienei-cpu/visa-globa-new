@@ -1,9 +1,9 @@
-```tsx
 "use client"
 
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
+import type { CSSProperties } from "react"
 import {
   BarChart3,
   Box,
@@ -96,6 +96,17 @@ function mapMenuByRole(item: AppMenuItem, access: CurrentAccess): AppMenuItem {
   return item
 }
 
+function initials(nameOrEmail: string | null | undefined) {
+  const value = (nameOrEmail || "NA").trim()
+  const parts = value.split(/\s+/).filter(Boolean)
+
+  if (parts.length >= 2) {
+    return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase()
+  }
+
+  return value.slice(0, 2).toUpperCase()
+}
+
 function VisaGlobaLogo() {
   return (
     <svg
@@ -113,6 +124,27 @@ function VisaGlobaLogo() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      <path
+        d="M12.4 17.5L16.4 13.6C17.5 12.5 19.2 12.5 20.3 13.6L22 15.2"
+        stroke="currentColor"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M27.6 17.5L23.6 13.6C22.5 12.5 20.8 12.5 19.7 13.6L18 15.2"
+        stroke="currentColor"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14.6 20.2L18.4 23.8C19.3 24.7 20.7 24.7 21.6 23.8L25.4 20.2"
+        stroke="currentColor"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -124,6 +156,7 @@ export default function AppSidebar() {
 
   const [access, setAccess] = useState<CurrentAccess | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [profileName, setProfileName] = useState<string>("")
 
   useEffect(() => {
     void loadAccess()
@@ -136,11 +169,20 @@ export default function AppSidebar() {
     if (current?.userId) {
       const { data } = await supabase
         .from("profiles")
-        .select("avatar_url")
+        .select("avatar_url, full_name, first_name, last_name, email")
         .eq("id", current.userId)
-        .single()
+        .maybeSingle()
 
       setAvatarUrl(data?.avatar_url || null)
+
+      const name =
+        data?.full_name ||
+        [data?.first_name, data?.last_name].filter(Boolean).join(" ").trim() ||
+        data?.email ||
+        current.email ||
+        "Naudotojas"
+
+      setProfileName(name)
     }
   }
 
@@ -169,6 +211,8 @@ export default function AppSidebar() {
     access?.role === "employee"
       ? staffTypeLabel(access.staffType)
       : roleLabel(access?.role)
+
+  const displayName = profileName || access?.email || "Naudotojas"
 
   return (
     <aside style={styles.sidebar}>
@@ -204,27 +248,19 @@ export default function AppSidebar() {
         <div style={styles.userBox}>
           <div style={styles.avatar}>
             {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt="Avatar"
-                style={styles.avatarImage}
-              />
+              <img src={avatarUrl} alt="Avatar" style={styles.avatarImage} />
             ) : (
-              (access?.email || "NA").slice(0, 2).toUpperCase()
+              initials(displayName)
             )}
           </div>
 
           <div style={styles.userInfo}>
-            <div style={styles.userName}>Naudotojas</div>
+            <div style={styles.userName}>{displayName}</div>
             <div style={styles.userRole}>{userRoleLabel}</div>
           </div>
         </div>
 
-        <button
-          type="button"
-          style={styles.logout}
-          onClick={() => void logout()}
-        >
+        <button type="button" style={styles.logout} onClick={() => void logout()}>
           <LogOut size={17} />
           Atsijungti
         </button>
@@ -233,7 +269,7 @@ export default function AppSidebar() {
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   sidebar: {
     width: 254,
     minWidth: 254,
@@ -353,7 +389,6 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     height: "100%",
     objectFit: "cover",
-    borderRadius: "50%",
   },
 
   userInfo: {
@@ -364,6 +399,9 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#ffffff",
     fontSize: 12,
     fontWeight: 900,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
 
   userRole: {
@@ -389,4 +427,3 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
   },
 }
-```
