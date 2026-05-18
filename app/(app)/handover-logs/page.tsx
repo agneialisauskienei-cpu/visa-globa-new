@@ -739,7 +739,7 @@ export default function HandoverLogsPage() {
                 <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input"><option value="all">Visi prioritetai</option>{PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
                 <select value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="input"><option value="all">Visos pamainos</option>{SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
                 <div className="flex min-w-0 flex-wrap gap-2">
-                  <FilterToggle active={!includeArchived && !unreadOnly} onClick={() => { setIncludeArchived(false); setUnreadOnly(false); }}>Visi aktyvūs</FilterToggle>
+                  <FilterToggle active={!includeArchived && !unreadOnly && !importantOnly} onClick={() => { setIncludeArchived(false); setUnreadOnly(false); }}>Visi aktyvūs</FilterToggle>
                   <FilterToggle active={unreadOnly} onClick={() => { setIncludeArchived(false); setUnreadOnly((v) => !v); }}>Nepatvirtinti</FilterToggle>
                   <FilterToggle active={importantOnly} onClick={() => setImportantOnly((v) => !v)}>Svarbūs</FilterToggle>
                   <FilterToggle active={includeArchived} onClick={() => { setUnreadOnly(false); setIncludeArchived((v) => !v); }}>Archyvas</FilterToggle>
@@ -930,7 +930,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function FilterToggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className={`inline-flex h-12 items-center justify-center rounded-2xl border px-4 text-sm font-black transition ${active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600"}`}>
+    <button type="button" onClick={onClick} className={`inline-flex h-12 items-center justify-center rounded-2xl border px-4 text-sm font-black transition ${active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}>
       {children}
     </button>
   );

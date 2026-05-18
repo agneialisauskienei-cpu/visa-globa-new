@@ -339,8 +339,9 @@ export default function MedicinePage() {
       const [residentsResult, roomsResult, medsResult, logsResult, prnResult, vitalsResult] = await Promise.all([
         supabase
           .from("residents")
-          .select("id, full_name, first_name, last_name, resident_code, current_room_id")
+          .select("id, full_name, first_name, last_name, resident_code, current_room_id, current_status, is_active, assigned_to")
           .eq("organization_id", orgId)
+          .eq("is_active", true)
           .is("archived_at", null),
 
         supabase.from("rooms").select("id, name").eq("organization_id", orgId),
