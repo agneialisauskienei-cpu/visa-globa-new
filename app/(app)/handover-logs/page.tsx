@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getCurrentOrganizationId } from "@/lib/current-organization";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
 type Priority = "low" | "medium" | "high" | "critical";
 type ShiftType = "morning" | "day" | "evening" | "night" | "other";
@@ -270,6 +271,8 @@ export default function HandoverLogsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileCreateOpen, setMobileCreateOpen] = useState(false);
 
   const [residentFilter, setResidentFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -296,6 +299,15 @@ export default function HandoverLogsPage() {
 
   useEffect(() => {
     void loadAll();
+  }, []);
+
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth < 1024);
+
+    update();
+    window.addEventListener("resize", update);
+
+    return () => window.removeEventListener("resize", update);
   }, []);
 
   async function loadAll() {
@@ -576,10 +588,351 @@ export default function HandoverLogsPage() {
     return Array.from(counts.values()).sort((a, b) => b.count - a.count).slice(0, 3);
   }, [logs, residents]);
 
+  if (isMobile) {
+    return (
+      <main className="min-h-screen bg-slate-50 pb-32 text-slate-950">
+        <section className="overflow-hidden rounded-b-[34px] bg-gradient-to-br from-emerald-800 via-emerald-700 to-slate-950 px-5 pb-7 pt-7 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.32em] text-emerald-100">
+                Perdavimo žurnalai
+              </p>
+              <h1 className="mt-3 text-[34px] font-black leading-[0.98] tracking-[-0.045em]">
+                Pamainų perdavimas
+              </h1>
+              <p className="mt-4 max-w-[320px] text-[15px] font-semibold leading-6 text-emerald-50/90">
+                Svarbiausi įrašai, kuriuos turi pamatyti kita pamaina.
+              </p>
+            </div>
+
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-white/15 text-white backdrop-blur">
+              <ClipboardList className="h-7 w-7" />
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-3 gap-3">
+            <MobileHeroStat label="Visi" value={stats.total} />
+            <MobileHeroStat label="Nauji" value={stats.unread} />
+            <MobileHeroStat label="Svarbūs" value={stats.important} />
+          </div>
+        </section>
+
+        <section className="space-y-4 px-4 pt-5">
+          {message ? (
+            <div className="rounded-[24px] border border-amber-100 bg-amber-50 p-4 text-sm font-black text-amber-800">
+              {message}
+            </div>
+          ) : null}
+
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Ieškoti gyventojo, teksto..."
+              className="h-14 w-full rounded-[22px] border border-slate-200/70 bg-white pl-12 pr-4 text-[15px] font-black text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.05)] outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+            />
+          </label>
+
+          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <MobileFilterChip
+              active={!includeArchived && !unreadOnly && !importantOnly}
+              onClick={() => {
+                setIncludeArchived(false);
+                setUnreadOnly(false);
+                setImportantOnly(false);
+              }}
+            >
+              Visi
+            </MobileFilterChip>
+            <MobileFilterChip
+              active={unreadOnly}
+              onClick={() => {
+                setIncludeArchived(false);
+                setUnreadOnly((value) => !value);
+              }}
+            >
+              Nauji
+            </MobileFilterChip>
+            <MobileFilterChip active={importantOnly} onClick={() => setImportantOnly((value) => !value)}>
+              Svarbūs
+            </MobileFilterChip>
+            <MobileFilterChip
+              active={includeArchived}
+              onClick={() => {
+                setUnreadOnly(false);
+                setIncludeArchived((value) => !value);
+              }}
+            >
+              Archyvas
+            </MobileFilterChip>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <MobileMiniStat label="Sekti" value={stats.followUp} />
+            <MobileMiniStat label="Kritiniai" value={stats.critical} />
+          </div>
+
+          {hotResidents.length > 0 ? (
+            <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">Dažniausiai minimi</p>
+                  <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">Gyventojai</h2>
+                </div>
+                <Sparkles className="h-5 w-5 text-emerald-700" />
+              </div>
+              <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {hotResidents.map((item) => (
+                  <button
+                    key={item.resident.id}
+                    type="button"
+                    onClick={() => setResidentFilter(item.resident.id)}
+                    className="min-w-[190px] rounded-[22px] border border-slate-200 bg-slate-50 p-3 text-left transition active:scale-[0.98]"
+                  >
+                    <p className="line-clamp-1 text-sm font-black text-slate-950">{residentName(item.resident, roomsById)}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">{item.count} įrašai · {item.critical} krit.</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="space-y-3">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">Pamaina</p>
+                <h2 className="mt-1 text-2xl font-black tracking-tight">Dabar svarbu</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadAll()}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200/70 bg-white text-emerald-700 shadow-sm"
+                aria-label="Atnaujinti"
+              >
+                <RefreshCw className="h-5 w-5" />
+              </button>
+            </div>
+
+            {filteredLogs.length === 0 ? (
+              <div className="rounded-[28px] border border-slate-200/70 bg-white p-8 text-center text-sm font-black text-slate-500">
+                Perdavimo įrašų pagal filtrus nėra.
+              </div>
+            ) : (
+              filteredLogs.map((log) => {
+                const resident = residents.find((item) => item.id === log.resident_id);
+                const author = profiles.find((item) => item.id === log.created_by);
+                const read = isRead(log.id);
+
+                return (
+                  <article
+                    key={log.id}
+                    className={`rounded-[28px] border bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)] ${
+                      log.priority === "critical"
+                        ? "border-rose-200"
+                        : log.priority === "high"
+                          ? "border-amber-200"
+                          : "border-slate-200"
+                    } ${log.archived ? "opacity-60" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-700">
+                            {shiftLabel(log.shift_type)}
+                          </span>
+                          <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700">
+                            {priorityLabel(log.priority)}
+                          </span>
+                          {!read ? (
+                            <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-black text-white">Nauja</span>
+                          ) : null}
+                          {log.is_important ? (
+                            <span className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-black text-rose-700">Svarbu</span>
+                          ) : null}
+                        </div>
+
+                        <h3 className="mt-3 text-xl font-black leading-tight tracking-[-0.02em] text-slate-950">
+                          {log.title}
+                        </h3>
+                        <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-600">
+                          {log.note}
+                        </p>
+                      </div>
+
+                      {!read ? (
+                        <button
+                          type="button"
+                          onClick={() => void markRead(log)}
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-emerald-50 text-emerald-700"
+                          aria-label="Patvirtinti, kad mačiau"
+                        >
+                          <CheckCircle2 className="h-6 w-6" />
+                        </button>
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-slate-50 text-slate-400">
+                          <CheckCircle2 className="h-6 w-6" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 rounded-[22px] bg-slate-50 p-3">
+                      <p className="line-clamp-1 text-sm font-black text-slate-700">{residentName(resident, roomsById)}</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">
+                        {formatShortDate(log.shift_date)} · {profileName(author)}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLog(log)}
+                        className="flex-1 rounded-[18px] bg-slate-950 px-4 py-3 text-sm font-black text-white"
+                      >
+                        Atidaryti
+                      </button>
+                      {!log.archived ? (
+                        <button
+                          type="button"
+                          onClick={() => void archiveLog(log)}
+                          className="rounded-[18px] border border-slate-200/70 bg-white px-4 py-3 text-sm font-black text-slate-700"
+                        >
+                          Arch.
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })
+            )}
+          </section>
+        </section>
+
+        <button
+          type="button"
+          onClick={() => setMobileCreateOpen(true)}
+          className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-white shadow-2xl active:scale-95"
+          aria-label="Naujas perdavimo įrašas"
+        >
+          <Plus className="h-7 w-7" />
+        </button>
+
+        {mobileCreateOpen ? (
+          <div className="fixed inset-0 z-40 flex items-end bg-slate-950/40 backdrop-blur-sm">
+            <section className="max-h-[88vh] w-full overflow-y-auto rounded-t-[32px] bg-white p-5 shadow-2xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">Naujas įrašas</p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight">Perduoti informaciją</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileCreateOpen(false)}
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"
+                  aria-label="Uždaryti"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                <Field label="Gyventojas">
+                  <select value={form.resident_id} onChange={(event) => setForm((prev) => ({ ...prev, resident_id: event.target.value }))} className="input">
+                    <option value="">Bendra įstaigos informacija</option>
+                    {residents.map((resident) => (
+                      <option key={resident.id} value={resident.id}>{residentName(resident, roomsById)}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Pamaina">
+                    <select value={form.shift_type} onChange={(event) => setForm((prev) => ({ ...prev, shift_type: event.target.value as ShiftType }))} className="input">
+                      {SHIFTS.map((shift) => <option key={shift.value} value={shift.value}>{shift.label}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Prioritetas">
+                    <select value={form.priority} onChange={(event) => setForm((prev) => ({ ...prev, priority: event.target.value as Priority }))} className="input">
+                      {PRIORITIES.map((priority) => <option key={priority.value} value={priority.value}>{priority.label}</option>)}
+                    </select>
+                  </Field>
+                </div>
+
+                <Field label="Pavadinimas">
+                  <input value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} className="input" placeholder="Pvz. Stebėti po kritimo" />
+                </Field>
+
+                <Field label="Informacija">
+                  <textarea value={form.note} onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))} className="input min-h-32 resize-none" placeholder="Ką būtina perduoti kitai pamainai?" />
+                </Field>
+
+                <div className="grid gap-2">
+                  <label className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-700">
+                    <input type="checkbox" checked={form.is_important} onChange={(event) => setForm((prev) => ({ ...prev, is_important: event.target.checked }))} />
+                    Pažymėti kaip svarbų
+                  </label>
+                  <label className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-700">
+                    <input type="checkbox" checked={form.needs_follow_up} onChange={(event) => setForm((prev) => ({ ...prev, needs_follow_up: event.target.checked }))} />
+                    Reikia sekti kitai pamainai
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void createLog().then(() => setMobileCreateOpen(false))}
+                  disabled={saving}
+                  className="flex h-14 w-full items-center justify-center rounded-[20px] bg-emerald-800 text-base font-black text-white shadow-lg disabled:opacity-60"
+                >
+                  {saving ? "Saugoma..." : "Sukurti įrašą"}
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {selectedLog ? (
+          <LogModal
+            log={selectedLog}
+            resident={residents.find((item) => item.id === selectedLog.resident_id)}
+            author={profiles.find((item) => item.id === selectedLog.created_by)}
+            comments={comments.filter((comment) => comment.handover_id === selectedLog.id)}
+            profiles={profiles}
+            roomsById={roomsById}
+            commentText={commentText}
+            setCommentText={setCommentText}
+            onClose={() => setSelectedLog(null)}
+            onAddComment={() => void addComment(selectedLog)}
+            saving={saving}
+          />
+        ) : null}
+
+        <style jsx>{`
+          .input {
+            width: 100%;
+            border-radius: 1.15rem;
+            border: 1px solid #dbe3ef;
+            background: white;
+            padding: 0.9rem 1rem;
+            font-weight: 850;
+            color: #0f172a;
+            outline: none;
+          }
+
+          .input:focus {
+            border-color: #10b981;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+          }
+        `}</style>
+
+        <MobileBottomNav />
+      </main>
+    );
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
-        <div className="mx-auto w-full max-w-[1700px] rounded-3xl border border-slate-200 bg-white p-8 text-center font-black shadow-sm">
+        <div className="mx-auto w-full max-w-[1700px] rounded-3xl border border-slate-200/70 bg-white p-8 text-center font-black shadow-sm">
           Kraunama perdavimo žurnalus...
         </div>
       </main>
@@ -589,7 +942,7 @@ export default function HandoverLogsPage() {
   return (
     <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
       <div className="mx-auto w-full max-w-[1700px] space-y-6">
-        <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+        <section className="rounded-3xl border border-slate-200/70 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-5">
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
@@ -604,7 +957,7 @@ export default function HandoverLogsPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={() => setHelpOpen(true)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 font-extrabold text-slate-700 hover:bg-slate-50">
+              <button type="button" onClick={() => setHelpOpen(true)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white px-5 py-3 font-extrabold text-slate-700 hover:bg-slate-50">
                 <HelpCircle className="h-4 w-4" /> Pagalba
               </button>
               <button type="button" onClick={() => void loadAll()} className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-extrabold text-emerald-700 hover:bg-emerald-100">
@@ -626,7 +979,7 @@ export default function HandoverLogsPage() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[560px_minmax(0,1fr)]">
-          <article className="xl:sticky xl:top-6 self-start rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <article className="xl:sticky xl:top-6 self-start rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
             <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Naujas įrašas</p>
             <h2 className="mt-1 text-2xl font-black tracking-tight">Perduoti informaciją</h2>
             <p className="mt-1 font-semibold text-slate-500">Pirmiausia pasirink temą, tada, jei reikia, priskirk gyventoją.</p>
@@ -721,7 +1074,7 @@ export default function HandoverLogsPage() {
           </article>
 
           <div className="min-w-0 space-y-6">
-            <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+            <article className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Filtrai</p>
@@ -734,11 +1087,49 @@ export default function HandoverLogsPage() {
                 </label>
               </div>
 
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <select value={residentFilter} onChange={(event) => setResidentFilter(event.target.value)} className="input min-w-[220px] flex-1"><option value="all">Visi gyventojai</option>{residents.map((resident) => <option key={resident.id} value={resident.id}>{residentName(resident, roomsById)}</option>)}</select>
-                <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input min-w-[220px] flex-1"><option value="all">Visi prioritetai</option>{PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select>
-                <select value={shiftFilter} onChange={(event) => setShiftFilter(event.target.value)} className="input min-w-[220px] flex-1"><option value="all">Visos pamainos</option>{SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
-                <div className="flex min-w-0 flex-wrap gap-2">
+              <div className="mt-5 space-y-3">
+                <div className="grid gap-3 lg:grid-cols-3">
+                  <select
+                    value={residentFilter}
+                    onChange={(event) => setResidentFilter(event.target.value)}
+                    className="h-14 w-full min-w-0 rounded-2xl border border-slate-200/70 bg-white px-5 text-sm font-black text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+                  >
+                    <option value="all">Visi gyventojai</option>
+                    {residents.map((resident) => (
+                      <option key={resident.id} value={resident.id}>
+                        {residentName(resident, roomsById)}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={priorityFilter}
+                    onChange={(event) => setPriorityFilter(event.target.value)}
+                    className="h-14 w-full min-w-0 rounded-2xl border border-slate-200/70 bg-white px-5 text-sm font-black text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+                  >
+                    <option value="all">Visi prioritetai</option>
+                    {PRIORITIES.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={shiftFilter}
+                    onChange={(event) => setShiftFilter(event.target.value)}
+                    className="h-14 w-full min-w-0 rounded-2xl border border-slate-200/70 bg-white px-5 text-sm font-black text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+                  >
+                    <option value="all">Visos pamainos</option>
+                    {SHIFTS.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                   <FilterToggle active={!includeArchived && !unreadOnly && !importantOnly} onClick={() => { setIncludeArchived(false); setUnreadOnly(false); }}>Visi aktyvūs</FilterToggle>
                   <FilterToggle active={unreadOnly} onClick={() => { setIncludeArchived(false); setUnreadOnly((v) => !v); }}>Nepatvirtinti</FilterToggle>
                   <FilterToggle active={importantOnly} onClick={() => setImportantOnly((v) => !v)}>Svarbūs</FilterToggle>
@@ -748,7 +1139,7 @@ export default function HandoverLogsPage() {
             </article>
 
             {hotResidents.length > 0 ? (
-              <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Dažniausiai minimi</p>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {hotResidents.map((item) => (
@@ -819,7 +1210,7 @@ export default function HandoverLogsPage() {
       {helpOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
           <section className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-7">
+            <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-5">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
                   Kaip naudoti
@@ -842,7 +1233,7 @@ export default function HandoverLogsPage() {
               </button>
             </div>
 
-            <div className="grid gap-5 p-7 md:grid-cols-2">
+            <div className="grid gap-5 p-5 md:grid-cols-2">
               <HelpRuleCard
                 title="1. Rašyk tik būtina informaciją"
                 text="Įrašas turi būti naudingas kitai pamainai arba gyventojo priežiūros tęstinumui. Venk perteklinių ir neaktualių asmens duomenų."
@@ -889,6 +1280,40 @@ export default function HandoverLogsPage() {
         }
       `}</style>
     </main>
+  );
+}
+
+function MobileHeroStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-[24px] bg-white/15 p-4 backdrop-blur">
+      <div className="text-2xl font-black text-white">{value}</div>
+      <div className="mt-1 text-[11px] font-black uppercase tracking-wide text-emerald-50">{label}</div>
+    </div>
+  );
+}
+
+function MobileMiniStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+      <div className="text-2xl font-black text-slate-950">{value}</div>
+      <div className="mt-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+function MobileFilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-black transition active:scale-[0.98] ${
+        active
+          ? "bg-slate-950 text-white shadow-sm"
+          : "border border-slate-200/70 bg-white text-slate-600"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -964,7 +1389,7 @@ function LogModal({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
       <section className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-7">
+        <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-5">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Perdavimo įrašas</p>
             <h2 className="mt-1 text-4xl font-black tracking-tight">{log.title}</h2>
@@ -973,7 +1398,7 @@ function LogModal({
           <button type="button" onClick={onClose} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"><X className="h-7 w-7" /></button>
         </div>
 
-        <div className="space-y-5 p-7">
+        <div className="space-y-5 p-5">
           <div className={`rounded-3xl border p-5 ${priorityClasses(log.priority)}`}>
             <div className="flex flex-wrap gap-2">
               <span className={`rounded-full px-3 py-1 text-xs font-black ${priorityPillClasses(log.priority)}`}>{priorityLabel(log.priority)}</span>

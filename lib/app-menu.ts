@@ -10,7 +10,7 @@ export type AppMenuItem = {
 export const APP_MENU: AppMenuItem[] = [
   {
     label: "Pagrindinis",
-    href: "/dashboard",
+    href: "/employee-dashboard",
     permission: "dashboard.view",
     icon: "home",
   },
@@ -25,6 +25,12 @@ export const APP_MENU: AppMenuItem[] = [
     href: "/tasks",
     permission: "tasks.view",
     icon: "tasks",
+  },
+  {
+    label: "Pranešimai",
+    href: "/notifications",
+    permission: "notifications.view",
+    icon: "bell",
   },
   {
     label: "Mano profilis",

@@ -6,11 +6,9 @@ import {
   ArrowLeft,
   ArrowRight,
   BedSingle,
-  Bell,
-  CalendarClock,
   CheckCircle2,
   ClipboardList,
-  Home,
+  Clock,
   Search,
   Users,
   X,
@@ -60,15 +58,14 @@ type ResidentTask = {
 function formatResidentName(resident: ResidentAssignmentRow["residents"]) {
   if (!resident) return "Gyventojas"
 
+  if (resident.full_name?.trim()) return resident.full_name.trim()
+
   const combined = [resident.first_name, resident.last_name]
     .filter(Boolean)
     .join(" ")
     .trim()
 
-  if (combined) return combined
-  if (resident.full_name?.trim()) return resident.full_name.trim()
-
-  return "Gyventojas"
+  return combined || "Gyventojas"
 }
 
 function getResidentInitials(resident: ResidentAssignmentRow["residents"]) {
@@ -280,6 +277,13 @@ export default function MyResidentsPage() {
     [tasks]
   )
 
+  const openTasks = useMemo(
+    () => tasks.filter((task) => isOpenTask(task.status)),
+    [tasks]
+  )
+
+  const lateTasks = useMemo(() => tasks.filter(isTaskLate), [tasks])
+
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase()
 
@@ -292,7 +296,7 @@ export default function MyResidentsPage() {
       const status = normalizeResidentStatus(resident?.status).toLowerCase()
       const residentTasks = tasksByResidentId[item.resident_id] || []
       const taskText = residentTasks
-        .map((task) => `${task.title || ""} ${normalizeTaskStatus(task.status)}`)
+        .map((task) => [task.title, task.description, task.type].filter(Boolean).join(" "))
         .join(" ")
         .toLowerCase()
 
@@ -311,12 +315,7 @@ export default function MyResidentsPage() {
     if (!query) return unassignedTasks
 
     return unassignedTasks.filter((task) =>
-      [
-        task.title,
-        task.description,
-        task.type,
-        normalizeTaskStatus(task.status),
-      ]
+      [task.title, task.description, task.type, normalizeTaskStatus(task.status)]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -334,8 +333,6 @@ export default function MyResidentsPage() {
       .filter((room): room is string => Boolean(room))
   ).size
 
-  const openTasks = tasks.filter((task) => isOpenTask(task.status))
-  const lateTasks = tasks.filter(isTaskLate)
   const residentsWithTasks = new Set(
     openTasks
       .map((task) => task.resident_id)
@@ -345,7 +342,7 @@ export default function MyResidentsPage() {
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-slate-950">
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <div className="rounded-3xl border border-slate-200/70 bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" />
           <p className="mt-4 text-lg font-black text-slate-700">Kraunama...</p>
           <p className="mt-1 text-sm font-semibold text-slate-500">
@@ -357,320 +354,189 @@ export default function MyResidentsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 pb-28 text-slate-950 sm:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={() => router.push(ROUTES.employeeDashboard)}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 active:scale-[0.98]"
-                aria-label="Grįžti į dashboard"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
+    <main className="min-h-screen overflow-x-hidden bg-slate-50 pb-28 text-slate-950">
+      <section className="overflow-hidden rounded-b-[34px] bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-950 px-5 pb-7 pt-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.18)]">
+        <div className="flex items-start justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => router.push(ROUTES.employeeDashboard)}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur transition active:scale-[0.98]"
+            aria-label="Grįžti į dashboard"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
 
-              <div className="flex items-center gap-5">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
-                  <Users className="h-7 w-7" />
-                </div>
-
-                <div>
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                    Mano gyventojai
-                  </p>
-                  <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-                    Priskirti gyventojai
-                  </h1>
-                  <p className="mt-2 text-base font-semibold text-slate-500 sm:text-lg">
-                    Čia matai tau priskirtus gyventojus ir tavo aktyvias užduotis.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid min-w-[260px] gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm font-extrabold uppercase tracking-wider text-slate-500">
-                  Gyventojai
-                </span>
-                <strong className="text-slate-950">{items.length}</strong>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm font-extrabold uppercase tracking-wider text-slate-500">
-                  Aktyvios užduotys
-                </span>
-                <strong className="text-slate-950">{openTasks.length}</strong>
-              </div>
-            </div>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur">
+            <Users className="h-6 w-6" />
           </div>
-        </section>
+        </div>
 
+        <div className="mt-5">
+          <p className="text-xs font-black uppercase tracking-[0.32em] text-emerald-100">
+            Mano gyventojai
+          </p>
+          <h1 className="mt-3 text-[34px] font-black leading-[1.04] tracking-[-0.04em]">
+            Priskirti gyventojai
+          </h1>
+          <p className="mt-3 max-w-[330px] text-[15px] font-semibold leading-6 text-emerald-50/90">
+            Tavo gyventojai, aktyvios užduotys ir svarbiausi veiksmai vienoje vietoje.
+          </p>
+        </div>
+
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          <MobileHeroStat label="Gyventojai" value={items.length} />
+          <MobileHeroStat label="Aktyvūs" value={activeCount} />
+          <MobileHeroStat label="Užduotys" value={openTasks.length} />
+        </div>
+      </section>
+
+      <section className="space-y-4 px-4 pt-5">
         {message ? (
-          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5 font-extrabold text-amber-800">
+          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-4 text-sm font-extrabold text-amber-800">
             {message}
           </div>
         ) : null}
 
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            icon={<Users className="h-6 w-6" />}
-            title="Priskirta"
-            value={String(items.length)}
-            meta="gyventojų"
-            tone="emerald"
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Ieškoti gyventojo, kambario, užduoties..."
+            className="h-14 w-full rounded-[24px] border border-slate-200/70 bg-white pl-12 pr-4 text-[15px] font-black text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.05)] outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
           />
-          <StatCard
-            icon={<CheckCircle2 className="h-6 w-6" />}
-            title="Aktyvūs"
-            value={String(activeCount)}
-            meta="gyventojai"
-            tone="blue"
-          />
-          <StatCard
-            icon={<ClipboardList className="h-6 w-6" />}
-            title="Užduotys"
-            value={String(openTasks.length)}
-            meta="aktyvios"
-            tone="rose"
+        </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <MobileMetricCard
+            icon={<ClipboardList className="h-5 w-5" />}
+            title="Aktyvios užduotys"
+            value={openTasks.length}
             onClick={() => setShowTasksModal(true)}
           />
-          <StatCard
-            icon={<BedSingle className="h-6 w-6" />}
+          <MobileMetricCard
+            icon={<BedSingle className="h-5 w-5" />}
             title="Kambariai"
-            value={String(roomsCount)}
-            meta="unikalūs"
-            tone="amber"
+            value={roomsCount}
           />
-        </section>
+        </div>
 
-        <section className="grid gap-6 lg:grid-cols-[1fr_380px]">
-          <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex items-center justify-between pt-1">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+              Sąrašas
+            </p>
+            <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+              Dabar svarbu
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowTasksModal(true)}
+            className="rounded-2xl border border-slate-200/70 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm"
+          >
+            Užduotys
+          </button>
+        </div>
+
+        {items.length === 0 ? (
+          <MobileEmptyState
+            title="Priskirtų gyventojų nėra"
+            text="Kai administratorius priskirs gyventojus, jie bus rodomi čia."
+          />
+        ) : filteredItems.length === 0 ? (
+          <MobileEmptyState
+            title="Nieko nerasta"
+            text="Pabandyk pakeisti paieškos tekstą arba išvalyti filtrą."
+          />
+        ) : (
+          <div className="space-y-3">
+            {filteredItems.map((item) => (
+              <MobileResidentCard
+                key={item.id}
+                item={item}
+                tasks={tasksByResidentId[item.resident_id] || []}
+                onClick={() => setSelectedResident(item)}
+              />
+            ))}
+          </div>
+        )}
+
+        {filteredUnassignedTasks.length > 0 ? (
+          <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                  Sąrašas
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+                  Bendros užduotys
                 </p>
-                <h2 className="mt-1 text-2xl font-black tracking-tight">
-                  Gyventojų kortelės
-                </h2>
-                <p className="mt-1 font-semibold text-slate-500">
-                  Paspausk kortelę, kad atsidarytų gyventojo informacija.
-                </p>
+                <h3 className="mt-1 text-xl font-black">Be gyventojo</h3>
               </div>
-
-              <label className="relative block w-full md:w-80">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Ieškoti pagal vardą, kambarį, užduotį..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
-                />
-              </label>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-black text-slate-700">
+                {filteredUnassignedTasks.length}
+              </span>
             </div>
 
-            {items.length === 0 ? (
-              <EmptyState
-                title="Priskirtų gyventojų nėra"
-                text="Gyventojų dar nėra priskirta, bet tavo aktyvios užduotys rodomos dešinėje pusėje."
-              />
-            ) : filteredItems.length === 0 ? (
-              <EmptyState
-                title="Nieko nerasta"
-                text="Pabandyk pakeisti paieškos tekstą arba išvalyti filtrą."
-              />
-            ) : (
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                {filteredItems.map((item) => (
-                  <ResidentCard
-                    key={item.id}
-                    item={item}
-                    tasks={tasksByResidentId[item.resident_id] || []}
-                    onClick={() => setSelectedResident(item)}
-                  />
-                ))}
-              </div>
-            )}
+            <div className="mt-4 space-y-3">
+              {filteredUnassignedTasks.slice(0, 5).map((task) => (
+                <TaskRow key={task.id} task={task} />
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </section>
 
-            {filteredUnassignedTasks.length > 0 ? (
-              <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-extrabold uppercase tracking-widest text-rose-700">
-                      Užduotys be gyventojo
-                    </p>
-                    <h3 className="mt-1 text-xl font-black">
-                      Tavo bendros užduotys
-                    </h3>
-                  </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-slate-700">
-                    {filteredUnassignedTasks.length}
-                  </span>
-                </div>
+      <MobileBottomNav notificationsCount={notificationsCount} />
 
-                <div className="mt-4 grid gap-3">
-                  {filteredUnassignedTasks.slice(0, 5).map((task) => (
-                    <TaskRow key={task.id} task={task} />
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </article>
-
-          <aside className="grid content-start gap-6">
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-blue-700">
-                    Šiandien naudinga
-                  </p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight">
-                    Darbo eiga
-                  </h2>
-                </div>
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-                  <CalendarClock className="h-6 w-6" />
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-3">
-                <InfoRow
-                  title="Gyventojai su užduotimis"
-                  value={String(residentsWithTasks)}
-                  desc="Gyventojų, kuriems yra atvirų veiksmų."
-                />
-                <InfoRow
-                  title="Atviros užduotys"
-                  value={String(openTasks.length)}
-                  desc="Tau priskirtos arba tavo sukurtos užduotys."
-                  onClick={() => setShowTasksModal(true)}
-                />
-                <InfoRow
-                  title="Vėluoja"
-                  value={String(lateTasks.length)}
-                  desc="Aktyvios užduotys, kurių terminas jau praėjo."
-                  danger
-                />
-              </div>
-            </article>
-
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                  <Home className="h-6 w-6" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black">Svarbu</h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Šiame puslapyje darbuotojas mato priskirtus gyventojus ir
-                    savo aktyvias užduotis. Užduotis galima valdyti per
-                    „Užduotys“ meniu.
-                  </p>
-                </div>
-              </div>
-            </article>
-
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-rose-700">
-                    Pranešimai
-                  </p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight">
-                    Nauji pranešimai
-                  </h2>
-                </div>
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
-                  <Bell className="h-6 w-6" />
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => router.push("/notifications")}
-                className="mt-6 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
-              >
-                <span>
-                  <b>Atidaryti pranešimus</b>
-                  <br />
-                  <small className="font-semibold text-slate-500">
-                    {notificationsCount} neperskaitytų
-                  </small>
-                </span>
-
-                <ArrowRight className="h-5 w-5 text-slate-400" />
-              </button>
-            </article>
-          </aside>
-        </section>
-      </div>
-
-      {selectedResident && (
+      {selectedResident ? (
         <ResidentModal
           item={selectedResident}
           tasks={tasksByResidentId[selectedResident.resident_id] || []}
           onClose={() => setSelectedResident(null)}
         />
-      )}
+      ) : null}
 
-      {showTasksModal && (
+      {showTasksModal ? (
         <TasksModal tasks={openTasks} onClose={() => setShowTasksModal(false)} />
-      )}
-
-      <MobileBottomNav />
+      ) : null}
     </main>
   )
 }
 
-function StatCard({
+function MobileHeroStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-[24px] bg-white/15 p-4 backdrop-blur">
+      <div className="text-2xl font-black text-white">{value}</div>
+      <div className="mt-1 text-[11px] font-black uppercase tracking-wide text-emerald-50">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+function MobileMetricCard({
   icon,
   title,
   value,
-  meta,
-  tone,
   onClick,
 }: {
   icon: React.ReactNode
   title: string
-  value: string
-  meta: string
-  tone: "emerald" | "amber" | "blue" | "rose"
+  value: number
   onClick?: () => void
 }) {
-  const toneClass = {
-    emerald: "bg-emerald-50 text-emerald-700",
-    amber: "bg-amber-50 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
-    rose: "bg-rose-50 text-rose-700",
-  }[tone]
-
-  const textClass = {
-    emerald: "text-emerald-700",
-    amber: "text-amber-700",
-    blue: "text-blue-700",
-    rose: "text-rose-700",
-  }[tone]
-
   const content = (
-    <div className="flex items-center gap-4">
-      <div
-        className={`flex h-14 w-14 items-center justify-center rounded-2xl ${toneClass}`}
-      >
+    <>
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
         {icon}
       </div>
-
       <div>
-        <p className="font-extrabold text-slate-500">{title}</p>
-        <p className="mt-1 text-4xl font-black">
-          {value}{" "}
-          <span className={`text-sm font-bold ${textClass}`}>{meta}</span>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+          {title}
         </p>
+        <p className="mt-1 text-3xl font-black text-slate-950">{value}</p>
       </div>
-    </div>
+    </>
   )
 
   if (onClick) {
@@ -678,7 +544,7 @@ function StatCard({
       <button
         type="button"
         onClick={onClick}
-        className="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-emerald-200 hover:shadow-md active:scale-[0.99]"
+        className="flex items-center gap-3 rounded-[26px] border border-slate-200/70 bg-white p-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.05)] active:scale-[0.99]"
       >
         {content}
       </button>
@@ -686,13 +552,13 @@ function StatCard({
   }
 
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
+    <article className="flex items-center gap-3 rounded-[26px] border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
       {content}
     </article>
   )
 }
 
-function ResidentCard({
+function MobileResidentCard({
   item,
   tasks,
   onClick,
@@ -705,21 +571,22 @@ function ResidentCard({
   const status = normalizeResidentStatus(resident?.status)
   const openTasks = tasks.filter((task) => isOpenTask(task.status))
   const nextTask = openTasks[0]
+  const lateCount = openTasks.filter(isTaskLate).length
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group rounded-3xl border border-slate-200 bg-slate-50 p-5 text-left transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:shadow-md active:scale-[0.99]"
+      className="w-full rounded-[28px] border border-slate-200/70 bg-white p-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition active:scale-[0.99]"
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-lg font-black text-emerald-700 shadow-sm">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-lg font-black text-emerald-700">
             {getResidentInitials(resident)}
           </div>
 
-          <div>
-            <h3 className="text-lg font-black text-slate-950">
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-black text-slate-950">
               {formatResidentName(resident)}
             </h3>
             <p className="mt-1 text-sm font-bold text-slate-500">
@@ -728,17 +595,26 @@ function ResidentCard({
           </div>
         </div>
 
-        <ArrowRight className="mt-2 h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-emerald-700" />
+        <ArrowRight className="mt-3 h-5 w-5 shrink-0 text-slate-400" />
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <InfoPill label="Būsena" value={status} />
-        <InfoPill label="Atviros užduotys" value={String(openTasks.length)} />
+      <div className="mt-4 flex flex-wrap gap-2">
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+          {status}
+        </span>
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+          {openTasks.length} aktyvios
+        </span>
+        {lateCount > 0 ? (
+          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-black text-rose-700">
+            {lateCount} vėluoja
+          </span>
+        ) : null}
       </div>
 
-      <div className="mt-3 rounded-2xl bg-white px-4 py-3">
-        <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
-          Artimiausia
+      <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
+        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
+          Artimiausia užduotis
         </p>
         <p className="mt-1 line-clamp-2 font-black text-slate-800">
           {nextTask?.title || "Aktyvių užduočių nėra"}
@@ -749,99 +625,42 @@ function ResidentCard({
 }
 
 function TaskRow({ task }: { task: ResidentTask }) {
+  const late = isTaskLate(task)
+
   return (
     <div
       className={`rounded-2xl border p-4 ${
-        isTaskLate(task)
-          ? "border-rose-100 bg-rose-50"
-          : "border-slate-100 bg-white"
+        late ? "border-rose-100 bg-rose-50" : "border-slate-100 bg-slate-50"
       }`}
     >
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-black text-slate-900">
-            {task.title || "Užduotis"}
-          </p>
+        <div className="min-w-0">
+          <p className="font-black text-slate-900">{task.title || "Užduotis"}</p>
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            {getTaskTypeLabel(task.type)} · Terminas:{" "}
-            {task.due_date ? formatDate(task.due_date) : "—"}
+            {getTaskTypeLabel(task.type)} · {task.due_date ? formatDate(task.due_date) : "Be termino"}
           </p>
         </div>
 
-        <span className="rounded-full bg-slate-50 px-3 py-1 text-sm font-black text-slate-700">
-          {normalizeTaskStatus(task.status)}
+        <span
+          className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
+            late ? "bg-white text-rose-700" : "bg-white text-slate-700"
+          }`}
+        >
+          {late ? "Vėluoja" : normalizeTaskStatus(task.status)}
         </span>
       </div>
     </div>
   )
 }
 
-function InfoPill({ label, value }: { label: string; value: string }) {
+function MobileEmptyState({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-2xl bg-white px-4 py-3">
-      <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1 font-black text-slate-800">{value}</p>
-    </div>
-  )
-}
-
-function InfoRow({
-  title,
-  value,
-  desc,
-  danger = false,
-  onClick,
-}: {
-  title: string
-  value: string
-  desc: string
-  danger?: boolean
-  onClick?: () => void
-}) {
-  const content = (
-    <>
-      <div>
-        <p className="font-black text-slate-900">{title}</p>
-        <p className="mt-1 text-sm font-semibold text-slate-500">{desc}</p>
+    <div className="rounded-[28px] border border-slate-200/70 bg-white p-8 text-center shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+        <Users className="h-7 w-7" />
       </div>
-
-      <span
-        className={`rounded-2xl bg-white px-4 py-2 text-xl font-black shadow-sm ${
-          danger ? "text-rose-700" : "text-slate-950"
-        }`}
-      >
-        {value}
-      </span>
-    </>
-  )
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 text-left transition hover:bg-emerald-50 active:scale-[0.99]"
-      >
-        {content}
-      </button>
-    )
-  }
-
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4">
-      {content}
-    </div>
-  )
-}
-
-function EmptyState({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-      <Users className="mx-auto h-10 w-10 text-slate-400" />
-      <p className="mt-4 text-lg font-black text-slate-700">{title}</p>
-      <p className="mt-1 font-semibold text-slate-500">{text}</p>
+      <p className="mt-4 text-lg font-black text-slate-800">{title}</p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">{text}</p>
     </div>
   )
 }
@@ -859,20 +678,20 @@ function ResidentModal({
   const openTasks = tasks.filter((task) => isOpenTask(task.status))
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-7">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-emerald-50 text-xl font-black text-emerald-700">
+    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/45 p-3 backdrop-blur-sm sm:items-center sm:justify-center">
+      <section className="max-h-[92vh] w-full overflow-y-auto rounded-[2rem] bg-white shadow-2xl sm:max-w-3xl">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 p-5 backdrop-blur">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-lg font-black text-emerald-700">
               {getResidentInitials(resident)}
             </div>
 
-            <div>
-              <h2 className="text-3xl font-black tracking-tight">
+            <div className="min-w-0">
+              <h2 className="truncate text-2xl font-black tracking-tight">
                 {formatResidentName(resident)}
               </h2>
-              <p className="mt-1 font-semibold text-slate-500">
-                Gyventojo informacija ir susijusios užduotys
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Gyventojo informacija ir užduotys
               </p>
             </div>
           </div>
@@ -880,67 +699,50 @@ function ResidentModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 active:scale-[0.98]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition active:scale-[0.98]"
             aria-label="Uždaryti"
           >
-            <X className="h-7 w-7" />
+            <X className="h-6 w-6" />
           </button>
         </div>
 
-        <div className="space-y-5 p-7">
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <DetailBox label="Kambarys" value={resident?.room_number || "—"} />
-              <DetailBox
-                label="Būsena"
-                value={normalizeResidentStatus(resident?.status)}
-              />
-              <DetailBox label="Priskirta" value={formatDate(item.created_at)} />
-              <DetailBox label="Atviros užduotys" value={String(openTasks.length)} />
-            </div>
+        <div className="space-y-4 p-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <DetailBox label="Kambarys" value={resident?.room_number || "—"} />
+            <DetailBox label="Būsena" value={normalizeResidentStatus(resident?.status)} />
+            <DetailBox label="Priskirta" value={formatDate(item.created_at)} />
+            <DetailBox label="Atviros užduotys" value={String(openTasks.length)} />
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5">
+          <section className="rounded-[28px] border border-slate-200/70 bg-white p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-blue-700">
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                   Užduotys
                 </p>
-                <h3 className="mt-1 text-2xl font-black tracking-tight">
+                <h3 className="mt-1 text-xl font-black tracking-tight">
                   Susijusios užduotys
                 </h3>
               </div>
 
-              <ClipboardList className="h-7 w-7 text-blue-700" />
+              <ClipboardList className="h-6 w-6 text-emerald-700" />
             </div>
 
             {tasks.length === 0 ? (
-              <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                <p className="font-black text-slate-700">
-                  Užduočių šiam gyventojui nėra
-                </p>
+              <div className="mt-4 rounded-2xl bg-slate-50 p-5 text-center">
+                <p className="font-black text-slate-700">Užduočių nėra</p>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
                   Kai atsiras susijusių užduočių, jos bus rodomos čia.
                 </p>
               </div>
             ) : (
-              <div className="mt-5 grid gap-3">
+              <div className="mt-4 space-y-3">
                 {tasks.map((task) => (
                   <TaskRow key={task.id} task={task} />
                 ))}
               </div>
             )}
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-2xl bg-slate-950 px-5 py-3 font-black text-white transition hover:bg-slate-800 active:scale-[0.98]"
-            >
-              Uždaryti
-            </button>
-          </div>
+          </section>
         </div>
       </section>
     </div>
@@ -955,49 +757,37 @@ function TasksModal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-7">
+    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/45 p-3 backdrop-blur-sm sm:items-center sm:justify-center">
+      <section className="max-h-[92vh] w-full overflow-y-auto rounded-[2rem] bg-white shadow-2xl sm:max-w-3xl">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 p-5 backdrop-blur">
           <div>
-            <h2 className="text-3xl font-black tracking-tight">
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
+              Užduotys
+            </p>
+            <h2 className="mt-1 text-2xl font-black tracking-tight">
               Aktyvios užduotys
             </h2>
-            <p className="mt-1 font-semibold text-slate-500">
-              Tau priskirtos arba tavo sukurtos užduotys.
-            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 active:scale-[0.98]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition active:scale-[0.98]"
             aria-label="Uždaryti"
           >
-            <X className="h-7 w-7" />
+            <X className="h-6 w-6" />
           </button>
         </div>
 
-        <div className="space-y-3 p-7">
+        <div className="space-y-3 p-5">
           {tasks.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-              <ClipboardList className="mx-auto h-10 w-10 text-slate-400" />
-              <p className="mt-4 text-lg font-black text-slate-700">
-                Aktyvių užduočių nėra
-              </p>
-            </div>
+            <MobileEmptyState
+              title="Aktyvių užduočių nėra"
+              text="Šiuo metu nėra atvirų užduočių."
+            />
           ) : (
             tasks.map((task) => <TaskRow key={task.id} task={task} />)
           )}
-
-          <div className="flex justify-end pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-2xl bg-slate-950 px-5 py-3 font-black text-white transition hover:bg-slate-800 active:scale-[0.98]"
-            >
-              Uždaryti
-            </button>
-          </div>
         </div>
       </section>
     </div>
@@ -1006,11 +796,11 @@ function TasksModal({
 
 function DetailBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white p-4">
+    <div className="rounded-2xl bg-slate-50 p-4">
       <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <p className="mt-2 break-words font-black text-slate-900">{value}</p>
+      <p className="mt-1 font-black text-slate-800">{value || "—"}</p>
     </div>
   )
 }

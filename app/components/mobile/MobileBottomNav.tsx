@@ -7,7 +7,7 @@ export default function MobileBottomNav() {
   const pathname = usePathname()
 
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard' },
+    { href: '/employee-dashboard', label: 'Dashboard' },
     { href: '/residents', label: 'Gyventojai' },
     { href: '/inventory', label: 'Sandėlis' },
     { href: '/team', label: 'Darbuotojai' },

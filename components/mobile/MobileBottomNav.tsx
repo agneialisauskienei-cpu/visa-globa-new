@@ -42,11 +42,12 @@ export default function MobileBottomNav() {
         bottom: 0,
         zIndex: 50,
         borderTop: '1px solid #e2e8f0',
-        background: '#ffffff',
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(18px)',
         display: 'grid',
         gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
         padding: '8px 8px calc(8px + env(safe-area-inset-bottom))',
-        boxShadow: '0 -6px 20px rgba(15,23,42,0.06)',
+        boxShadow: '0 -14px 38px rgba(15,23,42,0.08)',
       }}
     >
       {items.map((item) => {
@@ -59,17 +60,29 @@ export default function MobileBottomNav() {
             href={item.href}
             style={{
               textDecoration: 'none',
-              color: active ? '#0f766e' : '#64748b',
+              color: active ? '#047857' : '#64748b',
               display: 'grid',
               placeItems: 'center',
               gap: 4,
-              padding: '8px 4px',
+              padding: '10px 4px',
               position: 'relative',
               fontSize: 12,
               fontWeight: active ? 800 : 600,
             }}
           >
-            <div style={{ position: 'relative' }}>
+            <div
+              style={{
+                position: 'relative',
+                width: 52,
+                height: 52,
+                borderRadius: 18,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: active ? '#065f46' : 'transparent',
+                transition: 'all .2s ease',
+              }}
+            >
               <Icon size={20} />
               {item.badge && item.badge > 0 ? (
                 <span
@@ -105,7 +118,7 @@ export default function MobileBottomNav() {
                   width: 24,
                   height: 3,
                   borderRadius: 999,
-                  background: '#0f766e',
+                  background: '#047857',
                 }}
               />
             ) : null}

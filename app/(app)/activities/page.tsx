@@ -105,8 +105,8 @@ const STATUS_OPTIONS: StatusOption[] = [
     value: "refused",
     short: "A",
     label: "Atsisakė",
-    chipClass: "border-orange-200 bg-orange-50 text-orange-800",
-    cellClass: "border-orange-200 bg-orange-50 text-orange-800",
+    chipClass: "border-slate-200 bg-white text-orange-800",
+    cellClass: "border-slate-200 bg-white text-orange-800",
   },
   {
     value: "not_applicable",
@@ -426,7 +426,7 @@ function activityTone(index: number) {
     "border-violet-200 bg-violet-50 text-violet-900",
     "border-blue-200 bg-blue-50 text-blue-900",
     "border-amber-200 bg-amber-50 text-amber-900",
-    "border-rose-200 bg-rose-50 text-rose-900",
+    "border-rose-200 bg-white text-rose-900",
   ][index % 5];
 }
 
@@ -1022,7 +1022,7 @@ export default function ActivitiesPage() {
               <button type="button" onClick={() => void loadData()} className="rounded-2xl border border-[#d8e3da] bg-white px-5 py-3 text-sm font-black text-[#355244] transition hover:bg-[#eef4ef]">
                 <RefreshCw className="mr-2 inline h-4 w-4" /> Atnaujinti
               </button>
-              <button type="button" onClick={() => openActivityModal()} className="rounded-2xl bg-[#2f4f3f] px-5 py-3 text-sm font-black text-white shadow-lg shadow-green-950/10 transition hover:bg-[#243d31]">
+              <button type="button" onClick={() => openActivityModal()} className="rounded-2xl bg-[#2f4f3f] px-5 py-3 text-sm font-black text-white shadow-md shadow-green-950/10 transition hover:bg-[#243d31]">
                 <Plus className="mr-2 inline h-4 w-4" /> Nauja veikla
               </button>
             </div>
@@ -1174,7 +1174,7 @@ export default function ActivitiesPage() {
 
       {calendarHelpOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <section className="w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+          <section className="w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-xl">
             <div className="flex items-start justify-between gap-4 border-b border-[#dfe8e1] p-6">
               <div>
                 <p className="text-xs font-black uppercase tracking-widest text-[#2f4f3f]">Veiklų modulio instrukcija</p>
@@ -1419,7 +1419,7 @@ function ActivityModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <section className="w-full max-w-3xl rounded-[2rem] bg-white shadow-2xl">
+      <section className="w-full max-w-3xl rounded-[2rem] bg-white shadow-xl">
         <div className="flex items-start justify-between gap-6 border-b border-[#dfe8e1] p-6">
           <div>
             <h2 className="text-3xl font-black tracking-tight text-[#20312a]">Nauja veikla</h2>
@@ -1444,7 +1444,7 @@ function ActivityModal({
 
         {helpOpen ? (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-            <section className="w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+            <section className="w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-xl">
               <div className="flex items-start justify-between gap-4 border-b border-[#dfe8e1] p-6">
                 <div>
                   <p className="text-xs font-black uppercase tracking-widest text-[#2f4f3f]">Naujos veiklos instrukcija</p>
@@ -1519,11 +1519,11 @@ function ActivityModal({
             </Field>
 
             <Field label="Pabaiga">
-              <input type="time" min={value.start_time || undefined} value={value.end_time} onChange={(event) => onChange((previous) => ({ ...previous, end_time: event.target.value }))} className={`input ${timeInvalid ? "border-red-300 bg-red-50 text-red-900 focus:border-red-400 focus:ring-red-100" : ""}`} />
+              <input type="time" min={value.start_time || undefined} value={value.end_time} onChange={(event) => onChange((previous) => ({ ...previous, end_time: event.target.value }))} className={`input ${timeInvalid ? "border-red-300 bg-white text-red-900 focus:border-red-400 focus:ring-red-100" : ""}`} />
             </Field>
 
             {timeInvalid ? (
-              <div className="md:col-span-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-800">
+              <div className="md:col-span-2 rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-black text-red-800">
                 Veiklos pabaiga turi būti vėlesnė už pradžią.
               </div>
             ) : null}
@@ -1611,7 +1611,7 @@ function AttendanceModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <section className="max-h-[94vh] w-full max-w-7xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+      <section className="max-h-[94vh] w-full max-w-7xl overflow-hidden rounded-[2rem] bg-white shadow-xl">
         <div className="flex items-start justify-between gap-6 border-b border-[#dfe8e1] p-5 lg:p-6">
           <div>
             <p className="text-xs font-black uppercase tracking-widest text-[#2f4f3f]">Lankomumo žymėjimas</p>
@@ -1627,7 +1627,7 @@ function AttendanceModal({
 
         {helpOpen ? (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-            <section className="w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+            <section className="w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-xl">
               <div className="flex items-start justify-between gap-4 border-b border-[#dfe8e1] p-6">
                 <div>
                   <p className="text-xs font-black uppercase tracking-widest text-[#2f4f3f]">Trumpa instrukcija</p>
@@ -1680,7 +1680,7 @@ function AttendanceModal({
                     </p>
                   </div>
 
-                  <div className="rounded-3xl border border-red-100 bg-red-50 p-5">
+                  <div className="rounded-3xl border border-red-100 bg-white p-5">
                     <h4 className="font-black text-red-900">5. Nepažymėti</h4>
                     <p className="mt-2 text-sm font-bold leading-6 text-red-800">
                       Jei lieka nepažymėtų, veikla dar nėra pilnai sutvarkyta. Patikrink sąrašą prieš uždarant langą.
@@ -2000,7 +2000,7 @@ function MiniStat({
   const toneClass = {
     slate: "bg-slate-50 text-slate-700",
     emerald: "bg-emerald-50 text-emerald-700",
-    rose: "bg-rose-50 text-rose-700",
+    rose: "bg-white text-rose-700",
     amber: "bg-amber-50 text-amber-700",
     blue: "bg-blue-50 text-blue-700",
   }[tone];

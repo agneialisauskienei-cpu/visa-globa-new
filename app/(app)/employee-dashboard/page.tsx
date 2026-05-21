@@ -114,7 +114,7 @@ export default function EmployeeDashboardPage() {
                   Darbuotojo paskyra
                 </p>
                 <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
-                  Sveiki, Agn Almantaitien
+                  Sveiki, Agne Almantaitiene
                 </h1>
                 <p className="mt-2 text-base font-semibold text-slate-500 sm:text-lg">
                   Tavo pamainos, užduotys, mokymai, dokumentai ir pranešimai vienoje vietoje.
@@ -189,7 +189,7 @@ export default function EmployeeDashboardPage() {
               <div className="mt-5 grid flex-1 gap-3 sm:mt-6 sm:grid-cols-2 sm:gap-4">
                 <ActionCard
                   title="Mano profilis"
-                  desc="Peržiūrti ir redaguoti kontaktus"
+                  desc="Peržiūrėti ir redaguoti kontaktus"
                   active={activeView === "profile"}
                   onClick={() => openSection("profile")}
                 />
@@ -265,7 +265,7 @@ export default function EmployeeDashboardPage() {
                     <div>
                       <p className="font-black text-slate-900">Privalomi mokymai</p>
                       <p className="mt-1 text-sm font-semibold text-slate-600">
-                        Nra papildomų mokymų, kuriuos reikia atlikti dabar.
+                        Nėra papildomų mokymų, kuriuos reikia atlikti dabar.
                       </p>
                     </div>
                     <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-slate-600">
@@ -311,7 +311,7 @@ export default function EmployeeDashboardPage() {
                   onClick={() => openSection("documents")}
                 />
                 <DocumentRow
-                  title="Profesin licencija"
+                  title="Profesinė licencija"
                   desc={documentForm.licenseUntil ? `Galioja iki: ${documentForm.licenseUntil}` : "Galiojimas nenurodytas"}
                   badge={documentForm.licenseUntil ? "Užpildyta" : "Nenurodyta"}
                   tone={documentForm.licenseUntil ? "emerald" : "slate"}
@@ -351,7 +351,7 @@ export default function EmployeeDashboardPage() {
                   type="button"
                   onClick={() => openSection("schedule")}
                   className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
-                  aria-label="Atidaryti grafik"
+                  aria-label="Atidaryti grafiką"
                 >
                   <CalendarDays className="h-6 w-6" />
                 </button>
@@ -382,13 +382,13 @@ export default function EmployeeDashboardPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                Asmenin statistika
+                Asmeninė statistika
               </p>
               <h2 className="mt-1 text-2xl font-black tracking-tight">
                 Mano rodikliai
               </h2>
               <p className="mt-1 font-semibold text-slate-500">
-                Greita asmenins būsenos ir darbo informacijos apžvalga.
+                Greita asmeninės būsenos ir darbo informacijos apžvalga.
               </p>
             </div>
 
@@ -397,7 +397,7 @@ export default function EmployeeDashboardPage() {
               onClick={() => openSection("profile")}
               className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-200 active:scale-[0.98]"
             >
-              Peržiūrti profilį
+              Peržiūrėti profilį
             </button>
           </div>
 
@@ -439,7 +439,7 @@ export default function EmployeeDashboardPage() {
       </div>
 
       {modal === "profile" && (
-        <Modal title="Mano profilis" desc="Kontaktin informacija ir asmeniniai duomenys." onClose={() => setModal(null)}>
+        <Modal title="Mano profilis" desc="Kontaktinė informacija ir asmeniniai duomenys." onClose={() => setModal(null)}>
           <form
             className="space-y-5"
             onSubmit={(event) => {
@@ -489,7 +489,7 @@ export default function EmployeeDashboardPage() {
       )}
 
       {modal === "documents" && (
-        <Modal title="Dokumentai" desc="Atnaujinkite pažymų ir licencijų informacij. Pakeitimai bus pateikti administratoriui." onClose={() => setModal(null)}>
+        <Modal title="Dokumentai" desc="Atnaujinkite pažymų ir licencijų informaciją. Pakeitimai bus pateikti administratoriui." onClose={() => setModal(null)}>
           <form
             className="space-y-5"
             onSubmit={(event) => {
@@ -553,7 +553,7 @@ export default function EmployeeDashboardPage() {
       {modal === "tasks" && (
         <Modal title="Mano užduotys" desc="Atviros ir suplanuotos užduotys." onClose={() => setModal(null)}>
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <p className="font-black text-slate-800">Šiuo metu atvirų užduočių nra.</p>
+            <p className="font-black text-slate-800">Šiuo metu atvirų užduočių nėra.</p>
             <p className="mt-1 font-semibold text-slate-500">
               Naujos užduotys atsiras šiame lange.
             </p>
@@ -586,7 +586,7 @@ export default function EmployeeDashboardPage() {
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
               <p className="font-black text-slate-900">Privalomi mokymai</p>
               <p className="mt-1 font-semibold text-slate-600">
-                Papildomų privalomų mokymų dabar nra.
+                Papildomų privalomų mokymų dabar nėra.
               </p>
             </div>
           </div>
@@ -604,11 +604,11 @@ export default function EmployeeDashboardPage() {
             {notificationsRead ? (
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-center">
                 <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
-                <p className="mt-3 font-black">Naujų pranešimų nra</p>
+                <p className="mt-3 font-black">Naujų pranešimų nėra</p>
               </div>
             ) : (
               <>
-                <NotificationItem title="Dokumentai" desc="Patikrinkite dokumentų galiojimo informacij." />
+                <NotificationItem title="Dokumentai" desc="Patikrinkite dokumentų galiojimo informaciją." />
                 <NotificationItem title="Profilis" desc="Kontaktų pakeitimai turi būti pateikti administratoriui." />
               </>
             )}
@@ -618,7 +618,7 @@ export default function EmployeeDashboardPage() {
               Uždaryti
             </button>
             <button onClick={markNotificationsRead} className="btn-primary" type="button">
-              Pažymti kaip skaitytus
+              Pažymėti kaip skaitytus
             </button>
           </div>
         </Modal>

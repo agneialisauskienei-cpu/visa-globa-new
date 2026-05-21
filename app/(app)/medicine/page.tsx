@@ -1389,7 +1389,7 @@ export default function MedicinePage() {
 
                         {med.instructions?.trim() ? <p style={styles.note}>{med.instructions}</p> : null}
                         {med.safety_notes?.trim() ? <div style={styles.warningBox}>{med.safety_notes}</div> : null}
-                        {med.is_fractional ? <div style={styles.warningBox}>⚠️ Dalinė dozė</div> : null}
+                        {med.is_fractional ? <div style={styles.warningBox}>️ Dalinė dozė</div> : null}
 
                         <div style={styles.stockBoxCompact}>
                           <PackageMinus size={15} />

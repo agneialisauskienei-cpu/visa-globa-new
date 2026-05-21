@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import type { CSSProperties } from "react"
 import {
   BarChart3,
+  Bell,
   Box,
   ClipboardList,
   FileText,
@@ -56,6 +57,7 @@ function menuIcon(icon: string) {
   if (icon === "clipboard") return FileText
   if (icon === "inbox") return Inbox
   if (icon === "chart") return BarChart3
+  if (icon === "bell") return Bell
   if (icon === "shield") return ShieldCheck
 
   return Home
@@ -64,7 +66,7 @@ function menuIcon(icon: string) {
 function isActiveItem(
   item: AppMenuItem,
   pathname: string,
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
 ) {
   const [itemPath, itemQuery] = item.href.split("?")
 
@@ -166,14 +168,26 @@ export default function AppSidebar() {
     const current = await getCurrentAccess()
     setAccess(current)
 
-    if (current?.userId) {
-      const { data } = await supabase
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (user?.id) {
+      const { data, error } = await supabase
         .from("profiles")
         .select("avatar_url, full_name, first_name, last_name, email")
-        .eq("id", current.userId)
+        .eq("id", user.id)
         .maybeSingle()
 
-      setAvatarUrl(data?.avatar_url || null)
+      if (error) {
+        console.error("[AppSidebar] profile load failed", error)
+      }
+
+      const avatar = typeof data?.avatar_url === "string" && data.avatar_url.trim()
+        ? data.avatar_url.trim()
+        : null
+
+      setAvatarUrl(avatar)
 
       const name =
         data?.full_name ||
@@ -183,6 +197,9 @@ export default function AppSidebar() {
         "Naudotojas"
 
       setProfileName(name)
+    } else {
+      setProfileName(current.email || "Naudotojas")
+      setAvatarUrl(null)
     }
   }
 
@@ -198,7 +215,7 @@ export default function AppSidebar() {
 
     if (access.role === "super_admin") {
       return SUPER_ADMIN_MENU.filter((item) =>
-        hasPermission(access, item.permission)
+        hasPermission(access, item.permission),
       )
     }
 
@@ -213,6 +230,7 @@ export default function AppSidebar() {
       : roleLabel(access?.role)
 
   const displayName = profileName || access?.email || "Naudotojas"
+  const displayEmail = (access?.email || "").split("@")[0]
 
   return (
     <aside style={styles.sidebar}>
@@ -248,14 +266,25 @@ export default function AppSidebar() {
         <div style={styles.userBox}>
           <div style={styles.avatar}>
             {avatarUrl ? (
-              <img src={avatarUrl} alt="Avatar" style={styles.avatarImage} />
+              <img
+                src={avatarUrl}
+                alt="Avatar"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                  display: "block",
+                }}
+              />
             ) : (
               initials(displayName)
             )}
           </div>
 
           <div style={styles.userInfo}>
-            <div style={styles.userName}>{displayName}</div>
+            <div style={styles.userName}>{profileName || "Naudotojas"}</div>
+            {displayEmail ? <div style={styles.userEmail}>{displayEmail}</div> : null}
             <div style={styles.userRole}>{userRoleLabel}</div>
           </div>
         </div>
@@ -328,7 +357,7 @@ const styles: Record<string, CSSProperties> = {
 
   link: {
     minHeight: 40,
-    borderRadius: 11,
+    borderRadius: 14,
     padding: "0 12px",
     display: "flex",
     alignItems: "center",
@@ -337,21 +366,22 @@ const styles: Record<string, CSSProperties> = {
     textDecoration: "none",
     fontSize: 13,
     fontWeight: 850,
+    transition: "all .18s ease",
   },
 
   linkActive: {
     minHeight: 40,
-    borderRadius: 11,
+    borderRadius: 14,
     padding: "0 12px",
     display: "flex",
     alignItems: "center",
     gap: 10,
-    color: "#ffffff",
+    color: "#022c22",
     textDecoration: "none",
     fontSize: 13,
     fontWeight: 950,
-    background: "#15803d",
-    boxShadow: "0 14px 34px rgba(22, 163, 74, .22)",
+    background: "#ffffff",
+    boxShadow: "0 10px 30px rgba(0,0,0,.12)",
   },
 
   footer: {
@@ -365,31 +395,25 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    borderRadius: 15,
-    padding: "10px 12px",
+    borderRadius: 16,
+    padding: "8px 10px",
+    background: "rgba(255,255,255,.07)",
     minWidth: 0,
-    background: "rgba(255,255,255,.08)",
   },
 
   avatar: {
     width: 42,
     height: 42,
     minWidth: 42,
-    borderRadius: 13,
+    borderRadius: "50%",
+    overflow: "hidden",
+    background: "rgba(255,255,255,.14)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#0f172a",
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: 950,
-    overflow: "hidden",
-  },
-
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
+    color: "#fff",
+    fontWeight: 900,
+    fontSize: 13,
   },
 
   userInfo: {
@@ -400,8 +424,18 @@ const styles: Record<string, CSSProperties> = {
 
   userName: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 1.2,
     fontWeight: 900,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+
+  userEmail: {
+    marginTop: 2,
+    color: "rgba(255,255,255,.72)",
+    fontSize: 11,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -412,6 +446,9 @@ const styles: Record<string, CSSProperties> = {
     color: "#a7f3d0",
     fontSize: 11,
     fontWeight: 800,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
 
   logout: {

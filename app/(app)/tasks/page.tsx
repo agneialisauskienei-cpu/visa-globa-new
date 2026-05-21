@@ -337,6 +337,7 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState("")
   const [typeFilter, setTypeFilter] = useState("")
   const [viewFilter, setViewFilter] = useState<"my" | "maintenance" | "all">("my")
+  const [isMobile, setIsMobile] = useState(false)
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<TaskRow | null>(null)
@@ -344,6 +345,15 @@ export default function TasksPage() {
 
   useEffect(() => {
     void loadData()
+  }, [])
+
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth < 1024)
+
+    update()
+    window.addEventListener("resize", update)
+
+    return () => window.removeEventListener("resize", update)
   }, [])
 
   async function loadData() {
@@ -800,7 +810,7 @@ export default function TasksPage() {
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-slate-950">
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <div className="rounded-3xl border border-slate-200/70 bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" />
           <p className="mt-4 text-lg font-black text-slate-700">Kraunama...</p>
           <p className="mt-1 text-sm font-semibold text-slate-500">
@@ -814,10 +824,144 @@ export default function TasksPage() {
   const canCreate = hasPermission(access, "tasks.create")
   const canManage = canManageAllTasks(access)
 
+  if (isMobile) {
+    return (
+      <main className="min-h-screen bg-[#f7faf8] pb-28 text-slate-950">
+        <section className="overflow-hidden rounded-b-[34px] bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-600 px-5 pb-8 pt-7 text-white shadow-lg">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-100">
+                Užduotys
+              </p>
+              <h1 className="mt-3 text-3xl font-black leading-tight">
+                {canManage ? "Visos užduotys" : "Mano užduotys"}
+              </h1>
+              <p className="mt-3 max-w-[320px] text-sm font-semibold text-emerald-50/90">
+                Greitas pamainos darbas telefone: skubios, šiandienos ir neperžiūrėtos užduotys.
+              </p>
+            </div>
+
+            <div className="rounded-[28px] bg-white/15 p-4 backdrop-blur">
+              <ClipboardList className="h-7 w-7" />
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-3 gap-3">
+            <MobileTaskStat label="Šiandien" value={todayTasks.length} />
+            <MobileTaskStat label="Skubios" value={urgentTasks.length} />
+            <MobileTaskStat label="Vėluoja" value={lateTasks.length} />
+          </div>
+        </section>
+
+        <section className="space-y-4 px-4 pt-5">
+          {message ? (
+            <div className="rounded-[24px] border border-amber-100 bg-amber-50 p-4 text-sm font-extrabold text-amber-800">
+              {message}
+            </div>
+          ) : null}
+
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Ieškoti užduoties, gyventojo..."
+              className="h-14 w-full rounded-[22px] border border-slate-200/70 bg-white py-3 pl-12 pr-4 text-sm font-bold text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+            />
+          </label>
+
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <MobileTaskChip active={viewFilter === "my"} onClick={() => setViewFilter("my")}>
+              Mano
+            </MobileTaskChip>
+            <MobileTaskChip active={viewFilter === "maintenance"} onClick={() => setViewFilter("maintenance")}>
+              Ūkis
+            </MobileTaskChip>
+            <MobileTaskChip active={statusFilter === "new"} onClick={() => setStatusFilter(statusFilter === "new" ? "" : "new")}>
+              Naujos
+            </MobileTaskChip>
+            <MobileTaskChip active={statusFilter === "in_progress"} onClick={() => setStatusFilter(statusFilter === "in_progress" ? "" : "in_progress")}>
+              Vykdomos
+            </MobileTaskChip>
+            <MobileTaskChip active={viewFilter === "all"} onClick={() => setViewFilter("all")}>
+              Visos
+            </MobileTaskChip>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <MobileTaskMiniCard title="Nepamatytos" value={unseenTasks.length} tone="amber" />
+            <MobileTaskMiniCard title="Periodinės" value={recurringTasks.length} tone="emerald" />
+          </div>
+
+          {filteredTasks.length === 0 ? (
+            <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
+              <ClipboardList className="mx-auto h-10 w-10 text-slate-400" />
+              <p className="mt-4 text-lg font-black text-slate-700">Užduočių nėra</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Sukurk naują užduotį arba pakeisk filtrus.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredTasks.map((task) => (
+                <MobileTaskCard
+                  key={task.id}
+                  task={task}
+                  resident={task.resident_id ? residentsMap[task.resident_id] : undefined}
+                  assignedEmployee={task.assigned_user_id ? employeesMap[task.assigned_user_id] : undefined}
+                  saving={savingId === task.id}
+                  onOpen={() => void openTaskDetails(task)}
+                  onDone={() => void updateTaskStatus(task, "done")}
+                  onProgress={() => void updateTaskStatus(task, "in_progress")}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {canCreate ? (
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-white shadow-2xl transition active:scale-95"
+            aria-label="Sukurti užduotį"
+          >
+            <Plus className="h-7 w-7" />
+          </button>
+        ) : null}
+
+        {showCreateModal ? (
+          <MobileCreateTaskSheet
+            form={form}
+            setForm={setForm}
+            allResidents={allResidents}
+            employees={employees}
+            saving={saving}
+            onClose={() => setShowCreateModal(false)}
+            onSubmit={() => void createTask()}
+          />
+        ) : null}
+
+        {selectedTask ? (
+          <MobileTaskDetailsSheet
+            task={selectedTask}
+            resident={selectedTask.resident_id ? residentsMap[selectedTask.resident_id] : undefined}
+            assignedEmployee={selectedTask.assigned_user_id ? employeesMap[selectedTask.assigned_user_id] : undefined}
+            saving={savingId === selectedTask.id}
+            onClose={() => setSelectedTask(null)}
+            onStatusChange={(status) => void updateTaskStatus(selectedTask, status)}
+          />
+        ) : null}
+
+        <MobileBottomNav notificationsCount={notificationsCount} />
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 p-4 pb-28 text-slate-950 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+        <section className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm sm:p-7">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-5">
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
@@ -857,7 +1001,7 @@ export default function TasksPage() {
           </div>
         ) : null}
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
@@ -960,7 +1104,7 @@ export default function TasksPage() {
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
@@ -1088,7 +1232,7 @@ export default function TasksPage() {
           </article>
 
           <aside className="grid content-start gap-6">
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-extrabold uppercase tracking-widest text-amber-700">
@@ -1141,7 +1285,7 @@ export default function TasksPage() {
               </div>
             </article>
 
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-black">Matomumo taisyklės</h2>
               <div className="mt-4 space-y-3 text-sm font-semibold text-slate-600">
                 <p>• Admin / owner mato visas užduotis.</p>
@@ -1379,7 +1523,7 @@ export default function TasksPage() {
               </div>
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-5">
+            <section className="rounded-3xl border border-slate-200/70 bg-white p-5">
               <div className="mb-4 flex items-center gap-2">
                 <Repeat className="h-5 w-5 text-emerald-700" />
                 <h3 className="text-xl font-black">Pasikartojimas</h3>
@@ -1412,7 +1556,7 @@ export default function TasksPage() {
             </section>
 
             <section className="grid gap-5 lg:grid-cols-2">
-              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+              <div className="rounded-3xl border border-slate-200/70 bg-white p-5">
                 <div className="mb-3 flex items-center gap-2">
                   <Eye className="h-5 w-5 text-slate-600" />
                   <h3 className="text-lg font-black">Kas matys?</h3>
@@ -1552,7 +1696,7 @@ export default function TasksPage() {
             </div>
 
             {selectedTask.description ? (
-              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+              <div className="rounded-3xl border border-slate-200/70 bg-white p-5">
                 <p className="text-sm font-extrabold uppercase tracking-widest text-slate-400">
                   Aprašymas
                 </p>
@@ -1649,6 +1793,429 @@ export default function TasksPage() {
         }
       `}</style>
     </main>
+  )
+}
+
+
+
+function MobileTaskStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-[28px] bg-white/15 p-4 backdrop-blur">
+      <div className="text-2xl font-black text-white">{value}</div>
+      <div className="mt-1 text-[10px] font-black uppercase tracking-wide text-emerald-50">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+function MobileTaskChip({
+  children,
+  active,
+  onClick,
+}: {
+  children: React.ReactNode
+  active?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-black transition active:scale-[0.98] ${
+        active
+          ? "bg-slate-950 text-white"
+          : "border border-slate-200/70 bg-white text-slate-600"
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function MobileTaskMiniCard({
+  title,
+  value,
+  tone,
+}: {
+  title: string
+  value: number
+  tone: "amber" | "emerald"
+}) {
+  const toneClass =
+    tone === "amber"
+      ? "border-amber-100 bg-amber-50 text-amber-800"
+      : "border-emerald-100 bg-emerald-50 text-emerald-800"
+
+  return (
+    <article className={`rounded-[24px] border p-4 shadow-sm ${toneClass}`}>
+      <div className="text-2xl font-black">{value}</div>
+      <div className="mt-1 text-xs font-black uppercase tracking-wide opacity-80">
+        {title}
+      </div>
+    </article>
+  )
+}
+
+function MobilePriorityPill({ priority }: { priority: string | null }) {
+  const option = getPriorityOption(priority)
+
+  return (
+    <span className={`rounded-full border px-3 py-1 text-[10px] font-black ${option.className}`}>
+      {getPriorityLabel(priority)}
+    </span>
+  )
+}
+
+function MobileTaskCard({
+  task,
+  resident,
+  assignedEmployee,
+  saving,
+  onOpen,
+  onDone,
+  onProgress,
+}: {
+  task: TaskRow
+  resident?: ResidentRow
+  assignedEmployee?: EmployeeOption
+  saving: boolean
+  onOpen: () => void
+  onDone: () => void
+  onProgress: () => void
+}) {
+  const late = isTaskLate(task)
+  const done = task.status === "done"
+
+  return (
+    <article
+      className={`rounded-[28px] border p-4 shadow-sm ${
+        done
+          ? "border-emerald-100 bg-emerald-50"
+          : late
+            ? "border-rose-100 bg-rose-50"
+            : "border-slate-200 bg-white"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+          <div className="flex flex-wrap items-center gap-2">
+            <MobilePriorityPill priority={task.priority} />
+            {!task.viewed_at && isOpenTask(task) ? (
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black text-amber-800">
+                Nepamatyta
+              </span>
+            ) : null}
+            {late ? (
+              <span className="rounded-full bg-rose-100 px-3 py-1 text-[10px] font-black text-rose-700">
+                Vėluoja
+              </span>
+            ) : null}
+          </div>
+
+          <h3 className="mt-3 text-lg font-black leading-tight text-slate-950">
+            {task.title}
+          </h3>
+
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            {residentName(resident)} · {getTypeLabel(task.type)}
+          </p>
+        </button>
+
+        <button
+          type="button"
+          disabled={saving}
+          onClick={done ? onProgress : onDone}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition active:scale-95 disabled:opacity-50 ${
+            done ? "bg-white text-emerald-700" : "bg-emerald-50 text-emerald-700"
+          }`}
+          aria-label={done ? "Grąžinti" : "Atlikta"}
+        >
+          <CheckCircle2 className="h-5 w-5" />
+        </button>
+      </div>
+
+      {task.description ? (
+        <p className="mt-4 line-clamp-2 text-sm font-medium leading-relaxed text-slate-600">
+          {task.description}
+        </p>
+      ) : null}
+
+      <div className="mt-4 grid gap-2 rounded-[20px] bg-slate-50 p-3">
+        <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-500">
+          <span className="inline-flex items-center gap-1">
+            <Clock className="h-4 w-4" />
+            {task.due_date ? formatDateTime(task.due_date) : "Be termino"}
+          </span>
+          <span>{getTaskStatusLabel(task.status)}</span>
+        </div>
+        <div className="text-xs font-semibold text-slate-500">
+          Priskirta: {assignedEmployee ? employeeName(assignedEmployee) : "Nepriskirta"}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onOpen}
+        className="mt-3 h-11 w-full rounded-2xl bg-slate-950 text-sm font-black text-white transition active:scale-[0.99]"
+      >
+        Atidaryti
+      </button>
+    </article>
+  )
+}
+
+function MobileCreateTaskSheet({
+  form,
+  setForm,
+  allResidents,
+  employees,
+  saving,
+  onClose,
+  onSubmit,
+}: {
+  form: NewTaskForm
+  setForm: (updater: NewTaskForm | ((previous: NewTaskForm) => NewTaskForm)) => void
+  allResidents: ResidentRow[]
+  employees: EmployeeOption[]
+  saving: boolean
+  onClose: () => void
+  onSubmit: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-end bg-slate-950/45 backdrop-blur-sm">
+      <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-[32px] bg-white p-5 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+              Nauja užduotis
+            </p>
+            <h2 className="mt-2 text-2xl font-black tracking-tight">Sukurti greitai</h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"
+            aria-label="Uždaryti"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault()
+            onSubmit()
+          }}
+        >
+          <label className="block">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+              Pavadinimas
+            </span>
+            <input
+              value={form.title}
+              onChange={(event) =>
+                setForm((previous) => ({ ...previous, title: event.target.value }))
+              }
+              className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
+              placeholder="Pvz., sulūžo lova 203 kambaryje"
+            />
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+                Tipas
+              </span>
+              <select
+                value={form.type}
+                onChange={(event) =>
+                  setForm((previous) => ({ ...previous, type: event.target.value }))
+                }
+                className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none"
+              >
+                {TASK_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+                Prioritetas
+              </span>
+              <select
+                value={form.priority}
+                onChange={(event) =>
+                  setForm((previous) => ({ ...previous, priority: event.target.value }))
+                }
+                className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none"
+              >
+                {PRIORITY_OPTIONS.map((priority) => (
+                  <option key={priority.value} value={priority.value}>
+                    {priority.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+              Gyventojas
+            </span>
+            <select
+              value={form.resident_id}
+              onChange={(event) =>
+                setForm((previous) => ({ ...previous, resident_id: event.target.value }))
+              }
+              className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 font-bold outline-none"
+            >
+              <option value="">Nepriskirta gyventojui</option>
+              {allResidents.map((resident) => (
+                <option key={resident.id} value={resident.id}>
+                  {residentName(resident)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+              Priskirti darbuotojui
+            </span>
+            <select
+              value={form.assigned_user_id}
+              onChange={(event) =>
+                setForm((previous) => ({
+                  ...previous,
+                  assigned_user_id: event.target.value,
+                }))
+              }
+              className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 font-bold outline-none"
+            >
+              <option value="">Nepriskirta</option>
+              {employees.map((employee) => (
+                <option key={employee.user_id} value={employee.user_id}>
+                  {employeeName(employee)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+              Aprašymas
+            </span>
+            <textarea
+              value={form.description}
+              onChange={(event) =>
+                setForm((previous) => ({
+                  ...previous,
+                  description: event.target.value,
+                }))
+              }
+              className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
+              placeholder="Trumpai aprašyk problemą..."
+            />
+          </label>
+
+          <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-slate-100 bg-white/95 p-5 backdrop-blur">
+            <button
+              type="submit"
+              disabled={saving}
+              className="h-14 w-full rounded-2xl bg-emerald-700 text-base font-black text-white disabled:opacity-60"
+            >
+              {saving ? "Kuriama..." : "Sukurti užduotį"}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  )
+}
+
+function MobileTaskDetailsSheet({
+  task,
+  resident,
+  assignedEmployee,
+  saving,
+  onClose,
+  onStatusChange,
+}: {
+  task: TaskRow
+  resident?: ResidentRow
+  assignedEmployee?: EmployeeOption
+  saving: boolean
+  onClose: () => void
+  onStatusChange: (status: string) => void
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-end bg-slate-950/45 backdrop-blur-sm">
+      <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-[32px] bg-white p-5 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <MobilePriorityPill priority={task.priority} />
+            <h2 className="mt-3 text-2xl font-black tracking-tight">{task.title}</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {residentName(resident)} · {getTypeLabel(task.type)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"
+            aria-label="Uždaryti"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="grid gap-3">
+          <DetailBox label="Statusas" value={getTaskStatusLabel(task.status)} />
+          <DetailBox label="Terminas" value={formatDateTime(task.due_date)} />
+          <DetailBox
+            label="Priskirta"
+            value={assignedEmployee ? employeeName(assignedEmployee) : "Nepriskirta"}
+          />
+          <DetailBox label="Kartojimas" value={task.interval_days ? `Kas ${task.interval_days} d.` : "Nekartojama"} />
+        </div>
+
+        {task.description ? (
+          <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+              Aprašymas
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-700">
+              {task.description}
+            </p>
+          </div>
+        ) : null}
+
+        <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 bg-white/95 p-5 backdrop-blur">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => onStatusChange("in_progress")}
+            className="h-13 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 font-black text-slate-700 disabled:opacity-60"
+          >
+            Vykdoma
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => onStatusChange("done")}
+            className="h-13 rounded-2xl bg-emerald-700 px-4 py-3 font-black text-white disabled:opacity-60"
+          >
+            Atlikta
+          </button>
+        </div>
+      </section>
+    </div>
   )
 }
 
@@ -1835,7 +2402,7 @@ function StatCard({
   }[tone]
 
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
+    <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
       <div className="flex items-center gap-4">
         <div
           className={`flex h-14 w-14 items-center justify-center rounded-2xl ${toneClass}`}
@@ -1928,7 +2495,7 @@ function TaskCard({
                 type="button"
                 disabled={saving}
                 onClick={() => onStatusChange("in_progress")}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                className="rounded-2xl border border-slate-200/70 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
               >
                 Vykdoma
               </button>
@@ -1946,7 +2513,7 @@ function TaskCard({
               type="button"
               disabled={saving}
               onClick={() => onStatusChange("in_progress")}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+              className="rounded-2xl border border-slate-200/70 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
             >
               Grąžinti
             </button>

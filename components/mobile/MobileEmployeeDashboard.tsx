@@ -1,125 +1,249 @@
+'use client'
+
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import {
+  AlertTriangle,
+  Bell,
+  CheckCircle2,
+  ClipboardList,
+  Pill,
+  Plus,
+  Users,
+} from 'lucide-react'
+
+import { supabase } from '@/lib/supabase'
+import MobileBottomNav from '@/components/mobile/MobileBottomNav'
+
+type QuickAction = {
+  title: string
+  description: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  tone: string
+}
+
+const quickActions: QuickAction[] = [
+  {
+    title: 'Vaistai',
+    description: 'Žymėti davimą',
+    href: '/medicine',
+    icon: Pill,
+    tone: 'bg-emerald-50 text-emerald-700',
+  },
+  {
+    title: 'Perdavimai',
+    description: 'Naujas įrašas',
+    href: '/handover-logs',
+    icon: ClipboardList,
+    tone: 'bg-slate-100 text-slate-700',
+  },
+  {
+    title: 'Gyventojai',
+    description: 'Mano sąrašas',
+    href: '/my-residents',
+    icon: Users,
+    tone: 'bg-emerald-50 text-emerald-700',
+  },
+  {
+    title: 'Užduotys',
+    description: 'Darbai',
+    href: '/tasks',
+    icon: CheckCircle2,
+    tone: 'bg-slate-100 text-slate-700',
+  },
+]
+
+const importantItems = [
+  {
+    title: 'Kritinis perdavimas',
+    text: 'Peržiūrėkite naujus pamainos įrašus.',
+    href: '/handover-logs',
+    icon: AlertTriangle,
+  },
+  {
+    title: '08:00 vaistai',
+    text: 'Patikrinkite šiandienos davimus.',
+    href: '/medicine',
+    icon: Pill,
+  },
+  {
+    title: 'Mano užduotys',
+    text: 'Atidarykite priskirtus darbus.',
+    href: '/tasks',
+    icon: ClipboardList,
+  },
+]
+
 export default function MobileEmployeeDashboard() {
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [initials, setInitials] = useState('NA')
+
+  useEffect(() => {
+    async function loadProfile() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) return
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('avatar_url, full_name, first_name, last_name, email')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      const name =
+        data?.full_name ||
+        [data?.first_name, data?.last_name].filter(Boolean).join(' ').trim() ||
+        data?.email ||
+        user.email ||
+        'Naudotojas'
+
+      const parts = name.split(/\s+/).filter(Boolean)
+      setInitials(
+        parts.length >= 2
+          ? `${parts[0]?.[0] || ''}${parts[1]?.[0] || ''}`.toUpperCase()
+          : name.slice(0, 2).toUpperCase()
+      )
+      setAvatarUrl(data?.avatar_url || null)
+    }
+
+    void loadProfile()
+  }, [])
+
   return (
-    <main className="min-h-screen bg-[#f7faf8] pb-24 text-slate-950">
-      <div className="mx-auto max-w-[430px] px-4 py-4">
-        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">
-            ŠIANDIEN
-          </p>
+    <main className="min-h-screen bg-slate-50 pb-32 text-slate-950">
+      <section className="overflow-hidden rounded-b-[34px] bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-950 px-5 pb-8 pt-7 text-white shadow-[0_18px_42px_rgba(2,6,23,0.18)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-100">
+              Darbuotojo režimas
+            </p>
 
-          <h1 className="mt-3 text-[34px] font-black leading-[1.02] tracking-[-0.04em] text-slate-950">
-            Viskas vienoje vietoje
-          </h1>
+            <h1 className="mt-3 text-3xl font-black leading-tight">
+              Labas rytas
+            </h1>
 
-          <p className="mt-4 text-[17px] font-semibold leading-7 text-slate-500">
-            Grafikas, užduotys, dokumentai ir svarbūs pranešimai.
-          </p>
-
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            <button className="rounded-[22px] bg-[#f4f7f5] px-4 py-5 text-left transition hover:bg-[#edf3ef]">
-              <p className="text-[30px] font-black tracking-tight">0</p>
-              <span className="mt-4 block text-sm font-bold text-slate-700">
-                Užduočių
-              </span>
-            </button>
-
-            <button className="rounded-[22px] bg-[#eef8f4] px-4 py-5 text-left transition hover:bg-[#e4f4ed]">
-              <p className="text-[30px] font-black tracking-tight text-emerald-800">
-                2
-              </p>
-              <span className="mt-4 block text-sm font-bold text-slate-700">
-                Pranešimai
-              </span>
-            </button>
-
-            <button className="rounded-[22px] bg-[#fff7ed] px-4 py-5 text-left transition hover:bg-[#ffedd5]">
-              <p className="text-[30px] font-black tracking-tight text-amber-700">
-                33%
-              </p>
-              <span className="mt-4 block text-sm font-bold text-slate-700">
-                Dokumentai
-              </span>
-            </button>
+            <p className="mt-3 max-w-[320px] text-sm font-semibold text-emerald-50/90">
+              Pamainos informacija, užduotys ir svarbiausi veiksmai vienoje vietoje.
+            </p>
           </div>
-        </section>
 
-        <section className="mt-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
+          <div className="h-16 w-16 overflow-hidden rounded-[28px] bg-white/90 text-emerald-950 shadow-sm">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt="Profilio nuotrauka"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-lg font-black">
+                {initials}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          <HeroStat label="Užduotys" value="0" />
+          <HeroStat label="Perdavimai" value="2" />
+          <HeroStat label="Vaistai" value="3" />
+        </div>
+      </section>
+
+      <section className="space-y-5 px-4 pt-5">
+        <div className="grid grid-cols-2 gap-3">
+          {quickActions.map((action) => {
+            const Icon = action.icon
+
+            return (
+              <Link
+                key={action.title}
+                href={action.href}
+                className="rounded-[28px] border border-slate-200/70 bg-white p-4 text-left shadow-[0_10px_30px_rgba(15,23,42,0.08)] active:scale-[0.99]"
+              >
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${action.tone}`}>
+                  <Icon className="h-6 w-6" />
+                </div>
+
+                <h2 className="mt-4 text-lg font-black text-slate-950">
+                  {action.title}
+                </h2>
+
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  {action.description}
+                </p>
+              </Link>
+            )
+          })}
+        </div>
+
+        <section>
+          <div className="flex items-end justify-between gap-3">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-rose-600">
-                PRANEŠIMAI
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
+                Pamaina
               </p>
-
-              <h2 className="mt-2 text-[26px] font-black tracking-tight text-slate-950">
-                Nauji pranešimai
+              <h2 className="mt-1 text-2xl font-black tracking-tight">
+                Dabar svarbu
               </h2>
             </div>
-
-            <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-black text-rose-700">
-              2 nauji
-            </span>
           </div>
 
-          <p className="mt-4 text-[15px] font-semibold leading-6 text-slate-500">
-            Peržiūrėkite dokumentų ir profilio informaciją.
-          </p>
+          <div className="mt-3 space-y-3">
+            {importantItems.map((item) => {
+              const Icon = item.icon
+
+              return (
+                <Link
+                  key={item.title}
+                  href={item.href}
+                  className="flex items-center justify-between gap-3 rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                      <Icon className="h-6 w-6" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-black text-slate-950">
+                        {item.title}
+                      </h3>
+                      <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-500">
+                        {item.text}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">
+                    Atidaryti
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
         </section>
+      </section>
 
-        <section className="mt-4 grid grid-cols-2 gap-3">
-          <button className="rounded-[26px] border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-            <p className="text-lg font-black tracking-tight">Profilis</p>
-            <p className="mt-3 text-sm font-semibold leading-5 text-slate-500">
-              Kontaktai ir asmeniniai duomenys
-            </p>
-          </button>
-
-          <button className="rounded-[26px] border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-            <p className="text-lg font-black tracking-tight">Grafikas</p>
-            <p className="mt-3 text-sm font-semibold leading-5 text-slate-500">
-              Pamainos ir neatvykimai
-            </p>
-          </button>
-
-          <button className="rounded-[26px] border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-            <p className="text-lg font-black tracking-tight">Užduotys</p>
-            <p className="mt-3 text-sm font-semibold leading-5 text-slate-500">
-              Darbai ir priminimai
-            </p>
-          </button>
-
-          <button className="rounded-[26px] border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-            <p className="text-lg font-black tracking-tight">Dokumentai</p>
-            <p className="mt-3 text-sm font-semibold leading-5 text-slate-500">
-              Pažymos ir licencijos
-            </p>
-          </button>
-        </section>
-      </div>
-
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-3 pb-3 pt-2 backdrop-blur-xl">
-        <div className="mx-auto grid max-w-[430px] grid-cols-5 gap-1">
-          <button className="rounded-2xl bg-emerald-800 px-2 py-2.5 text-xs font-black text-white">
-            Pradžia
-          </button>
-
-          <button className="rounded-2xl px-2 py-2.5 text-xs font-black text-slate-500">
-            Grafikas
-          </button>
-
-          <button className="rounded-2xl px-2 py-2.5 text-xs font-black text-slate-500">
-            Užduotys
-          </button>
-
-          <button className="relative rounded-2xl px-2 py-2.5 text-xs font-black text-slate-500">
-            Žinutės
-            <span className="absolute right-3 top-2 h-2.5 w-2.5 rounded-full bg-rose-500" />
-          </button>
-
-          <button className="rounded-2xl px-2 py-2.5 text-xs font-black text-slate-500">
-            Profilis
-          </button>
-        </div>
-      </nav>
+      <MobileBottomNav />
     </main>
+  )
+}
+
+function HeroStat({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-[28px] bg-white/15 p-4 backdrop-blur">
+      <div className="text-2xl font-black text-white">{value}</div>
+      <div className="mt-1 text-[11px] font-black uppercase tracking-wide text-emerald-50">
+        {label}
+      </div>
+    </div>
   )
 }
