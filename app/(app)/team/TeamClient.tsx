@@ -48,6 +48,7 @@ type TabKey =
   | "invites";
 
 type Employee = {
+  member_id?: string | null;
   user_id: string;
   email?: string | null;
   first_name?: string | null;
@@ -195,6 +196,7 @@ type EditForm = {
 };
 
 type EmployeeEditorTab = "register" | "profile" | "contract" | "access" | "documents" | "trainings";
+type EmployeeFilterKey = "all" | "active" | "inactive" | "archived" | "administration" | "health" | "social" | "maintenance";
 
 const STAFF_TYPES = [
   {
@@ -412,6 +414,10 @@ function employeeName(employee?: Employee | null) {
   return "Darbuotojas";
 }
 
+function employeeKey(employee: Pick<Employee, "member_id" | "user_id">) {
+  return employee.member_id || employee.user_id;
+}
+
 function employeeRole(employee?: Employee | null) {
   const candidates = [
     employee?.position,
@@ -502,6 +508,7 @@ export default function TeamPage() {
 
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState<EmployeeFilterKey>("all");
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -586,7 +593,7 @@ export default function TeamPage() {
         supabase
           .from("organization_members")
           .select(
-            "user_id, role, legacy_role, position, department, staff_type, contract_number, employment_rate, weekly_hours, employment_type, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
+            "id, user_id, role, legacy_role, position, department, staff_type, contract_number, employment_rate, weekly_hours, employment_type, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
           )
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false }),
@@ -614,8 +621,9 @@ export default function TeamPage() {
 
       if (employeesResult.error) throw employeesResult.error;
 
-      const memberRows = ((employeesResult.data as Employee[]) || []).map((employee) => ({
+      const memberRows = ((employeesResult.data as Array<Employee & { id?: string | null }>) || []).map((employee) => ({
         ...employee,
+        member_id: employee.id || employee.member_id || null,
         extra_permissions: normalizeExtraPermissions(employee.extra_permissions),
       }));
 
@@ -1043,7 +1051,20 @@ export default function TeamPage() {
   const filteredEmployees = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    const visibleEmployees = employees.filter((employee) => employee.is_archived !== true);
+    const visibleEmployees = employees.filter((employee) => {
+      const department = String(employee.department || employee.position || employee.staff_type || "").toLowerCase();
+      const active = employee.is_archived !== true && employee.is_active !== false;
+
+      if (employeeFilter === "active") return active;
+      if (employeeFilter === "inactive") return employee.is_archived !== true && employee.is_active === false;
+      if (employeeFilter === "archived") return employee.is_archived === true;
+      if (employeeFilter === "administration") return department.includes("admin") || department.includes("vadov");
+      if (employeeFilter === "health") return department.includes("slaug") || department.includes("medic") || department.includes("sveikat");
+      if (employeeFilter === "social") return department.includes("social") || department.includes("glob") || department.includes("užimt") || department.includes("uzimt");
+      if (employeeFilter === "maintenance") return department.includes("ūk") || department.includes("uk") || department.includes("techn") || department.includes("sandel");
+
+      return true;
+    });
 
     if (!q) return visibleEmployees;
 
@@ -1062,11 +1083,13 @@ export default function TeamPage() {
         .toLowerCase()
         .includes(q),
     );
-  }, [employees, query]);
+  }, [employees, employeeFilter, query]);
 
   const employeeMap = useMemo(() => {
     return new Map(employees.map((employee) => [employee.user_id, employee]));
   }, [employees]);
+  const activeEmployeeCount = employees.filter((employee) => employee.is_archived !== true && employee.is_active !== false).length;
+  const inactiveEmployeeCount = employees.filter((employee) => employee.is_archived !== true && employee.is_active === false).length;
 
   const pendingVacations = vacations.filter((item) => item.status === "submitted" || item.status === "pending");
   const expiringCredentials = credentials.filter((item) => isExpiring(item.expires_at));
@@ -1081,7 +1104,21 @@ export default function TeamPage() {
     return employeeTrainings.length === 0;
   });
   const pendingInvites = invites.filter((invite) => invite.status === "pending");
-  const activeEmployees = employees.filter((employee) => employee.is_archived !== true && employee.is_active !== false);
+  const activeEmployees = employees.filter((employee) => employee.is_archived !== true);
+  const vacationEmployees = useMemo(() => {
+    const map = new Map<string, Employee>();
+
+    for (const employee of employees) {
+      if (!employee.user_id) continue;
+      if (employee.is_archived === true) continue;
+
+      map.set(employee.user_id, employee);
+    }
+
+    return Array.from(map.values()).sort((a, b) =>
+      employeeName(a).localeCompare(employeeName(b), "lt"),
+    );
+  }, [employees]);
   const archivedEmployees = employees.filter((employee) => employee.is_archived === true);
 
   const scheduleDays = useMemo(() => {
@@ -1692,24 +1729,29 @@ export default function TeamPage() {
                 <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
                   Filtrai
                 </span>
-                <span className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-black text-white">
-                  Visi
-                </span>
-                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
-                  Aktyvūs
-                </span>
-                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
-                  Administracija
-                </span>
-                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
-                  Slauga / medikai
-                </span>
-                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
-                  Socialinė sritis
-                </span>
-                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
-                  Ūkis
-                </span>
+                {[
+                  ["all", `Visi (${employees.length})`],
+                  ["active", `Aktyvūs (${activeEmployeeCount})`],
+                  ["inactive", `Neaktyvūs (${inactiveEmployeeCount})`],
+                  ["archived", `Archyvas (${archivedEmployees.length})`],
+                  ["administration", "Administracija"],
+                  ["health", "Slauga / medikai"],
+                  ["social", "Socialinė sritis"],
+                  ["maintenance", "Ūkis"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setEmployeeFilter(key as EmployeeFilterKey)}
+                    className={
+                      employeeFilter === key
+                        ? "rounded-lg bg-emerald-700 px-4 py-2 text-xs font-black text-white"
+                        : "rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]"
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
                 <button
                   type="button"
                   onClick={() => void loadAll()}
@@ -1726,9 +1768,9 @@ export default function TeamPage() {
               <div className="mt-5 grid gap-3">
                 {filteredEmployees.map((employee) => (
                   <EmployeeRowCard
-                    key={employee.user_id}
+                    key={employeeKey(employee)}
                     employee={employee}
-                    selected={editingEmployee?.user_id === employee.user_id}
+                    selected={editingEmployee ? employeeKey(editingEmployee) === employeeKey(employee) : false}
                     onEdit={() => openEmployeeEditor(employee)}
                   />
                 ))}
@@ -1787,7 +1829,7 @@ export default function TeamPage() {
 
         {tab === "vacations" && (
           <VacationRequests
-            employees={activeEmployees}
+            employees={vacationEmployees}
             requests={vacations}
             form={vacationForm}
             saving={saving}
