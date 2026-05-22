@@ -1,1181 +1,1531 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Edit3,
+  ChevronDown,
+  ChevronUp,
   GraduationCap,
-  LayoutList,
-  Library,
   Plus,
+  RefreshCw,
   Search,
-  ShieldCheck,
-  Users,
-  X,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { getChangedFields, logAudit } from "@/lib/audit";
 
-type Department =
-  | "Visi padaliniai"
-  | "Administracija"
-  | "Maitinimo paslaugos"
-  | "Socialinė sritis"
-  | "Sveikatos priežiūra"
-  | "Ūkis";
-
-type Training = {
+type EmployeeOption = {
   id: string;
+  full_name?: string | null;
+  name?: string | null;
+  role?: string | null;
+  department?: string | null;
+  position?: string | null;
+};
+
+type TrainingRecord = {
+  id: string;
+  organization_id?: string | null;
+  employee_id: string;
+  title?: string | null;
+  training_name?: string | null;
+  name?: string | null;
+  category?: string | null;
+  provider?: string | null;
+  completed_at?: string | null;
+  expires_at?: string | null;
+  valid_until?: string | null;
+  hours?: number | string | null;
+  status?: string | null;
+  approval_status?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  verified_at?: string | null;
+  verified_by?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  submitted_by?: string | null;
+  certificate_number?: string | null;
+  certificate_no?: string | null;
+  document_number?: string | null;
+  number?: string | null;
+  created_by?: string | null;
+};
+
+type Props = {
+  organizationId: string | null | undefined;
+  employees?: EmployeeOption[] | null;
+  trainings?: TrainingRecord[] | null;
+  onRefresh?: () => void | Promise<void>;
+};
+
+type FilterKey = "all" | "valid" | "expiring" | "expired" | "missing" | "pending";
+type DepartmentKey = "all" | "administration" | "social" | "health" | "food" | "maintenance";
+
+type Requirement = {
   title: string;
-  category: Department;
   hours: number;
-  validityMonths: number | null;
-  description: string;
-  isCommon: boolean;
 };
 
-type Position = {
-  id: string;
+type PositionRequirement = {
+  key: string;
   title: string;
-  department: Department;
-  yearlyHours: number;
-  assignedCount: number;
-  requiredTrainingIds: string[];
+  department: DepartmentKey;
+  departmentLabel: string;
+  annualHours: number;
+  roleKeywords: string[];
+  positionKeywords: string[];
+  required: Requirement[];
 };
 
-type Employee = {
-  id: string;
-  name: string;
-  department: Exclude<Department, "Visi padaliniai">;
-  positionId: string;
-  completedTrainingIds: string[];
-  expiringTrainingIds: string[];
-};
-
-type EmployeeTrainingSubmission = {
-  id: string;
-  employeeId: string;
-  trainingId: string;
-  completedAt: string;
-  note: string;
-  status: "pending" | "approved" | "rejected";
-};
-
-type DrawerMode =
-  | { type: "none" }
-  | { type: "library" }
-  | { type: "training"; trainingId: string | null }
-  | { type: "position"; positionId: string }
-  | { type: "requirement"; trainingId: string }
-  | { type: "employee"; employeeId: string };
-
-const departments: Department[] = [
-  "Visi padaliniai",
-  "Administracija",
-  "Socialinė sritis",
-  "Sveikatos priežiūra",
-  "Maitinimo paslaugos",
-  "Ūkis",
+const COMMON_TRAININGS: Requirement[] = [
+  { title: "Darbų sauga", hours: 2 },
+  { title: "Gaisrinė sauga", hours: 2 },
+  { title: "BDAR", hours: 1 },
 ];
 
-const initialTrainings: Training[] = [
-  {
-    id: "work-safety",
-    title: "Darbų sauga",
-    category: "Visi padaliniai",
-    hours: 2,
-    validityMonths: 12,
-    description:
-      "Bendras darbuotojų instruktavimas dėl saugaus darbo aplinkos reikalavimų.",
-    isCommon: true,
-  },
-  {
-    id: "fire-safety",
-    title: "Gaisrinė sauga",
-    category: "Visi padaliniai",
-    hours: 2,
-    validityMonths: 12,
-    description: "Gaisrinės saugos instruktažas ir evakuacijos tvarka.",
-    isCommon: true,
-  },
-  {
-    id: "gdpr",
-    title: "BDAR",
-    category: "Visi padaliniai",
-    hours: 1,
-    validityMonths: 12,
-    description:
-      "Asmens duomenų apsauga, konfidencialumas ir saugus informacijos tvarkymas.",
-    isCommon: true,
-  },
-  {
-    id: "info-security",
-    title: "Informacijos sauga",
-    category: "Administracija",
-    hours: 1,
-    validityMonths: 12,
-    description: "Prisijungimų, dokumentų ir vidinės informacijos sauga.",
-    isCommon: false,
-  },
-  {
-    id: "violence-prevention",
-    title: "Smurto prevencija",
-    category: "Socialinė sritis",
-    hours: 2,
-    validityMonths: 12,
-    description:
-      "Smurto, prievartos ir nepriežiūros atpažinimas bei reagavimo eiga.",
-    isCommon: false,
-  },
-  {
-    id: "intro-160",
-    title: "160 val. įvadiniai mokymai",
-    category: "Socialinė sritis",
-    hours: 160,
-    validityMonths: null,
-    description:
-      "Įvadiniai mokymai individualios priežiūros ir socialinės srities darbuotojams.",
-    isCommon: false,
-  },
-  {
-    id: "supervision",
-    title: "Supervizijos / intervizijos",
-    category: "Socialinė sritis",
-    hours: 8,
-    validityMonths: 12,
-    description:
-      "Profesinio palaikymo, refleksijos ir atvejų aptarimo valandos.",
-    isCommon: false,
-  },
-  {
-    id: "nursing-update",
-    title: "Slaugos kompetencijų atnaujinimas",
-    category: "Sveikatos priežiūra",
-    hours: 16,
-    validityMonths: 12,
-    description:
-      "Slaugos procedūrų, infekcijų kontrolės ir dokumentavimo atnaujinimas.",
-    isCommon: false,
-  },
-  {
-    id: "food-hygiene",
-    title: "Maisto higiena",
-    category: "Maitinimo paslaugos",
-    hours: 4,
-    validityMonths: 24,
-    description: "Maisto saugos, higienos ir virtuvės darbo reikalavimai.",
-    isCommon: false,
-  },
-  {
-    id: "lifting-techniques",
-    title: "Saugus kėlimas ir perkėlimas",
-    category: "Sveikatos priežiūra",
-    hours: 3,
-    validityMonths: 12,
-    description: "Gyventojų perkėlimo, kėlimo ir traumų prevencijos praktika.",
-    isCommon: false,
-  },
+const DEFAULT_GENERAL_TRAININGS: Requirement[] = [
+  ...COMMON_TRAININGS,
+  { title: "Pirmoji pagalba", hours: 4 },
+  { title: "Higienos mokymai", hours: 2 },
+  { title: "Infekcijų kontrolė", hours: 2 },
 ];
 
-const initialPositions: Position[] = [
+const POSITION_REQUIREMENTS: PositionRequirement[] = [
   {
-    id: "director",
+    key: "director",
     title: "Direktorius",
-    department: "Administracija",
-    yearlyHours: 8,
-    assignedCount: 1,
-    requiredTrainingIds: ["info-security"],
+    department: "administration",
+    departmentLabel: "Administracija",
+    annualHours: 8,
+    roleKeywords: ["owner", "admin"],
+    positionKeywords: ["direktor", "vadov", "administrator"],
+    required: [
+      { title: "Darbuotojų sauga vadovams", hours: 4 },
+      { title: "BDAR vadovams", hours: 2 },
+      { title: "Krizių valdymas", hours: 2 },
+    ],
   },
   {
-    id: "administrator",
-    title: "Administratorius",
-    department: "Administracija",
-    yearlyHours: 8,
-    assignedCount: 4,
-    requiredTrainingIds: ["info-security"],
-  },
-  {
-    id: "social-worker",
+    key: "social_worker",
     title: "Socialinis darbuotojas",
-    department: "Socialinė sritis",
-    yearlyHours: 24,
-    assignedCount: 28,
-    requiredTrainingIds: ["violence-prevention", "intro-160", "supervision"],
+    department: "social",
+    departmentLabel: "Socialinė sritis",
+    annualHours: 24,
+    roleKeywords: [],
+    positionKeywords: ["social", "soc", "glob", "užimt", "uzimt"],
+    required: [
+      { title: "Smurto prevencija", hours: 2 },
+      { title: "Socialinių paslaugų įvadiniai mokymai", hours: 160 },
+      { title: "Supervizijos / intervizijos", hours: 8 },
+    ],
   },
   {
-    id: "care-worker",
-    title: "Individualios priežiūros darbuotojas",
-    department: "Socialinė sritis",
-    yearlyHours: 16,
-    assignedCount: 96,
-    requiredTrainingIds: ["intro-160", "violence-prevention"],
+    key: "nurse",
+    title: "Slaugytojas",
+    department: "health",
+    departmentLabel: "Sveikatos priežiūra",
+    annualHours: 32,
+    roleKeywords: [],
+    positionKeywords: ["slaug", "medic", "sveikat", "gyd", "padėj", "padej"],
+    required: [
+      { title: "Profesinės licencijos palaikymas", hours: 8 },
+      { title: "Vaistų administravimas", hours: 4 },
+      { title: "Infekcijų kontrolė", hours: 2 },
+    ],
   },
   {
-    id: "nurse",
-    title: "Bendrosios praktikos slaugytojas",
-    department: "Sveikatos priežiūra",
-    yearlyHours: 24,
-    assignedCount: 18,
-    requiredTrainingIds: ["nursing-update", "lifting-techniques"],
+    key: "food",
+    title: "Maitinimo darbuotojas",
+    department: "food",
+    departmentLabel: "Maitinimo paslaugos",
+    annualHours: 12,
+    roleKeywords: [],
+    positionKeywords: ["maist", "virtuv", "virėj", "virej"],
+    required: [
+      { title: "Maisto sauga", hours: 4 },
+      { title: "Higienos mokymai", hours: 2 },
+    ],
   },
   {
-    id: "health-assistant",
-    title: "Asmens sveikatos priežiūros padėjėjas",
-    department: "Sveikatos priežiūra",
-    yearlyHours: 16,
-    assignedCount: 16,
-    requiredTrainingIds: ["lifting-techniques"],
-  },
-  {
-    id: "cook",
-    title: "Virėjas",
-    department: "Maitinimo paslaugos",
-    yearlyHours: 8,
-    assignedCount: 10,
-    requiredTrainingIds: ["food-hygiene"],
-  },
-  {
-    id: "kitchen-worker",
-    title: "Virtuvės darbininkas",
-    department: "Maitinimo paslaugos",
-    yearlyHours: 8,
-    assignedCount: 12,
-    requiredTrainingIds: ["food-hygiene"],
-  },
-  {
-    id: "maintenance",
-    title: "Pastatų priežiūros specialistas",
-    department: "Ūkis",
-    yearlyHours: 8,
-    assignedCount: 7,
-    requiredTrainingIds: [],
+    key: "maintenance",
+    title: "Ūkio darbuotojas",
+    department: "maintenance",
+    departmentLabel: "Ūkis",
+    annualHours: 8,
+    roleKeywords: [],
+    positionKeywords: ["ūk", "uk", "techn", "vair", "sandel", "sandėl"],
+    required: [
+      { title: "Darbų sauga", hours: 2 },
+      { title: "Gaisrinė sauga", hours: 2 },
+    ],
   },
 ];
 
-const names = [
-  "Jonas Jonaitis",
-  "Ona Onaitė",
-  "Asta Petrauskė",
-  "Ieva Kazlauskaitė",
-  "Rasa Žukauskienė",
-  "Tomas Stankevičius",
-  "Greta Paulauskaitė",
-  "Mantas Vaitkus",
-  "Lina Jankauskienė",
-  "Dalia Kavaliauskaitė",
-  "Saulius Butkus",
-  "Eglė Rimkutė",
+const DEPARTMENTS: Array<{ key: DepartmentKey; label: string }> = [
+  { key: "all", label: "Visi" },
+  { key: "administration", label: "Administracija" },
+  { key: "social", label: "Socialinė sritis" },
+  { key: "health", label: "Sveikatos priežiūra" },
+  { key: "food", label: "Maitinimas" },
+  { key: "maintenance", label: "Ūkis" },
 ];
 
-const generatedEmployees: Employee[] = Array.from(
-  { length: 300 },
-  (_, index) => {
-    const position = initialPositions[index % initialPositions.length];
-    const required = [
-      "work-safety",
-      "fire-safety",
-      "gdpr",
-      ...position.requiredTrainingIds,
-    ];
-    const completedTrainingIds = required.filter(
-      (_, trainingIndex) => (index + trainingIndex) % 4 !== 0,
-    );
-    const expiringTrainingIds = required.filter(
-      (_, trainingIndex) => (index + trainingIndex) % 9 === 0,
-    );
-
-    return {
-      id: `employee-${index + 1}`,
-      name: `${names[index % names.length]} ${index + 1}`,
-      department: position.department as Exclude<Department, "Visi padaliniai">,
-      positionId: position.id,
-      completedTrainingIds,
-      expiringTrainingIds,
-    };
-  },
-);
-
-const initialEmployeeSubmissions: EmployeeTrainingSubmission[] = [
-  {
-    id: "submission-1",
-    employeeId: "employee-2",
-    trainingId: "food-hygiene",
-    completedAt: "2026-05-02",
-    note: "Darbuotoja suvedė mokymo datą savo paskyroje. Admin turi patvirtinti, kad matė duomenis.",
-    status: "pending",
-  },
-  {
-    id: "submission-2",
-    employeeId: "employee-6",
-    trainingId: "work-safety",
-    completedAt: "2026-05-06",
-    note: "Darbuotojas pateikė informaciją be failo. Reikia administratoriaus patvirtinimo.",
-    status: "pending",
-  },
-];
-
-function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+function addMonths(date: Date, months: number) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next.toISOString().slice(0, 10);
 }
 
-function validityLabel(months: number | null) {
-  if (!months) return "Neterminuota";
-  return `${months} mėn.`;
+function fmt(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("lt-LT", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
-function pageNumbers(current: number, total: number) {
-  const pages = new Set<number>([1, total, current - 1, current, current + 1]);
-  return Array.from(pages)
-    .filter((page) => page >= 1 && page <= total)
-    .sort((a, b) => a - b);
+function normalize(value?: string | null) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
-export default function TrainingModule() {
-  const [trainings, setTrainings] = useState<Training[]>(initialTrainings);
-  const [positions, setPositions] = useState<Position[]>(initialPositions);
-  const [employees] = useState<Employee[]>(generatedEmployees);
-  const [adminApprovedTrainings, setAdminApprovedTrainings] = useState<
-    Record<string, string[]>
-  >({});
-  const [employeeSubmissions, setEmployeeSubmissions] = useState<
-    EmployeeTrainingSubmission[]
-  >(initialEmployeeSubmissions);
+function employeeName(employees: EmployeeOption[], id: string) {
+  const employee = employees.find((item) => item.id === id);
+  return employee?.full_name || employee?.name || "Darbuotojas";
+}
 
-  const [selectedDepartment, setSelectedDepartment] =
-    useState<Department>("Visi padaliniai");
-  const [selectedPositionId, setSelectedPositionId] = useState("social-worker");
-  const [employeeSearch, setEmployeeSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "missing" | "expiring" | "ok"
-  >("all");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-  const [drawer, setDrawer] = useState<DrawerMode>({ type: "none" });
+function trainingTitle(training: TrainingRecord) {
+  return training.title || training.training_name || training.name || "Mokymas";
+}
 
-  const commonTrainings = useMemo(
-    () => trainings.filter((training) => training.isCommon),
-    [trainings],
+function trainingExpiresAt(training: TrainingRecord) {
+  return training.expires_at || training.valid_until || null;
+}
+
+function trainingCertificateNumber(training: TrainingRecord) {
+  return (
+    training.certificate_number ||
+    training.certificate_no ||
+    training.document_number ||
+    training.number ||
+    null
   );
+}
 
-  const employeesWithApprovedTrainings = useMemo(() => {
-    return employees.map((employee) => {
-      const manuallyApproved = adminApprovedTrainings[employee.id] ?? [];
-      const approvedFromEmployeeSubmissions = employeeSubmissions
-        .filter(
-          (submission) =>
-            submission.employeeId === employee.id &&
-            submission.status === "approved",
-        )
-        .map((submission) => submission.trainingId);
-      const completedTrainingIds = Array.from(
-        new Set([
-          ...employee.completedTrainingIds,
-          ...manuallyApproved,
-          ...approvedFromEmployeeSubmissions,
-        ]),
-      );
+function isTrainingApproved(record?: TrainingRecord | null) {
+  if (!record) return false;
 
-      return { ...employee, completedTrainingIds };
-    });
-  }, [adminApprovedTrainings, employeeSubmissions, employees]);
+  const approval = normalize(record.approval_status);
+  const status = normalize(record.status);
 
-  const pendingSubmissionCount = employeeSubmissions.filter(
-    (submission) => submission.status === "pending",
-  ).length;
-
-  const filteredPositions = useMemo(() => {
-    return positions.filter((position) => {
-      return (
-        selectedDepartment === "Visi padaliniai" ||
-        position.department === selectedDepartment
-      );
-    });
-  }, [positions, selectedDepartment]);
-
-  const selectedPosition =
-    positions.find((position) => position.id === selectedPositionId) ??
-    filteredPositions[0] ??
-    positions[0];
-
-  const selectedRequiredTrainings = useMemo(() => {
-    return trainings.filter((training) =>
-      selectedPosition.requiredTrainingIds.includes(training.id),
-    );
-  }, [selectedPosition.requiredTrainingIds, trainings]);
-
-  const requiredTrainingIdsByPosition = useMemo(() => {
-    const map = new Map<string, string[]>();
-    positions.forEach((position) => {
-      map.set(position.id, [
-        ...commonTrainings.map((training) => training.id),
-        ...position.requiredTrainingIds,
-      ]);
-    });
-    return map;
-  }, [commonTrainings, positions]);
-
-  const employeeRows = useMemo(() => {
-    return employees.map((employee) => {
-      const position = positions.find(
-        (item) => item.id === employee.positionId,
-      );
-      const requiredIds =
-        requiredTrainingIdsByPosition.get(employee.positionId) ?? [];
-      const completedRequired = employee.completedTrainingIds.filter((id) =>
-        requiredIds.includes(id),
-      );
-      const missingIds = requiredIds.filter(
-        (id) => !employee.completedTrainingIds.includes(id),
-      );
-      const completedHours = trainings
-        .filter((training) => completedRequired.includes(training.id))
-        .reduce((sum, training) => sum + training.hours, 0);
-      const requiredHours = trainings
-        .filter((training) => requiredIds.includes(training.id))
-        .reduce((sum, training) => sum + training.hours, 0);
-      const progress =
-        requiredHours > 0
-          ? Math.round((completedHours / requiredHours) * 100)
-          : 100;
-
-      return {
-        ...employee,
-        positionTitle: position?.title ?? "Nepriskirta",
-        requiredIds,
-        missingIds,
-        completedHours,
-        requiredHours,
-        progress: Math.min(100, progress),
-      };
-    });
-  }, [
-    employeesWithApprovedTrainings,
-    positions,
-    requiredTrainingIdsByPosition,
-    trainings,
-  ]);
-
-  const filteredEmployees = useMemo(() => {
-    const query = employeeSearch.trim().toLowerCase();
-
-    return employeeRows.filter((employee) => {
-      const matchesDepartment =
-        selectedDepartment === "Visi padaliniai" ||
-        employee.department === selectedDepartment;
-      const matchesSearch =
-        !query ||
-        employee.name.toLowerCase().includes(query) ||
-        employee.positionTitle.toLowerCase().includes(query) ||
-        employee.department.toLowerCase().includes(query);
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "missing" && employee.missingIds.length > 0) ||
-        (statusFilter === "expiring" &&
-          employee.expiringTrainingIds.length > 0) ||
-        (statusFilter === "ok" &&
-          employee.missingIds.length === 0 &&
-          employee.expiringTrainingIds.length === 0);
-
-      return matchesDepartment && matchesSearch && matchesStatus;
-    });
-  }, [employeeRows, employeeSearch, selectedDepartment, statusFilter]);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredEmployees.length / pageSize),
+  return (
+    approval.includes("approved") ||
+    approval.includes("confirmed") ||
+    approval.includes("patvirt") ||
+    status === "approved" ||
+    status === "confirmed" ||
+    status === "valid" ||
+    status === "active" ||
+    Boolean(record.approved_at || record.verified_at || record.reviewed_at)
   );
-  const visibleEmployees = filteredEmployees.slice(
-    (page - 1) * pageSize,
-    page * pageSize,
-  );
+}
 
-  const missingEmployees = employeeRows.filter(
-    (employee) => employee.missingIds.length > 0,
-  ).length;
-  const expiringEmployees = employeeRows.filter(
-    (employee) => employee.expiringTrainingIds.length > 0,
-  ).length;
-  const completedHours = employeeRows.reduce(
-    (sum, employee) => sum + employee.completedHours,
-    0,
-  );
-  const requiredHours = employeeRows.reduce(
-    (sum, employee) => sum + employee.requiredHours,
-    0,
-  );
-  const completionPercent =
-    requiredHours > 0 ? Math.round((completedHours / requiredHours) * 100) : 0;
+function isPendingTraining(record?: TrainingRecord | null) {
+  if (!record) return false;
 
-  function selectDepartment(department: Department) {
-    setSelectedDepartment(department);
-    setPage(1);
-    const firstPosition = positions.find(
-      (position) =>
-        department === "Visi padaliniai" || position.department === department,
-    );
-    if (firstPosition) setSelectedPositionId(firstPosition.id);
-  }
+  const approval = normalize(record.approval_status);
+  const status = normalize(record.status);
 
-  function saveTraining(nextTraining: Training) {
-    setTrainings((current) => {
-      const exists = current.some(
-        (training) => training.id === nextTraining.id,
-      );
-      if (exists)
-        return current.map((training) =>
-          training.id === nextTraining.id ? nextTraining : training,
-        );
-      return [nextTraining, ...current];
-    });
-    setDrawer({ type: "none" });
-  }
+  if (approval.includes("rejected") || status.includes("rejected")) return false;
 
-  function savePosition(nextPosition: Position) {
-    setPositions((current) =>
-      current.map((position) =>
-        position.id === nextPosition.id ? nextPosition : position,
-      ),
-    );
-    setDrawer({ type: "none" });
-  }
-
-  function approveEmployeeTraining(
-    employeeId: string,
-    trainingId: string,
-    submissionId?: string,
+  if (
+    approval.includes("pending") ||
+    approval.includes("submitted") ||
+    approval.includes("lauki") ||
+    status.includes("pending") ||
+    status.includes("submitted") ||
+    status.includes("lauki")
   ) {
-    setAdminApprovedTrainings((current) => {
-      const currentIds = current[employeeId] ?? [];
-      return {
-        ...current,
-        [employeeId]: Array.from(new Set([...currentIds, trainingId])),
-      };
-    });
-
-    if (submissionId) {
-      setEmployeeSubmissions((current) =>
-        current.map((submission) =>
-          submission.id === submissionId
-            ? { ...submission, status: "approved" }
-            : submission,
-        ),
-      );
-    }
+    return true;
   }
 
-  function rejectEmployeeSubmission(submissionId: string) {
-    setEmployeeSubmissions((current) =>
-      current.map((submission) =>
-        submission.id === submissionId
-          ? { ...submission, status: "rejected" }
-          : submission,
-      ),
-    );
+  return false;
+}
+
+function statusForTraining(record?: TrainingRecord | null) {
+  if (!record) {
+    return {
+      key: "missing" as const,
+      label: "Trūksta",
+      cls: "bg-[#fff6df] text-[#8a5a13] ring-[#ead8a7]",
+    };
+  }
+
+  if (isPendingTraining(record)) {
+    return {
+      key: "pending" as const,
+      label: "Laukia patvirtinimo",
+      cls: "bg-[#fff6df] text-[#8a5a13] ring-[#ead8a7]",
+    };
+  }
+
+  if (normalize(record.approval_status).includes("rejected") || normalize(record.status).includes("rejected")) {
+    return {
+      key: "expired" as const,
+      label: "Nepatvirtinta",
+      cls: "bg-red-50 text-red-800 ring-red-200",
+    };
+  }
+
+  const expiresAt = trainingExpiresAt(record);
+  if (!expiresAt) {
+    return {
+      key: "valid" as const,
+      label: "Galioja",
+      cls: "bg-[#e9f7ef] text-[#047857] ring-[#b7e7c8]",
+    };
+  }
+
+  const expires = new Date(`${expiresAt}T00:00:00`);
+  const today = new Date(`${todayIso()}T00:00:00`);
+  const daysLeft = Math.ceil((expires.getTime() - today.getTime()) / 86400000);
+
+  if (daysLeft < 0) {
+    return {
+      key: "expired" as const,
+      label: "Pasibaigė",
+      cls: "bg-red-50 text-red-800 ring-red-200",
+    };
+  }
+
+  if (daysLeft <= 30) {
+    return {
+      key: "expiring" as const,
+      label: "Baigiasi",
+      cls: "bg-[#fff6df] text-[#8a5a13] ring-[#ead8a7]",
+    };
+  }
+
+  return {
+    key: "valid" as const,
+    label: "Galioja",
+    cls: "bg-[#e9f7ef] text-[#047857] ring-[#b7e7c8]",
+  };
+}
+
+function toEmployee(member: any, profile?: any): EmployeeOption {
+  const fullName =
+    profile?.full_name ||
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
+    profile?.email ||
+    null;
+
+  return {
+    id: member.user_id,
+    full_name: fullName,
+    name: fullName,
+    role: member.role || null,
+    department: member.department || null,
+    position: member.position || null,
+  };
+}
+
+function detectRequirement(employee: EmployeeOption) {
+  const text = normalize(`${employee.role || ""} ${employee.department || ""} ${employee.position || ""}`);
+
+  if (employee.role === "owner" || employee.role === "admin") {
+    return POSITION_REQUIREMENTS[0];
   }
 
   return (
-    <section className="mx-auto w-full max-w-[1480px] space-y-6 px-1">
-      <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
-        <StatCard
-          icon={<Users className="h-5 w-5" />}
-          value={String(employees.length)}
-          title="Darbuotojų"
-          description="Aktyvūs darbuotojai"
-          active
-        />
-        <StatCard
-          icon={<AlertTriangle className="h-5 w-5" />}
-          value={String(missingEmployees)}
-          title="Trūksta mokymų"
-          description="Darbuotojai su trūkumais"
-          danger
-        />
-        <StatCard
-          icon={<CalendarDays className="h-5 w-5" />}
-          value={String(expiringEmployees)}
-          title="Artėjantys terminai"
-          description="Baigiasi galiojimas"
-          warning
-        />
-        <StatCard
-          icon={<Clock className="h-5 w-5" />}
-          value={`${completionPercent}%`}
-          title="Užbaigimas"
-          description="Pagal privalomas valandas"
-        />
-      </div>
+    POSITION_REQUIREMENTS.find((requirement) =>
+      [...requirement.positionKeywords, ...requirement.roleKeywords].some((keyword) => text.includes(normalize(keyword))),
+    ) || POSITION_REQUIREMENTS[1]
+  );
+}
 
-      <div className="grid items-start gap-6 xl:grid-cols-[330px_minmax(0,1fr)]">
-        <aside className="space-y-6">
-          <Card>
-            <h3 className="text-xl font-black text-slate-950">Padaliniai</h3>
-            <p className="mt-1 text-sm font-bold text-slate-500">
-              Filtruok pareigybes ir darbuotojus.
+function employeeRequiredTrainings(employee: EmployeeOption) {
+  const requirement = detectRequirement(employee);
+  return {
+    requirement,
+    trainings: Array.from(
+      new Map([...DEFAULT_GENERAL_TRAININGS, ...requirement.required].map((item) => [normalize(item.title), item])).values(),
+    ),
+  };
+}
+
+function trainingMatchesRequired(training: TrainingRecord, requiredTitle: string) {
+  const trainingName = normalize(trainingTitle(training));
+  const required = normalize(requiredTitle);
+
+  return trainingName === required || trainingName.includes(required) || required.includes(trainingName);
+}
+
+function isKnownRequiredTraining(title: string) {
+  const normalized = normalize(title);
+  const allRequired = [
+    ...DEFAULT_GENERAL_TRAININGS,
+    ...POSITION_REQUIREMENTS.flatMap((requirement) => requirement.required),
+  ];
+
+  return allRequired.some((item) => {
+    const required = normalize(item.title);
+    return normalized === required || normalized.includes(required) || required.includes(normalized);
+  });
+}
+
+function shouldShowInApproval(record: TrainingRecord) {
+  if (isPendingTraining(record)) return true;
+
+  // Older employee-submitted records may have status="valid" because the previous
+  // version saved them directly. If the title is not part of the required catalogue,
+  // keep it visible for admin review so it is not lost.
+  return !isKnownRequiredTraining(trainingTitle(record)) && !isTrainingApproved(record);
+}
+
+export default function TrainingModule({
+  organizationId,
+  employees: employeeInput,
+  trainings: trainingInput,
+  onRefresh,
+}: Props) {
+  const [internalEmployees, setInternalEmployees] = useState<EmployeeOption[]>([]);
+  const [internalTrainings, setInternalTrainings] = useState<TrainingRecord[]>([]);
+  const [loadingRealData, setLoadingRealData] = useState(false);
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [departmentFilter, setDepartmentFilter] = useState<DepartmentKey>("all");
+  const [selectedRequirementKey, setSelectedRequirementKey] = useState("social_worker");
+  const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [selectedTraining, setSelectedTraining] = useState<TrainingRecord | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [form, setForm] = useState({
+    employee_id: "",
+    title: "",
+    provider: "",
+    completed_at: todayIso(),
+    expires_at: "",
+    hours: "1",
+    certificate_number: "",
+  });
+  const [positionRequirementOverrides, setPositionRequirementOverrides] = useState<Record<string, Requirement[]>>({});
+  const [requirementForm, setRequirementForm] = useState({
+    title: "",
+    hours: "1",
+  });
+  const [editingRequirementTitle, setEditingRequirementTitle] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRealData() {
+      if (!organizationId) return;
+
+      setLoadingRealData(true);
+
+      try {
+        const shouldLoadEmployees = !Array.isArray(employeeInput) || employeeInput.length === 0;
+        const shouldLoadTrainings = !Array.isArray(trainingInput) || trainingInput.length === 0;
+
+        if (shouldLoadEmployees) {
+          const { data: members, error: membersError } = await supabase
+            .from("organization_members")
+            .select("user_id, role, position, department, is_active, is_archived")
+            .eq("organization_id", organizationId)
+            .eq("is_active", true)
+            .neq("is_archived", true)
+            .order("position", { ascending: true });
+
+          if (membersError) throw membersError;
+
+          const userIds = (members || []).map((member: any) => member.user_id).filter(Boolean);
+          let profilesById = new Map<string, any>();
+
+          if (userIds.length) {
+            const { data: profiles, error: profilesError } = await supabase
+              .from("profiles")
+              .select("id, email, first_name, last_name, full_name")
+              .in("id", userIds);
+
+            if (!profilesError) {
+              profilesById = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
+            }
+          }
+
+          const nextEmployees = ((members || []) as any[])
+            .map((member) => toEmployee(member, profilesById.get(member.user_id)))
+            .sort((a, b) => (a.full_name || a.name || "").localeCompare(b.full_name || b.name || "", "lt"));
+
+          if (!cancelled) setInternalEmployees(nextEmployees);
+        }
+
+        if (shouldLoadTrainings) {
+          const { data, error } = await supabase
+            .from("personnel_trainings")
+            .select("*")
+            .eq("organization_id", organizationId)
+            .order("expires_at", { ascending: true, nullsFirst: false });
+
+          if (error) throw error;
+          if (!cancelled) setInternalTrainings((data || []) as TrainingRecord[]);
+        }
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error);
+        if (!cancelled) setMessage({ type: "error", text: `Nepavyko įkelti realių mokymų duomenų: ${text}` });
+      } finally {
+        if (!cancelled) setLoadingRealData(false);
+      }
+    }
+
+    void loadRealData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, employeeInput, trainingInput]);
+
+  const employees = useMemo(() => {
+    if (Array.isArray(employeeInput) && employeeInput.length > 0) return employeeInput;
+    return internalEmployees;
+  }, [employeeInput, internalEmployees]);
+
+  const trainings = useMemo(() => {
+    if (Array.isArray(trainingInput) && trainingInput.length > 0) return trainingInput;
+    return internalTrainings;
+  }, [trainingInput, internalTrainings]);
+
+  useEffect(() => {
+    if (!form.employee_id && employees[0]?.id) {
+      setForm((prev) => ({ ...prev, employee_id: employees[0].id }));
+    }
+  }, [employees, form.employee_id]);
+
+  const pendingTrainings = useMemo(() => trainings.filter(shouldShowInApproval), [trainings]);
+
+  const selectedRequirement = useMemo(() => {
+    const base = POSITION_REQUIREMENTS.find((item) => item.key === selectedRequirementKey) || POSITION_REQUIREMENTS[1];
+
+    return {
+      ...base,
+      required: positionRequirementOverrides[base.key] || base.required,
+    };
+  }, [selectedRequirementKey, positionRequirementOverrides]);
+
+  const filteredRequirements = useMemo(() => {
+    if (departmentFilter === "all") return POSITION_REQUIREMENTS;
+    return POSITION_REQUIREMENTS.filter((item) => item.department === departmentFilter);
+  }, [departmentFilter]);
+
+  useEffect(() => {
+    if (!filteredRequirements.some((item) => item.key === selectedRequirementKey)) {
+      setSelectedRequirementKey(filteredRequirements[0]?.key || "social_worker");
+    }
+  }, [filteredRequirements, selectedRequirementKey]);
+
+  const employeeSummaryRows = useMemo(() => {
+    return employees.map((employee) => {
+      const { requirement, trainings: requiredTrainings } = employeeRequiredTrainings(employee);
+      const employeeTrainings = trainings.filter((training) => training.employee_id === employee.id);
+      const approved = employeeTrainings.filter((training) => !["expired", "pending"].includes(statusForTraining(training).key) && !shouldShowInApproval(training));
+      const pending = employeeTrainings.filter(shouldShowInApproval);
+      const expiring = approved.filter((training) => statusForTraining(training).key === "expiring");
+      const expired = employeeTrainings.filter((training) => statusForTraining(training).key === "expired");
+      const missing = requiredTrainings.filter(
+        (required) => !approved.some((training) => trainingMatchesRequired(training, required.title)),
+      );
+      const progress = Math.round(((requiredTrainings.length - missing.length) / Math.max(1, requiredTrainings.length)) * 100);
+
+      return {
+        employee,
+        requirement,
+        requiredTrainings,
+        approved,
+        pending,
+        expiring,
+        expired,
+        missing,
+        progress,
+      };
+    });
+  }, [employees, trainings]);
+
+  const allDetailRows = useMemo(() => {
+    const rows: Array<{
+      id: string;
+      kind: "record" | "missing";
+      employee_id: string;
+      employee_name: string;
+      employee_position: string;
+      requirement: PositionRequirement;
+      title: string;
+      completed_at: string | null;
+      expires_at: string | null;
+      hours: number | string | null;
+      status: ReturnType<typeof statusForTraining>;
+      record?: TrainingRecord | null;
+    }> = [];
+
+    for (const summary of employeeSummaryRows) {
+      for (const training of trainings.filter((item) => item.employee_id === summary.employee.id)) {
+        rows.push({
+          id: training.id,
+          kind: "record",
+          employee_id: summary.employee.id,
+          employee_name: summary.employee.full_name || summary.employee.name || "Darbuotojas",
+          employee_position: summary.employee.position || summary.requirement.title,
+          requirement: summary.requirement,
+          title: trainingTitle(training),
+          completed_at: training.completed_at || null,
+          expires_at: trainingExpiresAt(training),
+          hours: training.hours || null,
+          status: shouldShowInApproval(training) ? {
+            key: "pending",
+            label: "Laukia patvirtinimo",
+            cls: "bg-[#fff6df] text-[#8a5a13] ring-[#ead8a7]",
+          } : statusForTraining(training),
+          record: training,
+        });
+      }
+
+      for (const missing of summary.missing) {
+        rows.push({
+          id: `missing-${summary.employee.id}-${missing.title}`,
+          kind: "missing",
+          employee_id: summary.employee.id,
+          employee_name: summary.employee.full_name || summary.employee.name || "Darbuotojas",
+          employee_position: summary.employee.position || summary.requirement.title,
+          requirement: summary.requirement,
+          title: missing.title,
+          completed_at: null,
+          expires_at: null,
+          hours: null,
+          status: statusForTraining(null),
+          record: null,
+        });
+      }
+    }
+
+    return rows;
+  }, [employeeSummaryRows, trainings]);
+
+  const counts = useMemo(() => {
+    const base = { all: employeeSummaryRows.length, valid: 0, expiring: 0, expired: 0, missing: 0, pending: pendingTrainings.length };
+
+    for (const row of employeeSummaryRows) {
+      if (row.missing.length === 0 && row.pending.length === 0 && row.expired.length === 0) base.valid += 1;
+      if (row.expiring.length > 0) base.expiring += 1;
+      if (row.expired.length > 0) base.expired += 1;
+      if (row.missing.length > 0) base.missing += 1;
+    }
+
+    return base;
+  }, [employeeSummaryRows, pendingTrainings]);
+
+  const selectedPositionSpecificTrainings = useMemo(() => {
+    const common = new Set(COMMON_TRAININGS.map((item) => normalize(item.title)));
+    return selectedRequirement.required.filter((item) => !common.has(normalize(item.title)));
+  }, [selectedRequirement.required]);
+
+  const positionStats = useMemo(() => {
+    const assignedEmployees = employees.filter((employee) => detectRequirement(employee).key === selectedRequirement.key);
+    const approvedTrainings = trainings.filter((training) => {
+      const employee = employees.find((item) => item.id === training.employee_id);
+      return employee && detectRequirement(employee).key === selectedRequirement.key && !["expired", "pending"].includes(statusForTraining(training).key) && !shouldShowInApproval(training);
+    });
+
+    const totalHours = approvedTrainings.reduce((sum, training) => sum + Number(training.hours || 0), 0);
+
+    return {
+      assigned: assignedEmployees.length,
+      hours: totalHours,
+    };
+  }, [employees, trainings, selectedRequirement]);
+
+  const filteredEmployeeSummary = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    return employeeSummaryRows.filter((row) => {
+      if (departmentFilter !== "all" && row.requirement.department !== departmentFilter) return false;
+
+      if (filter === "pending" && row.pending.length === 0) return false;
+      if (filter === "missing" && row.missing.length === 0) return false;
+      if (filter === "expiring" && row.expiring.length === 0) return false;
+      if (filter === "expired" && row.expired.length === 0) return false;
+      if (filter === "valid" && (row.missing.length > 0 || row.pending.length > 0 || row.expired.length > 0)) return false;
+
+      if (!q) return true;
+      return `${row.employee.full_name || row.employee.name || ""} ${row.employee.position || ""} ${row.requirement.title}`.toLowerCase().includes(q);
+    });
+  }, [employeeSummaryRows, departmentFilter, filter, query]);
+
+  function prefill(employeeId: string, title: string) {
+    setForm((prev) => ({
+      ...prev,
+      employee_id: employeeId,
+      title,
+      completed_at: todayIso(),
+      expires_at: "",
+      certificate_number: "",
+    }));
+    setShowNewForm(true);
+    setMessage(null);
+  }
+
+  function addRequiredTrainingForPosition() {
+    const title = requirementForm.title.trim();
+    const hours = Number(requirementForm.hours || 0);
+
+    if (!title) {
+      setMessage({ type: "error", text: "Įvesk privalomo mokymo pavadinimą." });
+      return;
+    }
+
+    setPositionRequirementOverrides((prev) => {
+      const current = prev[selectedRequirement.key] || selectedRequirement.required;
+      const withoutEdited = editingRequirementTitle
+        ? current.filter((item) => normalize(item.title) !== normalize(editingRequirementTitle))
+        : current;
+
+      const exists = withoutEdited.some((item) => normalize(item.title) === normalize(title));
+      const next = exists
+        ? withoutEdited.map((item) =>
+            normalize(item.title) === normalize(title) ? { ...item, hours } : item,
+          )
+        : [...withoutEdited, { title, hours }];
+
+      return {
+        ...prev,
+        [selectedRequirement.key]: next,
+      };
+    });
+
+    setRequirementForm({ title: "", hours: "1" });
+    setEditingRequirementTitle(null);
+    setMessage({
+      type: "success",
+      text: editingRequirementTitle ? "Privalomas mokymas atnaujintas." : "Privalomas mokymas pridėtas prie pareigybės.",
+    });
+  }
+
+  function editRequiredTrainingForPosition(item: Requirement) {
+    setRequirementForm({ title: item.title, hours: String(item.hours) });
+    setEditingRequirementTitle(item.title);
+  }
+
+  function cancelRequiredTrainingEdit() {
+    setRequirementForm({ title: "", hours: "1" });
+    setEditingRequirementTitle(null);
+  }
+
+  function removeRequiredTrainingFromPosition(title: string) {
+    setPositionRequirementOverrides((prev) => {
+      const current = prev[selectedRequirement.key] || selectedRequirement.required;
+      return {
+        ...prev,
+        [selectedRequirement.key]: current.filter((item) => normalize(item.title) !== normalize(title)),
+      };
+    });
+
+    if (editingRequirementTitle && normalize(editingRequirementTitle) === normalize(title)) {
+      cancelRequiredTrainingEdit();
+    }
+  }
+
+  async function refreshAll() {
+    await onRefresh?.();
+
+    if (!organizationId) return;
+
+    const { data, error } = await supabase
+      .from("personnel_trainings")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("expires_at", { ascending: true, nullsFirst: false });
+
+    if (!error) setInternalTrainings((data || []) as TrainingRecord[]);
+  }
+
+  async function saveTraining() {
+    setMessage(null);
+
+    if (!organizationId) {
+      setMessage({ type: "error", text: "Nenustatyta organizacija." });
+      return;
+    }
+
+    if (!form.employee_id || !form.title.trim()) {
+      setMessage({ type: "error", text: "Pasirink darbuotoją ir įvesk mokymo pavadinimą." });
+      return;
+    }
+
+    setSaving(true);
+
+    const payload: any = {
+      organization_id: organizationId,
+      employee_id: form.employee_id,
+      title: form.title.trim(),
+      provider: form.provider.trim() || null,
+      completed_at: form.completed_at || null,
+      expires_at: form.expires_at || null,
+      valid_until: form.expires_at || null,
+      hours: Number(form.hours || 0),
+      certificate_number: form.certificate_number.trim() || null,
+      status: "valid",
+      approval_status: "approved",
+    };
+
+    let { data, error } = await supabase
+      .from("personnel_trainings")
+      .insert(payload)
+      .select("*")
+      .single();
+
+    // If older DB schema does not yet have the optional fields, save the record
+    // without them instead of making the whole form feel broken.
+    if (error) {
+      const fallbackPayload = { ...payload } as any;
+      delete fallbackPayload.certificate_number;
+      delete fallbackPayload.valid_until;
+      delete fallbackPayload.approval_status;
+
+      const retry = await supabase
+        .from("personnel_trainings")
+        .insert(fallbackPayload)
+        .select("*")
+        .single();
+
+      data = retry.data;
+      error = retry.error;
+    }
+
+    setSaving(false);
+
+    if (error) {
+      setMessage({ type: "error", text: error.message });
+      return;
+    }
+
+    await logAudit({
+      organizationId,
+      tableName: "personnel_trainings",
+      recordId: (data as TrainingRecord).id,
+      action: "insert",
+      changes: getChangedFields({}, data as Record<string, unknown>),
+    });
+
+    setInternalTrainings((prev) => [data as TrainingRecord, ...prev]);
+    setMessage({ type: "success", text: "Mokymas išsaugotas ir įskaitytas." });
+    setForm((prev) => ({
+      ...prev,
+      title: "",
+      provider: "",
+      completed_at: todayIso(),
+      expires_at: "",
+      hours: "1",
+      certificate_number: "",
+    }));
+    setShowNewForm(false);
+    await onRefresh?.();
+  }
+
+  async function approveTraining(trainingId: string) {
+    setApprovingId(trainingId);
+    setMessage(null);
+
+    const previous = trainings;
+    const previousTraining = trainings.find((training) => training.id === trainingId) || null;
+    const approvedPayload = {
+      status: "valid",
+      approval_status: "approved",
+      approved_at: todayIso(),
+      verified_at: todayIso(),
+      reviewed_at: todayIso(),
+    };
+
+    setInternalTrainings((prev) =>
+      prev.map((training) =>
+        training.id === trainingId
+          ? { ...training, ...approvedPayload }
+          : training,
+      ),
+    );
+
+    let { error } = await supabase
+      .from("personnel_trainings")
+      .update(approvedPayload)
+      .eq("id", trainingId);
+
+    let actualPayload: Record<string, unknown> = approvedPayload;
+
+    if (error) {
+      const retry = await supabase
+        .from("personnel_trainings")
+        .update({ status: "valid" })
+        .eq("id", trainingId);
+      error = retry.error;
+      actualPayload = { status: "valid" };
+    }
+
+    setApprovingId(null);
+
+    if (error) {
+      setInternalTrainings(previous);
+      setMessage({ type: "error", text: `Nepavyko patvirtinti mokymo: ${error.message}` });
+      return;
+    }
+
+    setInternalTrainings((prev) =>
+      prev.map((training) =>
+        training.id === trainingId
+          ? { ...training, ...actualPayload }
+          : training,
+      ),
+    );
+
+    setSelectedTraining((current) =>
+      current?.id === trainingId
+        ? { ...current, ...actualPayload }
+        : current,
+    );
+
+    if (previousTraining) {
+      await logAudit({
+        organizationId: previousTraining.organization_id || organizationId,
+        tableName: "personnel_trainings",
+        recordId: trainingId,
+        action: "update",
+        changes: getChangedFields(previousTraining as Record<string, unknown>, {
+          ...previousTraining,
+          ...actualPayload,
+        } as Record<string, unknown>),
+      });
+    }
+
+    setMessage({ type: "success", text: "Mokymas patvirtintas ir įskaitytas." });
+    await onRefresh?.();
+  }
+
+  async function rejectTraining(trainingId: string) {
+    setApprovingId(trainingId);
+    setMessage(null);
+
+    const previous = trainings;
+    const previousTraining = trainings.find((training) => training.id === trainingId) || null;
+    const rejectedPayload = { status: "rejected", approval_status: "rejected" };
+
+    setInternalTrainings((prev) =>
+      prev.map((training) =>
+        training.id === trainingId
+          ? { ...training, ...rejectedPayload }
+          : training,
+      ),
+    );
+
+    let { error } = await supabase
+      .from("personnel_trainings")
+      .update(rejectedPayload)
+      .eq("id", trainingId);
+
+    let actualPayload: Record<string, unknown> = rejectedPayload;
+
+    if (error) {
+      const retry = await supabase
+        .from("personnel_trainings")
+        .update({ status: "rejected" })
+        .eq("id", trainingId);
+      error = retry.error;
+      actualPayload = { status: "rejected" };
+    }
+
+    setApprovingId(null);
+
+    if (error) {
+      setInternalTrainings(previous);
+      setMessage({ type: "error", text: `Nepavyko nepatvirtinti mokymo: ${error.message}` });
+      return;
+    }
+
+    setSelectedTraining((current) =>
+      current?.id === trainingId
+        ? { ...current, ...actualPayload }
+        : current,
+    );
+
+    if (previousTraining) {
+      await logAudit({
+        organizationId: previousTraining.organization_id || organizationId,
+        tableName: "personnel_trainings",
+        recordId: trainingId,
+        action: "update",
+        changes: getChangedFields(previousTraining as Record<string, unknown>, {
+          ...previousTraining,
+          ...actualPayload,
+        } as Record<string, unknown>),
+      });
+    }
+
+    setMessage({ type: "success", text: "Mokymas nepatvirtintas." });
+    await onRefresh?.();
+  }
+
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+      <header className="border-b border-[#dbe6e0] bg-[#486b5d] px-5 py-4 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">Mokymai</div>
+            <h2 className="mt-1 text-2xl font-black">Mokymų reikalavimai ir darbuotojų atitiktis</h2>
+            <p className="mt-1 text-sm font-semibold text-white/80">
+              Viena eilutė darbuotojui. Detalės atidaromos paspaudus darbuotoją.
             </p>
-            <div className="mt-5 space-y-2">
-              {departments.map((department) => (
-                <button
-                  key={department}
-                  type="button"
-                  onClick={() => selectDepartment(department)}
-                  className={cn(
-                    "h-12 w-full rounded-2xl px-4 text-left text-sm font-black transition",
-                    selectedDepartment === department
-                      ? "bg-emerald-700 text-white shadow-sm"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100",
-                  )}
-                >
-                  {department}
-                </button>
+          </div>
+          <div className="flex flex-wrap gap-2 text-sm font-black">
+            <button type="button" onClick={() => setFilter("all")} className={filter === "all" ? "rounded-lg bg-white px-3 py-2 text-[#486b5d]" : "rounded-lg bg-white/12 px-3 py-2"}>
+              Visi {counts.all}
+            </button>
+            <button type="button" onClick={() => setFilter("pending")} className={filter === "pending" ? "rounded-lg bg-[#fff6df] px-3 py-2 text-[#8a5a13]" : "rounded-lg bg-white/12 px-3 py-2"}>
+              Laukia patvirtinimo {counts.pending}
+            </button>
+            <button type="button" onClick={() => setFilter("missing")} className={filter === "missing" ? "rounded-lg bg-[#fff6df] px-3 py-2 text-[#8a5a13]" : "rounded-lg bg-white/12 px-3 py-2"}>
+              Trūksta {counts.missing}
+            </button>
+            <button type="button" onClick={() => setFilter("expiring")} className={filter === "expiring" ? "rounded-lg bg-[#fff6df] px-3 py-2 text-[#8a5a13]" : "rounded-lg bg-white/12 px-3 py-2"}>
+              Baigiasi {counts.expiring}
+            </button>
+            <button type="button" onClick={() => setFilter("valid")} className={filter === "valid" ? "rounded-lg bg-white px-3 py-2 text-[#486b5d]" : "rounded-lg bg-white/12 px-3 py-2"}>
+              Tvarkingi {counts.valid}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <section className="border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Veiksmai</span>
+          <button type="button" onClick={() => {
+              setShowNewForm(true);
+            }} className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]">
+            <Plus className="mr-1 inline h-3 w-3" />
+            Naujas mokymas
+          </button>
+          <button type="button" onClick={() => setShowLibrary(true)} className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]">
+            Mokymų biblioteka
+          </button>
+          <button type="button" onClick={() => void refreshAll()} disabled={loadingRealData} className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1] disabled:opacity-60">
+            {loadingRealData ? "Kraunama..." : "Atnaujinti"}
+          </button>
+
+          <div className="mx-2 hidden h-7 w-px bg-[#dbe6e0] md:block" />
+
+          <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Filtrai</span>
+          <label className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6a7e75]" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-9 min-w-[300px] rounded-lg border border-[#c2d3ca] bg-white pl-9 pr-3 text-xs font-semibold outline-none focus:border-[#486b5d]" placeholder="Ieškoti darbuotojo, pareigų, mokymo..." />
+          </label>
+          <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value as DepartmentKey)} className="h-9 rounded-lg border border-[#c2d3ca] bg-white px-3 text-xs font-bold outline-none">
+            {DEPARTMENTS.map((department) => (
+              <option key={department.key} value={department.key}>{department.label}</option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      {message ? (
+        <div className={`mx-4 mt-4 rounded-lg border px-4 py-3 text-sm font-bold ${message.type === "success" ? "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]" : "border-red-200 bg-red-50 text-red-800"}`}>
+          {message.text}
+        </div>
+      ) : null}
+
+      {showNewForm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
+          <section id="training-new-form" className="w-full max-w-5xl rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4 shadow-2xl">
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Naujas įrašas</div>
+              <div className="mt-1 text-lg font-black text-[#10251f]">Darbuotojo mokymas</div>
+              <p className="mt-1 text-sm font-bold text-[#6a7e75]">Administratorius įveda mokymą ir jis iškart įskaitomas. Galiojimo data ir pažymėjimo numeris neprivalomi.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-[#486b5d]" />
+              <button type="button" onClick={() => setShowNewForm(false)} className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d]">Uždaryti</button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <select value={form.employee_id} onChange={(event) => setForm((prev) => ({ ...prev, employee_id: event.target.value }))} className="h-10 min-w-0 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold outline-none">
+              <option value="">Pasirinkti darbuotoją</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>{employee.full_name || employee.name || employee.id}</option>
               ))}
-            </div>
-          </Card>
+            </select>
+            <input value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} className="h-10 min-w-0 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold outline-none" placeholder="Mokymo pavadinimas" />
+            <input value={form.provider} onChange={(event) => setForm((prev) => ({ ...prev, provider: event.target.value }))} className="h-10 min-w-0 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold outline-none" placeholder="Teikėjas" />
+            <input value={form.certificate_number} onChange={(event) => setForm((prev) => ({ ...prev, certificate_number: event.target.value }))} className="h-10 min-w-0 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold outline-none" placeholder="Pažymėjimo nr." />
+            <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-[#6a7e75]">
+              Mokymo data
+              <input type="date" value={form.completed_at} onChange={(event) => setForm((prev) => ({ ...prev, completed_at: event.target.value }))} className="h-10 min-w-0 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold normal-case tracking-normal outline-none" />
+            </label>
+            <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-[#6a7e75]">
+              Galioja iki
+              <input type="date" value={form.expires_at} onChange={(event) => setForm((prev) => ({ ...prev, expires_at: event.target.value }))} className="h-10 min-w-0 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold normal-case tracking-normal outline-none" />
+            </label>
+            <input type="number" min="0" step="0.5" value={form.hours} onChange={(event) => setForm((prev) => ({ ...prev, hours: event.target.value }))} className="h-10 min-w-0 self-end rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold outline-none" placeholder="Val." />
+            <button type="button" onClick={saveTraining} disabled={saving} className="h-10 self-end rounded-lg bg-[#486b5d] px-4 text-sm font-black text-white hover:bg-[#39594c] disabled:opacity-60">
+              {saving ? <RefreshCw className="mr-1 inline h-4 w-4 animate-spin" /> : null}
+              Išsaugoti
+            </button>
+          </div>
+          </section>
+        </div>
+      ) : null}
 
-          <Card>
-            <h3 className="text-xl font-black text-slate-950">Pareigybės</h3>
-            <p className="mt-1 text-sm font-bold text-slate-500">
-              Pasirink pareigybę reikalavimams.
-            </p>
-            <div className="mt-4 max-h-[520px] space-y-3 overflow-auto pr-1">
-              {filteredPositions.map((position) => (
-                <button
-                  key={position.id}
-                  type="button"
-                  onClick={() => setSelectedPositionId(position.id)}
-                  className={cn(
-                    "w-full rounded-3xl border p-4 text-left transition",
-                    selectedPosition.id === position.id
-                      ? "border-emerald-300 bg-emerald-50"
-                      : "border-slate-200 bg-white hover:bg-slate-50",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-base font-black leading-tight text-slate-950">
-                        {position.title}
-                      </p>
-                      <p className="mt-1 text-sm font-bold text-slate-500">
-                        {position.department}
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-700">
-                      {position.yearlyHours} val.
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Card>
-        </aside>
-
-        <main className="min-w-0 space-y-6">
-          <Card>
-            <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
-              <div className="min-w-0">
-                <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-                  Pareigybės reikalavimai
-                </p>
-                <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                  {selectedPosition.title}
-                </h2>
-                <p className="mt-1 text-sm font-bold text-slate-500">
-                  {selectedPosition.department}
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3 2xl:w-[430px]">
-                <MiniStat
-                  label="Metinė norma"
-                  value={`${selectedPosition.yearlyHours} val.`}
-                />
-                <MiniStat
-                  label="Priskirta"
-                  value={String(selectedPosition.assignedCount)}
-                />
-                <MiniStat
-                  label="Mokymų suma"
-                  value={`${[...commonTrainings, ...selectedRequiredTrainings].reduce((sum, training) => sum + training.hours, 0)} val.`}
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-center">
-                <div>
-                  <h3 className="text-xl font-black text-slate-950">
-                    Privalomi mokymai
-                  </h3>
-                  <p className="mt-1 text-sm font-bold text-slate-500">
-                    Bendri visiems darbuotojams ir papildomi pagal pareigybę.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <button
-                    type="button"
-                    onClick={() => setDrawer({ type: "library" })}
-                    className="inline-flex h-14 items-center justify-center gap-2 rounded-[20px] border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-100"
-                  >
-                    <Library className="h-4 w-4" />
-                    Biblioteka
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDrawer({ type: "training", trainingId: null })
-                    }
-                    className="inline-flex h-14 items-center justify-center gap-2 rounded-[20px] bg-emerald-700 px-5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Naujas
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDrawer({
-                        type: "position",
-                        positionId: selectedPosition.id,
-                      })
-                    }
-                    className="inline-flex h-14 items-center justify-center gap-2 rounded-[20px] border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-100"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                    Pareigybė
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-5">
-                <TrainingPills
-                  title="Bendrieji visiems darbuotojams"
-                  trainings={commonTrainings}
-                  onOpen={(trainingId) =>
-                    setDrawer({ type: "requirement", trainingId })
-                  }
-                />
-                <TrainingPills
-                  title="Pareigybei privalomi mokymai"
-                  trainings={selectedRequiredTrainings}
-                  onOpen={(trainingId) =>
-                    setDrawer({ type: "requirement", trainingId })
-                  }
-                />
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
+      {showLibrary ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
+          <section className="w-full max-w-4xl rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[#dbe6e0] pb-4">
               <div>
-                <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
-                  Darbuotojų mokymai
-                </p>
-                <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                  Būklė pagal darbuotojus
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
+                  Mokymų biblioteka
+                </div>
+                <h3 className="mt-1 text-2xl font-black text-[#10251f]">
+                  Pasirinkite mokymą
                 </h3>
-                <p className="mt-1 text-sm font-bold text-slate-500">
-                  Rodoma puslapiais, kad būtų patogu dirbti su 300+ darbuotojų.
+                <p className="mt-1 text-sm font-bold text-[#6a7e75]">
+                  Paspaudus mokymas įkeliamas į naujo įrašo formą.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <FilterButton
-                  active={statusFilter === "all"}
-                  onClick={() => {
-                    setStatusFilter("all");
-                    setPage(1);
-                  }}
-                >
-                  Visi
-                </FilterButton>
-                <FilterButton
-                  active={statusFilter === "missing"}
-                  onClick={() => {
-                    setStatusFilter("missing");
-                    setPage(1);
-                  }}
-                >
-                  Trūksta
-                </FilterButton>
-                <FilterButton
-                  active={statusFilter === "expiring"}
-                  onClick={() => {
-                    setStatusFilter("expiring");
-                    setPage(1);
-                  }}
-                >
-                  Baigiasi
-                </FilterButton>
-                <FilterButton
-                  active={statusFilter === "ok"}
-                  onClick={() => {
-                    setStatusFilter("ok");
-                    setPage(1);
-                  }}
-                >
-                  Tvarkingi
-                </FilterButton>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={employeeSearch}
-                  onChange={(event) => {
-                    setEmployeeSearch(event.target.value);
-                    setPage(1);
-                  }}
-                  placeholder="Ieškoti darbuotojo, pareigų arba padalinio..."
-                  className="h-13 w-full rounded-[20px] border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-bold outline-none transition focus:border-emerald-300 focus:bg-white"
-                />
-              </div>
-              <select
-                value={pageSize}
-                onChange={(event) => {
-                  setPageSize(Number(event.target.value));
-                  setPage(1);
-                }}
-                className="h-13 rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 outline-none focus:border-emerald-300"
+              <button
+                type="button"
+                onClick={() => setShowLibrary(false)}
+                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
               >
-                <option value={25}>25 eilutės</option>
-                <option value={50}>50 eilučių</option>
-              </select>
+                Uždaryti
+              </button>
             </div>
 
-            <div className="mt-5 overflow-x-auto rounded-[28px] border border-slate-200 bg-white">
-              <div className="hidden min-w-[940px] grid-cols-[minmax(220px,1.2fr)_minmax(190px,1fr)_120px_130px_110px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-500 xl:grid">
-                <span>Darbuotojas</span>
-                <span>Pareigos</span>
-                <span>Trūksta</span>
-                <span>Progresas</span>
-                <span className="text-right">Veiksmas</span>
-              </div>
+            <div className="mt-4 grid max-h-[55vh] gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+              {[...DEFAULT_GENERAL_TRAININGS, ...POSITION_REQUIREMENTS.flatMap((requirement) => requirement.required)]
+                .filter((item, index, all) => all.findIndex((other) => normalize(other.title) === normalize(item.title)) === index)
+                .map((item) => (
+                  <button
+                    key={`${item.title}-${item.hours}`}
+                    type="button"
+                    onClick={() => {
+                      setForm((prev) => ({ ...prev, title: item.title, hours: String(item.hours) }));
+                      setShowNewForm(true);
+                      setShowLibrary(false);
+                    }}
+                    className="rounded-xl border border-[#86efac] bg-[#e9f7ef] px-4 py-3 text-left text-sm font-black text-[#047857] hover:bg-[#dcfce7]"
+                  >
+                    ✓ {item.title}
+                    <span className="mt-1 block text-xs text-[#486b5d]">{item.hours} val.</span>
+                  </button>
+                ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
 
-              {visibleEmployees.map((employee, index) => (
-                <button
-                  key={employee.id}
-                  type="button"
-                  onClick={() =>
-                    setDrawer({ type: "employee", employeeId: employee.id })
-                  }
-                  className={cn(
-                    "grid w-full gap-4 px-5 py-4 text-left transition hover:bg-slate-50 min-w-[940px] xl:grid-cols-[minmax(220px,1.2fr)_minmax(190px,1fr)_120px_130px_110px] xl:items-center",
-                    index !== 0 && "border-t border-slate-100",
-                  )}
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-sm font-black text-slate-700">
-                      {initials(employee.name)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-black text-slate-950">
-                        {employee.name}
-                      </p>
-                      <p className="mt-1 text-sm font-bold text-slate-500">
-                        {employee.department}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-slate-800">
-                      {employee.positionTitle}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">
-                      {employee.requiredIds.length} privalomi mokymai
-                    </p>
-                  </div>
-                  <div>
-                    {employee.missingIds.length > 0 ? (
-                      <StatusBadge
-                        danger
-                        icon={<AlertTriangle className="h-3.5 w-3.5" />}
-                      >
-                        {employee.missingIds.length} mok.
-                      </StatusBadge>
-                    ) : (
-                      <StatusBadge
-                        success
-                        icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                      >
-                        Tvarkinga
-                      </StatusBadge>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-slate-800">
-                      {employee.progress}%
-                    </p>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className={cn(
-                          "h-full rounded-full",
-                          employee.progress >= 100
-                            ? "bg-emerald-600"
-                            : employee.progress >= 60
-                              ? "bg-amber-500"
-                              : "bg-rose-500",
-                        )}
-                        style={{ width: `${employee.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right text-sm font-black text-emerald-700">
-                    Atidaryti
-                  </div>
-                </button>
+      <section className="p-4">
+        <section className="mb-4 rounded-xl border border-[#dbe6e0] bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Padalinys</span>
+            {DEPARTMENTS.map((department) => (
+              <button
+                key={department.key}
+                type="button"
+                onClick={() => setDepartmentFilter(department.key)}
+                className={
+                  departmentFilter === department.key
+                    ? "rounded-lg bg-[#047857] px-4 py-2 text-sm font-black text-white"
+                    : "rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#eef4f1]"
+                }
+              >
+                {department.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Pareigybė</span>
+            {filteredRequirements.map((requirement) => (
+              <button
+                key={requirement.key}
+                type="button"
+                onClick={() => setSelectedRequirementKey(requirement.key)}
+                className={
+                  selectedRequirement.key === requirement.key
+                    ? "rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#047857]"
+                    : "rounded-full border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#eef4f1]"
+                }
+              >
+                {requirement.title} · {requirement.annualHours} val.
+              </button>
+            ))}
+            <select value={selectedRequirement.key} onChange={(event) => setSelectedRequirementKey(event.target.value)} className="ml-auto h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-black text-[#40594f] outline-none">
+              {POSITION_REQUIREMENTS.map((requirement) => (
+                <option key={requirement.key} value={requirement.key}>{requirement.title}</option>
               ))}
-            </div>
+            </select>
+          </div>
+        </section>
 
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-bold text-slate-500">
-                Rodoma {visibleEmployees.length} iš {filteredEmployees.length}{" "}
-                darbuotojų
-              </p>
-              <div className="flex items-center gap-2">
+        <section className="rounded-xl border border-[#dbe6e0] bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#6a7e75]">Pareigybės reikalavimai</div>
+              <h3 className="mt-1 text-3xl font-black">{selectedRequirement.title}</h3>
+              <p className="mt-1 text-sm font-bold text-[#6a7e75]">{selectedRequirement.departmentLabel}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-left">
+              <MiniStat label="Metinė norma" value={`${selectedRequirement.annualHours} val.`} />
+              <MiniStat label="Priskirta" value={String(positionStats.assigned)} />
+              <MiniStat label="Mokymų suma" value={`${positionStats.hours} val.`} />
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h4 className="text-xl font-black">Privalomi mokymai</h4>
+                <p className="mt-1 text-sm font-bold text-[#6a7e75]">Bendri visiems darbuotojams ir papildomi pagal pareigybę.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setShowLibrary(true)} className="rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d]">Biblioteka</button>
+                <button type="button" onClick={() => {
+                    setShowNewForm(true);
+                  }} className="rounded-xl bg-[#047857] px-4 py-3 text-sm font-black text-white">+ Naujas</button>
                 <button
                   type="button"
-                  disabled={page === 1}
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-700 disabled:opacity-40"
+                  onClick={() => {
+                    setRequirementForm((prev) => ({ ...prev, title: prev.title || "", hours: prev.hours || "1" }));
+                    document.getElementById("position-required-training-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }}
+                  className="rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d]"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  Pareigybė
                 </button>
-                {pageNumbers(page, totalPages).map(
-                  (pageNumber, index, pages) => (
-                    <span key={pageNumber} className="flex items-center gap-2">
-                      {index > 0 && pageNumber - pages[index - 1] > 1 ? (
-                        <span className="text-sm font-black text-slate-400">
-                          ...
-                        </span>
-                      ) : null}
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+              <RequirementBlock title="Bendrieji visiems darbuotojams" items={COMMON_TRAININGS} />
+
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
+                  Pareigybei privalomi mokymai
+                </div>
+
+                <div id="position-required-training-form" className="mt-3 rounded-xl border border-[#dbe6e0] bg-white p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75]">
+                      {editingRequirementTitle ? "Redaguojamas privalomas mokymas" : "Naujas privalomas mokymas"}
+                    </div>
+                    {editingRequirementTitle ? (
                       <button
                         type="button"
-                        onClick={() => setPage(pageNumber)}
-                        className={cn(
-                          "h-10 min-w-10 rounded-2xl px-3 text-sm font-black",
-                          page === pageNumber
-                            ? "bg-emerald-700 text-white"
-                            : "border border-slate-200 bg-white text-slate-700",
-                        )}
+                        onClick={cancelRequiredTrainingEdit}
+                        className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
                       >
-                        {pageNumber}
+                        Atšaukti
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-[1fr_110px_auto]">
+                    <input
+                      value={requirementForm.title}
+                      onChange={(event) => setRequirementForm((prev) => ({ ...prev, title: event.target.value }))}
+                      className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold outline-none"
+                      placeholder="Pvz., pragulų prevencija"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={requirementForm.hours}
+                      onChange={(event) => setRequirementForm((prev) => ({ ...prev, hours: event.target.value }))}
+                      className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold outline-none"
+                      placeholder="Val."
+                    />
+                    <button
+                      type="button"
+                      onClick={addRequiredTrainingForPosition}
+                      className="rounded-lg bg-[#047857] px-4 py-2 text-sm font-black text-white"
+                    >
+                      {editingRequirementTitle ? "Išsaugoti" : "Pridėti"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedPositionSpecificTrainings.map((item) => (
+                    <span
+                      key={`${item.title}-${item.hours}`}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#047857]"
+                    >
+                      ✓ {item.title} · {item.hours} val.
+                      <button
+                        type="button"
+                        onClick={() => editRequiredTrainingForPosition(item)}
+                        className="rounded-full bg-white/80 px-2 text-xs font-black text-[#486b5d]"
+                        title="Redaguoti"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeRequiredTrainingFromPosition(item.title)}
+                        className="rounded-full bg-white/80 px-2 text-xs font-black text-red-700"
+                        title="Ištrinti"
+                      >
+                        ×
                       </button>
                     </span>
-                  ),
-                )}
-                <button
-                  type="button"
-                  disabled={page === totalPages}
-                  onClick={() =>
-                    setPage((current) => Math.min(totalPages, current + 1))
-                  }
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-700 disabled:opacity-40"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </Card>
-        </main>
-      </div>
+          </div>
+        </section>
 
-      <Drawer
-        drawer={drawer}
-        trainings={trainings}
-        positions={positions}
-        employees={employeeRows}
-        commonTrainings={commonTrainings}
-        onClose={() => setDrawer({ type: "none" })}
-        onEditTraining={(trainingId) =>
-          setDrawer({ type: "training", trainingId })
-        }
-        onSaveTraining={saveTraining}
-        onSavePosition={savePosition}
-        employeeSubmissions={employeeSubmissions}
-        onApproveEmployeeTraining={approveEmployeeTraining}
-        onRejectEmployeeSubmission={rejectEmployeeSubmission}
-      />
+        <section className="mt-4 rounded-xl border border-[#dbe6e0] bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">Darbuotojų mokymai</div>
+              <h3 className="mt-1 text-3xl font-black">Būklė pagal darbuotojus</h3>
+              <p className="mt-1 max-w-xl text-sm font-bold text-[#6a7e75]">Viena eilutė darbuotojui. Detalės atidaromos po eilute.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setFilter("all")} className={filter === "all" ? "rounded-xl bg-[#047857] px-4 py-3 text-sm font-black text-white" : "rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#40594f]"}>
+                Visi
+              </button>
+              <button type="button" onClick={() => setFilter("pending")} className={filter === "pending" ? "rounded-xl bg-[#8a5a13] px-4 py-3 text-sm font-black text-white" : "rounded-xl border border-[#ead9b2] bg-white px-4 py-3 text-sm font-black text-[#8a5a13]"}>
+                Laukia patvirtinimo
+              </button>
+              <button type="button" onClick={() => setFilter("missing")} className={filter === "missing" ? "rounded-xl bg-[#047857] px-4 py-3 text-sm font-black text-white" : "rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#40594f]"}>
+                Trūksta
+              </button>
+              <button type="button" onClick={() => setFilter("expiring")} className={filter === "expiring" ? "rounded-xl bg-[#fff6df] px-4 py-3 text-sm font-black text-[#8a5a13]" : "rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#40594f]"}>
+                Baigiasi
+              </button>
+            </div>
+          </div>
+
+          {pendingTrainings.length > 0 ? (
+            <div className="mt-5 rounded-xl border border-[#ead9b2] bg-[#fffdf8] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#8a5a13]">Patvirtinimai</div>
+                  <h4 className="mt-1 text-xl font-black">Darbuotojų pateikti mokymai</h4>
+                  <p className="mt-1 max-w-2xl text-sm font-bold text-[#7a6a4f]">
+                    Darbuotojų įvesti mokymai įskaitomi tik administracijai patvirtinus, kad pažymėjimas buvo peržiūrėtas.
+                  </p>
+                </div>
+                <span className="rounded-xl bg-[#8a5a13] px-4 py-3 text-sm font-black text-white">
+                  Laukia patvirtinimo · {pendingTrainings.length}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-2">
+                {pendingTrainings.map((training) => (
+                  <div key={training.id} className="grid gap-3 rounded-xl border border-[#ead9b2] bg-white p-3 md:grid-cols-[1.2fr_1.4fr_0.7fr_auto] md:items-center">
+                    <div className="font-black">{employeeName(employees, training.employee_id)}</div>
+                    <div className="font-semibold text-[#40594f]">{trainingTitle(training)}</div>
+                    <div className="font-semibold text-[#6a7e75]">{fmt(training.completed_at)}</div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void approveTraining(training.id)}
+                        disabled={approvingId === training.id}
+                        className="rounded-lg bg-[#047857] px-3 py-2 text-xs font-black text-white disabled:opacity-60"
+                      >
+                        {approvingId === training.id ? "Tvirtinama..." : "Patvirtinti"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void rejectTraining(training.id)}
+                        disabled={approvingId === training.id}
+                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-800 disabled:opacity-60"
+                      >
+                        Nepatvirtinti
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTraining(training)}
+                        className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
+                      >
+                        Peržiūrėti
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-5 overflow-x-auto rounded-xl border border-[#dbe6e0]">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="bg-[#eef4f1] text-[#40594f]">
+                <tr>
+                  <th className="px-4 py-3 font-black">Darbuotojas</th>
+                  <th className="px-4 py-3 font-black">Pareigos</th>
+                  <th className="px-4 py-3 font-black">Būsena</th>
+                  <th className="px-4 py-3 font-black">Trūksta</th>
+                  <th className="px-4 py-3 font-black">Progresas</th>
+                  <th className="px-4 py-3 font-black">Veiksmas</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#eef4f1]">
+                {filteredEmployeeSummary.length ? filteredEmployeeSummary.map((row) => {
+                  const expanded = expandedEmployeeId === row.employee.id;
+                  return (
+                    <FragmentRow
+                      key={row.employee.id}
+                      row={row}
+                      expanded={expanded}
+                      details={allDetailRows.filter((detail) => detail.employee_id === row.employee.id)}
+                      onToggle={() => setExpandedEmployeeId(expanded ? null : row.employee.id)}
+                      onPrefill={prefill}
+                      onApprove={approveTraining}
+                      onPreview={(training) => setSelectedTraining(training)}
+                      onReject={rejectTraining}
+                      approvingId={approvingId}
+                    />
+                  );
+                }) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center font-bold text-[#6a7e75]">
+                      Darbuotojų mokymų pagal pasirinktus filtrus nėra.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      {selectedTraining ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#c9d8d0] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
+                  Mokymo peržiūra
+                </div>
+                <h3 className="mt-1 text-2xl font-black text-[#10251f]">
+                  {trainingTitle(selectedTraining)}
+                </h3>
+                <p className="mt-1 text-sm font-bold text-[#6a7e75]">
+                  {employeeName(employees, selectedTraining.employee_id)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTraining(null)}
+                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
+              >
+                Uždaryti
+              </button>
+            </div>
+
+            <div className="grid gap-3 p-5 sm:grid-cols-2">
+              <InfoLine label="Data" value={fmt(selectedTraining.completed_at)} />
+              <InfoLine label="Galioja iki" value={fmt(trainingExpiresAt(selectedTraining))} />
+              <InfoLine label="Valandos" value={String(selectedTraining.hours || "—")} />
+              <InfoLine label="Pažymėjimo nr." value={trainingCertificateNumber(selectedTraining) || "—"} />
+              <InfoLine label="Teikėjas" value={selectedTraining.provider || "—"} />
+              <InfoLine label="Būsena" value={statusForTraining(selectedTraining).label} />
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-[#dbe6e0] px-5 py-4">
+              {shouldShowInApproval(selectedTraining) ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void approveTraining(selectedTraining.id)}
+                    disabled={approvingId === selectedTraining.id}
+                    className="rounded-lg bg-[#047857] px-4 py-2 text-sm font-black text-white disabled:opacity-60"
+                  >
+                    {approvingId === selectedTraining.id ? "Tvirtinama..." : "Patvirtinti"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void rejectTraining(selectedTraining.id)}
+                    disabled={approvingId === selectedTraining.id}
+                    className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-800 disabled:opacity-60"
+                  >
+                    Nepatvirtinti
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setSelectedTraining(null)}
+                className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d]"
+              >
+                Gerai
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </section>
   );
 }
 
-function Card({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+function InfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      className={cn(
-        "rounded-[32px] border border-slate-200 bg-white p-7 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  value,
-  title,
-  description,
-  active,
-  danger,
-  warning,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  title: string;
-  description: string;
-  active?: boolean;
-  danger?: boolean;
-  warning?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "relative flex min-h-[190px] flex-col justify-between overflow-hidden rounded-[32px] border bg-white p-7 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-md",
-        active && "border-emerald-500 ring-1 ring-emerald-500",
-        danger && "border-rose-200",
-        warning && "border-amber-200",
-        !active && !danger && !warning && "border-slate-200",
-      )}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div
-          className={cn(
-            "flex h-12 w-12 items-center justify-center rounded-2xl",
-            danger
-              ? "bg-rose-100 text-rose-700"
-              : warning
-                ? "bg-amber-100 text-amber-700"
-                : "bg-emerald-50 text-emerald-700",
-          )}
-        >
-          {icon}
-        </div>
-        <LayoutList className="h-5 w-5 text-slate-300" />
-      </div>
-      <div>
-        <p className="text-4xl font-black tracking-tight text-slate-950">
-          {value}
-        </p>
-        <p className="mt-1 text-lg font-black text-slate-800">{title}</p>
-        <p className="mt-1 text-sm font-bold text-slate-500">{description}</p>
-      </div>
+    <div className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
+      <div className="text-[11px] font-black uppercase tracking-[0.14em] text-[#6a7e75]">{label}</div>
+      <div className="mt-1 break-words text-base font-black text-[#10251f]">{value}</div>
     </div>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-h-[76px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <p className="text-xs font-black uppercase tracking-wider text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
+    <div className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
+      <div className="text-[11px] font-black uppercase text-[#6a7e75]">{label}</div>
+      <div className="mt-1 text-xl font-black">{value}</div>
     </div>
   );
 }
 
-function FilterButton({
-  children,
-  active,
-  onClick,
-}: {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-11 items-center justify-center rounded-2xl px-4 text-sm font-black transition",
-        active
-          ? "bg-emerald-700 text-white"
-          : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function StatusBadge({
-  children,
-  icon,
-  danger,
-  warning,
-  success,
-}: {
-  children: React.ReactNode;
-  icon: React.ReactNode;
-  danger?: boolean;
-  warning?: boolean;
-  success?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black",
-        danger && "bg-rose-50 text-rose-700",
-        warning && "bg-amber-50 text-amber-700",
-        success && "bg-emerald-50 text-emerald-700",
-      )}
-    >
-      {icon}
-      {children}
-    </span>
-  );
-}
-
-function TrainingPills({
-  title,
-  trainings,
-  onOpen,
-}: {
-  title: string;
-  trainings: Training[];
-  onOpen: (trainingId: string) => void;
-}) {
+function RequirementBlock({ title, items }: { title: string; items: Requirement[] }) {
   return (
     <div>
-      <p className="mb-3 text-xs font-black uppercase tracking-widest text-slate-500">
-        {title}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {trainings.length > 0 ? (
-          trainings.map((training) => (
-            <button
-              key={training.id}
-              type="button"
-              onClick={() => onOpen(training.id)}
-              className="inline-flex h-11 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              {training.title} · {training.hours} val.
-            </button>
+      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">{title}</div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {items.length ? (
+          items.map((item) => (
+            <span key={`${item.title}-${item.hours}`} className="rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#047857]">
+              ✓ {item.title} · {item.hours} val.
+            </span>
           ))
         ) : (
-          <span className="rounded-full bg-slate-100 px-3 py-2 text-sm font-black text-slate-500">
-            Nėra priskirtų mokymų
+          <span className="rounded-full border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#6a7e75]">
+            Papildomų reikalavimų nėra
           </span>
         )}
       </div>
@@ -1183,826 +1533,121 @@ function TrainingPills({
   );
 }
 
-function Drawer({
-  drawer,
-  trainings,
-  positions,
-  employees,
-  commonTrainings,
-  onClose,
-  onEditTraining,
-  onSaveTraining,
-  onSavePosition,
-  employeeSubmissions,
-  onApproveEmployeeTraining,
-  onRejectEmployeeSubmission,
+function FragmentRow({
+  row,
+  expanded,
+  details,
+  onToggle,
+  onPrefill,
+  onApprove,
+  approvingId,
+  onPreview,
 }: {
-  drawer: DrawerMode;
-  trainings: Training[];
-  positions: Position[];
-  employees: Array<
-    Employee & {
-      positionTitle: string;
-      requiredIds: string[];
-      missingIds: string[];
-      completedHours: number;
-      requiredHours: number;
-      progress: number;
-    }
-  >;
-  commonTrainings: Training[];
-  onClose: () => void;
-  onEditTraining: (trainingId: string) => void;
-  onSaveTraining: (training: Training) => void;
-  onSavePosition: (position: Position) => void;
-  employeeSubmissions: EmployeeTrainingSubmission[];
-  onApproveEmployeeTraining: (
-    employeeId: string,
-    trainingId: string,
-    submissionId?: string,
-  ) => void;
-  onRejectEmployeeSubmission: (submissionId: string) => void;
-}) {
-  if (drawer.type === "none") return null;
-
-  const training =
-    drawer.type === "training" && drawer.trainingId
-      ? (trainings.find((item) => item.id === drawer.trainingId) ?? null)
-      : null;
-  const requirement =
-    drawer.type === "requirement"
-      ? trainings.find((item) => item.id === drawer.trainingId)
-      : null;
-  const employee =
-    drawer.type === "employee"
-      ? employees.find((item) => item.id === drawer.employeeId)
-      : null;
-  const position =
-    drawer.type === "position"
-      ? positions.find((item) => item.id === drawer.positionId)
-      : null;
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/30">
-      <button
-        type="button"
-        aria-label="Uždaryti"
-        onClick={onClose}
-        className="absolute inset-0 h-full w-full"
-      />
-      <aside className="absolute right-0 top-0 flex h-full w-full max-w-[960px] flex-col overflow-hidden rounded-l-[32px] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-7">
-          <div>
-            <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
-              Mokymai
-            </p>
-            <h3 className="mt-2 text-2xl font-black text-slate-950">
-              {drawer.type === "library" && "Mokymų biblioteka"}
-              {drawer.type === "training" &&
-                (training ? "Redaguoti mokymą" : "Naujas mokymas")}
-              {drawer.type === "position" && "Redaguoti pareigybę"}
-              {drawer.type === "requirement" && requirement?.title}
-              {drawer.type === "employee" && employee?.name}
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-auto p-7">
-          {drawer.type === "library" ? (
-            <LibraryPanel trainings={trainings} onEdit={onEditTraining} />
-          ) : null}
-          {drawer.type === "training" ? (
-            <TrainingForm
-              training={training}
-              onCancel={onClose}
-              onSave={onSaveTraining}
-            />
-          ) : null}
-          {drawer.type === "position" && position ? (
-            <PositionForm
-              position={position}
-              trainings={trainings}
-              commonTrainings={commonTrainings}
-              onCancel={onClose}
-              onSave={onSavePosition}
-            />
-          ) : null}
-          {drawer.type === "requirement" && requirement ? (
-            <RequirementPanel
-              training={requirement}
-              employees={employees}
-              positions={positions}
-            />
-          ) : null}
-          {drawer.type === "employee" && employee ? (
-            <EmployeePanel
-              employee={employee}
-              trainings={trainings}
-              submissions={employeeSubmissions.filter(
-                (submission) => submission.employeeId === employee.id,
-              )}
-              onApproveTraining={onApproveEmployeeTraining}
-              onRejectSubmission={onRejectEmployeeSubmission}
-            />
-          ) : null}
-        </div>
-      </aside>
-    </div>
-  );
-}
-
-function LibraryPanel({
-  trainings,
-  onEdit,
-}: {
-  trainings: Training[];
-  onEdit: (trainingId: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const filtered = trainings.filter((training) =>
-    training.title.toLowerCase().includes(query.toLowerCase()),
-  );
-
-  return (
-    <div>
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Ieškoti mokymo..."
-          className="h-13 w-full rounded-[20px] border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-bold outline-none transition focus:border-emerald-300 focus:bg-white"
-        />
-      </div>
-      <div className="mt-5 space-y-3">
-        {filtered.map((training) => (
-          <button
-            key={training.id}
-            type="button"
-            onClick={() => onEdit(training.id)}
-            className="flex w-full items-center justify-between gap-4 rounded-[24px] border border-slate-200 bg-white p-4 text-left transition hover:bg-slate-50"
-          >
-            <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                <GraduationCap className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-base font-black text-slate-950">
-                  {training.title}
-                </p>
-                <p className="mt-1 text-sm font-bold text-slate-500">
-                  {training.category} · {training.hours} val. ·{" "}
-                  {validityLabel(training.validityMonths)}
-                </p>
-              </div>
-            </div>
-            <Edit3 className="h-4 w-4 shrink-0 text-slate-400" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TrainingForm({
-  training,
-  onCancel,
-  onSave,
-}: {
-  training: Training | null;
-  onCancel: () => void;
-  onSave: (training: Training) => void;
-}) {
-  const [title, setTitle] = useState(training?.title ?? "");
-  const [category, setCategory] = useState<Department>(
-    training?.category ?? "Visi padaliniai",
-  );
-  const [hours, setHours] = useState(String(training?.hours ?? 1));
-  const [validityMonths, setValidityMonths] = useState(
-    training?.validityMonths ? String(training.validityMonths) : "",
-  );
-  const [description, setDescription] = useState(training?.description ?? "");
-  const [isCommon, setIsCommon] = useState(training?.isCommon ?? false);
-
-  function submit() {
-    const cleanTitle = title.trim();
-    if (!cleanTitle) return;
-
-    onSave({
-      id:
-        training?.id ??
-        `${cleanTitle
-          .toLowerCase()
-          .replaceAll(" ", "-")
-          .replace(/[^a-z0-9-]/g, "")}-${Date.now()}`,
-      title: cleanTitle,
-      category: isCommon ? "Visi padaliniai" : category,
-      hours: Number(hours) || 0,
-      validityMonths: validityMonths.trim()
-        ? Number(validityMonths) || null
-        : null,
-      description: description.trim(),
-      isCommon,
-    });
-  }
-
-  return (
-    <div className="space-y-5">
-      <label className="grid gap-2 text-sm font-black text-slate-700">
-        Pavadinimas
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          className="h-12 rounded-2xl border border-slate-200 px-4 font-bold outline-none focus:border-emerald-300"
-        />
-      </label>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="grid gap-2 text-sm font-black text-slate-700">
-          Valandos
-          <input
-            value={hours}
-            onChange={(event) => setHours(event.target.value)}
-            type="number"
-            min="0"
-            className="h-12 rounded-2xl border border-slate-200 px-4 font-bold outline-none focus:border-emerald-300"
-          />
-        </label>
-        <label className="grid gap-2 text-sm font-black text-slate-700">
-          Galiojimas mėn.
-          <input
-            value={validityMonths}
-            onChange={(event) => setValidityMonths(event.target.value)}
-            type="number"
-            min="0"
-            placeholder="Tuščia = neterminuota"
-            className="h-12 rounded-2xl border border-slate-200 px-4 font-bold outline-none focus:border-emerald-300"
-          />
-        </label>
-      </div>
-
-      <label className="grid gap-2 text-sm font-black text-slate-700">
-        Padalinys
-        <select
-          value={category}
-          onChange={(event) => setCategory(event.target.value as Department)}
-          disabled={isCommon}
-          className="h-12 rounded-2xl border border-slate-200 px-4 font-bold outline-none focus:border-emerald-300 disabled:bg-slate-100"
-        >
-          {departments.map((department) => (
-            <option key={department}>{department}</option>
-          ))}
-        </select>
-      </label>
-
-      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-700">
-        <input
-          type="checkbox"
-          checked={isCommon}
-          onChange={(event) => setIsCommon(event.target.checked)}
-          className="h-4 w-4 accent-emerald-700"
-        />
-        Bendras visiems darbuotojams
-      </label>
-
-      <label className="grid gap-2 text-sm font-black text-slate-700">
-        Aprašymas
-        <textarea
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          rows={5}
-          className="rounded-2xl border border-slate-200 p-4 font-bold outline-none focus:border-emerald-300"
-        />
-      </label>
-
-      <div className="flex justify-end gap-3 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="h-12 rounded-2xl border border-slate-200 px-5 text-sm font-black text-slate-700 hover:bg-slate-50"
-        >
-          Atšaukti
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          className="h-12 rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white hover:bg-emerald-800"
-        >
-          Išsaugoti
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PositionForm({
-  position,
-  trainings,
-  commonTrainings,
-  onCancel,
-  onSave,
-}: {
-  position: Position;
-  trainings: Training[];
-  commonTrainings: Training[];
-  onCancel: () => void;
-  onSave: (position: Position) => void;
-}) {
-  const [yearlyHours, setYearlyHours] = useState(String(position.yearlyHours));
-  const [requiredTrainingIds, setRequiredTrainingIds] = useState<string[]>(
-    position.requiredTrainingIds,
-  );
-  const editableTrainings = trainings.filter(
-    (training) =>
-      !training.isCommon &&
-      (training.category === position.department ||
-        training.category === "Visi padaliniai"),
-  );
-
-  function toggleTraining(id: string) {
-    setRequiredTrainingIds((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id],
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-        <p className="text-lg font-black text-slate-950">{position.title}</p>
-        <p className="mt-1 text-sm font-bold text-slate-500">
-          {position.department}
-        </p>
-      </div>
-
-      <label className="grid gap-2 text-sm font-black text-slate-700">
-        Metinė norma
-        <input
-          value={yearlyHours}
-          onChange={(event) => setYearlyHours(event.target.value)}
-          type="number"
-          min="0"
-          className="h-12 rounded-2xl border border-slate-200 px-4 font-bold outline-none focus:border-emerald-300"
-        />
-      </label>
-
-      <div>
-        <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-          Bendrieji mokymai
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {commonTrainings.map((training) => (
-            <span
-              key={training.id}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-emerald-50 px-4 text-sm font-black text-emerald-800"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              {training.title}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-          Pareigybei privalomi mokymai
-        </p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {editableTrainings.map((training) => (
-            <button
-              key={training.id}
-              type="button"
-              onClick={() => toggleTraining(training.id)}
-              className={cn(
-                "rounded-2xl border p-4 text-left transition",
-                requiredTrainingIds.includes(training.id)
-                  ? "border-emerald-300 bg-emerald-50"
-                  : "border-slate-200 bg-white hover:bg-slate-50",
-              )}
-            >
-              <p className="text-sm font-black text-slate-950">
-                {training.title}
-              </p>
-              <p className="mt-1 text-xs font-bold text-slate-500">
-                {training.hours} val. · {validityLabel(training.validityMonths)}
-              </p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-3 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="h-12 rounded-2xl border border-slate-200 px-5 text-sm font-black text-slate-700 hover:bg-slate-50"
-        >
-          Atšaukti
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            onSave({
-              ...position,
-              yearlyHours: Number(yearlyHours) || 0,
-              requiredTrainingIds,
-            })
-          }
-          className="h-12 rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white hover:bg-emerald-800"
-        >
-          Išsaugoti
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function RequirementPanel({
-  training,
-  employees,
-  positions,
-}: {
-  training: Training;
-  employees: Array<
-    Employee & {
-      positionTitle: string;
-      requiredIds: string[];
-      missingIds: string[];
-      completedHours: number;
-      requiredHours: number;
-      progress: number;
-    }
-  >;
-  positions: Position[];
-}) {
-  const assignedPositions = training.isCommon
-    ? positions
-    : positions.filter((position) =>
-        position.requiredTrainingIds.includes(training.id),
-      );
-  const requiredEmployees = employees.filter((employee) =>
-    employee.requiredIds.includes(training.id),
-  );
-  const missingEmployees = requiredEmployees.filter((employee) =>
-    employee.missingIds.includes(training.id),
-  );
-
-  return (
-    <div className="space-y-5">
-      <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-            <GraduationCap className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-lg font-black text-slate-950">
-              {training.title}
-            </p>
-            <p className="mt-1 text-sm font-bold text-slate-500">
-              {training.hours} val. · {validityLabel(training.validityMonths)}
-            </p>
-          </div>
-        </div>
-        <p className="mt-4 text-sm font-bold leading-6 text-slate-600">
-          {training.description}
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <MiniStat
-          label="Priskirta pareigų"
-          value={String(assignedPositions.length)}
-        />
-        <MiniStat label="Darbuotojų" value={String(requiredEmployees.length)} />
-        <MiniStat label="Trūksta" value={String(missingEmployees.length)} />
-      </div>
-
-      <div>
-        <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-          Kam priskirta
-        </p>
-        <div className="mt-3 space-y-2">
-          {assignedPositions.map((position) => (
-            <div
-              key={position.id}
-              className="rounded-2xl border border-slate-200 bg-white p-4"
-            >
-              <p className="text-sm font-black text-slate-950">
-                {position.title}
-              </p>
-              <p className="mt-1 text-xs font-bold text-slate-500">
-                {position.department}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-          Darbuotojai, kuriems trūksta
-        </p>
-        <div className="mt-3 max-h-[280px] space-y-2 overflow-auto pr-1">
-          {missingEmployees.length > 0 ? (
-            missingEmployees.slice(0, 30).map((employee) => (
-              <div
-                key={employee.id}
-                className="flex items-center justify-between gap-4 rounded-2xl border border-rose-100 bg-rose-50 p-4"
-              >
-                <div>
-                  <p className="text-sm font-black text-slate-950">
-                    {employee.name}
-                  </p>
-                  <p className="mt-1 text-xs font-bold text-slate-500">
-                    {employee.positionTitle}
-                  </p>
-                </div>
-                <AlertTriangle className="h-4 w-4 text-rose-600" />
-              </div>
-            ))
-          ) : (
-            <p className="rounded-2xl bg-emerald-50 p-4 text-sm font-black text-emerald-800">
-              Visi darbuotojai turi šį mokymą.
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EmployeePanel({
-  employee,
-  trainings,
-  submissions,
-  onApproveTraining,
-  onRejectSubmission,
-}: {
-  employee: Employee & {
-    positionTitle: string;
-    requiredIds: string[];
-    missingIds: string[];
-    completedHours: number;
-    requiredHours: number;
+  row: {
+    employee: EmployeeOption;
+    requirement: PositionRequirement;
+    missing: Requirement[];
+    pending: TrainingRecord[];
+    expiring: TrainingRecord[];
+    expired: TrainingRecord[];
     progress: number;
   };
-  trainings: Training[];
-  submissions: EmployeeTrainingSubmission[];
-  onApproveTraining: (
-    employeeId: string,
-    trainingId: string,
-    submissionId?: string,
-  ) => void;
-  onRejectSubmission: (submissionId: string) => void;
+  expanded: boolean;
+  details: Array<{
+    id: string;
+    kind: "record" | "missing";
+    employee_id: string;
+    title: string;
+    completed_at: string | null;
+    expires_at: string | null;
+    hours: number | string | null;
+    status: ReturnType<typeof statusForTraining>;
+    record?: TrainingRecord | null;
+  }>;
+  onToggle: () => void;
+  onPrefill: (employeeId: string, title: string) => void;
+  onApprove: (trainingId: string) => void;
+  onReject: (trainingId: string) => void;
+  approvingId: string | null;
+  onPreview: (training: TrainingRecord) => void;
 }) {
-  const requiredTrainings = trainings.filter((training) =>
-    employee.requiredIds.includes(training.id),
-  );
-  const missingTrainings = requiredTrainings.filter((training) =>
-    employee.missingIds.includes(training.id),
-  );
-  const pendingSubmissions = submissions.filter(
-    (submission) => submission.status === "pending",
-  );
-  const [selectedTrainingId, setSelectedTrainingId] = useState(
-    missingTrainings[0]?.id ?? requiredTrainings[0]?.id ?? "",
-  );
-
-  function approveSelectedTraining() {
-    if (!selectedTrainingId) return;
-    onApproveTraining(employee.id, selectedTrainingId);
-    const nextMissing = missingTrainings.find(
-      (training) => training.id !== selectedTrainingId,
-    );
-    if (nextMissing) setSelectedTrainingId(nextMissing.id);
-  }
+  const hasProblems = row.missing.length > 0 || row.pending.length > 0 || row.expired.length > 0 || row.expiring.length > 0;
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-        <div className="grid gap-5 md:grid-cols-[auto_minmax(0,1fr)] md:items-start">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-base font-black text-slate-700 shadow-sm">
-            {initials(employee.name)}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-lg font-black text-slate-950">
-              {employee.name}
-            </p>
-            <p className="mt-1 text-sm font-bold text-slate-500">
-              {employee.department} · {employee.positionTitle}
-            </p>
-            <div className="mt-5">
-              <div className="mb-2 flex items-center justify-between text-sm font-black">
-                <span className="text-slate-700">
-                  {employee.completedHours} / {employee.requiredHours} val.
-                </span>
-                <span className="text-slate-500">{employee.progress}%</span>
-              </div>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className={cn(
-                    "h-full rounded-full",
-                    employee.progress >= 100
-                      ? "bg-emerald-600"
-                      : employee.progress >= 60
-                        ? "bg-amber-500"
-                        : "bg-rose-500",
-                  )}
-                  style={{ width: `${employee.progress}%` }}
-                />
-              </div>
+    <>
+      <tr className="hover:bg-[#f8faf8]">
+        <td className="px-4 py-3 font-black text-[#10251f]">{row.employee.full_name || row.employee.name || "Darbuotojas"}</td>
+        <td className="px-4 py-3 font-semibold text-[#40594f]">{row.employee.position || row.requirement.title}</td>
+        <td className="px-4 py-3">
+          {hasProblems ? (
+            <div className="flex flex-wrap gap-1">
+              {row.pending.length ? <span className="rounded-full bg-[#fff6df] px-3 py-1 text-xs font-black text-[#8a5a13]">{row.pending.length} laukia</span> : null}
+              {row.missing.length ? <span className="rounded-full bg-[#fff6df] px-3 py-1 text-xs font-black text-[#8a5a13]">{row.missing.length} trūksta</span> : null}
+              {row.expiring.length ? <span className="rounded-full bg-[#fff6df] px-3 py-1 text-xs font-black text-[#8a5a13]">{row.expiring.length} baigiasi</span> : null}
+              {row.expired.length ? <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-800">{row.expired.length} pasibaigė</span> : null}
             </div>
+          ) : (
+            <span className="rounded-full bg-[#e9f7ef] px-3 py-1 text-xs font-black text-[#047857]">Tvarkinga</span>
+          )}
+        </td>
+        <td className="px-4 py-3 font-black text-[#8a5a13]">{row.missing.length}</td>
+        <td className="px-4 py-3">
+          <div className="h-2 rounded-full bg-[#eef4f1]">
+            <div className="h-2 rounded-full bg-[#047857]" style={{ width: `${row.progress}%` }} />
           </div>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <MiniStat
-          label="Privaloma"
-          value={String(employee.requiredIds.length)}
-        />
-        <MiniStat label="Trūksta" value={String(employee.missingIds.length)} />
-        <MiniStat
-          label="Laukia tvirtinimo"
-          value={String(pendingSubmissions.length)}
-        />
-      </div>
-
-      <div className="rounded-[24px] border border-emerald-100 bg-emerald-50 p-5">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-          <div>
-            <p className="text-sm font-black uppercase tracking-widest text-emerald-700">
-              Pridėti mokymą darbuotojui
-            </p>
-            <p className="mt-1 text-sm font-bold leading-6 text-emerald-900/70">
-              Admin pažymi mokymą kaip matytą ir patvirtintą. Tik po šio
-              patvirtinimo mokymas įsiskaito į progresą.
-            </p>
-            <select
-              value={selectedTrainingId}
-              onChange={(event) => setSelectedTrainingId(event.target.value)}
-              className="mt-4 h-12 w-full rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-slate-800 outline-none focus:border-emerald-400"
-            >
-              {requiredTrainings.map((training) => (
-                <option key={training.id} value={training.id}>
-                  {training.title} · {training.hours} val.
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            type="button"
-            onClick={approveSelectedTraining}
-            disabled={
-              !selectedTrainingId ||
-              employee.completedTrainingIds.includes(selectedTrainingId)
-            }
-            className="inline-flex h-12 items-center justify-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Patvirtinti mokymą
+          <div className="mt-1 text-xs font-bold text-[#6a7e75]">{row.progress}%</div>
+        </td>
+        <td className="px-4 py-3">
+          <button type="button" onClick={onToggle} className="inline-flex items-center gap-2 rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expanded ? "Slėpti" : "Detalės"}
           </button>
-        </div>
-      </div>
+        </td>
+      </tr>
 
-      {pendingSubmissions.length > 0 ? (
-        <div>
-          <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-            Darbuotojo pateikti duomenys
-          </p>
-          <div className="mt-3 space-y-3">
-            {pendingSubmissions.map((submission) => {
-              const training = trainings.find(
-                (item) => item.id === submission.trainingId,
-              );
-              if (!training) return null;
-
-              return (
-                <div
-                  key={submission.id}
-                  className="rounded-2xl border border-amber-200 bg-amber-50 p-4"
-                >
-                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
-                    <div>
-                      <p className="text-sm font-black text-slate-950">
-                        {training.title}
-                      </p>
-                      <p className="mt-1 text-xs font-bold text-slate-500">
-                        Išklausyta: {submission.completedAt}
-                      </p>
-                      <p className="mt-2 text-sm font-bold leading-6 text-slate-600">
-                        {submission.note}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2 xl:justify-end">
-                      <button
-                        type="button"
-                        onClick={() => onRejectSubmission(submission.id)}
-                        className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 hover:bg-slate-50"
-                      >
-                        Atmesti
+      {expanded ? (
+        <tr>
+          <td colSpan={6} className="bg-[#f8faf8] px-4 py-4">
+            <div className="grid gap-2">
+              {details.map((detail) => (
+                <div key={detail.id} className="grid gap-3 rounded-xl border border-[#dbe6e0] bg-white p-3 md:grid-cols-[1.4fr_0.7fr_0.7fr_0.4fr_0.8fr_auto] md:items-center">
+                  <div>
+                    <div className="font-black text-[#10251f]">{detail.title}</div>
+                    <div className="text-xs font-bold text-[#6a7e75]">{detail.kind === "missing" ? "Privalomas mokymas" : "Įvestas mokymas"}</div>
+                  </div>
+                  <div className="font-semibold text-[#40594f]">{fmt(detail.completed_at)}</div>
+                  <div className="font-semibold text-[#40594f]">{fmt(detail.expires_at)}</div>
+                  <div className="font-semibold text-[#40594f]">{detail.hours || "—"}</div>
+                  <div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${detail.status.cls}`}>{detail.status.label}</span>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {detail.status.key === "pending" && detail.record ? (
+                      <>
+                        <button type="button" onClick={() => onApprove(detail.record!.id)} disabled={approvingId === detail.record.id} className="rounded-lg bg-[#047857] px-3 py-2 text-xs font-black text-white disabled:opacity-60">
+                          {approvingId === detail.record.id ? "Tvirtinama..." : "Patvirtinti"}
+                        </button>
+                        <button type="button" onClick={() => onReject(detail.record!.id)} disabled={approvingId === detail.record.id} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-800 disabled:opacity-60">
+                          Nepatvirtinti
+                        </button>
+                      </>
+                    ) : null}
+                    {detail.kind === "record" && detail.record ? (
+                      <button type="button" onClick={() => onPreview(detail.record!)} className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]">
+                        Peržiūrėti
                       </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onApproveTraining(
-                            employee.id,
-                            submission.trainingId,
-                            submission.id,
-                          )
-                        }
-                        className="h-10 rounded-2xl bg-emerald-700 px-4 text-xs font-black text-white hover:bg-emerald-800"
-                      >
-                        Patvirtinti
+                    ) : (
+                      <button type="button" onClick={() => onPrefill(detail.employee_id, detail.title)} className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]">
+                        Pridėti
                       </button>
-                    </div>
+                    )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              ))}
+            </div>
+          </td>
+        </tr>
       ) : null}
-
-      <div>
-        <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-          Privalomi mokymai
-        </p>
-        <div className="mt-3 grid gap-3 2xl:grid-cols-2">
-          {requiredTrainings.map((training) => {
-            const completed = employee.completedTrainingIds.includes(
-              training.id,
-            );
-            const expiring = employee.expiringTrainingIds.includes(training.id);
-            return (
-              <div
-                key={training.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-slate-950">
-                      {training.title}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">
-                      {training.hours} val. ·{" "}
-                      {validityLabel(training.validityMonths)}
-                    </p>
-                  </div>
-                  {completed ? (
-                    <StatusBadge
-                      success
-                      icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                    >
-                      Atlikta
-                    </StatusBadge>
-                  ) : (
-                    <StatusBadge
-                      danger
-                      icon={<AlertTriangle className="h-3.5 w-3.5" />}
-                    >
-                      Trūksta
-                    </StatusBadge>
-                  )}
-                </div>
-                {expiring ? (
-                  <div className="mt-3">
-                    <StatusBadge
-                      warning
-                      icon={<CalendarDays className="h-3.5 w-3.5" />}
-                    >
-                      Terminas artėja
-                    </StatusBadge>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-1 h-5 w-5 text-emerald-700" />
-          <div>
-            <p className="text-sm font-black text-slate-800">
-              Tvirtinimo logika
-            </p>
-            <p className="mt-1 text-sm font-bold leading-6 text-slate-500">
-              Darbuotojas savo paskyroje gali įvesti mokymo datą ir pastabą.
-              Admin čia peržiūri įrašą ir paspaudžia „Patvirtinti“. Failų
-              kėlimas šiame modulyje nebūtinas.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

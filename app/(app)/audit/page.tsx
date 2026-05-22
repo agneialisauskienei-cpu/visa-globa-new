@@ -13,6 +13,7 @@ type AuditLog = {
   record_id: string | null
   action: string
   changed_by: string | null
+  actor?: string | null
   changed_at: string | null
   created_at?: string | null
   changes: Record<string, unknown> | null
@@ -46,6 +47,22 @@ type Task = {
   resident_id?: string | null
 }
 
+type OrganizationMember = {
+  id?: string | null
+  user_id?: string | null
+  role?: string | null
+  position?: string | null
+  department?: string | null
+}
+
+type PersonnelTraining = {
+  id: string
+  employee_id?: string | null
+  title?: string | null
+  training_name?: string | null
+  name?: string | null
+}
+
 const TABLE_LABELS: Record<string, string> = {
   residents: "Gyventojai",
   resident_contacts: "Kontaktai",
@@ -59,6 +76,7 @@ const TABLE_LABELS: Record<string, string> = {
   inventory_issue_history: "Sandėlio istorija",
   inventory_transactions: "Sandėlio judėjimai",
   organization_members: "Darbuotojai",
+  personnel_trainings: "Personalo mokymai",
   profiles: "Naudotojų profiliai",
   organization_invites: "Kvietimai",
   handover_logs: "Perdavimo žurnalai",
@@ -89,6 +107,16 @@ const FIELD_LABELS: Record<string, string> = {
   department: "Skyrius",
   due_date: "Terminas",
   completed_at: "Užbaigta",
+  valid_until: "Galioja iki",
+  hours: "Valandos",
+  provider: "Teikėjas",
+  training_name: "Mokymo pavadinimas",
+  certificate_number: "Pažymėjimo nr.",
+  approval_status: "Patvirtinimo būsena",
+  approved_at: "Patvirtinta",
+  verified_at: "Patikrinta",
+  reviewed_at: "Peržiūrėta",
+  employee_id: "Darbuotojas",
   recurrence_days: "Kartojimas",
   recurrence_until: "Kartoti iki",
   recurrence_parent_id: "Periodinės užduoties šaltinis",
@@ -219,6 +247,45 @@ function isUuidLike(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
 
+function singularTableLabel(tableName: string) {
+  const labels: Record<string, string> = {
+    residents: "Gyventojas",
+    resident_contacts: "Kontaktas",
+    rooms: "Kambarys",
+    tasks: "Užduotis",
+    organization_members: "Darbuotojas",
+    personnel_trainings: "Mokymas",
+    profiles: "Naudotojas",
+    organization_invites: "Kvietimas",
+    handover_logs: "Perdavimo įrašas",
+    report_exports: "Ataskaita",
+  }
+
+  return labels[tableName] || tableLabel(tableName)
+}
+
+function valuesDiffer(before: unknown, after: unknown) {
+  return String(before ?? "") !== String(after ?? "")
+}
+
+function diffObjects(before: Record<string, unknown>, after: Record<string, unknown>) {
+  const result: Record<string, { from: unknown; to: unknown }> = {}
+  const keys = Array.from(new Set([...Object.keys(before || {}), ...Object.keys(after || {})]))
+
+  keys.forEach((key) => {
+    if (["id", "created_at", "updated_at"].includes(key)) return
+
+    const oldValue = before?.[key] ?? null
+    const newValue = after?.[key] ?? null
+
+    if (valuesDiffer(oldValue, newValue)) {
+      result[key] = { from: oldValue, to: newValue }
+    }
+  })
+
+  return result
+}
+
 export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -231,6 +298,8 @@ export default function AuditPage() {
   const [residentsById, setResidentsById] = useState<Record<string, string>>({})
   const [roomsById, setRoomsById] = useState<Record<string, string>>({})
   const [tasksById, setTasksById] = useState<Record<string, string>>({})
+  const [membersById, setMembersById] = useState<Record<string, string>>({})
+  const [trainingsById, setTrainingsById] = useState<Record<string, string>>({})
 
   useEffect(() => {
     void loadLogs()
@@ -260,12 +329,19 @@ export default function AuditPage() {
             .flatMap((row) => {
               const ids: string[] = []
               if (row.changed_by) ids.push(row.changed_by)
+              if (row.actor) ids.push(row.actor)
+              if (
+                row.record_id &&
+                (row.table_name === "organization_members" || row.table_name === "profiles")
+              ) {
+                ids.push(row.record_id)
+              }
               Object.entries(row.changes || {}).forEach(([key, value]) => {
                 const pushValue = (v: unknown) => {
                   if (typeof v === "string" && isUuidLike(v)) ids.push(v)
                 }
 
-                if (key === "assigned_to" || key === "created_by" || key === "invited_by") {
+                if (key === "assigned_to" || key === "created_by" || key === "invited_by" || key === "employee_id") {
                   if (value && typeof value === "object" && "from" in value && "to" in value) {
                     const item = value as { from: unknown; to: unknown }
                     pushValue(item.from)
@@ -281,26 +357,24 @@ export default function AuditPage() {
         )
       )
 
+      let nextProfilesById: Record<string, string> = {}
+
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from("profiles")
           .select("id, full_name, first_name, last_name, email")
           .in("id", userIds)
 
-        setProfilesById(
-          Object.fromEntries(
-            ((profilesData || []) as Profile[]).map((profile) => [
-              profile.id,
-              profileName(profile) || profile.id,
-            ])
-          )
+        nextProfilesById = Object.fromEntries(
+          ((profilesData || []) as Profile[]).map((profile) => [
+            profile.id,
+            profileName(profile) || profile.id,
+          ])
         )
-      } else {
-        setProfilesById({})
       }
 
       if (orgId) {
-        const [residentsResult, roomsResult, tasksResult] = await Promise.all([
+        const [residentsResult, roomsResult, tasksResult, membersResult, trainingsResult] = await Promise.all([
           supabase
             .from("residents")
             .select("id, full_name, first_name, last_name, resident_code, current_room_id")
@@ -315,7 +389,45 @@ export default function AuditPage() {
             .from("tasks")
             .select("id, title, resident_id")
             .eq("organization_id", orgId),
+
+          supabase
+            .from("organization_members")
+            .select("id, user_id, role, position, department")
+            .eq("organization_id", orgId),
+
+          supabase
+            .from("personnel_trainings")
+            .select("id, employee_id, title, training_name, name")
+            .eq("organization_id", orgId),
         ])
+
+        const memberRows = (membersResult.data || []) as OrganizationMember[]
+        const trainingRows = (trainingsResult.data || []) as PersonnelTraining[]
+        const extraUserIds = Array.from(
+          new Set(
+            [
+              ...memberRows.map((member) => member.user_id),
+              ...trainingRows.map((training) => training.employee_id),
+            ].filter((id): id is string => Boolean(id && !nextProfilesById[id]))
+          )
+        )
+
+        if (extraUserIds.length > 0) {
+          const { data: extraProfiles } = await supabase
+            .from("profiles")
+            .select("id, full_name, first_name, last_name, email")
+            .in("id", extraUserIds)
+
+          nextProfilesById = {
+            ...nextProfilesById,
+            ...Object.fromEntries(
+              ((extraProfiles || []) as Profile[]).map((profile) => [
+                profile.id,
+                profileName(profile) || profile.id,
+              ])
+            ),
+          }
+        }
 
         const roomMap = Object.fromEntries(
           ((roomsResult.data || []) as Room[]).map((room) => [
@@ -340,10 +452,41 @@ export default function AuditPage() {
           ])
         )
 
+        const memberMap = Object.fromEntries(
+          memberRows.flatMap((member) => {
+            const label =
+              (member.user_id && nextProfilesById[member.user_id]) ||
+              member.position ||
+              member.role ||
+              "Darbuotojas"
+            return [member.id, member.user_id]
+              .filter((id): id is string => Boolean(id))
+              .map((id) => [id, label])
+          })
+        )
+
+        const trainingMap = Object.fromEntries(
+          trainingRows.map((training) => {
+            const title = training.title || training.training_name || training.name || "Mokymas"
+            const employee = training.employee_id ? nextProfilesById[training.employee_id] : null
+            return [
+              training.id,
+              employee ? `${title} · ${employee}` : title,
+            ]
+          })
+        )
+
         setRoomsById(roomMap)
         setResidentsById(residentMap)
         setTasksById(taskMap)
+        setMembersById(memberMap)
+        setTrainingsById(trainingMap)
+      } else {
+        setMembersById({})
+        setTrainingsById({})
       }
+
+      setProfilesById(nextProfilesById)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Nepavyko įkelti audito žurnalo.")
     } finally {
@@ -366,9 +509,10 @@ export default function AuditPage() {
       key === "assigned_to" ||
       key === "created_by" ||
       key === "invited_by" ||
+      key === "employee_id" ||
       key === "changed_by"
     ) {
-      return profilesById[str] || str
+      return profilesById[str] || membersById[str] || str
     }
 
     if (
@@ -395,10 +539,14 @@ export default function AuditPage() {
       return tasksById[str] || str
     }
 
+    if (key === "training_id") {
+      return trainingsById[str] || str
+    }
+
     if (VALUE_LABELS[str]) return VALUE_LABELS[str]
 
     if (isUuidLike(str)) {
-      return profilesById[str] || residentsById[str] || roomsById[str] || tasksById[str] || str
+      return profilesById[str] || membersById[str] || trainingsById[str] || residentsById[str] || roomsById[str] || tasksById[str] || str
     }
 
     return str
@@ -418,23 +566,28 @@ export default function AuditPage() {
     return <span style={styles.changeValue}>{cleanValue(value, key)}</span>
   }
 
-  function renderChanges(changes: Record<string, unknown> | null) {
-    if (!changes || Object.keys(changes).length === 0) {
-      return <span style={styles.muted}>—</span>
-    }
+  function normalizeChanges(changes: Record<string, unknown> | null) {
+    if (!changes || Object.keys(changes).length === 0) return {}
 
     if ("old" in changes || "new" in changes) {
-      return (
-        <div style={styles.changeItem}>
-          <strong>Įrašas</strong>
-          <span style={styles.changeValue}>Pakeistas</span>
-        </div>
-      )
+      const oldRecord = changes.old && typeof changes.old === "object" ? changes.old as Record<string, unknown> : {}
+      const newRecord = changes.new && typeof changes.new === "object" ? changes.new as Record<string, unknown> : {}
+      return diffObjects(oldRecord, newRecord)
+    }
+
+    return changes
+  }
+
+  function renderChanges(changes: Record<string, unknown> | null) {
+    const normalized = normalizeChanges(changes)
+
+    if (Object.keys(normalized).length === 0) {
+      return <span style={styles.muted}>—</span>
     }
 
     return (
       <div style={styles.changesList}>
-        {Object.entries(changes).map(([key, value]) => (
+        {Object.entries(normalized).map(([key, value]) => (
           <div key={key} style={styles.changeItem}>
             <strong>{fieldLabel(key)}</strong>
             {renderChangeValue(key, value)}
@@ -444,12 +597,44 @@ export default function AuditPage() {
     )
   }
 
+  function changeCurrentValue(changes: Record<string, unknown> | null, keys: string[]) {
+    const normalized = normalizeChanges(changes)
+
+    for (const key of keys) {
+      const value = normalized[key]
+      if (value && typeof value === "object" && "to" in value) {
+        const item = value as { to: unknown }
+        if (item.to !== null && item.to !== undefined && item.to !== "") return cleanValue(item.to, key)
+      }
+
+      if (value !== null && value !== undefined && value !== "") return cleanValue(value, key)
+    }
+
+    return null
+  }
+
   function recordName(log: AuditLog) {
     if (!log.record_id) return "—"
     if (log.table_name === "residents") return residentsById[log.record_id] || log.record_id
     if (log.table_name === "rooms") return roomsById[log.record_id] || log.record_id
     if (log.table_name === "tasks") return tasksById[log.record_id] || log.record_id
+    if (log.table_name === "organization_members" || log.table_name === "profiles") {
+      return membersById[log.record_id] || profilesById[log.record_id] || changeCurrentValue(log.changes, ["full_name", "employee_full_name", "email"]) || "Darbuotojas"
+    }
+    if (log.table_name === "resident_contacts") {
+      return changeCurrentValue(log.changes, ["full_name", "name", "resident_id", "phone", "email"]) || "Kontaktas"
+    }
+    if (log.table_name === "personnel_trainings") {
+      return trainingsById[log.record_id] || changeCurrentValue(log.changes, ["title", "training_name", "name", "employee_id"]) || "Mokymas"
+    }
+    if (isUuidLike(log.record_id)) return singularTableLabel(log.table_name)
     return log.record_id
+  }
+
+  function actorName(log: AuditLog) {
+    const actorId = log.changed_by || log.actor
+    if (!actorId) return "—"
+    return profilesById[actorId] || actorId
   }
 
   const tableOptions = useMemo(() => {
@@ -458,30 +643,30 @@ export default function AuditPage() {
     )
   }, [logs])
 
-  const filteredLogs = useMemo(() => {
-    const q = search.trim().toLowerCase()
+  const q = search.trim().toLowerCase()
+  const filteredLogs = logs.filter((log) => {
+    if (Object.keys(normalizeChanges(log.changes)).length === 0) return false
+    if (actionFilter && log.action !== actionFilter) return false
+    if (tableFilter && log.table_name !== tableFilter) return false
 
-    return logs.filter((log) => {
-      if (actionFilter && log.action !== actionFilter) return false
-      if (tableFilter && log.table_name !== tableFilter) return false
+    if (!q) return true
 
-      if (!q) return true
-
-      return [
-        log.table_name,
-        tableLabel(log.table_name),
-        log.action,
-        actionLabel(log.action),
-        log.record_id,
-        recordName(log),
-        log.changed_by,
-        JSON.stringify(log.changes || {}),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    })
-  }, [logs, search, actionFilter, tableFilter, profilesById, residentsById, roomsById, tasksById])
+    return [
+      log.table_name,
+      tableLabel(log.table_name),
+      log.action,
+      actionLabel(log.action),
+      log.record_id,
+      recordName(log),
+      actorName(log),
+      log.changed_by,
+      log.actor,
+      JSON.stringify(log.changes || {}),
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(q)
+  })
 
   return (
     <div style={styles.page}>
@@ -572,6 +757,7 @@ export default function AuditPage() {
                 <tr>
                   <th style={styles.th}>Data</th>
                   <th style={styles.th}>Veiksmas</th>
+                  <th style={styles.th}>Kas keitė</th>
                   <th style={styles.th}>Vieta</th>
                   <th style={styles.th}>Įrašas</th>
                   <th style={styles.th}>Pakeitimai</th>
@@ -598,13 +784,12 @@ export default function AuditPage() {
                       </span>
                     </td>
 
+                    <td style={styles.tdBold}>{actorName(log)}</td>
+
                     <td style={styles.tdBold}>{tableLabel(log.table_name)}</td>
 
                     <td style={styles.td}>
                       <strong>{recordName(log)}</strong>
-                      {log.record_id && recordName(log) !== log.record_id ? (
-                        <div style={styles.sub}>{log.record_id}</div>
-                      ) : null}
                     </td>
 
                     <td style={styles.td}>{renderChanges(log.changes)}</td>
@@ -640,7 +825,7 @@ const styles: Record<string, React.CSSProperties> = {
   meta: { color: "#64748b", fontSize: 13, fontWeight: 850 },
   empty: { padding: 22, border: "1px dashed #cbd5e1", borderRadius: 16, color: "#64748b", textAlign: "center", fontSize: 14, fontWeight: 750 },
   tableWrap: { overflowX: "auto" },
-  table: { width: "100%", minWidth: 1080, borderCollapse: "collapse" },
+  table: { width: "100%", minWidth: 980, borderCollapse: "collapse" },
   th: { textAlign: "left", padding: "12px 10px", borderBottom: "1px solid #e5e7eb", color: "#475569", fontWeight: 900 },
   td: { padding: "12px 10px", borderBottom: "1px solid #f1f5f9", color: "#334155", fontWeight: 650, verticalAlign: "top" },
   tdBold: { padding: "12px 10px", borderBottom: "1px solid #f1f5f9", color: "#0f172a", fontWeight: 900, verticalAlign: "top" },

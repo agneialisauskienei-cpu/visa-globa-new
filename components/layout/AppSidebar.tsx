@@ -45,6 +45,8 @@ const SUPER_ADMIN_MENU: AppMenuItem[] = [
   },
 ]
 
+const ADMIN_HIDDEN_MENU_LABELS = new Set(["Grafikas", "Pranešimai"])
+
 function menuIcon(icon: string) {
   if (icon === "home") return Home
   if (icon === "home2") return Home
@@ -208,7 +210,12 @@ export default function AppSidebar() {
     router.push("/login")
   }
 
-  const brandHref = access?.role === "super_admin" ? "/admin" : "/dashboard"
+  const brandHref =
+    access?.role === "super_admin"
+      ? "/admin"
+      : access?.role === "employee"
+        ? "/employee-dashboard"
+        : "/dashboard"
 
   const visibleMenu = useMemo(() => {
     if (!access) return []
@@ -221,6 +228,11 @@ export default function AppSidebar() {
 
     return APP_MENU
       .filter((item) => hasPermission(access, item.permission))
+      .filter((item) => {
+        if (access.role === "employee") return true
+
+        return !ADMIN_HIDDEN_MENU_LABELS.has(item.label)
+      })
       .map((item) => mapMenuByRole(item, access))
   }, [access])
 

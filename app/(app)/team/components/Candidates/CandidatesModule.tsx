@@ -505,112 +505,114 @@ export default function CandidatesModule({
   }
 
   return (
-    <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-            BDAR saugus atrankos klausimynas
-          </p>
-          <h2 className="mt-1 text-3xl font-black text-slate-950">Kandidatai</h2>
-          <p className="mt-2 max-w-4xl text-sm font-semibold text-slate-500">
-            Čia paruošiami klausimai, siunčiami kandidatui el. paštu. Sistema neprašo asmens kodo,
-            dokumentų kopijų ar perteklinių jautrių duomenų.
-          </p>
+    <section className="overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+      <header className="border-b border-[#dbe6e0] bg-[#486b5d] px-5 py-4 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
+              Kandidatai
+            </p>
+            <h2 className="mt-1 text-2xl font-black tracking-tight">Atranka ir klausimynai</h2>
+            <p className="mt-1 max-w-4xl text-sm font-semibold text-white/80">
+              Kandidatų kontaktai, klausimynai ir priėmimas į komandą vienoje vietoje.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-lg bg-white/12 px-3 py-2 text-sm font-black text-white/90 hover:bg-white/20"
+            >
+              Išvalyti formą
+            </button>
+          </div>
         </div>
+      </header>
 
-        <button
-          type="button"
-          onClick={resetForm}
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50"
-        >
-          Išvalyti formą
-        </button>
-      </div>
-
-      <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-bold text-blue-900">
-        Saugumo taisyklė: neklausti asmens kodo, dokumentų kopijų, sveikatos diagnozių,
-        šeiminės padėties, vaikų skaičiaus, politinių / religinių pažiūrų ar kitų specialių kategorijų duomenų.
+      <div className="border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-2 text-sm font-bold text-[#486b5d]">
+        BDAR saugi atranka: neklausiama asmens kodo, dokumentų kopijų, diagnozių ar kitų perteklinių jautrių duomenų.
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-[28px] border border-slate-200 bg-slate-50/70 p-6">
-          <h3 className="text-2xl font-black text-slate-950">Kandidato duomenys</h3>
-          <p className="mt-2 text-sm font-semibold text-slate-500">
+        <div className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+          <h3 className="text-xl font-black text-[#10251f]">Kandidato duomenys</h3>
+          <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
             Įvesk tik būtinus atrankos kontaktinius duomenis.
           </p>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Vardas</span>
+              <span className="text-sm font-black text-[#6a7e75]">Vardas</span>
               <input
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
                 placeholder="Vardas"
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#dce7e2]"
               />
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Pavardė</span>
+              <span className="text-sm font-black text-[#6a7e75]">Pavardė</span>
               <input
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
                 placeholder="Pavardė"
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#dce7e2]"
               />
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">El. paštas</span>
+              <span className="text-sm font-black text-[#6a7e75]">El. paštas</span>
               <input
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="vardas@pastas.lt"
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#dce7e2]"
               />
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Telefonas</span>
+              <span className="text-sm font-black text-[#6a7e75]">Telefonas</span>
               <input
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
                 placeholder="+370..."
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#dce7e2]"
               />
             </label>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-black text-slate-600">Norimos pareigos</span>
+              <span className="text-sm font-black text-[#6a7e75]">Norimos pareigos</span>
               <input
                 value={desiredRole}
                 onChange={(event) => setDesiredRole(event.target.value)}
                 placeholder="Pvz. slaugytojo padėjėjas, administratorius"
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#dce7e2]"
               />
             </label>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-black text-slate-600">Trumpa aktuali patirtis</span>
+              <span className="text-sm font-black text-[#6a7e75]">Trumpa aktuali patirtis</span>
               <textarea
                 value={experience}
                 onChange={(event) => setExperience(event.target.value)}
                 placeholder="Tik su pareigomis susijusi patirtis. Nerašyti perteklinių asmens duomenų."
                 rows={3}
-                className="w-full resize-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="w-full resize-none rounded-lg border border-[#c2d3ca] bg-white px-4 py-2 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#dce7e2]"
               />
             </label>
           </div>
 
-          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-[#dbe6e0] bg-white px-4 py-2">
             <input
               type="checkbox"
               checked={consent}
               onChange={(event) => setConsent(event.target.checked)}
-              className="mt-1 h-5 w-5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+              className="mt-1 h-5 w-5 rounded border-[#c2d3ca] text-[#486b5d] focus:ring-emerald-600"
             />
-            <span className="text-sm font-black leading-6 text-slate-700">
+            <span className="text-sm font-black leading-6 text-[#486b5d]">
               Kandidatas sutiko, kad jo pateikti duomenys būtų tvarkomi atrankos tikslu.
             </span>
           </label>
@@ -620,7 +622,7 @@ export default function CandidatesModule({
               type="button"
               disabled={saving}
               onClick={() => void saveCandidate("new")}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8] disabled:opacity-60"
             >
               <Plus size={16} />
               {saving ? "Saugoma..." : "Išsaugoti kandidatą"}
@@ -639,7 +641,7 @@ export default function CandidatesModule({
                 }
                 void saveCandidate("questionnaire_sent");
               }}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#486b5d] px-4 text-sm font-black text-white transition hover:bg-[#39594c]"
             >
               <Mail size={16} />
               Siųsti klausimyną el. paštu
@@ -648,7 +650,7 @@ export default function CandidatesModule({
             <button
               type="button"
               onClick={() => void copyEmailText()}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
             >
               <Copy size={16} />
               Kopijuoti laišką
@@ -658,12 +660,12 @@ export default function CandidatesModule({
           {message ? (
             <div
               className={[
-                "mt-4 whitespace-pre-wrap rounded-2xl border px-4 py-3 text-sm font-bold",
+                "mt-4 whitespace-pre-wrap rounded-lg border px-4 py-2 text-sm font-bold",
                 message.type === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  ? "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]"
                   : message.type === "warning"
-                    ? "border-amber-200 bg-amber-50 text-amber-800"
-                    : "border-red-200 bg-red-50 text-red-800",
+                    ? "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]"
+                    : "border-[#efc0bd] bg-[#fff1f0] text-red-800",
               ].join(" ")}
             >
               <div>{message.text}</div>
@@ -676,9 +678,9 @@ export default function CandidatesModule({
           ) : null}
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6">
-          <h3 className="text-2xl font-black text-slate-950">Klausimynas kandidatui</h3>
-          <p className="mt-2 text-sm font-semibold text-slate-500">
+        <div className="rounded-xl border border-[#dbe6e0] bg-white p-4">
+          <h3 className="text-xl font-black text-[#10251f]">Klausimynas kandidatui</h3>
+          <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
             Šabloną galima papildyti savo klausimais, bet sistema blokuoja akivaizdžiai perteklinius klausimus.
           </p>
 
@@ -686,25 +688,25 @@ export default function CandidatesModule({
             {questions.map((question, index) => (
               <div
                 key={question.id}
-                className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                className="flex items-start gap-3 rounded-lg border border-[#dbe6e0] bg-[#f8faf8] px-4 py-2"
               >
-                <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-slate-600">
+                <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-[#6a7e75]">
                   {index + 1}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-black text-slate-900">{question.label}</p>
+                  <p className="text-sm font-black text-[#10251f]">{question.label}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {question.required ? (
-                      <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">
+                      <span className="rounded-full bg-[#fff1f0] px-3 py-1 text-xs font-black text-[#8a2f27]">
                         Privalomas
                       </span>
                     ) : (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-[#6a7e75]">
                         Neprivalomas
                       </span>
                     )}
                     {question.includeInContract ? (
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+                      <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-xs font-black text-[#486b5d]">
                         Gali būti naudojama sutarčiai
                       </span>
                     ) : null}
@@ -713,7 +715,7 @@ export default function CandidatesModule({
                 <button
                   type="button"
                   onClick={() => removeQuestion(question.id)}
-                  className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-50"
+                  className="rounded-xl border border-[#dbe6e0] bg-white p-2 text-[#6a7e75] hover:bg-[#f8faf8]"
                   aria-label="Pašalinti klausimą"
                 >
                   <Trash2 size={16} />
@@ -722,8 +724,8 @@ export default function CandidatesModule({
             ))}
           </div>
 
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-600">
+          <div className="mt-5 rounded-lg border border-[#dbe6e0] bg-[#f8faf8] p-4">
+            <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#6a7e75]">
               Pridėti savo klausimą
             </h4>
             <textarea
@@ -731,10 +733,10 @@ export default function CandidatesModule({
               onChange={(event) => setNewQuestion(event.target.value)}
               placeholder="Įrašykite klausimą. Neklauskite asmens kodo, dokumentų kopijų ar jautrių duomenų."
               rows={3}
-              className="mt-3 w-full resize-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+              className="mt-3 w-full resize-none rounded-lg border border-[#c2d3ca] bg-white px-4 py-2 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#dce7e2]"
             />
             <div className="mt-3 flex flex-wrap gap-3">
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <label className="flex items-center gap-2 text-sm font-bold text-[#486b5d]">
                 <input
                   type="checkbox"
                   checked={newQuestionRequired}
@@ -742,7 +744,7 @@ export default function CandidatesModule({
                 />
                 Privalomas
               </label>
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+              <label className="flex items-center gap-2 text-sm font-bold text-[#486b5d]">
                 <input
                   type="checkbox"
                   checked={newQuestionContract}
@@ -753,7 +755,7 @@ export default function CandidatesModule({
               <button
                 type="button"
                 onClick={addQuestion}
-                className="ml-auto inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-black text-white hover:bg-slate-800"
+                className="ml-auto inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-black text-white hover:bg-slate-800"
               >
                 <Plus size={16} />
                 Pridėti klausimą
@@ -761,51 +763,51 @@ export default function CandidatesModule({
             </div>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-            <h4 className="text-sm font-black uppercase tracking-[0.14em] text-slate-600">
+          <div className="mt-5 rounded-lg border border-[#dbe6e0] bg-white p-4">
+            <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#6a7e75]">
               Laiško peržiūra
             </h4>
-            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-2xl bg-slate-950 p-4 text-xs font-semibold leading-5 text-slate-100">
+            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950 p-4 text-xs font-semibold leading-5 text-slate-100">
               {emailBody}
             </pre>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6">
-        <h3 className="text-2xl font-black text-slate-950">Kandidatų sąrašas</h3>
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+      <div className="mt-6 rounded-xl border border-[#dbe6e0] bg-white p-4">
+        <h3 className="text-xl font-black text-[#10251f]">Kandidatų sąrašas</h3>
+        <div className="mt-4 overflow-hidden rounded-lg border border-[#dbe6e0]">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-600">
+            <thead className="bg-[#f8faf8] text-[#6a7e75]">
               <tr>
-                <th className="px-4 py-3 font-black">Kandidatas</th>
-                <th className="px-4 py-3 font-black">Kontaktai</th>
-                <th className="px-4 py-3 font-black">Pareigos</th>
-                <th className="px-4 py-3 font-black">Būsena</th>
-                <th className="px-4 py-3 font-black">Patirtis</th>
-                <th className="px-4 py-3 text-right font-black">Veiksmai</th>
+                <th className="px-4 py-2 font-black">Kandidatas</th>
+                <th className="px-4 py-2 font-black">Kontaktai</th>
+                <th className="px-4 py-2 font-black">Pareigos</th>
+                <th className="px-4 py-2 font-black">Būsena</th>
+                <th className="px-4 py-2 font-black">Patirtis</th>
+                <th className="px-4 py-2 text-right font-black">Veiksmai</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {safeCandidates.length ? (
                 safeCandidates.map((candidate) => (
                   <tr key={candidate.id}>
-                    <td className="px-4 py-3 font-bold text-slate-900">
+                    <td className="px-4 py-2 font-bold text-[#10251f]">
                       {candidate.first_name} {candidate.last_name}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2">
                       {candidate.email || "—"} / {candidate.phone || "—"}
                     </td>
-                    <td className="px-4 py-3">{candidate.desired_role || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
+                    <td className="px-4 py-2">{candidate.desired_role || "—"}</td>
+                    <td className="px-4 py-2">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-[#486b5d]">
                         {candidateStatusLabel(candidate.status)}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{candidate.experience || "—"}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-2">{candidate.experience || "—"}</td>
+                    <td className="px-4 py-2 text-right">
                       {(candidate.status || "new") === "invited" || (candidate.status || "new") === "hired" ? (
-                        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-[#eef4f1] px-3 py-1 text-xs font-black text-[#486b5d]">
                           <CheckCircle2 size={14} />
                           Perduota komandai
                         </span>
@@ -814,7 +816,7 @@ export default function CandidatesModule({
                           type="button"
                           disabled={acceptingCandidateId === candidate.id}
                           onClick={() => void acceptCandidateToTeam(candidate)}
-                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:opacity-60"
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#486b5d] px-4 text-xs font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
                         >
                           <UserPlus size={15} />
                           {acceptingCandidateId === candidate.id ? "Kuriama..." : "Priimti į komandą"}
@@ -825,7 +827,7 @@ export default function CandidatesModule({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center font-bold text-slate-500">
+                  <td colSpan={6} className="px-4 py-10 text-center font-bold text-[#6a7e75]">
                     Kandidatų dar nėra.
                   </td>
                 </tr>

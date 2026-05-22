@@ -61,6 +61,9 @@ type Employee = {
   department?: string | null;
   staff_type?: string | null;
   contract_number?: string | null;
+  employment_rate?: number | null;
+  weekly_hours?: number | null;
+  employment_type?: string | null;
   employment_start_date?: string | null;
   termination_date?: string | null;
   is_archived?: boolean | null;
@@ -138,6 +141,9 @@ type Training = {
   completed_at: string | null;
   expires_at: string | null;
   hours: number | null;
+  provider?: string | null;
+  category?: string | null;
+  status?: string | null;
 };
 
 type Credential = {
@@ -174,6 +180,9 @@ type EditForm = {
   staff_type: string;
   role: string;
   contract_number: string;
+  employment_rate: number;
+  weekly_hours: number;
+  employment_type: string;
   employment_start_date: string;
   termination_date: string;
   is_archived: boolean;
@@ -184,6 +193,8 @@ type EditForm = {
   extra_permissions: string[];
   is_active: boolean;
 };
+
+type EmployeeEditorTab = "register" | "profile" | "contract" | "access" | "documents" | "trainings";
 
 const STAFF_TYPES = [
   {
@@ -247,7 +258,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
   { key: "overview", label: "Apžvalga", icon: ShieldCheck },
   { key: "employees", label: "Darbuotojai", icon: Users },
   { key: "schedule", label: "Grafikas", icon: CalendarDays },
-  { key: "vacations", label: "Neatvykimai", icon: Umbrella },
+  { key: "vacations", label: "Atostogos", icon: Umbrella },
   { key: "candidates", label: "Kandidatai", icon: UserPlus },
   { key: "access", label: "Pareigos ir teisės", icon: UserCog },
   { key: "trainings", label: "Mokymai", icon: GraduationCap },
@@ -485,7 +496,7 @@ function employeeProfileBirthDate(profile: Partial<Employee>) {
 export default function TeamPage() {
   const searchParams = useSearchParams();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>("overview");
+  const [tab, setTab] = useState<TabKey>("employees");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -517,18 +528,38 @@ export default function TeamPage() {
 
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [employeeEditorTab, setEmployeeEditorTab] = useState<EmployeeEditorTab>("register");
 
   useEffect(() => {
     void loadAll();
   }, []);
 
   useEffect(() => {
+    const moduleFromUrl = searchParams.get("module") as TabKey | null;
+    const savedModule = typeof window !== "undefined" ? (window.localStorage.getItem("team-active-module") as TabKey | null) : null;
+    const nextModule = moduleFromUrl || savedModule;
+
+    if (nextModule && tabs.some((item) => item.key === nextModule)) {
+      setTab(nextModule);
+    }
+
     if (searchParams.get("newEmployee") === "1") {
       setCreateModalMessage("");
       setTab("employees");
       setShowCreateModal(true);
     }
   }, [searchParams]);
+
+  function changeTab(nextTab: TabKey) {
+    setTab(nextTab);
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("team-active-module", nextTab);
+      const url = new URL(window.location.href);
+      url.searchParams.set("module", nextTab);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }
 
   async function loadAll() {
     setLoading(true);
@@ -555,7 +586,7 @@ export default function TeamPage() {
         supabase
           .from("organization_members")
           .select(
-            "user_id, role, legacy_role, position, department, staff_type, contract_number, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
+            "user_id, role, legacy_role, position, department, staff_type, contract_number, employment_rate, weekly_hours, employment_type, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
           )
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false }),
@@ -571,7 +602,7 @@ export default function TeamPage() {
           .order("created_at", { ascending: false }),
         supabase
           .from("personnel_trainings")
-          .select("id, employee_id, title, completed_at, expires_at, hours")
+          .select("id, employee_id, title, category, provider, completed_at, expires_at, hours, status")
           .eq("organization_id", orgId)
           .order("completed_at", { ascending: false }),
         supabase
@@ -693,6 +724,7 @@ export default function TeamPage() {
 
   function openEmployeeEditor(employee: Employee) {
     setEditingEmployee(employee);
+    setEmployeeEditorTab("profile");
     setEditForm({
       first_name: employee.first_name || "",
       last_name: employee.last_name || "",
@@ -705,6 +737,9 @@ export default function TeamPage() {
       staff_type: employee.staff_type || "",
       role: employee.role || "employee",
       contract_number: employee.contract_number || "",
+      employment_rate: Number(employee.employment_rate || 1),
+      weekly_hours: Number(employee.weekly_hours || 40),
+      employment_type: employee.employment_type || "full_time",
       employment_start_date: normalizeDateInput(employee.employment_start_date),
       termination_date: normalizeDateInput(employee.termination_date),
       is_archived: employee.is_archived === true,
@@ -715,11 +750,18 @@ export default function TeamPage() {
       extra_permissions: normalizeExtraPermissions(employee.extra_permissions),
       is_active: employee.is_active !== false,
     });
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("employee-register-tabs")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   function closeEmployeeEditor() {
     setEditingEmployee(null);
     setEditForm(null);
+    setEmployeeEditorTab("register");
   }
 
   async function saveEmployee() {
@@ -777,6 +819,9 @@ export default function TeamPage() {
         ),
         role: editForm.role || "employee",
         contract_number: editForm.contract_number.trim() || null,
+        employment_rate: Number(editForm.employment_rate || 1),
+        weekly_hours: Number(editForm.weekly_hours || 40),
+        employment_type: editForm.employment_type || "full_time",
         employment_start_date: editForm.employment_start_date || null,
         termination_date: editForm.termination_date || null,
         is_archived: editForm.is_archived,
@@ -868,7 +913,6 @@ export default function TeamPage() {
 
       setMessage((prev) => prev || "Darbuotojo duomenys atnaujinti.");
       closeEmployeeEditor();
-      window.location.reload();
     } catch (error) {
       console.error("[TeamPage] saveEmployee failed", error);
       setMessage(getReadableError(error));
@@ -1338,258 +1382,189 @@ export default function TeamPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-5">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
-                <BriefcaseBusiness className="h-7 w-7" />
-              </div>
-
+    <main className="min-h-screen bg-[#f3f6f4] p-5 text-[#10251f]">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="mb-4 overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+          <div className="bg-[#486b5d] px-5 py-4 text-white">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                  Personalo modulis
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
+                  Personalo valdymas
                 </p>
-                <h1 className="mt-2 text-4xl font-black tracking-tight">
-                  Komanda
+                <h1 className="mt-1 text-2xl font-black tracking-tight">
+                  Darbuotojai, grafikai ir prašymai
                 </h1>
-                <p className="mt-2 text-lg font-semibold text-slate-500">
-                  Darbuotojų registras, pareigos, dokumentai, mokymai, atostogos ir kandidatai vienoje vietoje.
+                <p className="mt-1 max-w-3xl text-sm font-semibold text-white/80">
+                  Vienas darbo langas personalo procesams: prašymai, grafikas, mokymai, dokumentai ir teisės.
                 </p>
               </div>
-            </div>
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => void loadAll()}
-                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-extrabold text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.98]"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Atnaujinti
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void loadAll()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] active:scale-[0.98]"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Atnaujinti
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setTab("candidates")}
-                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 font-extrabold text-emerald-800 shadow-sm transition hover:bg-emerald-50 active:scale-[0.98]"
-              >
-                <UserPlus className="h-4 w-4" />
-                Kandidatai
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setCreateModalMessage(""); setShowCreateModal(true); }}
-                className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 font-extrabold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98]"
-              >
-                <Plus className="h-4 w-4" />
-                Naujas darbuotojas
-              </button>
+                <button
+                  type="button"
+                  onClick={() => { setCreateModalMessage(""); setShowCreateModal(true); }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white/12 px-3 py-2 text-sm font-black text-white/90 ring-1 ring-white/20 transition hover:bg-white/18 active:scale-[0.98]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Naujas darbuotojas
+                </button>
+              </div>
             </div>
           </div>
+
+          <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d]">
+            {tabs.map((item) => {
+              const Icon = item.icon;
+              const active = tab === item.key;
+
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => changeTab(item.key)}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 transition ${
+                    active
+                      ? "bg-white text-[#486b5d] shadow-sm ring-1 ring-[#c9d8d0]"
+                      : "text-[#486b5d] hover:bg-white/80"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => changeTab("schedule")}
+              className="ml-auto rounded-lg border border-[#c2d3ca] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
+            >
+              Kompaktiškas režimas
+            </button>
+          </nav>
         </section>
 
         {message ? (
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5 font-extrabold text-emerald-800">
+          <div className="rounded-2xl border border-[#c9d8d0] bg-[#eef4f1] p-4 text-sm font-black text-[#486b5d]">
             {message}
           </div>
         ) : null}
 
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            icon={<Users className="h-6 w-6" />}
-            title="Darbuotojai"
-            value={String(activeEmployees.length)}
-            meta={`${employees.length} registre · ${archivedEmployees.length} archyve`}
-            tone="emerald"
-            onClick={() => setTab("employees")}
-          />
-          <StatCard
-            icon={<Umbrella className="h-6 w-6" />}
-            title="Atostogos"
-            value={String(pendingVacations.length)}
-            meta="laukia"
-            tone="amber"
-            onClick={() => setTab("vacations")}
-          />
-          <StatCard
-            icon={<FileText className="h-6 w-6" />}
-            title="Dokumentai"
-            value={String(expiringCredentials.length + expiringEmployeeDocs.length)}
-            meta="baigiasi"
-            tone="rose"
-            onClick={() => setTab("docs")}
-          />
-          <StatCard
-            icon={<GraduationCap className="h-6 w-6" />}
-            title="Mokymai"
-            value={String(trainingIssues.length)}
-            meta="neatitikimai"
-            tone="blue"
-            onClick={() => setTab("trainings")}
-          />
+        <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
+          <button
+            type="button"
+            onClick={() => changeTab("employees")}
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+          >
+            <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">Darbuotojai</p>
+            <p className="mt-1 text-2xl font-black text-[#10251f]">{activeEmployees.length}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">{employees.length} registre · {archivedEmployees.length} archyve</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeTab("vacations")}
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+          >
+            <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">Atostogos</p>
+            <p className="mt-1 text-2xl font-black text-[#8a5a13]">{pendingVacations.length}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">laukia patvirtinimo</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeTab("schedule")}
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+          >
+            <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">Grafikas</p>
+            <p className="mt-1 text-2xl font-black text-[#8a5a13]">{scheduleComplianceRows.length}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">įspėjimai</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeTab("trainings")}
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+          >
+            <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">Mokymai</p>
+            <p className="mt-1 text-2xl font-black text-[#10251f]">{trainingIssues.length}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">neatitikimai</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeTab("docs")}
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+          >
+            <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">Dokumentai</p>
+            <p className="mt-1 text-2xl font-black text-[#10251f]">{expiringCredentials.length + expiringEmployeeDocs.length}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">baigiasi</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeTab("candidates")}
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+          >
+            <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">Kandidatai</p>
+            <p className="mt-1 text-2xl font-black text-[#10251f]">{candidates.length}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">atrankos</p>
+          </button>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="grid gap-6">
-            <Card className="min-h-[286px]">
-              <h2 className="text-2xl font-black tracking-tight">Greiti veiksmai</h2>
-              <p className="mt-1 font-semibold text-slate-500">
-                Dažniausiai naudojamos personalo operacijos.
-              </p>
+        {tab !== "overview" ? (
+          <section className="mb-4 rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+            <div className="flex flex-wrap items-center gap-2 border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+              <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Veiksmai</span>
+              <button
+                type="button"
+                onClick={() => { setCreateModalMessage(""); setShowCreateModal(true); }}
+                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+              >
+                + Darbuotojas
+              </button>
+              <button
+                type="button"
+                onClick={() => changeTab("vacations")}
+                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+              >
+                + Prašymas
+              </button>
+              <button
+                type="button"
+                onClick={() => void loadAll()}
+                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+              >
+                Atnaujinti
+              </button>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <ActionCard
-                  title="Naujas darbuotojas"
-                  desc="Sukurti darbuotojo įrašą"
-                  onClick={() => { setCreateModalMessage(""); setShowCreateModal(true); }}
-                />
-                <ActionCard
-                  title="Pareigos ir teisės"
-                  desc="Keisti sistemos prieigas"
-                  onClick={() => setTab("access")}
-                />
-                <ActionCard
-                  title="Kandidatai"
-                  desc="Anketos, atranka ir priėmimas į darbą"
-                  onClick={() => setTab("candidates")}
-                />
-                <ActionCard
-                  title="Dokumentai"
-                  desc="Pažymos ir licencijos"
-                  onClick={() => setTab("docs")}
-                />
-              </div>
-            </Card>
+              <div className="mx-2 hidden h-7 w-px bg-[#dbe6e0] md:block" />
 
-            <Card className="min-h-[370px]">
-              <h2 className="text-2xl font-black tracking-tight">Naujausias aktyvumas</h2>
-              <p className="mt-1 font-semibold text-slate-500">
-                Paskutiniai personalo modulio signalai.
-              </p>
-
-              <div className="mt-5 space-y-3">
-                {dashboardActivity.map((item) => (
-                  <ActivityItem key={item.title} title={item.title} meta={item.meta} />
-                ))}
-              </div>
-            </Card>
-          </div>
-
-          <div className="grid gap-6">
-            <Card className="min-h-[286px]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                    Šiandien
-                  </p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight">
-                    Personalo santrauka
-                  </h2>
-                  <p className="mt-1 font-semibold text-slate-500">
-                    Svarbiausi darbuotojų ir HR procesų rodikliai.
-                  </p>
-                </div>
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                  <ClipboardList className="h-6 w-6" />
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <SummaryCard title="Aktyvūs darbuotojai" value={String(activeEmployees.length)} />
-                <SummaryCard title="Kvietimai" value={String(candidates.length)} />
-                <SummaryCard title="Kvietimai" value={`${pendingInvites.length} laukia`} muted />
-                <SummaryCard title="Atostogos" value={`${pendingVacations.length} laukia`} muted />
-              </div>
-            </Card>
-
-            <Card className="min-h-[370px]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-amber-600">
-                    Prioritetai
-                  </p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight">Reikia dėmesio</h2>
-                  <p className="mt-1 font-semibold text-slate-500">
-                    Dokumentai, mokymai, atostogos ir darbuotojų prieigos.
-                  </p>
-                </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-                  <AlertTriangle className="h-6 w-6" />
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                <PriorityItem
-                  title="Baigiasi dokumentai"
-                  value={`${expiringCredentials.length + expiringEmployeeDocs.length}`}
-                  tone="amber"
-                  onClick={() => setTab("docs")}
-                />
-                <PriorityItem
-                  title="Mokymų neatitikimai"
-                  value={`${trainingIssues.length}`}
-                  tone="rose"
-                  onClick={() => setTab("trainings")}
-                />
-                <PriorityItem
-                  title="Atostogų prašymai"
-                  value={`${pendingVacations.length}`}
-                  tone="blue"
-                  onClick={() => setTab("vacations")}
-                />
-              </div>
-            </Card>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                Moduliai
-              </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">
-                Personalo valdymas
-              </h2>
-              <p className="mt-1 font-semibold text-slate-500">
-                Pasirink modulį, kurį nori tvarkyti.
-              </p>
+              <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Filtrai</span>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="h-9 min-w-[220px] rounded-lg border border-[#c2d3ca] bg-white px-3 text-xs font-semibold outline-none focus:border-[#486b5d]"
+                placeholder="Ieškoti..."
+              />
+              <button
+                type="button"
+                onClick={() => changeTab("schedule")}
+                className="ml-auto rounded-lg bg-[#fff9e8] px-3 py-2 text-xs font-black text-[#8a5a13] ring-1 ring-[#ead8a7]"
+              >
+                Grafiko įspėjimai: {scheduleComplianceRows.length}
+              </button>
             </div>
-
-            <div className="grid w-full gap-3 md:grid-cols-2 xl:grid-cols-4 lg:max-w-5xl">
-              {tabs.map((item) => {
-                const Icon = item.icon;
-                const active = tab === item.key;
-
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setTab(item.key)}
-                    className={`flex items-center gap-3 rounded-2xl border p-4 text-left font-black transition active:scale-[0.99] ${
-                      active
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-200 hover:bg-emerald-50"
-                    }`}
-                  >
-                    <span
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                        active ? "bg-white text-emerald-700" : "bg-white text-slate-500"
-                      }`}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
 
         {tab === "overview" && (
           <section className="grid gap-6 lg:grid-cols-2">
@@ -1628,12 +1603,12 @@ export default function TeamPage() {
 
         {tab === "employees" && (
           <Card>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div id="employee-register-tabs" className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
                   Registras
                 </p>
-                <h2 className="mt-1 text-2xl font-black tracking-tight">
+                <h2 className="mt-1 text-3xl font-black tracking-tight text-[#10251f]">
                   Darbuotojų kortelės
                 </h2>
                 <p className="mt-1 font-semibold text-slate-500">
@@ -1641,30 +1616,139 @@ export default function TeamPage() {
                 </p>
               </div>
 
-              <label className="relative block w-full lg:w-96">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <label className="relative block w-full lg:w-[430px]">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8aa0b8]" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Ieškoti pagal vardą, pareigas, skyrių..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
+                  className="h-12 w-full rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] pl-12 pr-4 text-sm font-bold outline-none placeholder:text-[#8aa0b8] transition focus:border-emerald-500 focus:bg-white"
                 />
               </label>
             </div>
 
+            <nav className="mt-5 flex flex-wrap gap-1 rounded-2xl border border-[#dbe6e0] bg-[#eef4f1] p-2 text-sm font-black text-[#486b5d]">
+              <button
+                type="button"
+                onClick={() => {
+                  closeEmployeeEditor();
+                  setEmployeeEditorTab("register");
+                }}
+                className={`rounded-xl px-4 py-2 transition ${
+                  employeeEditorTab === "register" || !editingEmployee
+                    ? "bg-white shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "hover:bg-white/80"
+                }`}
+              >
+                Visi darbuotojai
+              </button>
+
+              {[
+                ["profile", "Duomenys"],
+                ["contract", "Sutartis"],
+                ["access", "Pareigos ir teisės"],
+                ["documents", "Dokumentai"],
+                ["trainings", "Mokymai"],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={!editingEmployee}
+                  onClick={() => setEmployeeEditorTab(key as EmployeeEditorTab)}
+                  className={`rounded-xl px-4 py-2 transition ${
+                    editingEmployee && employeeEditorTab === key
+                      ? "bg-white shadow-sm ring-1 ring-[#c9d8d0]"
+                      : editingEmployee
+                        ? "hover:bg-white/80"
+                        : "cursor-not-allowed opacity-45"
+                  }`}
+                  title={!editingEmployee ? "Pirma pasirinkite darbuotoją" : undefined}
+                >
+                  {label}
+                </button>
+              ))}
+
+              {editingEmployee ? (
+                <button
+                  type="button"
+                  onClick={closeEmployeeEditor}
+                  className="ml-auto rounded-xl border border-[#dbe6e0] bg-white px-4 py-2 text-[#486b5d]"
+                >
+                  Uždaryti kortelę
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setCreateModalMessage(""); setShowCreateModal(true); }}
+                  className="ml-auto rounded-xl border border-[#dbe6e0] bg-white px-4 py-2 text-[#486b5d]"
+                >
+                  + Darbuotojas
+                </button>
+              )}
+            </nav>
+
+            <section className="mt-4 border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
+                  Filtrai
+                </span>
+                <span className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-black text-white">
+                  Visi
+                </span>
+                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
+                  Aktyvūs
+                </span>
+                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
+                  Administracija
+                </span>
+                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
+                  Slauga / medikai
+                </span>
+                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
+                  Socialinė sritis
+                </span>
+                <span className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]">
+                  Ūkis
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void loadAll()}
+                  className="ml-auto rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]"
+                >
+                  Atnaujinti
+                </button>
+              </div>
+            </section>
+
             {filteredEmployees.length === 0 ? (
               <EmptyState text="Darbuotojų nerasta." />
             ) : (
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-5 grid gap-3">
                 {filteredEmployees.map((employee) => (
-                  <EmployeeCard
+                  <EmployeeRowCard
                     key={employee.user_id}
                     employee={employee}
+                    selected={editingEmployee?.user_id === employee.user_id}
                     onEdit={() => openEmployeeEditor(employee)}
                   />
                 ))}
               </div>
             )}
+
+            {editingEmployee && editForm && employeeEditorTab !== "register" ? (
+              <EmployeeTabbedEditor
+                employee={editingEmployee}
+                editForm={editForm}
+                activeTab={employeeEditorTab}
+                trainings={trainings.filter((training) => training.employee_id === editingEmployee.user_id)}
+                credentials={credentials.filter((credential) => credential.employee_id === editingEmployee.user_id)}
+                saving={saving}
+                onChange={setEditForm}
+                onTabChange={setEmployeeEditorTab}
+                onTogglePermission={toggleExtraPermission}
+                onSave={() => void saveEmployee()}
+              />
+            ) : null}
           </Card>
         )}
 
@@ -1683,7 +1767,23 @@ export default function TeamPage() {
           />
         )}
 
-        {tab === "trainings" && <TrainingModule />}
+        {tab === "trainings" && (
+          <TrainingModule
+            organizationId={organizationId}
+            employees={activeEmployees.map((employee) => ({
+              id: employee.user_id,
+              full_name: employeeName(employee),
+              name: employeeName(employee),
+              role: employee.position || employee.role || null,
+              department: employee.department || null,
+            }))}
+            trainings={trainings.map((training) => ({
+              ...training,
+              title: training.title || "Mokymas",
+            }))}
+            onRefresh={loadAll}
+          />
+        )}
 
         {tab === "vacations" && (
           <VacationRequests
@@ -1950,426 +2050,15 @@ export default function TeamPage() {
         </Modal>
       )}
 
-      {editingEmployee && editForm && (
-        <Modal
-          title="Redaguoti darbuotoją"
-          desc="Tvarkykite darbuotojo duomenis, pareigas, dokumentus ir individualias teises."
-          onClose={closeEmployeeEditor}
-        >
-          <form
-            className="space-y-5"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void saveEmployee();
-            }}
-          >
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <h3 className="text-xl font-black">1. Darbuotojo duomenys</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Čia redaguojami pagrindiniai darbuotojo duomenys. Pavyzdžiai laukeliuose yra tik pagalba — jų trinti nereikia, tiesiog įrašykite tikrą reikšmę.
-              </p>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Field label="Vardas">
-                  <input
-                    value={editForm.first_name}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, first_name: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-
-                <Field label="Pavardė">
-                  <input
-                    value={editForm.last_name}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, last_name: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-
-                <Field label="Rodomas vardas">
-                  <input
-                    value={editForm.full_name}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, full_name: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-
-                <Field label="El. paštas">
-                  <input
-                    value={editForm.email}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, email: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-
-                <Field label="Telefonas">
-                  <input
-                    value={editForm.phone}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, phone: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-
-                <Field label="Gimimo data">
-                  <input
-                    type="date"
-                    min="1900-01-01"
-                    max={new Date().toISOString().slice(0, 10)}
-                    value={editForm.birth_date}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, birth_date: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-
-                <Field label="Konkrečios pareigos">
-                  <input
-                    value={editForm.position}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, position: event.target.value })
-                    }
-                    className="input"
-                    placeholder="Pvz., vyr. slaugytoja"
-                  />
-                </Field>
-
-                <Field label="Skyrius">
-                  <input
-                    value={editForm.department}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, department: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <h3 className="text-xl font-black">2. Darbo sutartis ir statusas</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Šie laukai skirti personalo apskaitai. Po atleidimo darbuotoją galima archyvuoti, kad jis nebesimatytų aktyvių darbuotojų sąraše.
-              </p>
-
-
-              <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <Field label="Etato dydis">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="2"
-                    value={editForm.employment_rate || 1}
-                    onChange={(event) =>
-                      setEditForm({
-                        ...editForm,
-                        employment_rate: Number(event.target.value),
-                      })
-                    }
-                    className="input"
-                    placeholder="1.00"
-                  />
-                </Field>
-
-                <Field label="Savaitės valandos">
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    max="80"
-                    value={editForm.weekly_hours || 40}
-                    onChange={(event) =>
-                      setEditForm({
-                        ...editForm,
-                        weekly_hours: Number(event.target.value),
-                      })
-                    }
-                    className="input"
-                    placeholder="40"
-                  />
-                </Field>
-
-                <Field label="Darbo tipas">
-                  <select
-                    value={editForm.employment_type || "full_time"}
-                    onChange={(event) =>
-                      setEditForm({
-                        ...editForm,
-                        employment_type: event.target.value,
-                      })
-                    }
-                    className="input"
-                  >
-                    <option value="full_time">Pilnas etatas</option>
-                    <option value="part_time">Nepilnas etatas</option>
-                    <option value="temporary">Terminuota</option>
-                    <option value="internship">Praktika</option>
-                    <option value="volunteer">Savanoris</option>
-                    <option value="night_only">Naktinis</option>
-                  </select>
-                </Field>
-              </div>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <Field label="Darbo sutarties numeris">
-                  <input
-                    value={editForm.contract_number}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, contract_number: event.target.value })
-                    }
-                    className="input"
-                    placeholder="Pvz., DS-2026-001"
-                  />
-                </Field>
-
-                <Field label="Darbo pradžia">
-                  <input
-                    type="date"
-                    value={editForm.employment_start_date}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, employment_start_date: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-
-                <Field label="Atleidimo data">
-                  <input
-                    type="date"
-                    value={editForm.termination_date}
-                    onChange={(event) =>
-                      setEditForm({
-                        ...editForm,
-                        termination_date: event.target.value,
-                        is_active: event.target.value ? false : editForm.is_active,
-                      })
-                    }
-                    className="input"
-                  />
-                </Field>
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setEditForm({
-                      ...editForm,
-                      is_active: !editForm.is_active,
-                      is_archived: !editForm.is_active ? false : editForm.is_archived,
-                    })
-                  }
-                  className={`rounded-2xl border p-4 text-left font-black transition ${
-                    editForm.is_active
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-slate-200 bg-white text-slate-700"
-                  }`}
-                >
-                  {editForm.is_active ? "Aktyvus darbuotojas" : "Neaktyvus darbuotojas"}
-                  <span className="mt-1 block text-sm font-semibold text-slate-500">
-                    Neaktyvus gali būti atleistas, laikinai sustabdytas arba nebedirbantis.
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setEditForm({
-                      ...editForm,
-                      is_archived: !editForm.is_archived,
-                      is_active: editForm.is_archived ? editForm.is_active : false,
-                      termination_date: !editForm.is_archived && !editForm.termination_date ? new Date().toISOString().slice(0, 10) : editForm.termination_date,
-                    })
-                  }
-                  className={`rounded-2xl border p-4 text-left font-black transition ${
-                    editForm.is_archived
-                      ? "border-amber-200 bg-amber-50 text-amber-800"
-                      : "border-slate-200 bg-white text-slate-700"
-                  }`}
-                >
-                  {editForm.is_archived ? "Archyvuotas" : "Archyvuoti po atleidimo"}
-                  <span className="mt-1 block text-sm font-semibold text-slate-500">
-                    Archyvuoti darbuotojai neberodomi aktyviame registre, bet lieka istorijoje.
-                  </span>
-                </button>
-              </div>
-
-              <div className="mt-4">
-                <Field label="Archyvavimo / atleidimo pastaba">
-                  <textarea
-                    value={editForm.archive_reason}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, archive_reason: event.target.value })
-                    }
-                    className="input min-h-[90px]"
-                    placeholder="Pvz., darbo sutartis nutraukta darbuotojo prašymu"
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <h3 className="text-xl font-black">3. Sistemos pareigos ir teisės</h3>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <Field label="Sistemos pareigų tipas">
-                  <select
-                    value={editForm.staff_type}
-                    onChange={(event) => {
-                      const staffType = event.target.value;
-                      setEditForm({
-                        ...editForm,
-                        staff_type: staffType,
-                        position:
-                          STAFF_TYPES.find((type) => type.value === staffType)?.label ||
-                          editForm.position,
-                        extra_permissions: Array.from(
-                          new Set([
-                            ...staffPermissions(staffType),
-                            ...editForm.extra_permissions,
-                          ]),
-                        ),
-                      });
-                    }}
-                    className="input"
-                  >
-                    <option value="">Pasirinkti</option>
-                    {STAFF_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Rolė">
-                  <select
-                    value={editForm.role}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, role: event.target.value })
-                    }
-                    className="input"
-                  >
-                    <option value="employee">Darbuotojas</option>
-                    <option value="admin">Administratorius</option>
-                    <option value="owner">Savininkas</option>
-                  </select>
-                </Field>
-              </div>
-
-              <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-5">
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                  Papildomos individualios teisės
-                </p>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {EXTRA_PERMISSIONS.map((permission) => {
-                    const checked = editForm.extra_permissions.includes(permission.value);
-
-                    return (
-                      <button
-                        key={permission.value}
-                        type="button"
-                        onClick={() => toggleExtraPermission(permission.value)}
-                        className={`rounded-2xl border p-4 text-left font-black transition active:scale-[0.99] ${
-                          checked
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                            : "border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-200 hover:bg-emerald-50"
-                        }`}
-                      >
-                        {permission.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-blue-700">
-                    Galutinės aktyvios teisės
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {mergedPermissions(editForm).map((permission) => (
-                      <span
-                        key={permission}
-                        className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-800"
-                      >
-                        {permission}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <h3 className="text-xl font-black">4. Licencija ir sveikatos pažyma</h3>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <Field label="Profesinės licencijos numeris">
-                  <input
-                    value={editForm.professional_license_number}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, professional_license_number: event.target.value })
-                    }
-                    className="input"
-                    placeholder="Pvz., SPL-1234"
-                  />
-                </Field>
-
-                <Field label="Licencija galioja iki">
-                  <input
-                    type="date"
-                    value={editForm.professional_license_valid_until}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, professional_license_valid_until: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-
-                <Field label="Sveikatos pažyma galioja iki">
-                  <input
-                    type="date"
-                    value={editForm.occupational_health_valid_until}
-                    onChange={(event) =>
-                      setEditForm({ ...editForm, occupational_health_valid_until: event.target.value })
-                    }
-                    className="input"
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <ModalFooter
-              saving={saving}
-              onCancel={closeEmployeeEditor}
-              onSave={() => {
-                void saveEmployee();
-              }}
-              submitText="Išsaugoti"
-            />
-          </form>
-        </Modal>
-      )}
 
       <style jsx global>{`
         .input {
           width: 100%;
-          border-radius: 1rem;
+          border-radius: 0.85rem;
           border: 1px solid #dbe3ef;
           background: white;
-          padding: 0.9rem 1rem;
+          padding: 0.72rem 0.9rem;
           font-weight: 800;
           color: #0f172a;
           outline: none;
@@ -2393,7 +2082,7 @@ function Card({
 }) {
   return (
     <article
-      className={`rounded-3xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}
+      className={`rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm ${className}`}
     >
       {children}
     </article>
@@ -2534,6 +2223,344 @@ function PriorityItem({
     >
       <span className="font-black text-slate-900">{title}</span>
       <span className={`rounded-full px-3 py-1 text-sm font-black ${toneClass}`}>{value}</span>
+    </button>
+  );
+}
+
+
+function EmployeeTabbedEditor({
+  employee,
+  editForm,
+  activeTab,
+  trainings,
+  credentials,
+  saving,
+  onChange,
+  onTabChange,
+  onTogglePermission,
+  onSave,
+}: {
+  employee: Employee;
+  editForm: EditForm;
+  activeTab: EmployeeEditorTab;
+  trainings: Training[];
+  credentials: Credential[];
+  saving: boolean;
+  onChange: (form: EditForm) => void;
+  onTabChange: (tab: EmployeeEditorTab) => void;
+  onTogglePermission: (permission: string) => void;
+  onSave: () => void;
+}) {
+  return (
+    <section className="mt-5 overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+      <header className="border-b border-[#dbe6e0] bg-[#486b5d] px-5 py-4 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-lg font-black text-emerald-700 shadow-sm">
+              {employeeName(employee).slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
+                Redaguojama kortelė
+              </p>
+              <h3 className="mt-1 text-2xl font-black">{employeeName(employee)}</h3>
+              <p className="mt-1 text-sm font-semibold text-white/75">
+                {editForm.position || "Pareigos nenurodytos"} · {editForm.department || "Skyrius nenurodytas"}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="rounded-xl bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm disabled:opacity-60"
+          >
+            {saving ? "Saugoma..." : "Išsaugoti"}
+          </button>
+        </div>
+      </header>
+
+      <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d]">
+        {[
+          ["profile", "Duomenys"],
+          ["contract", "Sutartis"],
+          ["access", "Pareigos ir teisės"],
+          ["documents", "Dokumentai"],
+          ["trainings", "Mokymai"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onTabChange(key as EmployeeEditorTab)}
+            className={`rounded-xl px-4 py-2 transition ${
+              activeTab === key
+                ? "bg-white shadow-sm ring-1 ring-[#c9d8d0]"
+                : "hover:bg-white/80"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="p-4">
+        {activeTab === "profile" ? (
+          <section className="grid gap-3 md:grid-cols-2">
+            <Field label="Vardas">
+              <input value={editForm.first_name} onChange={(event) => onChange({ ...editForm, first_name: event.target.value })} className="input" />
+            </Field>
+            <Field label="Pavardė">
+              <input value={editForm.last_name} onChange={(event) => onChange({ ...editForm, last_name: event.target.value })} className="input" />
+            </Field>
+            <Field label="Rodomas vardas">
+              <input value={editForm.full_name} onChange={(event) => onChange({ ...editForm, full_name: event.target.value })} className="input" />
+            </Field>
+            <Field label="El. paštas">
+              <input value={editForm.email} onChange={(event) => onChange({ ...editForm, email: event.target.value })} className="input" type="email" />
+            </Field>
+            <Field label="Telefonas">
+              <input value={editForm.phone} onChange={(event) => onChange({ ...editForm, phone: event.target.value })} className="input" />
+            </Field>
+            <Field label="Gimimo data">
+              <input type="date" min="1900-01-01" max={new Date().toISOString().slice(0, 10)} value={editForm.birth_date} onChange={(event) => onChange({ ...editForm, birth_date: event.target.value })} className="input" />
+            </Field>
+          </section>
+        ) : null}
+
+        {activeTab === "contract" ? (
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <Field label="Konkrečios pareigos">
+              <input value={editForm.position} onChange={(event) => onChange({ ...editForm, position: event.target.value })} className="input" placeholder="Pvz., vyr. slaugytoja" />
+            </Field>
+            <Field label="Skyrius">
+              <input value={editForm.department} onChange={(event) => onChange({ ...editForm, department: event.target.value })} className="input" />
+            </Field>
+            <Field label="Darbo sutarties numeris">
+              <input value={editForm.contract_number} onChange={(event) => onChange({ ...editForm, contract_number: event.target.value })} className="input" placeholder="Pvz., DS-2026-001" />
+            </Field>
+            <Field label="Etato dydis">
+              <input type="number" step="0.01" min="0" max="2" value={editForm.employment_rate || 1} onChange={(event) => onChange({ ...editForm, employment_rate: Number(event.target.value) })} className="input" />
+            </Field>
+            <Field label="Savaitės valandos">
+              <input type="number" step="1" min="1" max="80" value={editForm.weekly_hours || 40} onChange={(event) => onChange({ ...editForm, weekly_hours: Number(event.target.value) })} className="input" />
+            </Field>
+            <Field label="Darbo tipas">
+              <select value={editForm.employment_type || "full_time"} onChange={(event) => onChange({ ...editForm, employment_type: event.target.value })} className="input">
+                <option value="full_time">Pilnas etatas</option>
+                <option value="part_time">Nepilnas etatas</option>
+                <option value="temporary">Terminuota</option>
+                <option value="internship">Praktika</option>
+                <option value="volunteer">Savanoris</option>
+                <option value="night_only">Naktinis</option>
+              </select>
+            </Field>
+            <Field label="Darbo pradžia">
+              <input type="date" value={editForm.employment_start_date} onChange={(event) => onChange({ ...editForm, employment_start_date: event.target.value })} className="input" />
+            </Field>
+            <Field label="Atleidimo data">
+              <input type="date" value={editForm.termination_date} onChange={(event) => onChange({ ...editForm, termination_date: event.target.value, is_active: event.target.value ? false : editForm.is_active })} className="input" />
+            </Field>
+            <Field label="Archyvavimo / atleidimo pastaba" full>
+              <textarea value={editForm.archive_reason} onChange={(event) => onChange({ ...editForm, archive_reason: event.target.value })} className="input min-h-[80px]" placeholder="Pvz., darbo sutartis nutraukta darbuotojo prašymu" />
+            </Field>
+
+            <button
+              type="button"
+              onClick={() => onChange({ ...editForm, is_active: !editForm.is_active, is_archived: !editForm.is_active ? false : editForm.is_archived })}
+              className={`rounded-2xl border p-4 text-left font-black transition ${
+                editForm.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              {editForm.is_active ? "Aktyvus darbuotojas" : "Neaktyvus darbuotojas"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                onChange({
+                  ...editForm,
+                  is_archived: !editForm.is_archived,
+                  is_active: editForm.is_archived ? editForm.is_active : false,
+                  termination_date: !editForm.is_archived && !editForm.termination_date ? new Date().toISOString().slice(0, 10) : editForm.termination_date,
+                })
+              }
+              className={`rounded-2xl border p-4 text-left font-black transition ${
+                editForm.is_archived ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              {editForm.is_archived ? "Archyvuotas" : "Archyvuoti po atleidimo"}
+            </button>
+          </section>
+        ) : null}
+
+        {activeTab === "access" ? (
+          <section className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Sistemos pareigų tipas">
+                <select
+                  value={editForm.staff_type}
+                  onChange={(event) => {
+                    const staffType = event.target.value;
+                    onChange({
+                      ...editForm,
+                      staff_type: staffType,
+                      position: STAFF_TYPES.find((type) => type.value === staffType)?.label || editForm.position,
+                      extra_permissions: Array.from(new Set([...staffPermissions(staffType), ...editForm.extra_permissions])),
+                    });
+                  }}
+                  className="input"
+                >
+                  <option value="">Pasirinkti</option>
+                  {STAFF_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Rolė">
+                <select value={editForm.role} onChange={(event) => onChange({ ...editForm, role: event.target.value })} className="input">
+                  <option value="employee">Darbuotojas</option>
+                  <option value="admin">Administratorius</option>
+                  <option value="owner">Savininkas</option>
+                </select>
+              </Field>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {EXTRA_PERMISSIONS.map((permission) => {
+                const checked = editForm.extra_permissions.includes(permission.value);
+
+                return (
+                  <button
+                    key={permission.value}
+                    type="button"
+                    onClick={() => onTogglePermission(permission.value)}
+                    className={`rounded-xl border px-3 py-2 text-left text-sm font-black transition ${
+                      checked ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-[#dbe6e0] bg-[#f8faf8] text-[#486b5d] hover:border-emerald-200 hover:bg-emerald-50"
+                    }`}
+                  >
+                    {permission.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Galutinės aktyvios teisės</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {mergedPermissions(editForm).map((permission) => (
+                  <span key={permission} className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-800">
+                    {permission}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "documents" ? (
+          <section className="grid gap-3 md:grid-cols-3">
+            <Field label="Profesinės licencijos numeris">
+              <input value={editForm.professional_license_number} onChange={(event) => onChange({ ...editForm, professional_license_number: event.target.value })} className="input" placeholder="Pvz., SPL-1234" />
+            </Field>
+            <Field label="Licencija galioja iki">
+              <input type="date" value={editForm.professional_license_valid_until} onChange={(event) => onChange({ ...editForm, professional_license_valid_until: event.target.value })} className="input" />
+            </Field>
+            <Field label="Sveikatos pažyma galioja iki">
+              <input type="date" value={editForm.occupational_health_valid_until} onChange={(event) => onChange({ ...editForm, occupational_health_valid_until: event.target.value })} className="input" />
+            </Field>
+
+            <div className="md:col-span-3 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+              <p className="text-sm font-black text-[#10251f]">Darbuotojo dokumentų įrašai</p>
+              <div className="mt-3 grid gap-2">
+                {credentials.length ? credentials.map((credential) => (
+                  <div key={credential.id} className="rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#486b5d]">
+                    {credential.type} · galioja iki {fmt(credential.expires_at)} · Nr. {credential.number || "—"}
+                  </div>
+                )) : (
+                  <p className="text-sm font-bold text-[#6a7e75]">Dokumentų įrašų nėra.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "trainings" ? (
+          <section className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+            <p className="text-sm font-black text-[#10251f]">Darbuotojo mokymai</p>
+            <div className="mt-3 grid gap-2">
+              {trainings.length ? trainings.map((training) => (
+                <div key={training.id} className="rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#486b5d]">
+                  {training.title} · {training.completed_at ? fmt(training.completed_at) : "data nenurodyta"} · {training.hours || 0} val.
+                </div>
+              )) : (
+                <p className="text-sm font-bold text-[#6a7e75]">Mokymų įrašų nėra.</p>
+              )}
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+
+function EmployeeRowCard({
+  employee,
+  selected,
+  onEdit,
+}: {
+  employee: Employee;
+  selected?: boolean;
+  onEdit: () => void;
+}) {
+  const initials = employeeName(employee)
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className={`grid w-full gap-3 rounded-2xl border p-4 text-left shadow-sm transition md:grid-cols-[56px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center ${
+        selected
+          ? "border-emerald-300 bg-emerald-50"
+          : "border-[#dbe6e0] bg-[#f8faf8] hover:border-emerald-200 hover:bg-emerald-50/40"
+      }`}
+    >
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-black text-emerald-700 shadow-sm">
+        {initials || "DR"}
+      </div>
+
+      <div>
+        <div className="text-lg font-black text-[#10251f]">{employeeName(employee)}</div>
+        <div className="text-sm font-bold text-[#6a7e75]">
+          {employee.position || employeeRole(employee) || "Pareigos nenurodytos"} · {employee.department || "Skyrius nenurodytas"}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-700">
+          {employee.is_active === false ? "Neaktyvus" : "Aktyvus"}
+        </span>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d]">
+          {staffTypeLabel(employee.staff_type)}
+        </span>
+      </div>
+
+      <div className="text-sm font-bold text-[#6a7e75]">
+        {employee.contract_number
+          ? `${employee.contract_number}${employee.employment_start_date ? ` · nuo ${fmt(employee.employment_start_date)}` : ""}`
+          : "Trūksta sutarties duomenų"}
+      </div>
+
+      <span className={selected ? "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-black text-white" : "rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d]"}>
+        Redaguoti
+      </span>
     </button>
   );
 }

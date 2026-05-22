@@ -1,21 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties, Dispatch, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import {
   ArrowLeft,
-  BadgeCheck,
   BriefcaseBusiness,
-  CalendarDays,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Circle,
   Plus,
   RefreshCw,
   Save,
   Search,
-  ShieldCheck,
   ToggleLeft,
   ToggleRight,
   UserRound,
@@ -61,6 +57,16 @@ type EmployeeFilter = "all" | "active" | "withPosition" | "withRights" | "withou
 
 const PAGE_SIZE = 10;
 
+type AccessGroupValue = "administration" | "social" | "medical" | "maintenance" | "care_worker";
+
+const ACCESS_GROUP_OPTIONS: Array<{ value: AccessGroupValue; label: string; department: string }> = [
+  { value: "administration", label: "Administracija", department: "Administracija" },
+  { value: "social", label: "Socialinė sritis", department: "Socialinė sritis" },
+  { value: "medical", label: "Medicina / slauga", department: "Sveikatos priežiūra" },
+  { value: "maintenance", label: "Ūkis", department: "Ūkis" },
+  { value: "care_worker", label: "Priežiūra", department: "Priežiūra" },
+];
+
 const PERMISSION_OPTIONS: PermissionOption[] = [
   { value: "dashboard.view", label: "Darbalaukis", description: "Pagrindinis sistemos ekranas." },
   { value: "tasks.view", label: "Užduotys", description: "Matyti priskirtas užduotis." },
@@ -98,7 +104,7 @@ const ROLE_TEMPLATES: RoleTemplate[] = [
     value: "medical",
     label: "Slaugos / medicinos bazinės teisės",
     shortLabel: "Slauga",
-    keywords: ["slaug", "medic", "sveik", "gyd", "padėj", "padej"],
+    keywords: ["slaug", "medic", "sveik", "gyd", "padėj", "padej", "sesel", "farmac", "kinez", "ergoter"],
     description: "Medicina, gyventojai, užduotys ir perdavimo žurnalai.",
     permissions: ["dashboard.view", "tasks.view", "tasks.create", "residents.view_basic", "medicine.view", "handover.view", "handover.create"],
   },
@@ -114,11 +120,15 @@ const ROLE_TEMPLATES: RoleTemplate[] = [
     value: "care_worker",
     label: "Priežiūros bazinės teisės",
     shortLabel: "Priežiūra",
-    keywords: ["priežiūr", "prieziur", "individual", "darbuotoj"],
+    keywords: ["priežiūr", "prieziur", "individual", "darbuotoj", "globėj", "globej"],
     description: "Bazinė gyventojų informacija ir užduotys.",
     permissions: ["dashboard.view", "tasks.view", "tasks.create", "residents.view_basic"],
   },
 ];
+
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
 
 function uniquePermissions(items: Permission[]) {
   return Array.from(new Set(items.filter(Boolean)));
@@ -166,14 +176,47 @@ function permissionLabel(permission: Permission) {
   return PERMISSION_OPTIONS.find((item) => item.value === permission)?.label || permission;
 }
 
+function normalizeText(value?: string | null) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function templateByValue(value: AccessGroupValue) {
+  return ROLE_TEMPLATES.find((template) => template.value === value) || ROLE_TEMPLATES[4];
+}
+
+function inferAccessGroupFromText(value?: string | null): AccessGroupValue | null {
+  const text = normalizeText(value);
+
+  if (/(slaug|medic|sveikat|gyd|padej|sesel|farmac|kinez|ergoter)/.test(text)) return "medical";
+  if (/(social|uzimt|soc\.?|atvejo|psicholog)/.test(text)) return "social";
+  if (/(direktor|admin|vadov|pavaduot|buhalt|personalo|koordinator)/.test(text)) return "administration";
+  if (/(uk|ūk|sandel|sandėl|pastat|techn|vair|valyt|virtu|maist|kuch)/.test(text)) return "maintenance";
+  if (/(prieziur|priežiūr|individual|globej|globėj|care)/.test(text)) return "care_worker";
+
+  return null;
+}
+
+function detectAccessGroup(employee: Employee): AccessGroupValue {
+  const byDepartment = inferAccessGroupFromText(employee.department);
+  if (byDepartment) return byDepartment;
+
+  const byPosition = inferAccessGroupFromText(employee.position);
+  if (byPosition) return byPosition;
+
+  if (employee.role === "admin" || employee.role === "owner") return "administration";
+
+  return "care_worker";
+}
+
 function detectBaseTemplate(employee: Employee) {
-  const haystack = `${employee.position || ""} ${employee.department || ""} ${employee.role || ""}`.toLowerCase();
+  return templateByValue(detectAccessGroup(employee));
+}
 
-  if (employee.role === "admin" || employee.role === "owner") {
-    return ROLE_TEMPLATES[0];
-  }
-
-  return ROLE_TEMPLATES.find((template) => template.keywords.some((keyword) => haystack.includes(keyword))) || ROLE_TEMPLATES[4];
+function departmentForAccessGroup(value: AccessGroupValue) {
+  return ACCESS_GROUP_OPTIONS.find((option) => option.value === value)?.department || "Priežiūra";
 }
 
 function getBasePermissions(employee: Employee) {
@@ -200,15 +243,6 @@ function toEmployee(member: any, profile?: any): Employee {
     employment_rate: Number(member.employment_rate ?? 1),
     weekly_hours: Number(member.weekly_hours ?? 40),
   };
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  try {
-    return new Intl.DateTimeFormat("lt-LT", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
-  } catch {
-    return value;
-  }
 }
 
 export default function StaffTypesModulePage() {
@@ -279,25 +313,41 @@ export default function StaffTypesModulePage() {
     void loadEmployees();
   }, []);
 
+  function latestEmployee(employee: Employee) {
+    return employees.find((item) => item.user_id === employee.user_id) || employee;
+  }
+
   async function updateEmployeeAccess(
     employee: Employee,
-    patch: Partial<Pick<Employee, "position" | "extra_permissions" | "employment_rate" | "weekly_hours">>,
+    patch: Partial<Pick<Employee, "position" | "department" | "extra_permissions" | "employment_rate" | "weekly_hours">>,
   ) {
-    setSavingUserId(employee.user_id);
-    setMessage("");
-
-    const nextEmployee: Employee = { ...employee, ...patch };
+    const currentEmployee = latestEmployee(employee);
+    const previousEmployee = { ...currentEmployee };
+    const nextEmployee: Employee = { ...currentEmployee, ...patch };
     const nextPosition = String(nextEmployee.position || "").trim() || null;
+    const inferredDepartment = inferAccessGroupFromText(nextPosition);
+    const nextDepartment =
+      patch.department !== undefined
+        ? String(patch.department || "").trim() || null
+        : String(currentEmployee.department || "").trim()
+          ? String(currentEmployee.department || "").trim()
+          : inferredDepartment
+            ? departmentForAccessGroup(inferredDepartment)
+            : null;
     const nextPermissions = normalizeExtraPermissions(nextEmployee.extra_permissions);
     const nextEmploymentRate = Math.max(0, Math.min(2, Number(nextEmployee.employment_rate ?? 1)));
     const nextWeeklyHours = Math.max(0, Math.min(80, Number(nextEmployee.weekly_hours ?? Math.round(nextEmploymentRate * 40))));
 
+    setSavingUserId(currentEmployee.user_id);
+    setMessage("");
+
     setEmployees((previous) =>
       previous.map((item) =>
-        item.user_id === employee.user_id
+        item.user_id === currentEmployee.user_id
           ? {
               ...item,
               position: nextPosition,
+              department: nextDepartment,
               extra_permissions: nextPermissions,
               employment_rate: nextEmploymentRate,
               weekly_hours: nextWeeklyHours,
@@ -310,23 +360,46 @@ export default function StaffTypesModulePage() {
       const organizationId = await getCurrentOrganizationId();
       if (!organizationId) throw new Error("Nepavyko nustatyti įstaigos.");
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("organization_members")
         .update({
           position: nextPosition,
+          department: nextDepartment,
           extra_permissions: nextPermissions,
           employment_rate: nextEmploymentRate,
           weekly_hours: nextWeeklyHours,
         })
         .eq("organization_id", organizationId)
-        .eq("user_id", employee.user_id);
+        .eq("user_id", currentEmployee.user_id)
+        .select("user_id, position, department, extra_permissions, employment_rate, weekly_hours")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data?.user_id) {
+        throw new Error("Pakeitimai neįrašyti. Patikrink RLS teises organization_members lentelei.");
+      }
+
+      setEmployees((previous) =>
+        previous.map((item) =>
+          item.user_id === currentEmployee.user_id
+            ? {
+                ...item,
+                position: data.position ?? nextPosition,
+                department: data.department ?? nextDepartment,
+                extra_permissions: normalizeExtraPermissions(data.extra_permissions),
+                employment_rate: Number(data.employment_rate ?? nextEmploymentRate),
+                weekly_hours: Number(data.weekly_hours ?? nextWeeklyHours),
+              }
+            : item,
+        ),
+      );
 
       setMessageType("success");
-      setMessage("Pareigos, etatas ir papildomos teisės išsaugotos.");
+      setMessage("Pakeitimai išsaugoti.");
     } catch (error) {
-      setEmployees((previous) => previous.map((item) => (item.user_id === employee.user_id ? employee : item)));
+      setEmployees((previous) =>
+        previous.map((item) => (item.user_id === previousEmployee.user_id ? previousEmployee : item)),
+      );
       setMessageType("error");
       setMessage(getReadableError(error));
     } finally {
@@ -335,12 +408,13 @@ export default function StaffTypesModulePage() {
   }
 
   function toggleExtraPermission(employee: Employee, permission: Permission) {
-    const current = normalizeExtraPermissions(employee.extra_permissions);
-    const base = getBasePermissions(employee);
+    const currentEmployee = latestEmployee(employee);
+    const current = normalizeExtraPermissions(currentEmployee.extra_permissions);
+    const base = getBasePermissions(currentEmployee);
 
     if (base.includes(permission)) {
       setMessageType("success");
-      setMessage("Ši teisė yra bazinė pagal pareigybę, todėl ji jau aktyvi ir jos atskirai jungti nereikia.");
+      setMessage("Ši teisė yra bazinė pagal pareigybę, todėl ji jau aktyvi.");
       return;
     }
 
@@ -348,21 +422,22 @@ export default function StaffTypesModulePage() {
       ? current.filter((item) => item !== permission)
       : uniquePermissions([...current, permission]);
 
-    void updateEmployeeAccess(employee, { extra_permissions: next });
+    void updateEmployeeAccess(currentEmployee, { extra_permissions: next });
   }
 
   function addTemplateExtras(employee: Employee, template: RoleTemplate) {
-    const base = getBasePermissions(employee);
-    const current = normalizeExtraPermissions(employee.extra_permissions);
+    const currentEmployee = latestEmployee(employee);
+    const base = getBasePermissions(currentEmployee);
+    const current = normalizeExtraPermissions(currentEmployee.extra_permissions);
     const onlyExtras = template.permissions.filter((permission) => !base.includes(permission));
 
-    void updateEmployeeAccess(employee, { extra_permissions: uniquePermissions([...current, ...onlyExtras]) });
+    void updateEmployeeAccess(currentEmployee, { extra_permissions: uniquePermissions([...current, ...onlyExtras]) });
   }
 
   function clearExtraPermissions(employee: Employee) {
     const confirmed = window.confirm("Ar tikrai nuimti visas papildomas teises? Bazinės teisės liks aktyvios.");
     if (!confirmed) return;
-    void updateEmployeeAccess(employee, { extra_permissions: [] });
+    void updateEmployeeAccess(latestEmployee(employee), { extra_permissions: [] });
   }
 
   const filteredEmployees = useMemo(() => {
@@ -419,12 +494,12 @@ export default function StaffTypesModulePage() {
 
   if (loading) {
     return (
-      <section style={styles.pageShell}>
-        <div style={styles.loadingCard}>
-          <div style={styles.spinner} />
+      <section className="mx-auto max-w-[1500px] px-5 py-5">
+        <div className="flex items-center gap-4 rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+          <RefreshCw className="h-5 w-5 animate-spin text-[#486b5d]" />
           <div>
-            <p style={styles.loadingTitle}>Kraunamos pareigos ir teisės</p>
-            <p style={styles.loadingText}>Tikrinami darbuotojai ir jų prieigos.</p>
+            <p className="font-black text-[#10251f]">Kraunamos pareigos ir teisės</p>
+            <p className="text-sm font-semibold text-[#6a7e75]">Tikrinami darbuotojai ir jų prieigos.</p>
           </div>
         </div>
       </section>
@@ -432,107 +507,158 @@ export default function StaffTypesModulePage() {
   }
 
   return (
-    <section style={styles.pageShell}>
-      <header style={styles.headerCard}>
-        <div style={styles.titleRow}>
-          <div style={styles.headerIcon}>
-            <BriefcaseBusiness size={30} color="#007a5a" />
+    <section className="mx-auto max-w-[1500px] px-5 py-5">
+      <section className="overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+        <header className="border-b border-[#dbe6e0] bg-[#486b5d] px-5 py-4 text-white">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">Pareigos ir teisės</div>
+              <h1 className="mt-1 text-2xl font-black tracking-tight">Pareigos, šablonai ir individualios teisės</h1>
+              <p className="mt-1 text-sm font-semibold text-white/80">Pasirinkite darbuotoją, valdykite pareigas, etatą ir individualias prieigas.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { window.location.href = "/team?module=employees"; }}
+                className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-black text-[#486b5d] shadow-sm"
+              >
+                <ArrowLeft className="h-4 w-4" /> Grįžti
+              </button>
+              <button
+                type="button"
+                onClick={loadEmployees}
+                className="inline-flex items-center gap-2 rounded-lg bg-white/12 px-3 py-2 text-sm font-black text-white/90 ring-1 ring-white/15"
+              >
+                <RefreshCw className="h-4 w-4" /> Atnaujinti
+              </button>
+            </div>
           </div>
-          <div>
-            <p style={styles.eyebrow}>Pareigos ir teisės</p>
-            <h1 style={styles.pageTitle}>Pareigos, šablonai ir individualios teisės</h1>
-            <p style={styles.pageSubtitle}>Pasirinkite darbuotoją ir valdykite jo bazines pagal pareigybę bei papildomas individualias teises.</p>
-          </div>
-        </div>
+        </header>
 
-        <div style={styles.headerActions}>
-          <button type="button" onClick={() => window.location.href = "/team"} style={styles.backButton}>
-            <ArrowLeft size={18} /> Grįžti
-          </button>
-          <button type="button" onClick={loadEmployees} style={styles.refreshButton}>
-            <RefreshCw size={18} /> Atnaujinti
-          </button>
-        </div>
-      </header>
-
-      {message ? (
-        <div style={messageType === "error" ? styles.messageError : styles.messageSuccess}>
-          <CheckCircle2 size={18} />
-          <span>{message}</span>
-        </div>
-      ) : null}
-
-      <div style={styles.filterGrid}>
-        {stats.map((stat) => {
-          const isActive = activeFilter === stat.key;
-          return (
+        <section className="grid grid-cols-2 gap-3 border-b border-[#dbe6e0] bg-white p-4 lg:grid-cols-5">
+          {stats.map((stat) => (
             <button
               key={stat.key}
               type="button"
               onClick={() => setActiveFilter(stat.key)}
-              style={isActive ? styles.filterCardActive : styles.filterCard}
+              className={cn(
+                "rounded-xl border p-4 text-left shadow-sm transition hover:bg-[#f8faf8]",
+                activeFilter === stat.key
+                  ? "border-[#a8d8bd] bg-[#e9f7ef] text-[#047857]"
+                  : "border-[#dbe6e0] bg-white text-[#10251f]",
+              )}
             >
-              <span>{stat.label}</span>
-              <strong>{stat.value}</strong>
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">{stat.label}</div>
+              <div className="mt-2 text-2xl font-black">{stat.value}</div>
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </section>
 
-      <article style={styles.mainCard}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h2 style={styles.cardTitle}>Darbuotojai</h2>
-            <p style={styles.cardSubtitle}>Kairėje pasirinkite darbuotoją, dešinėje matysite bazines ir papildomas teises.</p>
+        <section className="border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Veiksmai</span>
+            <button
+              type="button"
+              onClick={loadEmployees}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Atnaujinti
+            </button>
+
+            <div className="mx-2 hidden h-7 w-px bg-[#dbe6e0] md:block" />
+
+            <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Filtrai</span>
+            <select
+              value={activeFilter}
+              onChange={(event) => setActiveFilter(event.target.value as EmployeeFilter)}
+              className="h-9 rounded-lg border border-[#c2d3ca] bg-white px-3 text-xs font-bold text-[#10251f]"
+            >
+              <option value="all">Visi darbuotojai</option>
+              <option value="active">Aktyvūs</option>
+              <option value="withPosition">Su pareigomis</option>
+              <option value="withRights">Su teisėmis</option>
+              <option value="withoutRights">Be teisių</option>
+            </select>
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa096]" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="h-9 min-w-[250px] rounded-lg border border-[#c2d3ca] bg-white px-3 pl-9 text-xs font-semibold text-[#10251f] outline-none focus:border-[#486b5d]"
+                placeholder="Ieškoti darbuotojo, pareigų..."
+              />
+            </label>
+
+            <span className="ml-auto rounded-lg bg-[#eef4f1] px-3 py-2 text-xs font-black text-[#486b5d] ring-1 ring-[#c2d3ca]">
+              Pakeitimai saugomi automatiškai
+            </span>
           </div>
+        </section>
 
-          <label style={styles.searchBox}>
-            <Search size={19} color="#94a3b8" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Ieškoti darbuotojo..."
-              style={styles.searchInput}
-            />
-          </label>
-        </div>
+        {message ? (
+          <div
+            className={cn(
+              "mx-4 mt-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-black",
+              messageType === "error"
+                ? "border-red-200 bg-red-50 text-red-800"
+                : "border-emerald-200 bg-emerald-50 text-emerald-800",
+            )}
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {message}
+          </div>
+        ) : null}
 
-        <div style={styles.managerLayout}>
-          <aside style={styles.listPanel}>
-            <div style={styles.listHeader}>
-              <strong>{filteredEmployees.length} darbuotojų</strong>
-              <span>
-                {filteredEmployees.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}–
-                {Math.min(safePage * PAGE_SIZE, filteredEmployees.length)}
-              </span>
+        <section className="grid gap-0 xl:grid-cols-[330px_minmax(0,1fr)]">
+          <aside className="border-b border-[#dbe6e0] bg-[#f8faf8] p-4 xl:border-b-0 xl:border-r">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Darbuotojai</div>
+                <div className="mt-1 text-sm font-black text-[#10251f]">{filteredEmployees.length} darbuotojai</div>
+              </div>
+              <div className="rounded-lg bg-white px-2 py-1 text-xs font-black text-[#486b5d] ring-1 ring-[#dbe6e0]">
+                {filteredEmployees.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredEmployees.length)}
+              </div>
             </div>
 
             {paginatedEmployees.length === 0 ? (
-              <div style={styles.emptyState}>
-                <UserRound size={32} color="#94a3b8" />
-                <strong>Darbuotojų nerasta</strong>
-                <span>Pabandykite pakeisti paiešką.</span>
+              <div className="grid min-h-[180px] place-items-center rounded-xl border border-dashed border-[#c2d3ca] bg-white p-6 text-center">
+                <div>
+                  <UserRound className="mx-auto h-8 w-8 text-[#8aa096]" />
+                  <p className="mt-3 font-black text-[#10251f]">Darbuotojų nerasta</p>
+                  <p className="text-sm font-semibold text-[#6a7e75]">Pakeiskite filtrą arba paiešką.</p>
+                </div>
               </div>
             ) : (
-              <div style={styles.employeeList}>
+              <div className="grid gap-2">
                 {paginatedEmployees.map((employee) => {
-                  const effectiveCount = getEffectivePermissions(employee).length;
                   const active = selectedEmployee?.user_id === employee.user_id;
-
                   return (
                     <button
                       key={employee.user_id}
                       type="button"
                       onClick={() => setSelectedUserId(employee.user_id)}
-                      style={active ? styles.employeeRowActive : styles.employeeRow}
+                      className={cn(
+                        "grid grid-cols-[42px_1fr_auto] items-center gap-3 rounded-xl border p-3 text-left transition",
+                        active
+                          ? "border-[#a8d8bd] bg-[#e9f7ef] shadow-sm"
+                          : "border-[#dbe6e0] bg-white hover:bg-[#eef4f1]",
+                      )}
                     >
-                      <div style={styles.avatarSmall}>{employeeInitials(employee)}</div>
-                      <div style={styles.employeeRowText}>
-                        <strong>{employeeName(employee)}</strong>
-                        <span>{employee.position || "Pareigos nenurodytos"}</span>
-                        <small>{effectiveCount} teisės · {roleLabel(employee.role)}</small>
+                      <div className="grid h-10 w-10 place-items-center rounded-lg bg-white text-sm font-black text-[#007a5a] shadow-sm">
+                        {employeeInitials(employee)}
                       </div>
-                      <span style={employee.is_active === false ? styles.statusInactive : styles.statusActive}>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-black text-[#10251f]">{employeeName(employee)}</div>
+                        <div className="truncate text-xs font-semibold text-[#6a7e75]">{employee.position || "Pareigos nenurodytos"}</div>
+                        <div className="mt-1 text-[11px] font-bold text-[#6a7e75]">
+                          {getEffectivePermissions(employee).length} teisės · {roleLabel(employee.role)}
+                        </div>
+                      </div>
+                      <span className={cn(
+                        "rounded-full px-2 py-1 text-[11px] font-black",
+                        employee.is_active === false ? "bg-slate-100 text-slate-500" : "bg-[#d9f8e7] text-[#047857]",
+                      )}>
                         {employee.is_active === false ? "Neaktyvus" : "Aktyvus"}
                       </span>
                     </button>
@@ -541,30 +667,28 @@ export default function StaffTypesModulePage() {
               </div>
             )}
 
-            <div style={styles.pagination}>
+            <div className="mt-3 flex items-center justify-center gap-2 text-sm font-black text-[#486b5d]">
               <button
                 type="button"
                 disabled={safePage <= 1}
                 onClick={() => setPage((previous) => Math.max(1, previous - 1))}
-                style={styles.pageButton}
+                className="grid h-9 w-9 place-items-center rounded-lg border border-[#dbe6e0] bg-white disabled:opacity-40"
               >
-                <ChevronLeft size={17} />
+                <ChevronLeft className="h-4 w-4" />
               </button>
-              <span>
-                {safePage} / {pageCount}
-              </span>
+              <span>{safePage} / {pageCount}</span>
               <button
                 type="button"
                 disabled={safePage >= pageCount}
                 onClick={() => setPage((previous) => Math.min(pageCount, previous + 1))}
-                style={styles.pageButton}
+                className="grid h-9 w-9 place-items-center rounded-lg border border-[#dbe6e0] bg-white disabled:opacity-40"
               >
-                <ChevronRight size={17} />
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </aside>
 
-          <section style={styles.detailPanel}>
+          <section className="min-w-0 p-4">
             {selectedEmployee ? (
               <EmployeeAccessEditor
                 employee={selectedEmployee}
@@ -576,15 +700,17 @@ export default function StaffTypesModulePage() {
                 updateEmployeeAccess={updateEmployeeAccess}
               />
             ) : (
-              <div style={styles.emptyState}>
-                <UserRound size={32} color="#94a3b8" />
-                <strong>Pasirinkite darbuotoją</strong>
-                <span>Dešinėje bus rodomos pareigos ir teisės.</span>
+              <div className="grid min-h-[260px] place-items-center rounded-xl border border-dashed border-[#c2d3ca] bg-[#f8faf8] p-6 text-center">
+                <div>
+                  <UserRound className="mx-auto h-9 w-9 text-[#8aa096]" />
+                  <p className="mt-3 font-black text-[#10251f]">Pasirinkite darbuotoją</p>
+                  <p className="text-sm font-semibold text-[#6a7e75]">Dešinėje bus rodomos pareigos ir teisės.</p>
+                </div>
               </div>
             )}
           </section>
-        </div>
-      </article>
+        </section>
+      </section>
     </section>
   );
 }
@@ -604,381 +730,238 @@ function EmployeeAccessEditor({
   toggleExtraPermission: (employee: Employee, permission: Permission) => void;
   addTemplateExtras: (employee: Employee, template: RoleTemplate) => void;
   clearExtraPermissions: (employee: Employee) => void;
-  updateEmployeeAccess: (employee: Employee, patch: Partial<Pick<Employee, "position" | "extra_permissions" | "employment_rate" | "weekly_hours">>) => void;
+  updateEmployeeAccess: (employee: Employee, patch: Partial<Pick<Employee, "position" | "department" | "extra_permissions" | "employment_rate" | "weekly_hours">>) => void;
 }) {
   const baseTemplate = detectBaseTemplate(employee);
   const basePermissions = getBasePermissions(employee);
   const extraPermissions = normalizeExtraPermissions(employee.extra_permissions).filter((permission) => !basePermissions.includes(permission));
   const effectivePermissions = getEffectivePermissions(employee);
 
+  function updateLocal<K extends keyof Employee>(key: K, value: Employee[K]) {
+    setEmployees((previous) =>
+      previous.map((item) => (item.user_id === employee.user_id ? { ...item, [key]: value } : item)),
+    );
+  }
+
   return (
-    <div style={styles.editorCard}>
-      <div style={styles.employeeHeader}>
-        <div style={styles.employeeMain}>
-          <div style={styles.avatar}>{employeeInitials(employee)}</div>
-          <div style={styles.employeeInfo}>
-            <h3 style={styles.employeeName}>{employeeName(employee)}</h3>
-            <p style={styles.employeeMeta}>{employee.position || "Pareigos nenurodytos"}</p>
-            <p style={styles.employeeMetaSoft}>{employee.department || "Skyrius nenurodytas"}</p>
-            <p style={styles.employeeMetaSoft}>
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid h-14 w-14 place-items-center rounded-xl bg-[#e9f7ef] text-xl font-black text-[#007a5a]">
+            {employeeInitials(employee)}
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-[#10251f]">{employeeName(employee)}</h2>
+            <div className="mt-1 text-sm font-bold text-[#6a7e75]">
+              {employee.position || "Pareigos nenurodytos"} · {employee.department || "Skyrius nenurodytas"}
+            </div>
+            <div className="mt-1 text-xs font-bold text-[#6a7e75]">
               Etatas: {Number(employee.employment_rate ?? 1).toFixed(2)} · {Number(employee.weekly_hours ?? 40)} val./sav.
-            </p>
+            </div>
           </div>
         </div>
-
-        <div style={styles.employeeBadges}>
-          <span style={employee.is_active === false ? styles.badgeDanger : styles.badgeGood}>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-full bg-[#d9f8e7] px-3 py-1 text-xs font-black text-[#047857]">
             {employee.is_active === false ? "Neaktyvus" : "Aktyvus"}
           </span>
-          <span style={styles.badgeSoft}>{roleLabel(employee.role)}</span>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d] ring-1 ring-[#dbe6e0]">
+            {roleLabel(employee.role)}
+          </span>
         </div>
       </div>
 
-      <div style={styles.formGrid}>
-        <label style={styles.fieldLabel}>
-          <span>Konkrečios pareigos</span>
-          <input
-            value={employee.position || ""}
-            onChange={(event) => {
-              const nextValue = event.target.value;
-              setEmployees((previous) =>
-                previous.map((item) => (item.user_id === employee.user_id ? { ...item, position: nextValue } : item)),
-              );
-            }}
-            onBlur={(event) => updateEmployeeAccess(employee, { position: event.target.value })}
-            disabled={saving}
-            placeholder="Pvz., vyr. slaugytoja, ūkvedys"
-            style={styles.input}
-          />
-        </label>
+      <div className="grid gap-3 lg:grid-cols-[1fr_1.35fr]">
+        <section className="rounded-xl border border-[#dbe6e0] bg-white p-4">
+          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Darbo duomenys</div>
+          <div className="mt-3 grid gap-3">
+            <label className="grid gap-1 text-xs font-black text-[#40594f]">
+              Konkrečios pareigos
+              <input
+                value={employee.position || ""}
+                onChange={(event) => updateLocal("position", event.target.value)}
+                onBlur={(event) => {
+                  const position = event.target.value;
+                  const inferred = inferAccessGroupFromText(position);
+                  updateEmployeeAccess(employee, {
+                    position,
+                    department: employee.department || (inferred ? departmentForAccessGroup(inferred) : undefined),
+                  });
+                }}
+                disabled={saving}
+                className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                placeholder="Pvz., vyr. slaugytoja"
+              />
+            </label>
 
-        <label style={styles.fieldLabel}>
-          <span>Etato dydis</span>
-          <input
-            type="number"
-            min={0}
-            max={2}
-            step={0.01}
-            value={employee.employment_rate ?? 1}
-            onChange={(event) => {
-              const nextRate = Number(event.target.value);
-              setEmployees((previous) =>
-                previous.map((item) =>
-                  item.user_id === employee.user_id
-                    ? { ...item, employment_rate: nextRate, weekly_hours: item.weekly_hours ?? Math.round(nextRate * 40) }
-                    : item,
-                ),
-              );
-            }}
-            onBlur={(event) => {
-              const nextRate = Math.max(0, Math.min(2, Number(event.target.value || 1)));
-              updateEmployeeAccess(employee, {
-                employment_rate: nextRate,
-                weekly_hours: employee.weekly_hours ?? Math.round(nextRate * 40),
-              });
-            }}
-            disabled={saving}
-            placeholder="Pvz., 1.00"
-            style={styles.input}
-          />
-        </label>
-
-        <label style={styles.fieldLabel}>
-          <span>Savaitės valandos</span>
-          <input
-            type="number"
-            min={0}
-            max={80}
-            step={1}
-            value={employee.weekly_hours ?? 40}
-            onChange={(event) => {
-              const nextHours = Number(event.target.value);
-              setEmployees((previous) =>
-                previous.map((item) => (item.user_id === employee.user_id ? { ...item, weekly_hours: nextHours } : item)),
-              );
-            }}
-            onBlur={(event) =>
-              updateEmployeeAccess(employee, {
-                employment_rate: employee.employment_rate ?? 1,
-                weekly_hours: Math.max(0, Math.min(80, Number(event.target.value || 40))),
-              })
-            }
-            disabled={saving}
-            placeholder="Pvz., 40"
-            style={styles.input}
-          />
-        </label>
-
-        <div style={styles.accessSummaryGrid}>
-          <div style={styles.accessSummaryItem}>
-            <span>Pareigybės šablonas</span>
-            <strong>{baseTemplate.shortLabel}</strong>
-          </div>
-          <div style={styles.accessSummaryItem}>
-            <span>Etatas</span>
-            <strong>{Number(employee.employment_rate ?? 1).toFixed(2)} et.</strong>
-          </div>
-          <div style={styles.accessSummaryItem}>
-            <span>Bazinės teisės</span>
-            <strong>{basePermissions.length} teisės</strong>
-          </div>
-          <div style={styles.accessSummaryItem}>
-            <span>Papildomos teisės</span>
-            <strong>{extraPermissions.length} teisės</strong>
-          </div>
-          <div style={styles.accessSummaryItemStrong}>
-            <span>Iš viso aktyvių teisių</span>
-            <strong>{effectivePermissions.length} teisės</strong>
-          </div>
-        </div>
-      </div>
-
-      <div style={styles.infoBox}>
-        <BadgeCheck size={18} color="#2563eb" />
-        <div>
-          <strong>Kaip veikia teisės?</strong>
-          <span>Bazinės teisės žaliai aktyvios automatiškai pagal pareigybę / rolę. Papildomos teisės jungiamos rankiniu būdu konkrečiam darbuotojui.</span>
-        </div>
-      </div>
-
-      <section style={styles.permissionSection}>
-        <div style={styles.permissionsHeader}>
-          <div>
-            <p style={styles.sectionTitle}>Bazinės teisės pagal pareigybę</p>
-            <p style={styles.helpText}>{baseTemplate.description} Jų atskirai įjungti nereikia.</p>
-          </div>
-          <span style={styles.baseStatusPill}>Visos bazinės teisės aktyvios</span>
-        </div>
-
-        <div style={styles.permissionGridCompact}>
-          {basePermissions.map((permission) => (
-            <div key={permission} style={styles.basePermissionCard}>
-              <CheckCircle2 size={18} color="#047857" />
-              <strong>{permissionLabel(permission)}</strong>
-              <span style={styles.baseBadge}>Bazinė</span>
+            <label className="grid gap-1 text-xs font-black text-[#40594f]">
+              Pareigų grupė / automatinės teisės
+              <select
+                value={detectAccessGroup(employee)}
+                onChange={(event) => {
+                  const group = event.target.value as AccessGroupValue;
+                  const department = departmentForAccessGroup(group);
+                  updateLocal("department", department);
+                  updateEmployeeAccess(employee, { department });
+                }}
+                disabled={saving}
+                className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+              >
+                {ACCESS_GROUP_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="grid gap-1 text-xs font-black text-[#40594f]">
+                Etato dydis
+                <input
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.01}
+                  value={employee.employment_rate ?? 1}
+                  onChange={(event) => updateLocal("employment_rate", Number(event.target.value))}
+                  onBlur={(event) => {
+                    const nextRate = Math.max(0, Math.min(2, Number(event.target.value || 1)));
+                    updateEmployeeAccess(employee, {
+                      employment_rate: nextRate,
+                      weekly_hours: employee.weekly_hours ?? Math.round(nextRate * 40),
+                    });
+                  }}
+                  disabled={saving}
+                  className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-black text-[#40594f]">
+                Savaitės valandos
+                <input
+                  type="number"
+                  min={0}
+                  max={80}
+                  step={1}
+                  value={employee.weekly_hours ?? 40}
+                  onChange={(event) => updateLocal("weekly_hours", Number(event.target.value))}
+                  onBlur={(event) =>
+                    updateEmployeeAccess(employee, {
+                      employment_rate: employee.employment_rate ?? 1,
+                      weekly_hours: Math.max(0, Math.min(80, Number(event.target.value || 40))),
+                    })
+                  }
+                  disabled={saving}
+                  className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                />
+              </label>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section style={styles.permissionSection}>
-        <div style={styles.permissionsHeader}>
-          <div>
-            <p style={styles.sectionTitle}>Papildomos individualios teisės</p>
-            <p style={styles.helpText}>Pridedamos prie bazinių teisių. Aktyvios pažymėtos mėlynai.</p>
           </div>
-          <button
-            type="button"
-            disabled={saving || extraPermissions.length === 0}
-            onClick={() => clearExtraPermissions(employee)}
-            style={styles.clearButton}
-          >
-            Nuimti papildomas
-          </button>
-        </div>
 
-        <div style={styles.templateSection}>
-          <span style={styles.templateLabel}>Greitai pridėti papildomų teisių pagal šabloną</span>
-          <div style={styles.templateGrid}>
+          <div className="mt-4 overflow-hidden rounded-xl border border-[#dbe6e0]">
+            <div className="grid grid-cols-2 border-b border-[#dbe6e0] bg-[#eef4f1]">
+              <SummaryItem label="Šablonas" value={baseTemplate.shortLabel} />
+              <SummaryItem label="Etatas" value={`${Number(employee.employment_rate ?? 1).toFixed(2)} et.`} border />
+            </div>
+            <div className="grid grid-cols-3">
+              <SummaryItem label="Bazinės" value={`${basePermissions.length}`} />
+              <SummaryItem label="Papildomos" value={`${extraPermissions.length}`} border />
+              <div className="border-l border-[#dbe6e0] bg-[#e9f7ef] p-3 text-[#047857]">
+                <div className="text-[11px] font-black uppercase">Iš viso</div>
+                <div className="mt-1 font-black">{effectivePermissions.length}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-[#dbe6e0] bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Bazinės teisės</div>
+              <h3 className="mt-1 text-lg font-black text-[#10251f]">Aktyvios pagal pareigybę</h3>
+              <p className="mt-1 text-xs font-semibold text-[#6a7e75]">{baseTemplate.description}</p>
+            </div>
+            <span className="rounded-full bg-[#d9f8e7] px-3 py-1 text-xs font-black text-[#047857]">
+              {basePermissions.length} aktyvios
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {basePermissions.map((permission) => (
+              <div key={permission} className="rounded-lg border border-[#b7e7c8] bg-[#e9f7ef] px-3 py-2 text-sm font-black text-[#064e3b]">
+                ✓ {permissionLabel(permission)}
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="rounded-xl border border-[#dbe6e0] bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">Papildomos teisės</div>
+            <h3 className="mt-1 text-lg font-black text-[#10251f]">Individualūs leidimai</h3>
+            <p className="mt-1 text-xs font-semibold text-[#6a7e75]">Aktyvios teisės pažymėtos mėlynai ir išsaugomos iškart.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
             {ROLE_TEMPLATES.map((template) => (
               <button
                 key={template.value}
                 type="button"
                 disabled={saving}
                 onClick={() => addTemplateExtras(employee, template)}
-                style={styles.templateButton}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1] disabled:opacity-50"
                 title={template.description}
               >
-                <Plus size={15} /> {template.shortLabel}
+                <Plus className="h-3.5 w-3.5" /> {template.shortLabel}
               </button>
             ))}
+            <button
+              type="button"
+              disabled={saving || extraPermissions.length === 0}
+              onClick={() => clearExtraPermissions(employee)}
+              className="rounded-lg border border-[#f1caca] bg-[#fff7f7] px-3 py-2 text-xs font-black text-[#8a3a2f] disabled:opacity-50"
+            >
+              Nuimti papildomas
+            </button>
           </div>
         </div>
-
-        <div style={styles.permissionGrid}>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {PERMISSION_OPTIONS.filter((permission) => !basePermissions.includes(permission.value)).map((permission) => {
             const checked = extraPermissions.includes(permission.value);
-
             return (
               <button
                 key={permission.value}
                 type="button"
                 disabled={saving}
                 onClick={() => toggleExtraPermission(employee, permission.value)}
-                style={checked ? styles.extraPermissionCardActive : styles.extraPermissionCard}
+                className={cn(
+                  "rounded-lg border p-3 text-left text-xs font-bold transition disabled:opacity-60",
+                  checked
+                    ? "border-blue-200 bg-blue-50 text-blue-900"
+                    : "border-[#dbe6e0] bg-[#f8faf8] text-[#40594f] hover:bg-[#eef4f1]",
+                )}
               >
-                <div style={styles.permissionCardTop}>
-                  <strong>{permission.label}</strong>
-                  {checked ? <ToggleRight size={28} color="#2563eb" /> : <ToggleLeft size={28} color="#94a3b8" />}
+                <div className="flex items-start justify-between gap-2">
+                  <span>{permission.label}</span>
+                  {checked ? <ToggleRight className="h-5 w-5 text-blue-700" /> : <ToggleLeft className="h-5 w-5 text-[#8aa096]" />}
                 </div>
-                <span>{permission.description}</span>
+                <span className="mt-1 block font-semibold text-[#6a7e75]">{permission.description}</span>
               </button>
             );
           })}
         </div>
-      </section>
-
-      <div style={styles.footerActions}>
-        <div style={styles.saveHint}>
-          {saving ? <RefreshCw size={17} /> : <Save size={17} />}
-          <span>{saving ? "Saugoma..." : "Pakeitimai išsaugomi automatiškai"}</span>
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-[#dbe6e0] pt-3 text-xs font-black text-[#6a7e75]">
+          {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {saving ? "Saugoma..." : "Pakeitimai saugomi automatiškai"}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
 
-const styles: Record<string, CSSProperties> = {
-  pageShell: {
-    width: "min(100%, 1280px)",
-    margin: "0 auto",
-    display: "grid",
-    gap: 18,
-    padding: "0 18px 40px",
-  },
-  loadingCard: {
-    border: "1px solid #e2e8f0",
-    background: "#ffffff",
-    borderRadius: 28,
-    padding: 28,
-    display: "flex",
-    alignItems: "center",
-    gap: 16,
-    boxShadow: "0 18px 44px rgba(15,23,42,.08)",
-  },
-  spinner: { width: 38, height: 38, borderRadius: 999, border: "4px solid #e2e8f0", borderTop: "4px solid #007a5a" },
-  loadingTitle: { margin: 0, color: "#020617", fontSize: 18, fontWeight: 950 },
-  loadingText: { margin: "4px 0 0", color: "#64748b", fontSize: 14, fontWeight: 800 },
-  headerCard: {
-    border: "1px solid #dde7f2",
-    background: "#ffffff",
-    borderRadius: 30,
-    padding: 26,
-    boxShadow: "0 18px 45px rgba(15,23,42,.08)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 18,
-  },
-  titleRow: { display: "flex", alignItems: "center", gap: 18, minWidth: 0 },
-  headerActions: { display: "flex", alignItems: "center", gap: 10, flexShrink: 0 },
-  backButton: {
-    border: "1px solid #dbe5ee",
-    background: "#ffffff",
-    color: "#334155",
-    borderRadius: 18,
-    padding: "12px 16px",
-    fontWeight: 950,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    cursor: "pointer",
-  },
-  refreshButton: {
-    border: "1px solid #bbf7d0",
-    background: "#ecfdf5",
-    color: "#007a5a",
-    borderRadius: 18,
-    padding: "12px 16px",
-    fontWeight: 950,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    cursor: "pointer",
-  },
-  headerIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    display: "grid",
-    placeItems: "center",
-    background: "#ecfdf5",
-    flexShrink: 0,
-  },
-  eyebrow: { margin: 0, color: "#007a5a", textTransform: "uppercase", letterSpacing: 4, fontWeight: 950, fontSize: 13 },
-  pageTitle: { margin: "6px 0 0", color: "#020617", fontSize: 30, lineHeight: 1.1, fontWeight: 950 },
-  pageSubtitle: { margin: "8px 0 0", color: "#64748b", fontSize: 15, fontWeight: 800 },
-  messageSuccess: { border: "1px solid #bbf7d0", background: "#ecfdf5", color: "#047857", borderRadius: 18, padding: "13px 16px", display: "flex", alignItems: "center", gap: 10, fontWeight: 900 },
-  messageError: { border: "1px solid #fecaca", background: "#fef2f2", color: "#b91c1c", borderRadius: 18, padding: "13px 16px", display: "flex", alignItems: "center", gap: 10, fontWeight: 900 },
-  filterGrid: { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 12 },
-  filterCard: {
-    border: "1px solid #e2e8f0",
-    background: "#ffffff",
-    borderRadius: 18,
-    padding: 16,
-    color: "#334155",
-    display: "grid",
-    gap: 6,
-    cursor: "pointer",
-    boxShadow: "0 10px 22px rgba(15,23,42,.05)",
-  },
-  filterCardActive: {
-    border: "1px solid #86efac",
-    background: "#ecfdf5",
-    borderRadius: 18,
-    padding: 16,
-    color: "#047857",
-    display: "grid",
-    gap: 6,
-    cursor: "pointer",
-    boxShadow: "0 16px 34px rgba(0,122,90,.12)",
-  },
-  mainCard: { border: "1px solid #e2e8f0", background: "#ffffff", borderRadius: 30, padding: 24, boxShadow: "0 18px 45px rgba(15,23,42,.08)" },
-  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, paddingBottom: 18, borderBottom: "1px solid #edf2f7" },
-  cardTitle: { margin: 0, color: "#020617", fontSize: 23, fontWeight: 950 },
-  cardSubtitle: { margin: "8px 0 0", color: "#64748b", fontSize: 14, fontWeight: 800 },
-  searchBox: { width: 340, border: "1px solid #dbe5ee", background: "#f8fafc", borderRadius: 20, padding: "0 14px", height: 56, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 },
-  searchInput: { border: 0, outline: 0, background: "transparent", color: "#0f172a", fontSize: 15, fontWeight: 800, width: "100%" },
-  managerLayout: { display: "grid", gridTemplateColumns: "360px minmax(0, 1fr)", gap: 18, paddingTop: 18 },
-  listPanel: { border: "1px solid #e2e8f0", background: "#f8fbff", borderRadius: 24, padding: 14, display: "grid", gap: 12, alignContent: "start" },
-  listHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", color: "#0f172a", fontWeight: 950, padding: "0 4px" },
-  employeeList: { display: "grid", gap: 10 },
-  employeeRow: { border: "1px solid #e2e8f0", background: "#ffffff", borderRadius: 18, padding: 12, display: "grid", gridTemplateColumns: "48px minmax(0, 1fr) auto", alignItems: "center", gap: 11, textAlign: "left", cursor: "pointer" },
-  employeeRowActive: { border: "1px solid #86efac", background: "#ecfdf5", borderRadius: 18, padding: 12, display: "grid", gridTemplateColumns: "48px minmax(0, 1fr) auto", alignItems: "center", gap: 11, textAlign: "left", cursor: "pointer", boxShadow: "0 10px 20px rgba(0,122,90,.10)" },
-  avatarSmall: { width: 46, height: 46, borderRadius: 16, background: "#ffffff", color: "#007a5a", display: "grid", placeItems: "center", fontSize: 18, fontWeight: 950, boxShadow: "0 7px 18px rgba(15,23,42,.08)" },
-  employeeRowText: { display: "grid", gap: 4, color: "#020617", minWidth: 0 },
-  statusActive: { background: "#dcfce7", color: "#047857", border: "1px solid #bbf7d0", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 950 },
-  statusInactive: { background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 950 },
-  pagination: { display: "flex", alignItems: "center", justifyContent: "center", gap: 12, color: "#334155", fontWeight: 950, paddingTop: 4 },
-  pageButton: { width: 38, height: 38, borderRadius: 14, border: "1px solid #dbe5ee", background: "#ffffff", color: "#334155", display: "grid", placeItems: "center", cursor: "pointer" },
-  detailPanel: { minWidth: 0 },
-  emptyState: { minHeight: 180, border: "1px dashed #cbd5e1", borderRadius: 22, display: "grid", placeItems: "center", alignContent: "center", gap: 8, color: "#64748b", fontWeight: 900, padding: 20 },
-  editorCard: { border: "1px solid #dbe5ee", background: "#f8fbff", borderRadius: 28, padding: 18, display: "grid", gap: 16 },
-  employeeHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 },
-  employeeMain: { display: "flex", alignItems: "center", gap: 15, minWidth: 0 },
-  avatar: { width: 70, height: 70, borderRadius: 22, background: "#ecfdf5", color: "#007a5a", display: "grid", placeItems: "center", fontSize: 26, fontWeight: 950, boxShadow: "0 12px 28px rgba(15,23,42,.08)" },
-  employeeInfo: { minWidth: 0 },
-  employeeName: { margin: 0, color: "#020617", fontSize: 25, fontWeight: 950 },
-  employeeMeta: { margin: "5px 0 0", color: "#64748b", fontSize: 16, fontWeight: 900 },
-  employeeMetaSoft: { margin: "4px 0 0", color: "#64748b", fontSize: 14, fontWeight: 850 },
-  employeeBadges: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" },
-  badgeGood: { background: "#dcfce7", color: "#047857", borderRadius: 999, padding: "8px 12px", fontSize: 13, fontWeight: 950 },
-  badgeDanger: { background: "#fee2e2", color: "#b91c1c", borderRadius: 999, padding: "8px 12px", fontSize: 13, fontWeight: 950 },
-  badgeSoft: { background: "#ffffff", color: "#334155", borderRadius: 999, padding: "8px 12px", fontSize: 13, fontWeight: 950 },
-  formGrid: { display: "grid", gridTemplateColumns: "minmax(240px, 1fr) minmax(520px, 1.6fr)", gap: 14, alignItems: "end" },
-  fieldLabel: { display: "grid", gap: 8, color: "#334155", fontWeight: 950, fontSize: 14 },
-  input: { height: 50, border: "1px solid #dbe5ee", background: "#ffffff", borderRadius: 17, padding: "0 14px", outline: 0, color: "#0f172a", fontSize: 15, fontWeight: 850 },
-  accessSummaryGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", border: "1px solid #e2e8f0", background: "#ffffff", borderRadius: 18, overflow: "hidden" },
-  accessSummaryItem: { padding: 12, display: "grid", gap: 6, borderRight: "1px solid #e2e8f0", color: "#334155", fontSize: 13, fontWeight: 850 },
-  accessSummaryItemStrong: { padding: 12, display: "grid", gap: 6, color: "#047857", fontSize: 13, fontWeight: 850, background: "#f0fdf4" },
-  infoBox: { border: "1px solid #dbeafe", background: "#eff6ff", color: "#1e3a8a", borderRadius: 18, padding: 13, display: "flex", gap: 10, fontSize: 13, fontWeight: 850, lineHeight: 1.45 },
-  permissionSection: { border: "1px solid #e2e8f0", background: "#ffffff", borderRadius: 22, padding: 14, display: "grid", gap: 12 },
-  permissionsHeader: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  sectionTitle: { margin: 0, color: "#0f172a", fontSize: 17, fontWeight: 950 },
-  helpText: { margin: "5px 0 0", color: "#64748b", fontSize: 13, fontWeight: 800 },
-  baseStatusPill: { background: "#dcfce7", color: "#047857", border: "1px solid #bbf7d0", borderRadius: 999, padding: "7px 10px", fontSize: 12, fontWeight: 950, whiteSpace: "nowrap" },
-  permissionGridCompact: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 },
-  basePermissionCard: { border: "1px solid #bbf7d0", background: "#ecfdf5", borderRadius: 14, padding: "11px 12px", display: "grid", gridTemplateColumns: "20px minmax(0, 1fr) auto", gap: 8, alignItems: "center", color: "#064e3b" },
-  baseBadge: { background: "#ffffff", border: "1px solid #bbf7d0", color: "#047857", borderRadius: 999, padding: "4px 8px", fontSize: 11, fontWeight: 950 },
-  templateSection: { display: "grid", gap: 8 },
-  templateLabel: { color: "#334155", fontSize: 13, fontWeight: 950 },
-  templateGrid: { display: "flex", flexWrap: "wrap", gap: 8 },
-  templateButton: { border: "1px solid #dbe5ee", background: "#ffffff", borderRadius: 999, padding: "9px 12px", color: "#334155", fontWeight: 950, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 },
-  permissionGrid: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 },
-  extraPermissionCard: { border: "1px solid #e2e8f0", background: "#f8fafc", borderRadius: 16, padding: 11, textAlign: "left", cursor: "pointer", display: "grid", gap: 6, color: "#334155" },
-  extraPermissionCardActive: { border: "1px solid #bfdbfe", background: "#eff6ff", borderRadius: 16, padding: 11, textAlign: "left", cursor: "pointer", display: "grid", gap: 6, color: "#1e3a8a" },
-  permissionCardTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  clearButton: { border: "1px solid #fecaca", background: "#fff7f7", color: "#b91c1c", borderRadius: 14, padding: "9px 11px", fontSize: 12, fontWeight: 950, cursor: "pointer" },
-  footerActions: { display: "flex", justifyContent: "flex-end", borderTop: "1px solid #e2e8f0", paddingTop: 12 },
-  saveHint: { display: "inline-flex", alignItems: "center", gap: 8, color: "#64748b", fontSize: 13, fontWeight: 900 },
-};
+function SummaryItem({ label, value, border = false }: { label: string; value: string; border?: boolean }) {
+  return (
+    <div className={cn("p-3", border && "border-l border-[#dbe6e0]")}>
+      <div className="text-[11px] font-black uppercase text-[#6a7e75]">{label}</div>
+      <div className="mt-1 font-black text-[#10251f]">{value}</div>
+    </div>
+  );
+}

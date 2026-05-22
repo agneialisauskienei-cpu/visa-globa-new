@@ -52,8 +52,9 @@ export default function AdminDashboardPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
-  
-  const [embeddedFormRoute, setEmbeddedFormRoute] = useState<string | null>(null);async function loadStats() {
+  const [embeddedFormRoute, setEmbeddedFormRoute] = useState<string | null>(null);
+
+  async function loadStats() {
     setLoading(true);
 
     const [
@@ -125,36 +126,36 @@ export default function AdminDashboardPage() {
 
   return (
 
-    <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
-<div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+    <main className="min-h-screen bg-[#f8faf8] p-4 text-[#10251f] sm:p-6">
+      <div className="mx-auto max-w-7xl space-y-4">
+        <section className="rounded-xl border border-[#dbe6e0] bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-5">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[#e9f7ef] text-[#047857]">
                 <Home className="h-7 w-7" />
               </div>
 
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
                   Pagrindinis skydelis
                 </p>
 
-                <h1 className="mt-2 text-4xl font-black tracking-tight">
+                <h1 className="mt-1 text-4xl font-black">
                   Pagrindinis skydelis
                 </h1>
 
-                <p className="mt-2 text-lg font-semibold text-slate-500">
+                <p className="mt-2 max-w-3xl text-sm font-bold text-[#6a7e75]">
                   Greita įstaigos statistika, personalo prioritetai ir pagrindiniai valdymo veiksmai.
                 </p>
 
-                <p className="mt-2 text-sm font-bold text-slate-400">
+                <p className="mt-2 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75]">
                   {lastUpdated ? `Atnaujinta: ${formatDateTime(lastUpdated)}` : "Kraunama statistika..."}
                 </p>
 
                 <button
                   type="button"
                   onClick={() => setShowHelp(true)}
-                  className="mt-3 inline-flex items-center gap-2 text-sm font-black text-emerald-700 underline underline-offset-4 transition hover:text-emerald-800"
+                  className="mt-3 inline-flex items-center gap-2 text-sm font-black text-[#047857] underline underline-offset-4 transition hover:text-[#065f46]"
                 >
                   <Info className="h-4 w-4" />
                   Plačiau
@@ -167,7 +168,7 @@ export default function AdminDashboardPage() {
                 type="button"
                 onClick={loadStats}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-extrabold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-xl border border-[#86efac] bg-[#e9f7ef] px-4 py-3 text-sm font-black text-[#047857] transition hover:bg-[#d8f3e3] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCw className="h-4 w-4" />
                 Atnaujinti
@@ -176,7 +177,7 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => router.push("/reports")}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 font-extrabold text-white shadow-sm transition hover:bg-emerald-800"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#047857] px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#065f46]"
               >
                 <BarChart3 className="h-4 w-4" />
                 Ataskaitos
@@ -185,7 +186,7 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
             icon={<Building2 />}
             title="Įstaigos"
@@ -216,15 +217,15 @@ export default function AdminDashboardPage() {
           />
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="grid gap-6">
+        <section className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4">
             <Card className="min-h-[286px]">
-              <h2 className="text-2xl font-black tracking-tight">Greiti veiksmai</h2>
-              <p className="mt-1 font-semibold text-slate-500">
+              <h2 className="text-2xl font-black">Greiti veiksmai</h2>
+              <p className="mt-1 text-sm font-bold text-[#6a7e75]">
                 Dažniausiai naudojamos administravimo operacijos.
               </p>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
                 <ActionCard title="Naujas gyventojas" desc="Pridėti gyventojo profilį" onClick={() => setEmbeddedFormRoute("/residents?newResident=1")} />
                 <ActionCard title="Naujas darbuotojas" desc="Sukurti darbuotojo paskyrą" onClick={() => setEmbeddedFormRoute("/team?newEmployee=1")} />
                 <ActionCard title="Nauja užduotis" desc="Sukurti užduotį" onClick={() => router.push("/tasks")} />
@@ -233,8 +234,8 @@ export default function AdminDashboardPage() {
             </Card>
 
             <Card className="min-h-[370px]">
-              <h2 className="text-2xl font-black tracking-tight">Naujausias aktyvumas</h2>
-              <p className="mt-1 font-semibold text-slate-500">
+              <h2 className="text-2xl font-black">Naujausias aktyvumas</h2>
+              <p className="mt-1 text-sm font-bold text-[#6a7e75]">
                 Paskutiniai administraciniai veiksmai sistemoje.
               </p>
 
@@ -247,16 +248,16 @@ export default function AdminDashboardPage() {
             </Card>
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid gap-4">
             <Card className="min-h-[286px]">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">Šiandien</p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight">Direktoriaus santrauka</h2>
-                  <p className="mt-1 font-semibold text-slate-500">Svarbiausi rodikliai ir veiksmai vienoje vietoje.</p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">Šiandien</p>
+                  <h2 className="mt-1 text-2xl font-black">Direktoriaus santrauka</h2>
+                  <p className="mt-1 text-sm font-bold text-[#6a7e75]">Svarbiausi rodikliai ir veiksmai vienoje vietoje.</p>
                 </div>
 
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#e9f7ef] text-[#047857]">
                   <CalendarCheck className="h-6 w-6" />
                 </div>
               </div>
@@ -272,12 +273,12 @@ export default function AdminDashboardPage() {
             <Card className="min-h-[370px]">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-amber-600">Prioritetai</p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight">Reikia dėmesio</h2>
-                  <p className="mt-1 font-semibold text-slate-500">Personalo, pažymų, mokymų ir atostogų klausimai.</p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#8a5a13]">Prioritetai</p>
+                  <h2 className="mt-1 text-2xl font-black">Reikia dėmesio</h2>
+                  <p className="mt-1 text-sm font-bold text-[#6a7e75]">Personalo, pažymų, mokymų ir atostogų klausimai.</p>
                 </div>
 
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#fff6df] text-[#8a5a13]">
                   <AlertTriangle className="h-6 w-6" />
                 </div>
               </div>
@@ -292,46 +293,46 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-xl border border-[#dbe6e0] bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">Statistika</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">Įstaigos rodikliai</h2>
-              <p className="mt-1 font-semibold text-slate-500">Greitai įvertinami rodikliai direktoriui.</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">Statistika</p>
+              <h2 className="mt-1 text-2xl font-black">Įstaigos rodikliai</h2>
+              <p className="mt-1 text-sm font-bold text-[#6a7e75]">Greitai įvertinami rodikliai direktoriui.</p>
             </div>
 
             <button
               type="button"
               onClick={() => router.push("/audit")}
-              className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-200"
+              className="rounded-xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
             >
               Peržiūrėti ataskaitą
             </button>
           </div>
 
-          <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            <ChartCard title="Užimtumas" value={`${computed.occupancy}%`} progress={computed.occupancy} color="#10b981" desc={stats.capacity ? `Užimta ${stats.activeResidents} iš ${stats.capacity} vietų.` : `${stats.activeResidents} aktyvūs gyventojai.`} />
-            <ChartCard title="Mokymai" value={`${computed.trainingCompletion}%`} progress={computed.trainingCompletion} color="#3b82f6" desc={`${stats.completedTrainings} iš ${stats.requiredTrainings} privalomų įrašų.`} />
-            <ChartCard title="Pažymos" value={String(stats.expiringCertificates)} progress={clamp(stats.expiringCertificates * 20, 0, 100)} color="#f43f5e" desc="Baigiasi per 14 dienų." />
-            <ChartCard title="Atostogos" value={String(stats.pendingLeaves)} progress={clamp(stats.pendingLeaves * 25, 0, 100)} color="#f59e0b" desc="Laukia sprendimo." />
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <ChartCard title="Užimtumas" value={`${computed.occupancy}%`} progress={computed.occupancy} color="#047857" desc={stats.capacity ? `Užimta ${stats.activeResidents} iš ${stats.capacity} vietų.` : `${stats.activeResidents} aktyvūs gyventojai.`} />
+            <ChartCard title="Mokymai" value={`${computed.trainingCompletion}%`} progress={computed.trainingCompletion} color="#047857" desc={`${stats.completedTrainings} iš ${stats.requiredTrainings} privalomų įrašų.`} />
+            <ChartCard title="Pažymos" value={String(stats.expiringCertificates)} progress={clamp(stats.expiringCertificates * 20, 0, 100)} color="#b91c1c" desc="Baigiasi per 14 dienų." />
+            <ChartCard title="Atostogos" value={String(stats.pendingLeaves)} progress={clamp(stats.pendingLeaves * 25, 0, 100)} color="#8a5a13" desc="Laukia sprendimo." />
           </div>
         </section>
       </div>
     
       {showHelp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-5xl overflow-hidden rounded-[28px] border border-slate-200 bg-[#f8faf8] shadow-2xl">
-            <div className="flex items-start justify-between gap-6 border-b border-slate-200 bg-white px-7 py-6">
+          <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
               <div>
-                <p className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-[#446452]">
+                <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                   Trumpa instrukcija
                 </p>
 
-                <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
+                <h1 className="text-3xl font-black text-[#10251f] sm:text-4xl">
                   Kaip naudotis pagrindiniu skydeliu?
                 </h1>
 
-                <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-slate-600">
+                <p className="mt-3 max-w-3xl text-sm font-bold leading-6 text-[#6a7e75]">
                   Čia matysi svarbiausią įstaigos dienos informaciją: užimtumą,
                   gyventojus, darbuotojus, užduotis ir įspėjimus.
                 </p>
@@ -340,26 +341,26 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setShowHelp(false)}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#eef4ef] text-3xl leading-none text-[#315740] transition hover:bg-[#e2ece4]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#dbe6e0] bg-white text-2xl leading-none text-[#486b5d] transition hover:bg-[#eef4f1]"
                 aria-label="Uždaryti instrukciją"
               >
                 ×
               </button>
             </div>
 
-            <div className="max-h-[72vh] overflow-y-auto p-6 sm:p-7">
-              <div className="mb-6 rounded-[26px] border border-[#d9eadf] bg-[#eef8f1] p-6">
+            <div className="max-h-[72vh] overflow-y-auto bg-white p-5">
+              <div className="mb-4 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
                 <div className="mb-4 flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#dcefe3] text-xl font-black text-[#24543a]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f7ef] text-lg font-black text-[#047857]">
                     1
                   </div>
 
-                  <h2 className="text-2xl font-black text-[#20382b] sm:text-3xl">
+                  <h2 className="text-2xl font-black text-[#10251f]">
                     Pagrindinė santrauka
                   </h2>
                 </div>
 
-                <p className="max-w-4xl text-lg font-semibold leading-8 text-[#456454]">
+                <p className="max-w-4xl text-sm font-bold leading-6 text-[#6a7e75]">
                   Viršutiniai blokai parodo bendrą situaciją: kiek yra aktyvių
                   gyventojų, kiek vietų užimta kambariuose, kiek darbuotojų ir
                   kiek užduočių laukia dėmesio.
@@ -367,11 +368,11 @@ export default function AdminDashboardPage() {
 
                 <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
                   {["Gyventojai", "Užimtumas", "Darbuotojai", "Užduotys"].map((item) => (
-                    <div key={item} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    <div key={item} className="rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 shadow-sm">
+                      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#6a7e75]">
                         Blokas
                       </p>
-                      <p className="mt-1 text-base font-black text-slate-800">
+                      <p className="mt-1 text-base font-black text-[#10251f]">
                         {item}
                       </p>
                     </div>
@@ -380,69 +381,69 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-xl border border-[#dbe6e0] bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef4ef] text-lg font-black text-[#315740]">
                       2
                     </div>
 
-                    <h3 className="text-xl font-black text-slate-900">
+                    <h3 className="text-xl font-black text-[#10251f]">
                       Greiti veiksmai
                     </h3>
                   </div>
 
-                  <p className="text-base font-semibold leading-7 text-slate-600">
+                  <p className="text-sm font-bold leading-6 text-[#6a7e75]">
                     Mygtukas „Greiti veiksmai“ leidžia pasirinkti, ką kurti: gyventoją,
                     darbuotoją, užduotį arba perdavimo įrašą.
                   </p>
                 </div>
 
-                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-xl border border-[#dbe6e0] bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef4ef] text-lg font-black text-[#315740]">
                       3
                     </div>
 
-                    <h3 className="text-xl font-black text-slate-900">
+                    <h3 className="text-xl font-black text-[#10251f]">
                       Užimtumo skaičiavimas
                     </h3>
                   </div>
 
-                  <p className="text-base font-semibold leading-7 text-slate-600">
+                  <p className="text-sm font-bold leading-6 text-[#6a7e75]">
                     Užimtumas skaičiuojamas pagal kambarių vietas, o ne tik pagal
                     gyventojų skaičių. Jei vietų nėra, sistema parodo įspėjimą.
                   </p>
                 </div>
 
-                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-xl border border-[#dbe6e0] bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef4ef] text-lg font-black text-[#315740]">
                       4
                     </div>
 
-                    <h3 className="text-xl font-black text-slate-900">
+                    <h3 className="text-xl font-black text-[#10251f]">
                       Paspaudžiami blokai
                     </h3>
                   </div>
 
-                  <p className="text-base font-semibold leading-7 text-slate-600">
+                  <p className="text-sm font-bold leading-6 text-[#6a7e75]">
                     Statistikos kortelės gali nuvesti į susijusią skiltį arba
                     parodyti detalesnę informaciją apie pasirinktą rodiklį.
                   </p>
                 </div>
 
-                <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                <div className="rounded-xl border border-[#ead9b2] bg-[#fffdf8] p-4 shadow-sm">
                   <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-lg font-black text-amber-800">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff6df] text-lg font-black text-[#8a5a13]">
                       5
                     </div>
 
-                    <h3 className="text-xl font-black text-amber-950">
+                    <h3 className="text-xl font-black text-[#10251f]">
                       Įspėjimai
                     </h3>
                   </div>
 
-                  <p className="text-base font-semibold leading-7 text-amber-900">
+                  <p className="text-sm font-bold leading-6 text-[#7a6a4f]">
                     Geltoni arba raudoni pranešimai rodo, kad reikia patikrinti
                     trūkstamus duomenis, neatliktas užduotis arba sistemos klaidas.
                   </p>
@@ -450,11 +451,11 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div className="flex justify-end border-t border-slate-200 bg-white px-7 py-5">
+            <div className="flex justify-end border-t border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
               <button
                 type="button"
                 onClick={() => setShowHelp(false)}
-                className="rounded-2xl bg-[#315740] px-8 py-4 text-base font-black text-white shadow-sm transition hover:bg-[#284a36]"
+                className="rounded-xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#065f46]"
               >
                 Supratau
               </button>
@@ -466,13 +467,13 @@ export default function AdminDashboardPage() {
     
       {embeddedFormRoute && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="flex h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div className="flex h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
                   Greitas veiksmas
                 </p>
-                <h2 className="mt-1 text-2xl font-black text-slate-950">
+                <h2 className="mt-1 text-2xl font-black text-[#10251f]">
                   {embeddedFormRoute.startsWith("/residents") ? "Naujas gyventojas" : "Naujas darbuotojas"}
                 </h2>
               </div>
@@ -483,7 +484,7 @@ export default function AdminDashboardPage() {
                   setEmbeddedFormRoute(null);
                   void loadStats();
                 }}
-                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dbe6e0] bg-white text-[#486b5d] transition hover:bg-[#eef4f1]"
                 aria-label="Uždaryti"
               >
                 <X className="h-5 w-5" />

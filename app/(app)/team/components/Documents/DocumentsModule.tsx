@@ -93,7 +93,7 @@ function getDocumentStatus(record?: CredentialRecord | null) {
     return {
       key: "missing" as const,
       label: "Trūksta",
-      className: "bg-slate-100 text-slate-700",
+      className: "bg-[#eef4f1] text-[#40594f]",
     }
   }
 
@@ -102,7 +102,7 @@ function getDocumentStatus(record?: CredentialRecord | null) {
     return {
       key: "valid" as const,
       label: "Galioja",
-      className: "bg-emerald-100 text-emerald-800",
+      className: "bg-[#dce7e2] text-[#486b5d]",
     }
   }
 
@@ -127,7 +127,7 @@ function getDocumentStatus(record?: CredentialRecord | null) {
   return {
     key: "valid" as const,
     label: "Galioja",
-    className: "bg-emerald-100 text-emerald-800",
+    className: "bg-[#dce7e2] text-[#486b5d]",
   }
 }
 
@@ -391,36 +391,36 @@ export default function DocumentsModule({
   }
 
   return (
-    <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-lg border border-[#dbe6e0] bg-white p-5 shadow-sm">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">
             Vienas dokumentų modulis
           </p>
-          <h2 className="mt-1 text-3xl font-black text-slate-950">
+          <h2 className="mt-1 text-2xl font-black text-[#10251f]">
             Dokumentai
           </h2>
-          <p className="mt-2 max-w-3xl text-sm font-semibold text-slate-500">
+          <p className="mt-2 max-w-3xl text-sm font-semibold text-[#6a7e75]">
             Pažymos, licencijos ir patikrinimo faktas tvarkomi vienoje vietoje.
             Atskiro „Dokumentų patikrinimai“ modulio nebereikia.
           </p>
         </div>
 
-        <div className="rounded-3xl border border-emerald-100 bg-emerald-50 px-6 py-4 text-center">
-          <div className="text-4xl font-black text-emerald-800">{compliancePercent}%</div>
-          <div className="text-xs font-black uppercase tracking-wide text-emerald-700">
+        <div className="rounded-xl border border-[#dce7e2] bg-[#eef4f1] px-6 py-4 text-center">
+          <div className="text-2xl font-black text-[#486b5d]">{compliancePercent}%</div>
+          <div className="text-xs font-black uppercase tracking-wide text-[#486b5d]">
             Atitiktis
           </div>
         </div>
       </div>
 
       {(counts.expiring > 0 || counts.expired > 0 || counts.missing > 0) ? (
-        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
           Yra dokumentų rizikų: {counts.expiring} baigiasi, {counts.expired} pasibaigę,
           {" "}{counts.missing} trūksta. Tokius darbuotojus grafike verta žymėti įspėjimu.
         </div>
       ) : (
-        <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-black text-emerald-900">
+        <div className="mb-5 rounded-lg border border-[#c9d8d0] bg-[#eef4f1] px-5 py-4 text-sm font-black text-[#10251f]">
           Dokumentų rizikų nėra.
         </div>
       )}
@@ -438,10 +438,10 @@ export default function DocumentsModule({
             type="button"
             onClick={() => setFilter(key as DocsFilter)}
             className={[
-              "rounded-2xl border px-4 py-2 text-sm font-black transition",
+              "rounded-lg border px-4 py-2 text-sm font-black transition",
               filter === key
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                ? "border-slate-900 bg-[#486b5d] text-white"
+                : "border-[#dbe6e0] bg-white text-[#40594f] hover:bg-[#f8faf8]",
             ].join(" ")}
           >
             {label} · {count}
@@ -450,19 +450,19 @@ export default function DocumentsModule({
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[0.85fr_1.35fr]">
-        <div id="documents-form" className="rounded-[28px] border border-slate-200 bg-slate-50/70 p-6">
-          <h3 className="text-2xl font-black text-slate-950">Pridėti dokumentą</h3>
-          <p className="mt-2 text-sm font-semibold text-slate-500">
+        <div id="documents-form" className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8]/70 p-5">
+          <h3 className="text-2xl font-black text-[#10251f]">Pridėti dokumentą</h3>
+          <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
             Įvedamas dokumento faktas ir privalomas patikrinimas. Failų kelti nereikia.
           </p>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Darbuotojas</span>
+              <span className="text-sm font-black text-[#40594f]">Darbuotojas</span>
               <select
                 value={employeeId}
                 onChange={(event) => setEmployeeId(event.target.value)}
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
               >
                 <option value="">Pasirinkti darbuotoją</option>
                 {employees.map((employee) => (
@@ -474,11 +474,11 @@ export default function DocumentsModule({
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Dokumento tipas</span>
+              <span className="text-sm font-black text-[#40594f]">Dokumento tipas</span>
               <select
                 value={type}
                 onChange={(event) => setType(event.target.value)}
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
               >
                 {Array.from(new Set([...CREDENTIAL_TYPES, ...requiredDocuments, type].filter(Boolean))).map((item) => (
                   <option key={item} value={normalizeCredentialType(item)}>
@@ -489,58 +489,58 @@ export default function DocumentsModule({
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Numeris</span>
+              <span className="text-sm font-black text-[#40594f]">Numeris</span>
               <input
                 value={number}
                 onChange={(event) => setNumber(event.target.value)}
                 placeholder="Dokumento nr."
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
               />
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Išdavė / kur patikrinta</span>
+              <span className="text-sm font-black text-[#40594f]">Išdavė / kur patikrinta</span>
               <input
                 value={issuer}
                 onChange={(event) => setIssuer(event.target.value)}
                 placeholder="Įstaiga / institucija / registras"
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
               />
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Galioja nuo</span>
+              <span className="text-sm font-black text-[#40594f]">Galioja nuo</span>
               <input
                 type="date"
                 value={issuedAt}
                 onChange={(event) => setIssuedAt(event.target.value)}
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
               />
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-slate-600">Galioja iki</span>
+              <span className="text-sm font-black text-[#40594f]">Galioja iki</span>
               <input
                 type="date"
                 value={expiresAt}
                 onChange={(event) => setExpiresAt(event.target.value)}
-                className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
               />
             </label>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
             <h4 className="text-sm font-black uppercase tracking-[0.14em] text-amber-800">
               Privalomas patikrinimo faktas
             </h4>
 
             <div className="mt-4 grid gap-4">
               <label className="space-y-2">
-                <span className="text-sm font-black text-slate-600">Patikrinimo būdas</span>
+                <span className="text-sm font-black text-[#40594f]">Patikrinimo būdas</span>
                 <select
                   value={checkMethod}
                   onChange={(event) => setCheckMethod(event.target.value)}
-                  className="h-12 w-full rounded-2xl border border-amber-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                  className="h-10 w-full rounded-lg border border-amber-200 bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                 >
                   {CHECK_METHODS.map((method) => (
                     <option key={method} value={method}>{method}</option>
@@ -550,22 +550,22 @@ export default function DocumentsModule({
 
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-sm font-black text-slate-600">Patikrinimo data</span>
+                  <span className="text-sm font-black text-[#40594f]">Patikrinimo data</span>
                   <input
                     type="date"
                     value={checkedAt}
                     onChange={(event) => setCheckedAt(event.target.value)}
-                    className="h-12 w-full rounded-2xl border border-amber-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                    className="h-10 w-full rounded-lg border border-amber-200 bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                   />
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-black text-slate-600">Kas patikrino</span>
+                  <span className="text-sm font-black text-[#40594f]">Kas patikrino</span>
                   <input
                     value={checkedByText}
                     onChange={(event) => setCheckedByText(event.target.value)}
                     placeholder="Vardas arba pareigos"
-                    className="h-12 w-full rounded-2xl border border-amber-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                    className="h-10 w-full rounded-lg border border-amber-200 bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                   />
                 </label>
               </div>
@@ -573,24 +573,24 @@ export default function DocumentsModule({
           </div>
 
           <label className="mt-4 block space-y-2">
-            <span className="text-sm font-black text-slate-600">Pastaba</span>
+            <span className="text-sm font-black text-[#40594f]">Pastaba</span>
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder="Neprivaloma pastaba"
               rows={3}
-              className="w-full resize-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+              className="w-full resize-none rounded-lg border border-[#c2d3ca] bg-white px-4 py-3 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
             />
           </label>
 
-          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-[#dbe6e0] bg-white px-4 py-3">
             <input
               type="checkbox"
               checked={confirmed}
               onChange={(event) => setConfirmed(event.target.checked)}
-              className="mt-1 h-5 w-5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+              className="mt-1 h-5 w-5 rounded border-[#c2d3ca] text-[#486b5d] focus:ring-[#486b5d]"
             />
-            <span className="text-sm font-black leading-6 text-slate-700">
+            <span className="text-sm font-black leading-6 text-[#40594f]">
               Patvirtinu, kad dokumentas patikrintas dėl darbo ir įvesti duomenys yra teisingi.
             </span>
           </label>
@@ -598,9 +598,9 @@ export default function DocumentsModule({
           {message ? (
             <div
               className={[
-                "mt-4 rounded-2xl border px-4 py-3 text-sm font-bold",
+                "mt-4 rounded-lg border px-4 py-3 text-sm font-bold",
                 message.type === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  ? "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]"
                   : "border-red-200 bg-red-50 text-red-800",
               ].join(" ")}
             >
@@ -618,18 +618,18 @@ export default function DocumentsModule({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 px-7 text-base font-black text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#486b5d] px-5 text-base font-black text-white shadow-sm transition hover:bg-[#39594c] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? "Saugoma..." : "+ Išsaugoti"}
             </button>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6">
+        <div className="rounded-xl border border-[#dbe6e0] bg-white p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-2xl font-black text-slate-950">Dokumentų sąrašas</h3>
-              <p className="text-sm font-bold text-slate-500">
+              <h3 className="text-2xl font-black text-[#10251f]">Dokumentų sąrašas</h3>
+              <p className="text-sm font-bold text-[#6a7e75]">
                 Filtras: {filter === "all" ? "Visi" : filter === "valid" ? "Galioja" : filter === "expiring" ? "Baigiasi" : filter === "expired" ? "Pasibaigę" : "Trūksta"}
               </p>
             </div>
@@ -637,15 +637,15 @@ export default function DocumentsModule({
             <button
               type="button"
               onClick={() => setFilter("all")}
-              className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-[#dbe6e0] px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#f8faf8]"
             >
               Rodyti visus
             </button>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200">
+          <div className="overflow-hidden rounded-lg border border-[#dbe6e0]">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600">
+              <thead className="bg-[#f8faf8] text-[#40594f]">
                 <tr>
                   <th className="px-4 py-3 font-black">Darbuotojas</th>
                   <th className="px-4 py-3 font-black">Tipas</th>
@@ -673,7 +673,7 @@ export default function DocumentsModule({
                           <button
                             type="button"
                             onClick={() => fillFromMissing({ employee_id: row.employee_id, type: row.type })}
-                            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                            className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
                           >
                             Pridėti dokumentą
                           </button>
@@ -681,7 +681,7 @@ export default function DocumentsModule({
                           <button
                             type="button"
                             onClick={() => fillFromMissing({ employee_id: row.employee_id, type: row.type })}
-                            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                            className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
                           >
                             Atnaujinti
                           </button>
@@ -691,7 +691,7 @@ export default function DocumentsModule({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center font-bold text-slate-500">
+                    <td colSpan={6} className="px-4 py-10 text-center font-bold text-[#6a7e75]">
                       Dokumentų pagal pasirinktą filtrą nėra.
                     </td>
                   </tr>

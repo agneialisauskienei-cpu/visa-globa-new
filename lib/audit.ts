@@ -42,6 +42,15 @@ export async function logAudit({
   action: AuditAction
   changes?: unknown
 }) {
+  if (
+    changes &&
+    typeof changes === "object" &&
+    !Array.isArray(changes) &&
+    Object.keys(changes as Record<string, unknown>).length === 0
+  ) {
+    return;
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser()

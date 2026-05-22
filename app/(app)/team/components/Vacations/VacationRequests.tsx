@@ -23,6 +23,11 @@ type Employee = {
   position?: string | null;
   department?: string | null;
   staff_type?: string | null;
+  employment_start_date?: string | null;
+  termination_date?: string | null;
+  employment_rate?: number | string | null;
+  fte?: number | string | null;
+  employment_fte?: number | string | null;
 };
 
 type VacationRequest = {
@@ -166,6 +171,81 @@ function vacationEntitlement(employee?: Employee | null) {
   };
 }
 
+
+function parseNumericValue(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(String(value).replace(",", ".").trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function employeeFte(employee?: Employee | null) {
+  const raw =
+    parseNumericValue(employee?.employment_rate) ??
+    parseNumericValue(employee?.employment_fte) ??
+    parseNumericValue(employee?.fte);
+  if (raw === null || raw <= 0) return 1;
+  return Math.min(raw, 2);
+}
+
+function dateFromInput(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function clampDate(date: Date, min: Date, max: Date) {
+  if (date < min) return min;
+  if (date > max) return max;
+  return date;
+}
+
+function daysInclusive(start: Date, end: Date) {
+  const startMs = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const endMs = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+  return Math.max(0, Math.floor((endMs - startMs) / 86400000) + 1);
+}
+
+function roundDays(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function formatDays(value: number) {
+  const rounded = roundDays(value);
+  return rounded.toLocaleString("lt-LT", {
+    minimumFractionDigits: rounded % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 2,
+  });
+}
+
+function accrualInfo(employee?: Employee | null, targetInput?: string) {
+  const entitlement = vacationEntitlement(employee);
+  const fte = employeeFte(employee);
+  const today = new Date();
+  const target = dateFromInput(targetInput) || today;
+  const year = target.getFullYear();
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year, 11, 31);
+  const employmentStart = dateFromInput(employee?.employment_start_date);
+  const employmentEnd = dateFromInput(employee?.termination_date);
+  const accrualStart = employmentStart && employmentStart > yearStart ? employmentStart : yearStart;
+  const accrualEndLimit = employmentEnd && employmentEnd < yearEnd ? employmentEnd : yearEnd;
+  const cappedTarget = clampDate(target, accrualStart, accrualEndLimit);
+  const workedDays = daysInclusive(accrualStart, cappedTarget);
+  const possibleDays = daysInclusive(yearStart, yearEnd);
+  const annualNorm = entitlement.days * fte;
+  const accrued = possibleDays > 0 ? (annualNorm / possibleDays) * workedDays : 0;
+
+  return {
+    annualNorm: roundDays(annualNorm),
+    monthly: roundDays(annualNorm / 12),
+    daily: roundDays(possibleDays > 0 ? annualNorm / possibleDays : 0),
+    accrued: roundDays(accrued),
+    target: toDateInput(target),
+    basis: entitlement.basis,
+    fte,
+  };
+}
+
 function cleanRoleText(value?: string | null) {
   const text = String(value || "").trim();
   const normalized = text.toLowerCase();
@@ -298,6 +378,7 @@ export default function VacationRequests({
   const [historyEmployeeId, setHistoryEmployeeId] = useState<string | null>(
     null,
   );
+  const [forecastDate, setForecastDate] = useState(() => toDateInput(new Date()));
   const filter = activeFilter || localFilter;
   const [optimisticRequests, setOptimisticRequests] = useState<VacationRequest[]>([]);
   const employeeMap = useMemo(
@@ -472,6 +553,13 @@ export default function VacationRequests({
     ? employeeMap.get(historyEmployeeId)
     : selectedEmployee;
   const selectedBalance = remainingAnnualDays(selectedEmployee);
+  const detailEmployee = historyEmployee || selectedEmployee;
+  const detailBalance = remainingAnnualDays(detailEmployee);
+  const selectedAccrual = accrualInfo(selectedEmployee, form.start_date || forecastDate);
+  const detailAccrual = accrualInfo(detailEmployee, forecastDate);
+  const projectedAvailableAtForecast = detailEmployee
+    ? Math.max(0, detailAccrual.accrued - usedAnnualDays(detailEmployee) - reservedAnnualDays(detailEmployee))
+    : 0;
   const previewRequest: VacationRequest = {
     id: "preview",
     employee_id: form.employee_id,
@@ -494,6 +582,9 @@ export default function VacationRequests({
   const previewDays = isTemporaryLeave(form.type)
     ? 0
     : daysBetween(form.start_date, form.end_date);
+  const selectedProjectedAfterRequest = selectedEmployee
+    ? selectedAccrual.accrued - usedAnnualDays(selectedEmployee) - reservedAnnualDays(selectedEmployee) - (isAnnual(form.type) ? previewDays || 0 : 0)
+    : 0;
   const previewHours = isTemporaryLeave(form.type)
     ? timeRangeHours(form.start_time, form.end_time)
     : 0;
@@ -587,7 +678,7 @@ export default function VacationRequests({
           <span className="vr-eyebrow">Prašymai</span>
           <h2>Atostogos ir trumpi išvykimai</h2>
           <p>
-            Vadovas mato visų darbuotojų pateiktus prašymus. Kol nepatvirtinta, grafike rodoma rezervacija; patvirtinus — įrašas perduodamas į grafiką.
+            Darbuotojų atostogų, mamadienių, tėvadienių ir trumpų išvykimų valdymas.
           </p>
         </div>
         <div className="vr-summary" aria-label="Prašymų filtrai">
@@ -643,7 +734,10 @@ export default function VacationRequests({
       <div className="vr-form">
         <select
           value={form.employee_id}
-          onChange={(event) => update("employee_id", event.target.value)}
+          onChange={(event) => {
+            update("employee_id", event.target.value);
+            setHistoryEmployeeId(event.target.value || null);
+          }}
         >
           {employees.map((employee) => {
             const balance = remainingAnnualDays(employee);
@@ -725,65 +819,12 @@ Ar leisti atostogas į minusą?`,
         </button>
       </div>
 
-      {selectedEmployee ? (
-        <div className="vr-balance">
-          <Umbrella size={18} />
-          <b>{employeeDisplayName(selectedEmployee)}</b>
-          <span>Priklauso: {selectedBalance.entitlement} d.</span>
-          <span>Panaudota: {selectedBalance.used} d.</span>
-          <span>Rezervuota: {selectedBalance.reserved} d.</span>
-          <span className={selectedBalance.left <= 0 ? "vr-balance-warning" : ""}>Likutis: {selectedBalance.left} d.</span>
-          {isAnnual(form.type) ? <span>Po prašymo: {selectedBalance.rawLeft - previewDays} d.</span> : null}
-          <small>{selectedBalance.basis} Etatas dienų skaičiaus nemažina.</small>
+      <div className="vr-main-list-title">
+        <div>
+          <span>Prašymai</span>
+          <h3>Darbuotojų pateikti prašymai</h3>
         </div>
-      ) : null}
-
-      {previewImpact ? (
-        <div
-          className={
-            previewImpact.risky || previewOverBalance
-              ? "vr-impact vr-impact-risk"
-              : "vr-impact"
-          }
-        >
-          <TrendingDown size={18} />
-          <b>Poveikis prieš pateikiant:</b>
-          {isTemporaryLeave(form.type) ? (
-            <span>Trumpas išvykimas: {previewHours || "—"} val.</span>
-          ) : (
-            <span>Prašoma: {previewDays} d.</span>
-          )}
-          {isAnnual(form.type) ? (
-            <span>
-              Likutis po prašymo: {selectedBalance.rawLeft - previewDays} d.
-            </span>
-          ) : null}
-          {!isTemporaryLeave(form.type) ? (
-            <span>
-              Komandoje liks {previewImpact.left} iš {previewImpact.total}
-            </span>
-          ) : (
-            <span>Tabelyje atskiru kodu nerodoma</span>
-          )}
-          {!isTemporaryLeave(form.type) ? (
-            <span>Kritinė diena: {fmt(previewImpact.worstDay)}</span>
-          ) : null}
-          {previewOverBalance ? (
-            <strong>
-              <AlertTriangle size={16} /> Viršija atostogų likutį
-            </strong>
-          ) : null}
-          {previewImpact.risky ? (
-            <strong>
-              <AlertTriangle size={16} /> Gali trūkti žmonių
-            </strong>
-          ) : (
-            <strong>
-              <CheckCircle2 size={16} /> Rizikų nerasta
-            </strong>
-          )}
-        </div>
-      ) : null}
+      </div>
 
       <div className="vr-table-shell">
         <div className="vr-table-head">
@@ -872,7 +913,7 @@ Ar leisti atostogas į minusą?`,
                   >
                     <b>
                       {isTemporaryLeave(request.type)
-                        ? "Vidinė info"
+                        ? "Trumpas išvykimas"
                         : overBalance
                           ? "Viršija likutį"
                           : `Liks ${impact.left}/${impact.total}`}
@@ -920,16 +961,18 @@ Ar leisti atostogas į minusą?`,
         </div>
       </div>
 
-      <div className="vr-history">
-        <div className="vr-history-title">
-          <h3>
-            <History size={18} /> Atostogų istorija
-          </h3>
+      <section className="vr-detail-panel">
+        <div className="vr-detail-head">
+          <div>
+            <span>Darbuotojo likutis</span>
+            <h3>Kaupimas, prognozė ir istorija</h3>
+          </div>
           <select
-            value={historyEmployee?.user_id || ""}
-            onChange={(event) =>
-              setHistoryEmployeeId(event.target.value || null)
-            }
+            value={detailEmployee?.user_id || ""}
+            onChange={(event) => {
+              const nextEmployeeId = event.target.value || "";
+              setHistoryEmployeeId(nextEmployeeId || null);
+            }}
           >
             {employees.map((employee) => (
               <option key={employee.user_id} value={employee.user_id}>
@@ -941,12 +984,155 @@ Ar leisti atostogas į minusą?`,
             ))}
           </select>
         </div>
-        {historyEmployee ? (
+
+      {detailEmployee ? (
+        <div className="vr-balance">
+          <Umbrella size={18} />
+          <b>{employeeDisplayName(detailEmployee)}</b>
+          <span>Metinė norma: {formatDays(detailAccrual.annualNorm)} d.</span>
+          <span>Kaupiasi: +{formatDays(detailAccrual.monthly)} d./mėn.</span>
+          <span>Per dieną: +{formatDays(detailAccrual.daily)} d.</span>
+          <span>Panaudota: {detailBalance.used} d.</span>
+          <span>Rezervuota: {detailBalance.reserved} d.</span>
+          <span className={projectedAvailableAtForecast <= 0 ? "vr-balance-warning" : ""}>Prognozė: {formatDays(projectedAvailableAtForecast)} d.</span>
+          <small>{detailBalance.basis}</small>
+        </div>
+      ) : null}
+
+      {detailEmployee ? (
+        <section className="vr-forecast" aria-label="Atostogų likučio prognozė">
+          <div className="vr-forecast-main">
+            <div>
+              <span>Prognozė pasirinktai datai</span>
+              <h3>{formatDays(projectedAvailableAtForecast)} d.</h3>
+              <p>Preliminarus likutis įvertinus sukaupimą, panaudotas ir rezervuotas kasmetines atostogas.</p>
+            </div>
+            <label>
+              Data
+              <input
+                type="date"
+                value={forecastDate}
+                onChange={(event) => setForecastDate(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="vr-forecast-grid">
+            <span><b>Metinė norma</b>{formatDays(detailAccrual.annualNorm)} d.</span>
+            <span><b>Per mėnesį</b>+{formatDays(detailAccrual.monthly)} d.</span>
+            <span><b>Per dieną</b>+{formatDays(detailAccrual.daily)} d.</span>
+            <span><b>Sukaupta iki datos</b>{formatDays(detailAccrual.accrued)} d.</span>
+            <span><b>Po rengiamo prašymo</b>{formatDays(selectedProjectedAfterRequest)} d.</span>
+          </div>
+        </section>
+      ) : null}
+
+      {previewImpact ? (
+        <div
+          className={
+            previewImpact.risky || previewOverBalance
+              ? "vr-impact vr-impact-risk"
+              : "vr-impact"
+          }
+        >
+          <TrendingDown size={18} />
+          <b>Poveikis prieš pateikiant:</b>
+          {isTemporaryLeave(form.type) ? (
+            <span>Trumpas išvykimas: {previewHours || "—"} val.</span>
+          ) : (
+            <span>Prašoma: {previewDays} d.</span>
+          )}
+          {isAnnual(form.type) ? (
+            <span>
+              Likutis po prašymo: {selectedBalance.rawLeft - previewDays} d.
+            </span>
+          ) : null}
+          {!isTemporaryLeave(form.type) ? (
+            <span>
+              Komandoje liks {previewImpact.left} iš {previewImpact.total}
+            </span>
+          ) : (
+            <span>Trumpas išvykimas valandomis</span>
+          )}
+          {!isTemporaryLeave(form.type) ? (
+            <span>Kritinė diena: {fmt(previewImpact.worstDay)}</span>
+          ) : null}
+          {previewOverBalance ? (
+            <strong>
+              <AlertTriangle size={16} /> Viršija atostogų likutį
+            </strong>
+          ) : null}
+          {previewImpact.risky ? (
+            <strong>
+              <AlertTriangle size={16} /> Gali trūkti žmonių
+            </strong>
+          ) : (
+            <strong>
+              <CheckCircle2 size={16} /> Rizikų nerasta
+            </strong>
+          )}
+        </div>
+      ) : null}
+
+
+      {detailEmployee ? (
+        <section className="vr-rules" aria-label="Atostogų skaičiavimo taisyklės">
+          <div className="vr-rule-head">
+            <div>
+              <span>Skaičiavimo taisyklės</span>
+              <h3>Norma parenkama pagal darbuotojo pareigybę / grupę</h3>
+            </div>
+            <strong>Automatiškai</strong>
+          </div>
+          <div className="vr-rule-grid">
+            <article className="vr-rule-card">
+              <b>Administracija</b>
+              <strong>20 d. d.</strong>
+              <p>Standartinė 5 d. savaitė. Jei 6 d. savaitė — 24 d. d.</p>
+            </article>
+            <article className="vr-rule-card vr-rule-card-active">
+              <b>Socialinė / slauga / globos darbuotojai</b>
+              <strong>30 d. d.</strong>
+              <p>5 d. savaitė. Jei 6 d. savaitė — 36 d. d.; jei kintantis grafikas — 6 savaitės.</p>
+            </article>
+            <article className="vr-rule-card vr-rule-card-warn">
+              <b>Pradinis likutis ir korekcijos</b>
+              <strong>{detailBalance.left} d.</strong>
+              <p>Pradinis likutis įvedamas pirmą kartą arba metų pradžioje. Visi pakeitimai turi likti audite.</p>
+            </article>
+          </div>
+        </section>
+      ) : null}
+
+      </section>
+
+      <div className="vr-history">
+        <div className="vr-history-title">
+          <h3>
+            <History size={18} /> Atostogų istorija
+          </h3>
+          <select
+            value={detailEmployee?.user_id || ""}
+            onChange={(event) => {
+              const nextEmployeeId = event.target.value || "";
+              setHistoryEmployeeId(nextEmployeeId || null);
+            }}
+          >
+            {employees.map((employee) => (
+              <option key={employee.user_id} value={employee.user_id}>
+                {employeeDisplayName(employee)}
+                {employeePositionText(employee)
+                  ? ` — ${employeePositionText(employee)}`
+                  : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        {detailEmployee ? (
           (() => {
-            const balance = remainingAnnualDays(historyEmployee);
+            const balance = remainingAnnualDays(detailEmployee);
             const employeeRequests = allRequests
               .filter(
-                (request) => request.employee_id === historyEmployee.user_id,
+                (request) => request.employee_id === detailEmployee.user_id,
               )
               .sort((a, b) =>
                 String(b.start_date).localeCompare(String(a.start_date)),
@@ -955,12 +1141,12 @@ Ar leisti atostogas į minusą?`,
               <div className="vr-history-panel">
                 <div className="vr-history-person">
                   <div className="vr-avatar">
-                    {employeeInitials(historyEmployee)}
+                    {employeeInitials(detailEmployee)}
                   </div>
                   <div>
-                    <b>{employeeDisplayName(historyEmployee)}</b>
-                    {employeePositionText(historyEmployee) ? (
-                      <small>{employeePositionText(historyEmployee)}</small>
+                    <b>{employeeDisplayName(detailEmployee)}</b>
+                    {employeePositionText(detailEmployee) ? (
+                      <small>{employeePositionText(detailEmployee)}</small>
                     ) : null}
                   </div>
                 </div>
@@ -1021,50 +1207,278 @@ Ar leisti atostogas į minusą?`,
 }
 
 const css = `
-.vr-card { width:min(100%,1280px); margin:0 auto; background:#fff; border:1px solid #dbe6f3; border-radius:28px; padding:28px; box-shadow:0 18px 46px rgba(15,23,42,.07); overflow:hidden; container-type:inline-size; }
-.vr-header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:20px; margin-bottom:22px; align-items:start; }
-.vr-eyebrow { display:block; margin-bottom:8px; color:#007a5a; font-size:13px; letter-spacing:.18em; text-transform:uppercase; font-weight:950; }
-.vr-header h2 { margin:0 0 8px; font-size:clamp(24px,2.5vw,34px); line-height:1.05; color:#03081f; font-weight:950; letter-spacing:-.03em; }
-.vr-header p { margin:0; color:#63718b; font-weight:800; max-width:880px; line-height:1.45; }
-.vr-summary { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; max-width:760px; }
-.vr-filter { border:1px solid #dbe6f3; border-radius:999px; padding:12px 16px; color:#334155; font-weight:950; background:#f8fbff; cursor:pointer; display:inline-flex; gap:8px; align-items:center; white-space:nowrap; box-shadow:0 10px 20px rgba(15,23,42,.03); }
-.vr-filter.active { background:#007f63; border-color:#007f63; color:#fff; }
-.vr-filter.danger:not(.active) { background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
-.vr-form { display:grid; grid-template-columns:minmax(240px,1.35fr) minmax(210px,1fr) minmax(145px,.75fr) minmax(145px,.75fr) minmax(170px,1fr) minmax(180px,.9fr); gap:12px; margin-bottom:14px; }
-.vr-form select,.vr-form input { width:100%; min-width:0; min-height:54px; border:1px solid #d7e1ef; border-radius:18px; padding:0 16px; color:#07122a; font-weight:850; background:#fff; outline:none; font-size:15px; }
-.vr-form select:focus,.vr-form input:focus { border-color:#007f63; box-shadow:0 0 0 4px rgba(0,127,99,.10); }
-.vr-form button { border:0; border-radius:18px; background:#007f63; color:#fff; font-weight:950; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; min-height:54px; font-size:15px; box-shadow:0 14px 26px rgba(0,127,99,.18); }
+.vr-card {
+  width: min(100%, 1500px);
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #c9d8d0;
+  border-radius: 20px;
+  box-shadow: 0 16px 38px rgba(16,37,31,.07);
+  overflow: hidden;
+  container-type: inline-size;
+}
+.vr-header {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin: 0;
+  padding: 18px 22px;
+  background: #486b5d;
+  color: #fff;
+}
+.vr-eyebrow {
+  display:block;
+  margin-bottom:6px;
+  color: rgba(255,255,255,.72);
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  font-weight: 950;
+}
+.vr-header h2 {
+  margin:0;
+  color:#fff;
+  font-size: clamp(24px,2.05vw,32px);
+  line-height:1.04;
+  font-weight:950;
+  letter-spacing:-.035em;
+}
+.vr-header p {
+  margin: 7px 0 0;
+  color: rgba(255,255,255,.82);
+  font-weight: 760;
+  max-width: 780px;
+  line-height: 1.45;
+  font-size: 14px;
+}
+.vr-summary {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  max-width:760px;
+}
+.vr-filter {
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:10px;
+  padding:9px 12px;
+  color:rgba(255,255,255,.84);
+  font-weight:950;
+  background:rgba(255,255,255,.12);
+  cursor:pointer;
+  display:inline-flex;
+  gap:7px;
+  align-items:center;
+  white-space:nowrap;
+}
+.vr-filter.active { background:#fff; border-color:#fff; color:#486b5d; box-shadow:0 10px 20px rgba(16,37,31,.12); }
+.vr-filter.danger:not(.active) { background:#fff6df; border-color:#f2ddaa; color:#8a5a13; }
+.vr-form {
+  display:grid;
+  grid-template-columns:minmax(230px,1.35fr) minmax(210px,1.05fr) minmax(145px,.78fr) minmax(145px,.78fr) minmax(170px,1fr) auto;
+  gap:10px;
+  margin:0;
+  padding:16px 22px;
+  border-bottom:1px solid #dbe6e0;
+  background:#eef4f1;
+}
+.vr-form select,.vr-form input {
+  width:100%;
+  min-width:0;
+  min-height:44px;
+  border:1px solid #c2d3ca;
+  border-radius:10px;
+  padding:0 13px;
+  color:#10251f;
+  font-weight:850;
+  background:#fff;
+  outline:none;
+  font-size:14px;
+}
+.vr-form select:focus,.vr-form input:focus { border-color:#486b5d; box-shadow:0 0 0 3px rgba(72,107,93,.12); }
+.vr-form button {
+  border:0;
+  border-radius:10px;
+  background:#486b5d;
+  color:#fff;
+  font-weight:950;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  cursor:pointer;
+  min-height:44px;
+  padding:0 18px;
+  font-size:14px;
+  box-shadow:0 10px 20px rgba(72,107,93,.18);
+  white-space:nowrap;
+}
+.vr-form button:hover { background:#39594c; }
 .vr-form button:disabled,.vr-actions button:disabled { opacity:.55; cursor:not-allowed; box-shadow:none; }
-.vr-balance { display:flex; flex-wrap:wrap; align-items:center; gap:10px; border:1px solid #bbf7d0; background:#ecfdf5; color:#065f46; border-radius:18px; padding:14px 16px; margin:12px 0; font-weight:900; }
-.vr-balance svg { color:#007f63; } .vr-balance small { color:#64748b; font-weight:850; }
-.vr-balance-warning { color:#b45309; background:#fff7ed; border-radius:999px; padding:4px 8px; }
-.vr-impact { display:flex; flex-wrap:wrap; align-items:center; gap:10px; border:1px solid #bfdbfe; background:#eff6ff; color:#1e3a8a; border-radius:18px; padding:14px 16px; margin-bottom:18px; font-weight:900; }
-.vr-impact-risk { border-color:#fed7aa; background:#fff7ed; color:#9a3412; } .vr-impact strong{ display:inline-flex; align-items:center; gap:6px; }
-.vr-table-shell { border:1px solid #e2eaf5; border-radius:22px; overflow:hidden; max-width:100%; background:#fff; }
-.vr-table-head { display:grid; grid-template-columns:minmax(180px,1.1fr) minmax(260px,1.5fr) minmax(170px,.9fr) minmax(140px,.75fr) minmax(150px,.85fr) minmax(170px,.8fr); gap:12px; padding:14px 16px; background:#f4f8fc; color:#52657e; text-transform:uppercase; font-size:12px; letter-spacing:.04em; font-weight:950; }
+.vr-main-list-title{ display:flex; justify-content:space-between; align-items:end; gap:16px; padding:16px 22px 0; background:#fff; }
+.vr-main-list-title span{ display:block; text-transform:uppercase; letter-spacing:.13em; font-size:11px; font-weight:950; color:#6a7e75; }
+.vr-main-list-title h3{ margin:3px 0 0; font-size:18px; font-weight:950; color:#10251f; }
+.vr-main-list-title small{ color:#6a7e75; font-weight:800; text-align:right; max-width:460px; }
+.vr-table-shell {
+  border:1px solid #dbe6e0;
+  border-radius:14px;
+  overflow:hidden;
+  max-width:calc(100% - 44px);
+  margin:14px 22px 18px;
+  background:#fff;
+}
+.vr-table-head {
+  display:grid;
+  grid-template-columns:minmax(180px,1.15fr) minmax(260px,1.45fr) minmax(150px,.8fr) minmax(130px,.7fr) minmax(140px,.8fr) minmax(170px,.9fr);
+  gap:12px;
+  padding:13px 16px;
+  background:#dce7e2;
+  color:#40594f;
+  text-transform:uppercase;
+  font-size:12px;
+  letter-spacing:.04em;
+  font-weight:950;
+}
 .vr-list { display:grid; }
-.vr-row { display:grid; grid-template-columns:minmax(180px,1.1fr) minmax(260px,1.5fr) minmax(170px,.9fr) minmax(140px,.75fr) minmax(150px,.85fr) minmax(170px,.8fr); gap:12px; align-items:center; border-top:1px solid #e2eaf5; padding:16px; background:#fff; }
-.vr-row-pending { background:linear-gradient(90deg,#fffdf5,#fff); }
-.vr-person { display:flex; align-items:center; gap:12px; min-width:0; text-align:left; border:0; background:transparent; padding:0; cursor:pointer; } .vr-person:hover strong{ text-decoration:underline; }
-.vr-avatar{ flex:0 0 auto; width:46px; height:46px; border-radius:16px; background:#e9fff6; color:#007f63; display:grid; place-items:center; font-weight:950; box-shadow:0 10px 20px rgba(15,23,42,.06); }
-.vr-person strong{ display:block; color:#07122a; font-weight:950; overflow:hidden; text-overflow:ellipsis; } .vr-person small{ color:#607089; font-weight:850; display:block; overflow:hidden; text-overflow:ellipsis; }
-.vr-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px; color:#334155; font-weight:850; min-width:0; } .vr-meta span{ background:#f8fbff; border:1px solid #e2eaf5; border-radius:999px; padding:7px 10px; } .vr-type b{ color:#007f63; } .vr-note{ border-radius:12px!important; max-width:100%; white-space:normal; }
-.vr-balance-cell { display:grid; gap:3px; color:#334155; font-weight:900; } .vr-balance-cell small { color:#64748b; font-weight:800; }
-.vr-status{ display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:999px; padding:9px 12px; font-weight:950; white-space:nowrap; } .vr-status-submitted{ background:#fff7e6; color:#9a5a00; } .vr-status-approved{ background:#eafff4; color:#007f63; } .vr-status-rejected{ background:#fff0f0; color:#a11919; }
-.vr-decision{ display:grid; gap:2px; border-radius:16px; padding:10px; background:#eafff4; color:#007f63; text-align:center; font-weight:950; } .vr-decision small{ font-weight:850; } .vr-decision-risk{ background:#fff0f0; color:#a11919; }
-.vr-actions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; } .vr-actions button{ border:0; border-radius:14px; padding:10px 12px; font-weight:950; cursor:pointer; } .vr-approve{ background:#007f63; color:#fff; } .vr-reject{ background:#fff0f0; color:#9f1239; }
-.vr-empty{ border-top:1px solid #e2eaf5; padding:34px; text-align:center; color:#607089; font-weight:900; background:#fbfdff; }
-.vr-history { margin-top:18px; border:1px solid #e2eaf5; border-radius:22px; padding:18px; background:#fbfdff; }
+.vr-row {
+  display:grid;
+  grid-template-columns:minmax(180px,1.15fr) minmax(260px,1.45fr) minmax(150px,.8fr) minmax(130px,.7fr) minmax(140px,.8fr) minmax(170px,.9fr);
+  gap:12px;
+  align-items:center;
+  border-top:1px solid #dbe6e0;
+  padding:14px 16px;
+  background:#fff;
+}
+.vr-row-pending { background:linear-gradient(90deg,#fffaf0,#fff); }
+.vr-person { display:flex; align-items:center; gap:12px; min-width:0; text-align:left; border:0; background:transparent; padding:0; cursor:pointer; }
+.vr-person:hover strong{ text-decoration:underline; }
+.vr-avatar{ flex:0 0 auto; width:42px; height:42px; border-radius:14px; background:#eef4f1; color:#486b5d; display:grid; place-items:center; font-weight:950; }
+.vr-person strong{ display:block; color:#10251f; font-weight:950; overflow:hidden; text-overflow:ellipsis; }
+.vr-person small{ color:#6a7e75; font-weight:800; display:block; overflow:hidden; text-overflow:ellipsis; }
+.vr-meta { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:#40594f; font-weight:850; min-width:0; }
+.vr-meta span{ background:#f8faf8; border:1px solid #dbe6e0; border-radius:999px; padding:7px 10px; }
+.vr-type b{ color:#486b5d; }
+.vr-note{ border-radius:10px!important; max-width:100%; white-space:normal; }
+.vr-balance-cell { display:grid; gap:3px; color:#40594f; font-weight:900; }
+.vr-balance-cell small { color:#6a7e75; font-weight:800; }
+.vr-status{ display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:999px; padding:8px 11px; font-weight:950; white-space:nowrap; }
+.vr-status-submitted{ background:#fff7e6; color:#8a5a13; }
+.vr-status-approved{ background:#eef8f3; color:#486b5d; }
+.vr-status-rejected{ background:#fff0f0; color:#8a2f27; }
+.vr-decision{ display:grid; gap:2px; border-radius:12px; padding:9px; background:#eef8f3; color:#486b5d; text-align:center; font-weight:950; }
+.vr-decision small{ font-weight:850; }
+.vr-decision-risk{ background:#fff0f0; color:#8a2f27; }
+.vr-actions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+.vr-actions button{ border:0; border-radius:10px; padding:9px 11px; font-weight:950; cursor:pointer; }
+.vr-approve{ background:#486b5d; color:#fff; }
+.vr-reject{ background:#fff0f0; color:#8a2f27; }
+.vr-empty{ border-top:1px solid #dbe6e0; padding:28px; text-align:center; color:#6a7e75; font-weight:900; background:#f8faf8; }
+.vr-detail-panel { border-top:1px solid #dbe6e0; background:#fbfcfb; }
+.vr-detail-head { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 22px; border-bottom:1px solid #dbe6e0; }
+.vr-detail-head span{ display:block; text-transform:uppercase; letter-spacing:.13em; font-size:11px; font-weight:950; color:#6a7e75; }
+.vr-detail-head h3{ margin:3px 0 0; color:#10251f; font-weight:950; font-size:16px; }
+.vr-detail-head select{ height:40px; min-width:320px; border:1px solid #c2d3ca; border-radius:10px; background:#fff; padding:0 12px; color:#10251f; font-weight:850; }
+.vr-balance {
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  align-items:center;
+  gap:10px;
+  border-bottom:1px solid #dbe6e0;
+  background:#fff;
+  color:#10251f;
+  padding:14px 22px;
+  margin:0;
+  font-weight:900;
+}
+.vr-balance svg { color:#486b5d; }
+.vr-balance span,.vr-balance b { background:#f7faf8; border:1px solid #dbe6e0; border-radius:10px; padding:9px 11px; }
+.vr-balance small { grid-column:1/-1; color:#6a7e75; font-weight:850; }
+.vr-balance-warning { color:#8a5a13!important; background:#fff7ed!important; border-color:#fed7aa!important; }
+.vr-forecast{ margin:0; padding:16px 22px; border-bottom:1px solid #dbe6e0; background:#fff; }
+.vr-forecast-main{ display:flex; justify-content:space-between; gap:18px; align-items:end; }
+.vr-forecast-main span{ display:block; text-transform:uppercase; letter-spacing:.13em; font-size:11px; font-weight:950; color:#6a7e75; }
+.vr-forecast-main h3{ margin:4px 0 0; font-size:30px; line-height:1; font-weight:950; color:#10251f; }
+.vr-forecast-main p{ margin:6px 0 0; color:#6a7e75; font-weight:750; max-width:720px; }
+.vr-forecast-main label{ color:#6a7e75; font-size:11px; font-weight:950; text-transform:uppercase; letter-spacing:.11em; }
+.vr-forecast-main input{ display:block; margin-top:6px; height:42px; min-width:180px; border:1px solid #c2d3ca; border-radius:10px; padding:0 12px; color:#10251f; font-weight:850; outline:none; background:#fff; }
+.vr-forecast-main input:focus{ border-color:#486b5d; box-shadow:0 0 0 3px rgba(72,107,93,.12); }
+.vr-forecast-grid{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:14px; }
+.vr-forecast-grid span{ border:1px solid #dbe6e0; background:#f8faf8; border-radius:12px; padding:12px; font-size:18px; font-weight:950; color:#10251f; }
+.vr-forecast-grid b{ display:block; margin-bottom:6px; text-transform:uppercase; letter-spacing:.09em; font-size:10px; font-weight:950; color:#6a7e75; }
+.vr-impact {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:10px;
+  border-bottom:1px solid #dbe6e0;
+  background:#fbfcfb;
+  color:#40594f;
+  padding:14px 22px;
+  margin:0;
+  font-weight:900;
+}
+.vr-impact span,.vr-impact strong { border-radius:999px; padding:7px 10px; background:#eef4f1; display:inline-flex; align-items:center; gap:6px; }
+.vr-impact-risk { background:#fffaf0; color:#8a5a13; }
+.vr-rules { border-bottom:1px solid #dbe6e0; background:#fff; padding:16px 22px; }
+.vr-rule-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:12px; }
+.vr-rule-head span { display:block; color:#6a7e75; text-transform:uppercase; letter-spacing:.12em; font-size:11px; font-weight:950; }
+.vr-rule-head h3 { margin:4px 0 0; color:#10251f; font-size:17px; font-weight:950; }
+.vr-rule-head strong { border-radius:999px; background:#eef4f1; color:#486b5d; padding:7px 11px; font-size:12px; }
+.vr-rule-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.vr-rule-card { border:1px solid #dbe6e0; background:#f8faf8; border-radius:14px; padding:14px; }
+.vr-rule-card b { display:block; font-size:14px; color:#10251f; }
+.vr-rule-card strong { display:block; margin-top:6px; color:#10251f; font-size:26px; line-height:1; }
+.vr-rule-card p { margin:8px 0 0; color:#6a7e75; font-weight:750; font-size:12px; line-height:1.4; }
+.vr-rule-card-active { background:#eef8f3; border-color:#c6dcd2; }
+.vr-rule-card-active strong { color:#486b5d; }
+.vr-rule-card-warn { background:#fff9e8; border-color:#ead8a7; }
+.vr-rule-card-warn strong,.vr-rule-card-warn p { color:#8a5a13; }
+.vr-history {
+  margin:0;
+  border-top:1px solid #dbe6e0;
+  border-left:0;
+  border-right:0;
+  border-bottom:0;
+  border-radius:0;
+  padding:16px 22px;
+  background:#f7faf8;
+}
 .vr-history-title{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
-.vr-history h3 { margin:0; display:flex; align-items:center; gap:8px; color:#07122a; font-weight:950; }
-.vr-history-title select{ min-height:46px; border:1px solid #cfdbea; border-radius:16px; padding:0 14px; font-weight:900; color:#07122a; background:#fff; min-width:min(420px,100%); }
+.vr-history h3 { margin:0; display:flex; align-items:center; gap:8px; color:#10251f; font-weight:950; }
+.vr-history-title select{ min-height:40px; border:1px solid #c2d3ca; border-radius:10px; padding:0 13px; font-weight:900; color:#10251f; background:#fff; min-width:min(360px,100%); }
 .vr-history-panel{ display:grid; gap:12px; }
-.vr-history-person{ display:flex; align-items:center; gap:12px; } .vr-history-person b{ display:block; color:#07122a; } .vr-history-person small{ color:#64748b; font-weight:800; }
-.vr-history-balance { display:flex; flex-wrap:wrap; gap:6px; } .vr-history-balance span { border-radius:999px; padding:7px 10px; background:#f4f8fc; font-weight:850; color:#334155; }
-.vr-history-table{ border:1px solid #e2eaf5; border-radius:16px; overflow:hidden; background:#fff; }
+.vr-history-person{ display:flex; align-items:center; gap:12px; }
+.vr-history-person b{ display:block; color:#10251f; }
+.vr-history-person small{ color:#6a7e75; font-weight:800; }
+.vr-history-balance { display:flex; flex-wrap:wrap; gap:6px; }
+.vr-history-balance span { border-radius:999px; padding:7px 10px; background:#eef4f1; font-weight:850; color:#40594f; }
+.vr-history-table{ border:1px solid #dbe6e0; border-radius:12px; overflow:hidden; background:#fff; }
 .vr-history-head,.vr-history-line{ display:grid; grid-template-columns:minmax(170px,1fr) minmax(180px,1fr) 90px 150px minmax(120px,1fr); gap:10px; padding:10px 12px; align-items:center; }
-.vr-history-head{ background:#f4f8fc; color:#52657e; text-transform:uppercase; font-size:12px; letter-spacing:.04em; font-weight:950; }
-.vr-history-line{ border-top:1px solid #e2eaf5; color:#334155; font-weight:800; }
-@container (max-width: 1180px){ .vr-header{ grid-template-columns:1fr; } .vr-summary{ justify-content:flex-start; } .vr-form{ grid-template-columns:1fr 1fr; } .vr-table-head{ display:none; } .vr-row{ grid-template-columns:1fr 1fr; border-top:1px solid #e2eaf5; } .vr-actions{ justify-content:flex-start; } }
-@container (max-width: 720px){ .vr-card{ padding:18px; } .vr-form{ grid-template-columns:1fr; } .vr-row{ grid-template-columns:1fr; } .vr-history-head{ display:none; } .vr-history-line{ grid-template-columns:1fr; } }
+.vr-history-head{ background:#dce7e2; color:#40594f; text-transform:uppercase; font-size:12px; letter-spacing:.04em; font-weight:950; }
+.vr-history-line{ border-top:1px solid #dbe6e0; color:#40594f; font-weight:800; }
+@container (max-width: 1180px){
+  .vr-header{ grid-template-columns:1fr; }
+  .vr-summary{ justify-content:flex-start; }
+  .vr-form{ grid-template-columns:1fr 1fr; }
+  .vr-balance{ grid-template-columns:1fr 1fr; }
+  .vr-rule-grid{ grid-template-columns:1fr; }
+  .vr-forecast-main{ flex-direction:column; align-items:stretch; }
+  .vr-forecast-grid{ grid-template-columns:1fr 1fr; }
+  .vr-table-head{ display:none; }
+  .vr-row{ grid-template-columns:1fr 1fr; border-top:1px solid #dbe6e0; }
+  .vr-actions{ justify-content:flex-start; }
+}
+@container (max-width: 720px){
+  .vr-form{ grid-template-columns:1fr; }
+  .vr-balance{ grid-template-columns:1fr; }
+  .vr-row{ grid-template-columns:1fr; }
+  .vr-history-head{ display:none; }
+  .vr-history-line{ grid-template-columns:1fr; }
+  .vr-table-shell{ max-width:calc(100% - 24px); margin:12px; }
+  .vr-header,.vr-form,.vr-rules,.vr-history,.vr-forecast{ padding-left:14px; padding-right:14px; }
+  .vr-forecast-grid{ grid-template-columns:1fr; }
+  .vr-detail-head{ align-items:stretch; flex-direction:column; }
+  .vr-detail-head select{ min-width:0; width:100%; }
+}
 `;

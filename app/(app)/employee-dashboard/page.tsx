@@ -1802,10 +1802,17 @@ function TaskItem({
   onComplete: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <article
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
-      className="w-full rounded-3xl border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      className="w-full cursor-pointer rounded-3xl border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99] focus:outline-none focus:ring-4 focus:ring-emerald-100"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
@@ -1838,7 +1845,7 @@ function TaskItem({
           <span className="text-xs font-bold text-slate-400">Spausk kortelę aprašymui</span>
         </div>
       </div>
-    </button>
+    </article>
   );
 }
 
