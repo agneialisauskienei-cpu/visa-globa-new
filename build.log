@@ -1,0 +1,108 @@
+
+> visa-globa-new@0.1.0 build
+> next build
+
+▲ Next.js 16.2.3 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 6.3s
+  Skipping validation of types
+  Finished TypeScript config validation in 8ms ...
+  Collecting page data using 13 workers ...
+  Generating static pages using 13 workers (0/78) ...
+  Generating static pages using 13 workers (19/78) 
+  Generating static pages using 13 workers (38/78) 
+  Generating static pages using 13 workers (58/78) 
+✓ Generating static pages using 13 workers (78/78) in 647ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /activities
+├ ○ /admin
+├ ○ /admin-dashboard
+├ ○ /admin-join-requests
+├ ○ /admin-tasks
+├ ○ /admin/organizations
+├ ƒ /api/activity-attendance
+├ ƒ /api/activity-attendance/copy-previous
+├ ƒ /api/activity-sessions
+├ ƒ /api/admin/archive-organization
+├ ƒ /api/admin/assign-admin
+├ ƒ /api/admin/create-organization
+├ ƒ /api/admin/restore-organization
+├ ƒ /api/admin/update-organization
+├ ƒ /api/care-tasks/[id]
+├ ƒ /api/personnel/document-acknowledgements/acknowledge
+├ ƒ /api/personnel/document-acknowledgements/view
+├ ƒ /api/reports/audit
+├ ƒ /api/reports/employees
+├ ƒ /api/reports/medicine
+├ ƒ /api/reports/residents
+├ ƒ /api/resident-activities
+├ ƒ /api/resident-assignments
+├ ƒ /api/residents
+├ ƒ /api/residents/[id]
+├ ƒ /api/residents/secure
+├ ○ /audit
+├ ƒ /auth/callback
+├ ○ /clients
+├ ○ /create-password
+├ ○ /dashboard
+├ ○ /employee-dashboard
+├ ○ /employee-tasks
+├ ○ /employees
+├ ○ /handover-logs
+├ ○ /inventory
+├ ƒ /inventory/[category]
+├ ○ /invites
+├ ○ /login
+├ ○ /medications
+├ ○ /medicine
+├ ○ /mobile-dashboard
+├ ○ /my-profile
+├ ○ /my-residents
+├ ○ /my-schedule
+├ ○ /my-tasks
+├ ○ /notifications
+├ ○ /organization
+├ ○ /organizations
+├ ○ /pending-approval
+├ ○ /register
+├ ○ /reports
+├ ○ /reports/activities
+├ ○ /reports/audit
+├ ○ /reports/employees
+├ ○ /reports/employees/employees
+├ ○ /reports/handover
+├ ○ /reports/medicine
+├ ○ /reports/residents
+├ ○ /reports/rooms
+├ ○ /reports/tasks
+├ ○ /requests
+├ ○ /reset-password
+├ ○ /residents
+├ ƒ /residents/[id]
+├ ○ /residents/archive
+├ ○ /rooms
+├ ƒ /rooms/[id]/residents
+├ ○ /signup
+├ ○ /starter-test
+├ ○ /success
+├ ○ /super-admin
+├ ○ /system
+├ ○ /tasks
+├ ○ /team
+├ ○ /team/staff-types
+├ ○ /team/team
+├ ○ /team/team/staff-types
+└ ○ /update-password
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
