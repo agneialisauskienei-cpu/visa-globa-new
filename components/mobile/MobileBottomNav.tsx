@@ -1,18 +1,28 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Bell, CalendarDays, Home, User, Users } from 'lucide-react'
+import { Bell, CalendarDays, Home, LogOut, User, Users } from 'lucide-react'
 import { ROUTES } from '@/lib/routes'
+import { supabase } from '@/lib/supabase'
 import { useNotifications } from '@/components/providers/NotificationProvider'
 
 function isActive(pathname: string, href: string) {
   return pathname === href
 }
 
+type NavItem = {
+  href: string
+  label: string
+  icon: typeof Home
+  badge?: number
+  action?: () => Promise<void> | void
+}
+
 export default function MobileBottomNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const { unreadCount } = useNotifications()
   const [isMobile, setIsMobile] = useState(false)
 
@@ -23,14 +33,20 @@ export default function MobileBottomNav() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.replace(ROUTES.login)
+  }
+
   if (!isMobile) return null
 
-  const items = [
+  const items: NavItem[] = [
     { href: ROUTES.employeeDashboard, label: 'Pagr.', icon: Home },
     { href: ROUTES.myResidents, label: 'Gyvent.', icon: Users },
     { href: ROUTES.mySchedule, label: 'Grafikas', icon: CalendarDays },
     { href: ROUTES.notifications, label: 'Praneš.', icon: Bell, badge: unreadCount },
     { href: ROUTES.myProfile, label: 'Profilis', icon: User },
+    { href: '#logout', label: 'Išeiti', icon: LogOut, action: handleLogout },
   ]
 
   return (
@@ -46,7 +62,7 @@ export default function MobileBottomNav() {
         backdropFilter: 'blur(18px)',
         display: 'grid',
         gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
-        padding: '8px 8px calc(8px + env(safe-area-inset-bottom))',
+        padding: '8px 6px calc(8px + env(safe-area-inset-bottom))',
         boxShadow: '0 -14px 38px rgba(15,23,42,0.08)',
       }}
     >
@@ -58,28 +74,35 @@ export default function MobileBottomNav() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={(event) => {
+              if (item.action) {
+                event.preventDefault()
+                void item.action()
+              }
+            }}
             style={{
               textDecoration: 'none',
               color: active ? '#047857' : '#64748b',
               display: 'grid',
               placeItems: 'center',
               gap: 4,
-              padding: '10px 4px',
+              padding: '8px 2px',
               position: 'relative',
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: active ? 800 : 600,
             }}
           >
             <div
               style={{
                 position: 'relative',
-                width: 52,
-                height: 52,
-                borderRadius: 18,
+                width: 44,
+                height: 44,
+                borderRadius: 16,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 background: active ? '#065f46' : 'transparent',
+                color: active ? '#fff' : '#64748b',
                 transition: 'all .2s ease',
               }}
             >

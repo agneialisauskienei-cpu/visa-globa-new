@@ -33,6 +33,7 @@ export type Permission =
   | "tasks.view"
   | "tasks.create"
   | "tasks.manage"
+  | "schedule.view"
   | "notifications.view"
   | "medicine.view"
   | "handover.view"
@@ -101,6 +102,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "tasks.view",
   "tasks.create",
   "tasks.manage",
+  "schedule.view",
   "notifications.view",
   "medicine.view",
   "handover.view",
@@ -128,6 +130,7 @@ const ROLE_PERMISSIONS: Record<MembershipRole, Permission[]> = {
     "tasks.view",
     "tasks.create",
     "tasks.manage",
+    "schedule.view",
     "notifications.view",
     "medicine.view",
     "handover.view",
@@ -148,6 +151,7 @@ const ROLE_PERMISSIONS: Record<MembershipRole, Permission[]> = {
     "tasks.view",
     "tasks.create",
     "tasks.manage",
+    "schedule.view",
     "notifications.view",
     "medicine.view",
     "handover.view",
@@ -163,6 +167,7 @@ const ROLE_PERMISSIONS: Record<MembershipRole, Permission[]> = {
     "dashboard.view",
     "tasks.view",
     "tasks.create",
+    "schedule.view",
     "notifications.view",
   ],
 }

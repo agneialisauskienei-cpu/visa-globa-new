@@ -13,6 +13,7 @@ import {
   FileText,
   Hammer,
   Plus,
+  PencilLine,
   Repeat,
   Search,
   Sparkles,
@@ -57,6 +58,8 @@ type ResidentRow = {
   first_name?: string | null
   last_name?: string | null
   room_number?: string | null
+  current_room_id?: string | null
+  rooms?: { name?: string | null } | null
 }
 
 type EmployeeOption = {
@@ -302,6 +305,29 @@ function residentName(resident?: ResidentRow) {
   return combined || resident.resident_code || "Gyventojas"
 }
 
+function residentRoom(resident?: ResidentRow) {
+  if (!resident) return "—"
+
+  return (
+    resident.room_number ||
+    resident.rooms?.name ||
+    resident.current_room_id ||
+    "—"
+  )
+}
+
+function toDateTimeLocal(value?: string | null) {
+  if (!value) return ""
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+
+  const offset = date.getTimezoneOffset()
+  const local = new Date(date.getTime() - offset * 60 * 1000)
+
+  return local.toISOString().slice(0, 16)
+}
+
 function isTaskLate(task: TaskRow) {
   if (!task.due_date) return false
   if (task.status === "done" || task.status === "cancelled") return false
@@ -341,7 +367,9 @@ export default function TasksPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedTask, setSelectedTask] = useState<TaskRow | null>(null)
+  const [editingTask, setEditingTask] = useState<TaskRow | null>(null)
   const [form, setForm] = useState<NewTaskForm>(initialForm)
+  const [editForm, setEditForm] = useState<NewTaskForm>(initialForm)
 
   useEffect(() => {
     void loadData()
@@ -442,26 +470,35 @@ export default function TasksPage() {
       const typedTasks = (tasksData as TaskRow[]) || []
       setTasks(typedTasks)
 
-      const { data: residentsData, error: residentsError } = await supabase
-        .from("residents")
-        .select("id, resident_code, full_name, first_name, last_name, room_number")
-        .eq("organization_id", currentAccess.organizationId)
-        .order("resident_code")
+      let residents: ResidentRow[] = []
 
-      if (!residentsError) {
-        const residents = (residentsData as ResidentRow[]) || []
-        const map: Record<string, ResidentRow> = {}
+      const residentQueries = [
+        "id, resident_code, full_name, first_name, last_name, room_number, current_room_id, rooms:current_room_id(name)",
+        "id, resident_code, full_name, first_name, last_name, room_number, current_room_id",
+        "id, resident_code, full_name, first_name, last_name, current_room_id",
+      ]
 
-        for (const resident of residents) {
-          map[resident.id] = resident
+      for (const selectFields of residentQueries) {
+        const { data: residentsData, error: residentsError } = await supabase
+          .from("residents")
+          .select(selectFields)
+          .eq("organization_id", currentAccess.organizationId)
+          .order("resident_code")
+
+        if (!residentsError) {
+          residents = (residentsData as ResidentRow[]) || []
+          break
         }
-
-        setAllResidents(residents)
-        setResidentsMap(map)
-      } else {
-        setAllResidents([])
-        setResidentsMap({})
       }
+
+      const map: Record<string, ResidentRow> = {}
+
+      for (const resident of residents) {
+        map[resident.id] = resident
+      }
+
+      setAllResidents(residents)
+      setResidentsMap(map)
 
       const { data: membersData, error: membersError } = await supabase
         .from("organization_members")
@@ -588,6 +625,69 @@ export default function TasksPage() {
       } else {
         setMessage(readable)
       }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function openEditTask(task: TaskRow) {
+    setSelectedTask(null)
+    setEditingTask(task)
+    setEditForm({
+      title: task.title || "",
+      description: task.description || "",
+      type: task.type || "kita",
+      subtype: task.subtype || "",
+      priority: task.priority || "medium",
+      status: task.status || "new",
+      due_date: toDateTimeLocal(task.due_date),
+      resident_id: task.resident_id || "",
+      assigned_user_id: task.assigned_user_id || "",
+      interval_days: task.interval_days ? String(task.interval_days) : "",
+      keep_open: false,
+      draft_note: "",
+    })
+  }
+
+  async function updateTask() {
+    if (!editingTask) return
+
+    const cleanTitle = editForm.title.trim()
+
+    if (!cleanTitle) {
+      setMessage("Įveskite užduoties pavadinimą.")
+      return
+    }
+
+    setSaving(true)
+    setMessage("")
+
+    try {
+      const payload = {
+        assigned_user_id: editForm.assigned_user_id || null,
+        resident_id: editForm.resident_id || null,
+        title: cleanTitle,
+        description: editForm.description.trim() || null,
+        type: editForm.type || "kita",
+        subtype: editForm.subtype.trim() || null,
+        status: editForm.status || "new",
+        priority: editForm.priority || "medium",
+        due_date: editForm.due_date ? new Date(editForm.due_date).toISOString() : null,
+        interval_days: editForm.interval_days ? Number(editForm.interval_days) : null,
+      }
+
+      const { error } = await supabase
+        .from("employee_tasks")
+        .update(payload)
+        .eq("id", editingTask.id)
+
+      if (error) throw error
+
+      setEditingTask(null)
+      setMessage("Užduotis atnaujinta.")
+      await loadData()
+    } catch (error) {
+      setMessage(getReadableError(error))
     } finally {
       setSaving(false)
     }
@@ -949,11 +1049,190 @@ export default function TasksPage() {
             assignedEmployee={selectedTask.assigned_user_id ? employeesMap[selectedTask.assigned_user_id] : undefined}
             saving={savingId === selectedTask.id}
             onClose={() => setSelectedTask(null)}
+            onEdit={() => openEditTask(selectedTask)}
             onStatusChange={(status) => void updateTaskStatus(selectedTask, status)}
           />
         ) : null}
 
-        <MobileBottomNav notificationsCount={notificationsCount} />
+  
+      {editingTask && (
+        <Modal
+          title="Redaguoti užduotį"
+          desc="Pakeisk užduoties detales, gyventoją, kambarį per gyventojo priskyrimą, atsakingą darbuotoją ir terminą."
+          onClose={() => setEditingTask(null)}
+        >
+          <form
+            className="space-y-6"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void updateTask()
+            }}
+          >
+            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="grid gap-5 md:grid-cols-2">
+                <Field label="Pavadinimas" full>
+                  <input
+                    value={editForm.title}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, title: event.target.value }))
+                    }
+                    className="input text-lg"
+                    placeholder="Užduoties pavadinimas"
+                  />
+                </Field>
+
+                <Field label="Gyventojas">
+                  <select
+                    value={editForm.resident_id}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, resident_id: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    <option value="">Pasirinkti gyventoją (nebūtina)</option>
+                    {allResidents.map((resident) => (
+                      <option key={resident.id} value={resident.id}>
+                        {residentName(resident)}{residentRoom(resident) !== "—" ? ` · kamb. ${residentRoom(resident)}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Priskirti darbuotojui">
+                  <select
+                    value={editForm.assigned_user_id}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, assigned_user_id: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    <option value="">Pasirinkti darbuotoją (nebūtina)</option>
+                    {employees.map((employee) => (
+                      <option key={employee.user_id} value={employee.user_id}>
+                        {employeeName(employee)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Tipas">
+                  <select
+                    value={editForm.type}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, type: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    {TASK_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Statusas">
+                  <select
+                    value={editForm.status}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, status: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Prioritetas">
+                  <select
+                    value={editForm.priority}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, priority: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    {PRIORITY_OPTIONS.map((priority) => (
+                      <option key={priority.value} value={priority.value}>
+                        {priority.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Terminas">
+                  <input
+                    type="datetime-local"
+                    value={editForm.due_date}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, due_date: event.target.value }))
+                    }
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="Papildoma kategorija">
+                  <input
+                    value={editForm.subtype}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, subtype: event.target.value }))
+                    }
+                    className="input"
+                    placeholder="Pvz., baldai, elektra, higiena"
+                  />
+                </Field>
+
+                <Field label="Pasikartojimas">
+                  <select
+                    value={editForm.interval_days}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, interval_days: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    {REPEAT_OPTIONS.map((option) => (
+                      <option key={option.value || "none"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            </section>
+
+            <Field label="Aprašymas">
+              <textarea
+                value={editForm.description}
+                onChange={(event) =>
+                  setEditForm((previous) => ({ ...previous, description: event.target.value }))
+                }
+                className="input min-h-36 resize-none"
+                placeholder="Trumpai aprašyk užduotį..."
+              />
+            </Field>
+
+            {editForm.resident_id ? (
+              <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5 text-sm font-bold text-emerald-900">
+                Pasirinktas gyventojas: {residentName(residentsMap[editForm.resident_id])} · kambarys: {residentRoom(residentsMap[editForm.resident_id])}
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
+              <button type="button" onClick={() => setEditingTask(null)} className="btn-secondary">
+                Atšaukti
+              </button>
+              <button type="submit" disabled={saving} className="btn-primary">
+                {saving ? "Saugoma..." : "Išsaugoti pakeitimus"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      <MobileBottomNav notificationsCount={notificationsCount} />
       </main>
     )
   }
@@ -1224,6 +1503,7 @@ export default function TasksPage() {
                     assignedEmployee={task.assigned_user_id ? employeesMap[task.assigned_user_id] : undefined}
                     saving={savingId === task.id}
                     onClick={() => void openTaskDetails(task)}
+                    onEdit={() => openEditTask(task)}
                     onStatusChange={(status) => void updateTaskStatus(task, status)}
                   />
                 ))}
@@ -1467,7 +1747,7 @@ export default function TasksPage() {
                     <option value="">Pasirinkti gyventoją (nebūtina)</option>
                     {allResidents.map((resident) => (
                       <option key={resident.id} value={resident.id}>
-                        {residentName(resident)}
+                        {residentName(resident)}{residentRoom(resident) !== "—" ? ` · kamb. ${residentRoom(resident)}` : ""}
                       </option>
                     ))}
                   </select>
@@ -1680,6 +1960,14 @@ export default function TasksPage() {
                       : undefined
                   )}
                 />
+                <DetailBox
+                  label="Kambarys"
+                  value={residentRoom(
+                    selectedTask.resident_id
+                      ? residentsMap[selectedTask.resident_id]
+                      : undefined
+                  )}
+                />
                 <DetailBox label="Sukurta" value={formatDate(selectedTask.created_at)} />
                 <DetailBox
                   label="Priskirta"
@@ -1709,6 +1997,14 @@ export default function TasksPage() {
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
+                onClick={() => openEditTask(selectedTask)}
+                className="btn-secondary inline-flex items-center gap-2"
+              >
+                <PencilLine className="h-4 w-4" />
+                Redaguoti
+              </button>
+              <button
+                type="button"
                 onClick={() => void updateTaskStatus(selectedTask, "in_progress")}
                 className="btn-secondary"
               >
@@ -1732,6 +2028,184 @@ export default function TasksPage() {
           </div>
         </Modal>
       )}
+
+      {editingTask && (
+        <Modal
+          title="Redaguoti užduotį"
+          desc="Pakeisk užduoties detales, gyventoją, kambarį per gyventojo priskyrimą, atsakingą darbuotoją ir terminą."
+          onClose={() => setEditingTask(null)}
+        >
+          <form
+            className="space-y-6"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void updateTask()
+            }}
+          >
+            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="grid gap-5 md:grid-cols-2">
+                <Field label="Pavadinimas" full>
+                  <input
+                    value={editForm.title}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, title: event.target.value }))
+                    }
+                    className="input text-lg"
+                    placeholder="Užduoties pavadinimas"
+                  />
+                </Field>
+
+                <Field label="Gyventojas">
+                  <select
+                    value={editForm.resident_id}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, resident_id: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    <option value="">Pasirinkti gyventoją (nebūtina)</option>
+                    {allResidents.map((resident) => (
+                      <option key={resident.id} value={resident.id}>
+                        {residentName(resident)}{residentRoom(resident) !== "—" ? ` · kamb. ${residentRoom(resident)}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Priskirti darbuotojui">
+                  <select
+                    value={editForm.assigned_user_id}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, assigned_user_id: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    <option value="">Pasirinkti darbuotoją (nebūtina)</option>
+                    {employees.map((employee) => (
+                      <option key={employee.user_id} value={employee.user_id}>
+                        {employeeName(employee)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Tipas">
+                  <select
+                    value={editForm.type}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, type: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    {TASK_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Statusas">
+                  <select
+                    value={editForm.status}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, status: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Prioritetas">
+                  <select
+                    value={editForm.priority}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, priority: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    {PRIORITY_OPTIONS.map((priority) => (
+                      <option key={priority.value} value={priority.value}>
+                        {priority.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Terminas">
+                  <input
+                    type="datetime-local"
+                    value={editForm.due_date}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, due_date: event.target.value }))
+                    }
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="Papildoma kategorija">
+                  <input
+                    value={editForm.subtype}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, subtype: event.target.value }))
+                    }
+                    className="input"
+                    placeholder="Pvz., baldai, elektra, higiena"
+                  />
+                </Field>
+
+                <Field label="Pasikartojimas">
+                  <select
+                    value={editForm.interval_days}
+                    onChange={(event) =>
+                      setEditForm((previous) => ({ ...previous, interval_days: event.target.value }))
+                    }
+                    className="input"
+                  >
+                    {REPEAT_OPTIONS.map((option) => (
+                      <option key={option.value || "none"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            </section>
+
+            <Field label="Aprašymas">
+              <textarea
+                value={editForm.description}
+                onChange={(event) =>
+                  setEditForm((previous) => ({ ...previous, description: event.target.value }))
+                }
+                className="input min-h-36 resize-none"
+                placeholder="Trumpai aprašyk užduotį..."
+              />
+            </Field>
+
+            {editForm.resident_id ? (
+              <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5 text-sm font-bold text-emerald-900">
+                Pasirinktas gyventojas: {residentName(residentsMap[editForm.resident_id])} · kambarys: {residentRoom(residentsMap[editForm.resident_id])}
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
+              <button type="button" onClick={() => setEditingTask(null)} className="btn-secondary">
+                Atšaukti
+              </button>
+              <button type="submit" disabled={saving} className="btn-primary">
+                {saving ? "Saugoma..." : "Išsaugoti pakeitimus"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
 
       <MobileBottomNav notificationsCount={notificationsCount} />
 
@@ -1918,7 +2392,7 @@ function MobileTaskCard({
           </h3>
 
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            {residentName(resident)} · {getTypeLabel(task.type)}
+            {residentName(resident)} · kamb. {residentRoom(resident)} · {getTypeLabel(task.type)}
           </p>
         </button>
 
@@ -2145,6 +2619,7 @@ function MobileTaskDetailsSheet({
   assignedEmployee,
   saving,
   onClose,
+  onEdit,
   onStatusChange,
 }: {
   task: TaskRow
@@ -2152,6 +2627,7 @@ function MobileTaskDetailsSheet({
   assignedEmployee?: EmployeeOption
   saving: boolean
   onClose: () => void
+  onEdit: () => void
   onStatusChange: (status: string) => void
 }) {
   return (
@@ -2178,6 +2654,8 @@ function MobileTaskDetailsSheet({
         <div className="grid gap-3">
           <DetailBox label="Statusas" value={getTaskStatusLabel(task.status)} />
           <DetailBox label="Terminas" value={formatDateTime(task.due_date)} />
+          <DetailBox label="Gyventojas" value={residentName(resident)} />
+          <DetailBox label="Kambarys" value={residentRoom(resident)} />
           <DetailBox
             label="Priskirta"
             value={assignedEmployee ? employeeName(assignedEmployee) : "Nepriskirta"}
@@ -2197,6 +2675,13 @@ function MobileTaskDetailsSheet({
         ) : null}
 
         <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 bg-white/95 p-5 backdrop-blur">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="col-span-2 h-13 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 font-black text-slate-700"
+          >
+            Redaguoti užduotį
+          </button>
           <button
             type="button"
             disabled={saving}
@@ -2428,6 +2913,7 @@ function TaskCard({
   assignedEmployee,
   saving,
   onClick,
+  onEdit,
   onStatusChange,
 }: {
   task: TaskRow
@@ -2435,6 +2921,7 @@ function TaskCard({
   assignedEmployee?: EmployeeOption
   saving: boolean
   onClick: () => void
+  onEdit: () => void
   onStatusChange: (status: string) => void
 }) {
   const late = isTaskLate(task)
@@ -2480,6 +2967,7 @@ function TaskCard({
 
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <InfoPill label="Gyventojas" value={residentName(resident)} />
+            <InfoPill label="Kambarys" value={residentRoom(resident)} />
             <InfoPill label="Priskirta" value={assignedEmployee ? employeeName(assignedEmployee) : "Nepriskirta"} />
             <InfoPill label="Terminas" value={formatDateTime(task.due_date)} />
             <InfoPill label="Kartojimas" value={task.interval_days ? `Kas ${task.interval_days} d.` : "—"} />
@@ -2489,6 +2977,13 @@ function TaskCard({
         </button>
 
         <div className="flex shrink-0 flex-wrap gap-2 md:flex-col">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-2xl border border-slate-200/70 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100"
+          >
+            Redaguoti
+          </button>
           {task.status !== "done" ? (
             <>
               <button

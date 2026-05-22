@@ -1,149 +1,467 @@
- 'use client'
+"use client";
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { CalendarClock, ChevronLeft, Clock, RefreshCw } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import MobileBottomNav from '@/components/mobile/MobileBottomNav'
-import { getCurrentOrganizationId } from '@/lib/current-organization'
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  CalendarDays,
+  CalendarX,
+  ChevronLeft,
+  Clock,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
-type ShiftRow = {
-  id: string
-  shift_date: string
-  start_time: string | null
-  end_time: string | null
-  shift_type: string | null
-  status: string | null
-  notes: string | null
+type ScheduleRow = {
+  id: string;
+  organization_id?: string | null;
+  user_id?: string | null;
+  employee_id?: string | null;
+  assigned_user_id?: string | null;
+  staff_user_id?: string | null;
+  organization_member_id?: string | null;
+  member_id?: string | null;
+  shift_date?: string | null;
+  date?: string | null;
+  work_date?: string | null;
+  schedule_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  shift_start?: string | null;
+  shift_end?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  shift_type?: string | null;
+  status?: string | null;
+  is_published?: boolean | null;
+  notes?: string | null;
+  note?: string | null;
+  location?: string | null;
+  department?: string | null;
+  position?: string | null;
+};
+
+type MembershipRow = {
+  id?: string | null;
+  organization_id?: string | null;
+  position?: string | null;
+  department?: string | null;
+};
+
+function getScheduleDate(shift: ScheduleRow) {
+  return shift.shift_date || shift.date || shift.work_date || shift.schedule_date || "";
 }
 
-type MembershipRow = { role: 'owner' | 'admin' | 'employee' }
-type NotificationCountRow = { id: string; is_read: boolean | null }
-
-function getReadableError(error: unknown) {
-  if (!error) return 'Nežinoma klaida.'
-  if (error instanceof Error) return error.message
-  if (typeof error === 'object') {
-    const maybe = error as { message?: string; details?: string; hint?: string; code?: string }
-    return maybe.message || maybe.details || maybe.hint || (maybe.code ? `Klaidos kodas: ${maybe.code}` : 'Nepavyko įvykdyti veiksmo.')
-  }
-  return 'Nepavyko įvykdyti veiksmo.'
+function getScheduleStart(shift: ScheduleRow) {
+  return shift.start_time || shift.shift_start || shift.starts_at || "";
 }
 
-function formatDate(value: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('lt-LT', { weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit' })
+function getScheduleEnd(shift: ScheduleRow) {
+  return shift.end_time || shift.shift_end || shift.ends_at || "";
 }
 
-function formatShiftTime(start: string | null, end: string | null) {
-  return `${start?.slice(0, 5) || '--:--'}–${end?.slice(0, 5) || '--:--'}`
+function isPublished(shift: ScheduleRow) {
+  const status = String(shift.status || "").toLowerCase();
+  return shift.is_published === true || status === "published" || status === "paskelbta" || status === "approved";
+}
+
+function dateObject(value?: string | null) {
+  if (!value) return null;
+  const clean = value.slice(0, 10);
+  const date = new Date(`${clean}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDate(value?: string | null) {
+  const date = dateObject(value);
+  if (!date) return value?.slice(0, 10) || "Data nenurodyta";
+  return new Intl.DateTimeFormat("lt-LT", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
+
+function shortDate(value?: string | null) {
+  return value ? value.slice(0, 10) : "—";
+}
+
+function weekday(value?: string | null) {
+  const date = dateObject(value);
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("lt-LT", { weekday: "short" }).format(date).replace(".", "");
+}
+
+function cleanTime(value?: string | null) {
+  if (!value) return "--:--";
+  return value.slice(0, 5);
+}
+
+function minutesFromTime(value?: string | null) {
+  const time = cleanTime(value);
+  const [h, m] = time.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+}
+
+function durationHours(shift: ScheduleRow) {
+  const start = minutesFromTime(getScheduleStart(shift));
+  const end = minutesFromTime(getScheduleEnd(shift));
+  if (start === null || end === null) return null;
+  let diff = end - start;
+  if (diff <= 0) diff += 24 * 60;
+  if (cleanTime(getScheduleEnd(shift)) === "23:59") diff += 1;
+  const breakMinutes = /P30|pertrauka 30/i.test(String(shift.notes || shift.note || "")) ? 30 : 0;
+  return Math.max(0, diff - breakMinutes) / 60;
+}
+
+function technicalNoteHidden(value?: string | null) {
+  if (!value) return "";
+  return value
+    .replace(/\s*·?\s*split_parent=\d{4}-\d{2}-\d{2}/g, "")
+    .replace(/split_parent=\d{4}-\d{2}-\d{2}/g, "")
+    .trim();
+}
+
+function isContinuation(shift: ScheduleRow) {
+  return /tęsinys|tesinys|split_parent=/i.test(String(shift.notes || shift.note || "")) && cleanTime(getScheduleStart(shift)) === "00:00";
+}
+
+function shiftLabel(shift: ScheduleRow) {
+  const note = String(shift.notes || shift.note || "").toLowerCase();
+  const type = String(shift.shift_type || "").toLowerCase();
+  const start = cleanTime(getScheduleStart(shift));
+  const end = cleanTime(getScheduleEnd(shift));
+
+  if (note.includes("paros") && start !== "00:00") return "Paros pamaina";
+  if (note.includes("paros") && start === "00:00") return "Paros pamainos tęsinys";
+  if (start === end && start !== "--:--") return "Paros pamaina";
+  if (type === "day" || type === "work") return "Dieninė pamaina";
+  if (type === "night") return "Naktinė pamaina";
+  if (type === "off") return "Poilsis";
+  if (type === "sick") return "Liga";
+  if (type === "reserved") return "Rezervacija";
+  if (type === "short_leave") return "Trumpas išvykimas";
+  if (["a", "m", "t", "na", "vacation"].includes(type)) return "Atostogos / neatvykimas";
+  return "Pamaina";
+}
+
+function shiftTone(shift: ScheduleRow) {
+  const label = shiftLabel(shift).toLowerCase();
+  const type = String(shift.shift_type || "").toLowerCase();
+  if (label.includes("paros") || type === "night") return "border-indigo-100 bg-indigo-50 text-indigo-950";
+  if (type === "off") return "border-slate-200 bg-slate-50 text-slate-700";
+  if (type === "sick") return "border-rose-100 bg-rose-50 text-rose-900";
+  if (type === "reserved") return "border-violet-100 bg-violet-50 text-violet-900";
+  if (["a", "m", "t", "na", "vacation"].includes(type)) return "border-amber-100 bg-amber-50 text-amber-900";
+  return "border-emerald-100 bg-emerald-50 text-emerald-950";
+}
+
+function timeText(shift: ScheduleRow) {
+  const start = cleanTime(getScheduleStart(shift));
+  const end = cleanTime(getScheduleEnd(shift));
+  if (end === "23:59") return `${start}–24:00`;
+  return `${start}–${end}`;
 }
 
 export default function MySchedulePage() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState('')
-  const [shifts, setShifts] = useState<ShiftRow[]>([])
-  const [notificationsCount, setNotificationsCount] = useState(0)
-  const [isMobile, setIsMobile] = useState(false)
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<ScheduleRow[]>([]);
+  const [membership, setMembership] = useState<MembershipRow | null>(null);
 
-  async function loadData() {
-    setLoading(true)
-    setMessage('')
+  useEffect(() => {
+    void loadSchedule();
+  }, []);
+
+  async function loadSchedule(showRefresh = false) {
+    if (showRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.replace('/login'); return }
-      const organizationId = await getCurrentOrganizationId()
-      if (!organizationId) { setMessage('Nepavyko nustatyti įstaigos.'); return }
-      const { data: membership, error: membershipError } = await supabase
-        .from('organization_members')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .maybeSingle()
-      if (membershipError) throw membershipError
-      const typedMembership = (membership as MembershipRow | null) || null
-      if (typedMembership?.role === 'owner' || typedMembership?.role === 'admin') { router.replace('/admin-dashboard'); return }
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-      const today = new Date()
-      const endDate = new Date(today)
-      endDate.setDate(today.getDate() + 14)
-      const from = today.toISOString().slice(0, 10)
-      const to = endDate.toISOString().slice(0, 10)
+      if (userError) throw userError;
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
 
-      const { data, error } = await supabase
-        .from('work_shifts')
-        .select('id, shift_date, start_time, end_time, shift_type, status, notes')
-        .eq('user_id', user.id)
-        .gte('shift_date', from)
-        .lte('shift_date', to)
-        .order('shift_date', { ascending: true })
-        .order('start_time', { ascending: true })
-      if (error) throw error
-      setShifts((data as ShiftRow[]) || [])
+      const { data: membershipData } = await supabase
+        .from("organization_members")
+        .select("id, organization_id, position, department")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
 
-      const { data: notifications, error: notificationsError } = await supabase
-        .from('notifications')
-        .select('id, is_read')
-        .eq('user_id', user.id)
-        .eq('is_read', false)
-      if (notificationsError) throw notificationsError
-      setNotificationsCount(((notifications as NotificationCountRow[]) || []).length)
-    } catch (error) {
-      setMessage(getReadableError(error))
+      const currentMembership = (membershipData || null) as MembershipRow | null;
+      setMembership(currentMembership);
+
+      const candidates: Array<{ column: string; value: string }> = [
+        { column: "user_id", value: user.id },
+        { column: "assigned_user_id", value: user.id },
+        { column: "staff_user_id", value: user.id },
+        { column: "employee_id", value: user.id },
+      ];
+
+      if (currentMembership?.id) {
+        candidates.push({ column: "organization_member_id", value: currentMembership.id });
+        candidates.push({ column: "member_id", value: currentMembership.id });
+        candidates.push({ column: "employee_id", value: currentMembership.id });
+      }
+
+      let found: ScheduleRow[] = [];
+
+      for (const candidate of candidates) {
+        const { data, error } = await supabase
+          .from("employee_schedules")
+          .select("*")
+          .eq(candidate.column, candidate.value)
+          .limit(220);
+
+        if (error) {
+          console.warn(`[my-schedule] skipped ${candidate.column}:`, error.message);
+          continue;
+        }
+
+        const rows = ((data || []) as ScheduleRow[])
+          .filter(isPublished)
+          .sort((a, b) => `${getScheduleDate(a)} ${getScheduleStart(a)}`.localeCompare(`${getScheduleDate(b)} ${getScheduleStart(b)}`));
+
+        if (rows.length) {
+          found = rows;
+          break;
+        }
+      }
+
+      setSchedule(found);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nepavyko įkelti grafiko.");
     } finally {
-      setLoading(false)
+      setLoading(false);
+      setRefreshing(false);
     }
   }
 
-  useEffect(() => { void loadData() }, [])
+  const todayIso = new Date().toISOString().slice(0, 10);
 
-  const todayText = useMemo(() => new Date().toLocaleDateString('lt-LT'), [])
-  const nextShift = shifts[0]
+  const upcoming = useMemo(() => {
+    return schedule.filter((item) => {
+      const date = getScheduleDate(item).slice(0, 10);
+      return !date || date >= todayIso;
+    });
+  }, [schedule, todayIso]);
 
-  if (loading) {
-    return <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6"><div className="rounded-3xl border border-slate-200/70 bg-white p-8 text-center shadow-sm"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-700"/><p className="mt-4 text-lg font-black text-slate-700">Kraunama...</p></div></main>
-  }
+  const past = useMemo(() => {
+    return schedule
+      .filter((item) => {
+        const date = getScheduleDate(item).slice(0, 10);
+        return date && date < todayIso;
+      })
+      .slice(-8)
+      .reverse();
+  }, [schedule, todayIso]);
+
+  const nextShift = upcoming[0] || null;
 
   return (
-    <main className="min-h-screen bg-slate-50 pb-28 text-slate-950">
-      <section className="rounded-b-[34px] bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-950 px-5 pb-7 pt-6 text-white shadow-md">
-        <div className="flex items-start justify-between gap-4">
-          <button onClick={() => router.push('/employee-dashboard')} className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/12 text-white"><ChevronLeft className="h-5 w-5" /></button>
-          <button onClick={() => void loadData()} className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/12 text-white"><RefreshCw className="h-5 w-5" /></button>
-        </div>
-        <p className="mt-5 text-xs font-black uppercase tracking-[0.32em] text-emerald-100">Mano grafikas</p>
-        <h1 className="mt-3 text-3xl font-black leading-tight">Artimiausios pamainos</h1>
-        <p className="mt-3 text-sm font-semibold leading-6 text-emerald-50/90">Rodomos artimiausios 14 dienų pamainos nuo {todayText}.</p>
-        <div className="mt-5 rounded-3xl border border-white/12 bg-white/10 p-4 backdrop-blur">
-          <p className="text-xs font-black uppercase tracking-widest text-emerald-100">Kita pamaina</p>
-          <div className="mt-2 flex items-center justify-between gap-4">
-            <strong className="text-xl font-black">{nextShift ? formatDate(nextShift.shift_date) : 'Nėra suplanuota'}</strong>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-900">{nextShift ? formatShiftTime(nextShift.start_time, nextShift.end_time) : '—'}</span>
+    <main className="min-h-screen bg-slate-50 px-4 pb-24 pt-4 text-slate-950 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
+      <div className="mx-auto max-w-7xl space-y-5 lg:space-y-7">
+        <section className="overflow-hidden rounded-[34px] bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-950 p-6 text-white shadow-[0_24px_70px_rgba(2,6,23,0.22)] sm:p-8 lg:p-10">
+          <div className="flex items-start justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => router.push("/employee-dashboard")}
+              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/12 text-white transition hover:bg-white/18"
+              aria-label="Grįžti"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void loadSchedule(true)}
+              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/12 text-white transition hover:bg-white/18"
+              aria-label="Atnaujinti grafiką"
+            >
+              {refreshing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+            </button>
           </div>
-        </div>
-      </section>
 
-      <section className="space-y-3 px-4 pt-5">
-        {message ? <div className="rounded-[24px] border border-slate-200/70 bg-white p-4 text-sm font-extrabold text-slate-700 shadow-sm">{message}</div> : null}
-        {shifts.length === 0 ? (
-          <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm"><CalendarClock className="mx-auto h-10 w-10 text-slate-400" /><p className="mt-4 text-lg font-black text-slate-700">Artimiausių pamainų nerasta</p><p className="mt-1 text-sm font-semibold text-slate-500">Kai grafikas bus patvirtintas, jis atsiras čia.</p></div>
-        ) : shifts.map((shift) => (
-          <article key={shift.id} className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div><p className="text-xs font-black uppercase tracking-widest text-emerald-700">{shift.shift_type || 'Pamaina'}</p><h2 className="mt-2 text-xl font-black">{formatDate(shift.shift_date)}</h2></div>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">{shift.status || 'suplanuota'}</span>
+          <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_420px] lg:items-end">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-100">Mano grafikas</p>
+              <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">Artimiausios pamainos</h1>
+              <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-emerald-50 sm:text-lg">
+                Čia rodomas tik administratoriaus paskelbtas grafikas. Juodraščiai darbuotojams nerodomi.
+              </p>
             </div>
-            <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm font-black text-slate-700"><Clock className="mr-2 inline h-4 w-4" />{formatShiftTime(shift.start_time, shift.end_time)}</div>
-            {shift.notes?.trim() ? <p className="mt-3 text-sm font-semibold leading-6 text-slate-500">{shift.notes.trim()}</p> : null}
-          </article>
-        ))}
-      </section>
 
-      <MobileBottomNav notificationsCount={notificationsCount} />
+            <div className="rounded-[28px] border border-white/15 bg-white/10 p-5 backdrop-blur">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-100">Kita pamaina</p>
+              <div className="mt-3 flex flex-col gap-3">
+                <div>
+                  <p className="text-2xl font-black">{nextShift ? formatDate(getScheduleDate(nextShift)) : "Nėra suplanuota"}</p>
+                  <p className="mt-1 text-lg font-extrabold text-emerald-50">{nextShift ? timeText(nextShift) : "—"}</p>
+                </div>
+                <div className="w-max rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-800">
+                  {nextShift ? shiftLabel(nextShift) : "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {error ? (
+          <section className="rounded-3xl border border-amber-100 bg-amber-50 p-5 text-sm font-bold text-amber-900">{error}</section>
+        ) : null}
+
+        <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-7">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-700">Paskelbta</p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight lg:text-3xl">Pamainos</h2>
+              <p className="mt-1 font-semibold text-slate-500">
+                {membership?.department ? `${membership.department} · ` : ""}
+                {membership?.position || "Darbuotojas"}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-600">{upcoming.length} būsimų</div>
+          </div>
+
+          <div className="mt-6">
+            {loading ? (
+              <div className="flex min-h-[260px] items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50">
+                <Loader2 className="h-7 w-7 animate-spin text-emerald-700" />
+              </div>
+            ) : upcoming.length ? (
+              <>
+                <div className="hidden overflow-hidden rounded-3xl border border-slate-200 lg:block">
+                  <table className="w-full border-collapse bg-white text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Data</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Diena</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Laikas</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Tipas</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Valandos</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Pastaba</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {upcoming.map((shift) => (
+                        <DesktopShiftRow key={shift.id} shift={shift} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="space-y-3 lg:hidden">
+                  {upcoming.map((shift) => (
+                    <ShiftCard key={shift.id} shift={shift} />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <EmptySchedule />
+            )}
+          </div>
+        </section>
+
+        {!loading && past.length ? (
+          <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-7">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Istorija</p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight">Praėjusios pamainos</h2>
+            </div>
+            <div className="mt-5 grid gap-3 lg:grid-cols-2">
+              {past.map((shift) => (
+                <ShiftCard key={shift.id} shift={shift} muted />
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
     </main>
-  )
+  );
+}
+
+function DesktopShiftRow({ shift }: { shift: ScheduleRow }) {
+  const date = getScheduleDate(shift);
+  const hours = durationHours(shift);
+  const cleanNote = technicalNoteHidden(shift.notes || shift.note || "");
+
+  return (
+    <tr className="border-t border-slate-100">
+      <td className="px-5 py-4 text-base font-black text-slate-950">{shortDate(date)}</td>
+      <td className="px-5 py-4 text-sm font-extrabold capitalize text-slate-600">{weekday(date)}</td>
+      <td className="px-5 py-4">
+        <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-4 py-2 text-sm font-black text-slate-800">
+          <Clock className="h-4 w-4" />
+          {timeText(shift)}
+        </span>
+      </td>
+      <td className="px-5 py-4">
+        <span className={`inline-flex rounded-full border px-4 py-2 text-sm font-black ${shiftTone(shift)}`}>{shiftLabel(shift)}</span>
+      </td>
+      <td className="px-5 py-4 text-sm font-black text-slate-700">{hours === null ? "—" : `${hours.toFixed(hours % 1 === 0 ? 0 : 1)} val.`}</td>
+      <td className="max-w-md px-5 py-4 text-sm font-semibold text-slate-500">{cleanNote || (isContinuation(shift) ? "Tęsinys iš ankstesnės dienos" : "—")}</td>
+    </tr>
+  );
+}
+
+function ShiftCard({ shift, muted = false }: { shift: ScheduleRow; muted?: boolean }) {
+  const date = getScheduleDate(shift);
+  const tone = muted ? "border-slate-200 bg-slate-50 text-slate-700" : shiftTone(shift);
+  const hours = durationHours(shift);
+  const cleanNote = technicalNoteHidden(shift.notes || shift.note || "");
+
+  return (
+    <article className={`rounded-3xl border p-5 ${tone}`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] opacity-70">
+            <CalendarDays className="h-4 w-4" />
+            {shortDate(date)}
+          </div>
+          <h3 className="mt-2 text-xl font-black tracking-tight sm:text-2xl">{formatDate(date)}</h3>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-base font-extrabold">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2">
+              <Clock className="h-4 w-4" />
+              {timeText(shift)}
+            </span>
+            <span className="rounded-full bg-white/80 px-4 py-2">{shiftLabel(shift)}</span>
+            {hours !== null ? <span className="rounded-full bg-white/80 px-4 py-2">{hours.toFixed(hours % 1 === 0 ? 0 : 1)} val.</span> : null}
+          </div>
+          {(shift.location || shift.department || shift.position || cleanNote) && (
+            <p className="mt-3 text-sm font-bold opacity-75">
+              {[shift.location, shift.department, shift.position, cleanNote].filter(Boolean).join(" · ")}
+            </p>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function EmptySchedule() {
+  return (
+    <div className="flex min-h-[260px] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-slate-400 shadow-sm">
+        <CalendarX className="h-8 w-8" />
+      </div>
+      <h3 className="mt-5 text-xl font-black tracking-tight">Paskelbtų pamainų nėra</h3>
+      <p className="mt-2 max-w-md text-sm font-semibold leading-6 text-slate-500">
+        Kai administratorius paskelbs grafiką, pamainos automatiškai atsiras čia.
+      </p>
+    </div>
+  );
 }
