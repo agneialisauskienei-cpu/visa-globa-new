@@ -3,15 +3,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
-  BarChart3,
   ArrowRight,
+  BarChart3,
   Building2,
   CalendarCheck,
+  CheckCircle2,
   ClipboardList,
   Home,
   Info,
-  Plus,
   RefreshCw,
+  ShieldAlert,
+  Stethoscope,
   Users,
   UserPlus,
   X,
@@ -30,7 +32,32 @@ type DashboardStats = {
   completedTrainings: number;
   requiredTrainings: number;
   capacity: number | null;
+  todayShiftEntries: number;
+  todayAbsences: number;
+  incidentAlerts: number;
+  medicationAlerts: number;
+  activityGaps: number;
+  plannedFte: number;
+  filledFte: number;
+  freeFte: number;
+  temporaryUnavailableFte: number;
+  replacementNeededFte: number;
+  fteRows: FteRow[];
 };
+
+type FteRow = {
+  key: string;
+  title: string;
+  planned: number;
+  filled: number;
+  free: number;
+  coefficient: string;
+  status: string;
+  percent: number;
+  color: "emerald" | "amber" | "red";
+};
+
+type DashboardTab = "overview" | "capacity" | "risks" | "activity" | "documents";
 
 const EMPTY_STATS: DashboardStats = {
   organizations: 0,
@@ -43,6 +70,17 @@ const EMPTY_STATS: DashboardStats = {
   completedTrainings: 0,
   requiredTrainings: 0,
   capacity: null,
+  todayShiftEntries: 0,
+  todayAbsences: 0,
+  incidentAlerts: 0,
+  medicationAlerts: 0,
+  activityGaps: 0,
+  plannedFte: 0,
+  filledFte: 0,
+  freeFte: 0,
+  temporaryUnavailableFte: 0,
+  replacementNeededFte: 0,
+  fteRows: [],
 };
 
 export default function AdminDashboardPage() {
@@ -51,7 +89,7 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [showHelp, setShowHelp] = useState(false);
-
+  const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [embeddedFormRoute, setEmbeddedFormRoute] = useState<string | null>(null);
 
   async function loadStats() {
@@ -67,6 +105,12 @@ export default function AdminDashboardPage() {
       expiringCertificates,
       trainingStats,
       capacity,
+      todayShiftEntries,
+      todayAbsences,
+      incidentAlerts,
+      medicationAlerts,
+      activityGaps,
+      fteSummary,
     ] = await Promise.all([
       safeCount("organizations"),
       safeCount("residents"),
@@ -75,6 +119,7 @@ export default function AdminDashboardPage() {
       firstWorkingCount([
         () => safeCountResult("tasks", (q) => q.in("status", ["pending", "open", "todo", "new"])),
         () => safeCountResult("admin_tasks", (q) => q.in("status", ["pending", "open", "todo", "new"])),
+        () => safeCountResult("employee_tasks", (q) => q.in("status", ["pending", "open", "todo", "new"])),
         () => safeCountResult("requests", (q) => q.in("status", ["pending", "submitted", "new"])),
       ]),
       firstWorkingCount([
@@ -85,6 +130,12 @@ export default function AdminDashboardPage() {
       countExpiringCertificates(),
       countTrainingProgress(),
       getOrganizationCapacity(),
+      countTodayShiftEntries(),
+      countTodayAbsences(),
+      countIncidentAlerts(),
+      countMedicationAlerts(),
+      countActivityGaps(),
+      loadFteSummary(),
     ]);
 
     const activeResidentsFixed = activeResidents || allResidents;
@@ -100,6 +151,17 @@ export default function AdminDashboardPage() {
       completedTrainings: trainingStats.completed,
       requiredTrainings: trainingStats.required,
       capacity,
+      todayShiftEntries,
+      todayAbsences,
+      incidentAlerts,
+      medicationAlerts,
+      activityGaps,
+      plannedFte: fteSummary.plannedFte,
+      filledFte: fteSummary.filledFte,
+      freeFte: fteSummary.freeFte,
+      temporaryUnavailableFte: fteSummary.temporaryUnavailableFte,
+      replacementNeededFte: fteSummary.replacementNeededFte,
+      fteRows: fteSummary.rows || [],
     });
 
     setLastUpdated(new Date());
@@ -121,388 +183,494 @@ export default function AdminDashboardPage() {
       ? percentage(stats.completedTrainings, stats.requiredTrainings)
       : 0;
 
-    return { occupancy, trainingCompletion };
+    const freePlaces = stats.capacity && stats.capacity > stats.activeResidents
+      ? stats.capacity - stats.activeResidents
+      : 0;
+
+    const workloadRisk = clamp((stats.pendingTasks + stats.pendingLeaves) * 10, 0, 100);
+    const documentRisk = clamp(stats.expiringCertificates * 20, 0, 100);
+    const careRisk = clamp((stats.incidentAlerts + stats.medicationAlerts + stats.activityGaps) * 15, 0, 100);
+    const shiftCoverage = stats.activeEmployees > 0
+      ? percentage(stats.todayShiftEntries, stats.activeEmployees)
+      : 0;
+
+    const ftePercent = stats.plannedFte > 0
+      ? percentage(stats.filledFte, stats.plannedFte)
+      : 0;
+
+    return {
+      occupancy,
+      ftePercent,
+      trainingCompletion,
+      freePlaces,
+      workloadRisk,
+      documentRisk,
+      careRisk,
+      shiftCoverage,
+      totalRisks: stats.incidentAlerts + stats.medicationAlerts + stats.activityGaps,
+    };
   }, [stats]);
 
-  return (
+  const attentionItems = [
+    {
+      title: "Atostogų prašymai",
+      desc: `${stats.pendingLeaves} praš. laukia sprendimo.`,
+      badge: stats.pendingLeaves ? "Peržiūrėti" : "Nėra",
+      color: stats.pendingLeaves ? "amber" as const : "emerald" as const,
+      onClick: () => router.push("/team?module=vacations"),
+    },
+    {
+      title: "Baigiasi pažymos",
+      desc: `${stats.expiringCertificates} pažym. baigiasi per 14 dienų.`,
+      badge: stats.expiringCertificates ? "Skubu" : "Gerai",
+      color: stats.expiringCertificates ? "red" as const : "emerald" as const,
+      onClick: () => router.push("/team?module=docs"),
+    },
+    {
+      title: "Mokymų neatitikimai",
+      desc: `Mokymų užbaigimas: ${computed.trainingCompletion}%.`,
+      badge: computed.trainingCompletion < 70 ? "Sekti" : "Gerai",
+      color: computed.trainingCompletion < 70 ? "blue" as const : "emerald" as const,
+      onClick: () => router.push("/team?module=trainings"),
+    },
+    {
+      title: "Užduotys",
+      desc: `${stats.pendingTasks} užduočių laukia dėmesio.`,
+      badge: stats.pendingTasks ? "Tvarkyti" : "Ramu",
+      color: stats.pendingTasks ? "amber" as const : "emerald" as const,
+      onClick: () => router.push("/tasks"),
+    },
+  ];
 
-    <main className="min-h-screen bg-[#f8faf8] p-4 text-[#10251f] sm:p-6">
-      <div className="mx-auto max-w-7xl space-y-4">
-        <section className="rounded-xl border border-[#dbe6e0] bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-5">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[#e9f7ef] text-[#047857]">
-                <Home className="h-7 w-7" />
+  const riskItems = [
+    {
+      label: "Incidentai",
+      value: stats.incidentAlerts,
+      hint: "reikia peržiūros",
+      color: "red" as const,
+      onClick: () => router.push("/handover-logs"),
+    },
+    {
+      label: "Vaistų neatitikimai",
+      value: stats.medicationAlerts,
+      hint: "saugos patikra",
+      color: "amber" as const,
+      onClick: () => router.push("/medicine"),
+    },
+    {
+      label: "Veiklų spragos",
+      value: stats.activityGaps,
+      hint: "gyventojai be aktyvumo",
+      color: "blue" as const,
+      onClick: () => router.push("/activities"),
+    },
+  ];
+
+  return (
+    <main className="min-h-screen bg-[#f3f6f4] p-4 text-[#10251f] sm:p-6">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+          <div className="bg-[#486b5d] px-5 py-4 text-white">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/12 text-white ring-1 ring-white/15">
+                  <Home className="h-7 w-7" />
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
+                    Pagrindinis skydelis
+                  </p>
+                  <h1 className="mt-1 text-2xl font-black tracking-tight">
+                    Dienos apžvalga
+                  </h1>
+                  <p className="mt-1 max-w-3xl text-sm font-semibold text-white/80">
+                    Svarbiausi įstaigos rodikliai ir šiandienos prioritetai.
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
-                  Pagrindinis skydelis
-                </p>
-
-                <h1 className="mt-1 text-4xl font-black">
-                  Pagrindinis skydelis
-                </h1>
-
-                <p className="mt-2 max-w-3xl text-sm font-bold text-[#6a7e75]">
-                  Greita įstaigos statistika, personalo prioritetai ir pagrindiniai valdymo veiksmai.
-                </p>
-
-                <p className="mt-2 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75]">
-                  {lastUpdated ? `Atnaujinta: ${formatDateTime(lastUpdated)}` : "Kraunama statistika..."}
-                </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadStats}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                  Atnaujinti
+                </button>
 
                 <button
                   type="button"
-                  onClick={() => setShowHelp(true)}
-                  className="mt-3 inline-flex items-center gap-2 text-sm font-black text-[#047857] underline underline-offset-4 transition hover:text-[#065f46]"
+                  onClick={() => router.push("/reports")}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white/12 px-3 py-2 text-sm font-black text-white/90 ring-1 ring-white/20 transition hover:bg-white/18"
                 >
-                  <Info className="h-4 w-4" />
-                  Plačiau
+                  <BarChart3 className="h-4 w-4" />
+                  Ataskaitos
                 </button>
               </div>
             </div>
+          </div>
 
-            <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-2 gap-3 border-b border-[#dbe6e0] bg-[#f8faf8] p-4 lg:grid-cols-4 xl:grid-cols-7">
+            <TopMetric title="Gyventojai" value={loading ? "…" : String(stats.activeResidents)} meta="aktyvūs" onClick={() => router.push("/residents")} />
+            <TopMetric title="Užimtumas" value={loading ? "…" : `${computed.occupancy}%`} meta="vietos" accent="emerald" onClick={() => router.push("/rooms")} />
+            <TopMetric title="Darbuotojai" value={loading ? "…" : String(stats.activeEmployees)} meta="aktyvūs" onClick={() => router.push("/team?module=employees")} />
+            <TopMetric title="Etatai" value={loading ? "…" : formatFte(stats.freeFte)} meta={`laisva iš ${formatFte(stats.plannedFte)} et.`} accent={stats.freeFte > 0 ? "red" : "emerald"} onClick={() => router.push("/team?module=fte")} />
+            <TopMetric title="Užduotys" value={loading ? "…" : String(stats.pendingTasks)} meta={stats.pendingTasks ? "laukia" : "nėra"} accent={stats.pendingTasks ? "amber" : "emerald"} onClick={() => router.push("/tasks")} />
+            <TopMetric title="Mokymai" value={loading ? "…" : `${computed.trainingCompletion}%`} meta="sutvarkyta" accent={computed.trainingCompletion < 70 ? "amber" : "emerald"} onClick={() => router.push("/team?module=trainings")} />
+            <TopMetric title="Dokumentai" value={loading ? "…" : String(stats.expiringCertificates)} meta="baigiasi" accent={stats.expiringCertificates ? "red" : "emerald"} onClick={() => router.push("/team?module=docs")} />
+          </div>
+
+          <div className="sticky top-0 z-20 border-b border-[#dbe6e0] bg-white/95 px-4 py-3 backdrop-blur">
+            <nav className="flex gap-2 overflow-x-auto text-sm font-black text-[#486b5d]">
+              <DashboardTabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>
+                Rodiklių apžvalga
+              </DashboardTabButton>
+              <DashboardTabButton active={activeTab === "capacity"} onClick={() => setActiveTab("capacity")}>
+                Pajėgumas
+              </DashboardTabButton>
+              <DashboardTabButton active={activeTab === "risks"} onClick={() => setActiveTab("risks")}>
+                Rizikos
+              </DashboardTabButton>
+              <DashboardTabButton active={activeTab === "activity"} onClick={() => setActiveTab("activity")}>
+                Veikla
+              </DashboardTabButton>
+              <DashboardTabButton active={activeTab === "documents"} onClick={() => setActiveTab("documents")}>
+                Dokumentai
+              </DashboardTabButton>
               <button
                 type="button"
-                onClick={loadStats}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#86efac] bg-[#e9f7ef] px-4 py-3 text-sm font-black text-[#047857] transition hover:bg-[#d8f3e3] disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => setShowHelp(true)}
+                className="ml-auto shrink-0 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-2 transition hover:bg-white"
               >
-                <RefreshCw className="h-4 w-4" />
-                Atnaujinti
+                Instrukcija
               </button>
-
-              <button
-                type="button"
-                onClick={() => router.push("/reports")}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#047857] px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#065f46]"
-              >
-                <BarChart3 className="h-4 w-4" />
-                Ataskaitos
-              </button>
-            </div>
+            </nav>
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            icon={<Building2 />}
-            title="Įstaigos"
-            value={loading ? "…" : String(stats.organizations)}
-            meta={stats.organizations === 1 ? "Aktyvi" : "Aktyvios"}
-            onClick={() => router.push("/organizations")}
-          />
-          <StatCard
-            icon={<Users />}
-            title="Gyventojai"
-            value={loading ? "…" : String(stats.activeResidents)}
-            meta={stats.capacity ? `iš ${stats.capacity}` : "aktyvūs"}
-            onClick={() => router.push("/residents")}
-          />
-          <StatCard
-            icon={<UserPlus />}
-            title="Darbuotojai"
-            value={loading ? "…" : String(stats.activeEmployees)}
-            meta="aktyvūs"
-            onClick={() => router.push("/team")}
-          />
-          <StatCard
-            icon={<ClipboardList />}
-            title="Užduotys"
-            value={loading ? "…" : String(stats.pendingTasks)}
-            meta={stats.pendingTasks ? "laukia" : "nėra"}
-            onClick={() => router.push("/tasks")}
-          />
-        </section>
+        {(stats.pendingLeaves > 0 || stats.todayAbsences > 0 || stats.replacementNeededFte > 0) ? (
+          <section className="grid gap-3 lg:grid-cols-3">
+            <CriticalStrip
+              icon={<CalendarCheck />}
+              title="Laukia prašymai"
+              text={`${stats.pendingLeaves} atostogų / išvykimo užklausos laukia sprendimo`}
+              color="amber"
+              onClick={() => {
+                setActiveTab("risks");
+                router.push("/team?module=vacations");
+              }}
+            />
+            <CriticalStrip
+              icon={<Users />}
+              title="Šiandien nėra darbuotojų"
+              text={`${stats.todayAbsences} patvirtinti neatvykimai šiandien`}
+              color={stats.todayAbsences > 0 ? "amber" : "blue"}
+              onClick={() => {
+                setActiveTab("capacity");
+                router.push("/team?module=schedule");
+              }}
+            />
+            <CriticalStrip
+              icon={<ShieldAlert />}
+              title="Pavadavimo poreikis"
+              text={`${formatFte(stats.replacementNeededFte)} et. reikia padengti`}
+              color={stats.replacementNeededFte > 0 ? "red" : "blue"}
+              onClick={() => {
+                setActiveTab("capacity");
+                router.push("/team?module=schedule");
+              }}
+            />
+          </section>
+        ) : null}
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          <div className="grid gap-4">
-            <Card className="min-h-[286px]">
-              <h2 className="text-2xl font-black">Greiti veiksmai</h2>
-              <p className="mt-1 text-sm font-bold text-[#6a7e75]">
-                Dažniausiai naudojamos administravimo operacijos.
-              </p>
-
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
-                <ActionCard title="Naujas gyventojas" desc="Pridėti gyventojo profilį" onClick={() => setEmbeddedFormRoute("/residents?newResident=1")} />
-                <ActionCard title="Naujas darbuotojas" desc="Sukurti darbuotojo paskyrą" onClick={() => setEmbeddedFormRoute("/team?newEmployee=1")} />
-                <ActionCard title="Nauja užduotis" desc="Sukurti užduotį" onClick={() => router.push("/tasks")} />
-                <ActionCard title="Audit žurnalas" desc="Peržiūrėti pakeitimus" onClick={() => router.push("/audit")} />
-              </div>
-            </Card>
-
-            <Card className="min-h-[370px]">
-              <h2 className="text-2xl font-black">Naujausias aktyvumas</h2>
-              <p className="mt-1 text-sm font-bold text-[#6a7e75]">
-                Paskutiniai administraciniai veiksmai sistemoje.
-              </p>
-
-              <div className="mt-5 space-y-3">
-                <ActivityItem title="Atnaujinta statistika" meta="Sistema · dabar" />
-                <ActivityItem title="Aktyvių darbuotojų skaičius perskaičiuotas" meta={`Darbuotojai · ${stats.activeEmployees}`} />
-                <ActivityItem title="Gyventojų užimtumas perskaičiuotas" meta={`Gyventojai · ${computed.occupancy}%`} />
-                <ActivityItem title="Mokymų būsena perskaičiuota" meta={`Mokymai · ${computed.trainingCompletion}%`} />
-              </div>
-            </Card>
-          </div>
-
-          <div className="grid gap-4">
-            <Card className="min-h-[286px]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">Šiandien</p>
-                  <h2 className="mt-1 text-2xl font-black">Direktoriaus santrauka</h2>
-                  <p className="mt-1 text-sm font-bold text-[#6a7e75]">Svarbiausi rodikliai ir veiksmai vienoje vietoje.</p>
-                </div>
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#e9f7ef] text-[#047857]">
-                  <CalendarCheck className="h-6 w-6" />
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <SummaryCard title="Gyventojai" value={`${stats.activeResidents} aktyvūs`} />
-                <SummaryCard title="Darbuotojai" value={`${stats.activeEmployees} aktyvūs`} />
-                <SummaryCard title="Užduotys" value={`${stats.pendingTasks} laukia`} muted={stats.pendingTasks === 0} />
-                <SummaryCard title="Atostogos" value={`${stats.pendingLeaves} laukia`} muted={stats.pendingLeaves === 0} />
-              </div>
-            </Card>
-
-            <Card className="min-h-[370px]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#8a5a13]">Prioritetai</p>
-                  <h2 className="mt-1 text-2xl font-black">Reikia dėmesio</h2>
-                  <p className="mt-1 text-sm font-bold text-[#6a7e75]">Personalo, pažymų, mokymų ir atostogų klausimai.</p>
-                </div>
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#fff6df] text-[#8a5a13]">
-                  <AlertTriangle className="h-6 w-6" />
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                <PriorityCard title="Mokymų užbaigimas" desc={`Privalomų mokymų užbaigimas: ${computed.trainingCompletion}%.`} color={computed.trainingCompletion < 70 ? "red" : "blue"} badge="Sekti" />
-                <PriorityCard title="Baigiasi pažymos" desc={`${stats.expiringCertificates} pažym. baigiasi per 14 dienų.`} color={stats.expiringCertificates ? "red" : "emerald"} badge={stats.expiringCertificates ? "Skubu" : "Gerai"} />
-                <PriorityCard title="Atostogų prašymai" desc={`${stats.pendingLeaves} praš. laukia patvirtinimo.`} color={stats.pendingLeaves ? "amber" : "emerald"} badge={stats.pendingLeaves ? "Peržiūrėti" : "Nėra"} />
-                <PriorityCard title="Užimtumas" desc={`Gyventojų vietų užpildymas: ${computed.occupancy}%.`} color="blue" badge="Info" />
-              </div>
-            </Card>
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-[#dbe6e0] bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">Statistika</p>
-              <h2 className="mt-1 text-2xl font-black">Įstaigos rodikliai</h2>
-              <p className="mt-1 text-sm font-bold text-[#6a7e75]">Greitai įvertinami rodikliai direktoriui.</p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => router.push("/audit")}
-              className="rounded-xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
-            >
-              Peržiūrėti ataskaitą
-            </button>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <ChartCard title="Užimtumas" value={`${computed.occupancy}%`} progress={computed.occupancy} color="#047857" desc={stats.capacity ? `Užimta ${stats.activeResidents} iš ${stats.capacity} vietų.` : `${stats.activeResidents} aktyvūs gyventojai.`} />
-            <ChartCard title="Mokymai" value={`${computed.trainingCompletion}%`} progress={computed.trainingCompletion} color="#047857" desc={`${stats.completedTrainings} iš ${stats.requiredTrainings} privalomų įrašų.`} />
-            <ChartCard title="Pažymos" value={String(stats.expiringCertificates)} progress={clamp(stats.expiringCertificates * 20, 0, 100)} color="#b91c1c" desc="Baigiasi per 14 dienų." />
-            <ChartCard title="Atostogos" value={String(stats.pendingLeaves)} progress={clamp(stats.pendingLeaves * 25, 0, 100)} color="#8a5a13" desc="Laukia sprendimo." />
-          </div>
-        </section>
-      </div>
-    
-      {showHelp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
-              <div>
-                <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#6a7e75]">
-                  Trumpa instrukcija
-                </p>
-
-                <h1 className="text-3xl font-black text-[#10251f] sm:text-4xl">
-                  Kaip naudotis pagrindiniu skydeliu?
-                </h1>
-
-                <p className="mt-3 max-w-3xl text-sm font-bold leading-6 text-[#6a7e75]">
-                  Čia matysi svarbiausią įstaigos dienos informaciją: užimtumą,
-                  gyventojus, darbuotojus, užduotis ir įspėjimus.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowHelp(false)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#dbe6e0] bg-white text-2xl leading-none text-[#486b5d] transition hover:bg-[#eef4f1]"
-                aria-label="Uždaryti instrukciją"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="max-h-[72vh] overflow-y-auto bg-white p-5">
-              <div className="mb-4 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f7ef] text-lg font-black text-[#047857]">
-                    1
+        {activeTab === "overview" ? (
+          <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="grid gap-4">
+              <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                      Rodiklių apžvalga
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black">Bendra situacija</h2>
                   </div>
 
-                  <h2 className="text-2xl font-black text-[#10251f]">
-                    Pagrindinė santrauka
-                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/reports")}
+                    className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
+                  >
+                    Plačiau
+                  </button>
                 </div>
 
-                <p className="max-w-4xl text-sm font-bold leading-6 text-[#6a7e75]">
-                  Viršutiniai blokai parodo bendrą situaciją: kiek yra aktyvių
-                  gyventojų, kiek vietų užimta kambariuose, kiek darbuotojų ir
-                  kiek užduočių laukia dėmesio.
-                </p>
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  <RoundMetric
+                    title="Kambariai"
+                    label={stats.capacity ? `${computed.occupancy}% užimtumas` : "talpa nenustatyta"}
+                    value={computed.occupancy}
+                    center={stats.capacity ? `${stats.activeResidents}/${stats.capacity}` : `${computed.occupancy}%`}
+                    sublabel="vietos"
+                    color="#047857"
+                  />
 
-                <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                  {["Gyventojai", "Užimtumas", "Darbuotojai", "Užduotys"].map((item) => (
-                    <div key={item} className="rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 shadow-sm">
-                      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#6a7e75]">
-                        Blokas
-                      </p>
-                      <p className="mt-1 text-base font-black text-[#10251f]">
-                        {item}
-                      </p>
-                    </div>
+                  <RoundMetric
+                    title="Etatai"
+                    label={stats.plannedFte ? `${formatFte(stats.filledFte)} / ${formatFte(stats.plannedFte)} et.` : "planas nesuvestas"}
+                    value={computed.ftePercent}
+                    center={stats.plannedFte ? `${formatFte(stats.filledFte)}/${formatFte(stats.plannedFte)}` : "—"}
+                    sublabel="etatai"
+                    color="#0f766e"
+                  />
+
+                  <RoundMetric
+                    title="Slaugos pajėgumas"
+                    label={computed.totalRisks ? "reikia dėmesio" : "kritinių rizikų nėra"}
+                    value={100 - computed.careRisk}
+                    center={`${100 - computed.careRisk}%`}
+                    sublabel="pajėgumas"
+                    color={computed.careRisk > 30 ? "#ca8a04" : "#047857"}
+                    warm={computed.careRisk > 30}
+                  />
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                  Veiksmų centras
+                </p>
+                <h2 className="mt-1 text-2xl font-black">Kas šiandien svarbiausia?</h2>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  {attentionItems.map((row) => (
+                    <PriorityActionCard
+                      key={row.title}
+                      title={row.title}
+                      desc={row.desc}
+                      badge={row.badge}
+                      color={row.color}
+                      onClick={row.onClick}
+                    />
                   ))}
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-[#dbe6e0] bg-white p-4 shadow-sm">
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef4ef] text-lg font-black text-[#315740]">
-                      2
-                    </div>
-
-                    <h3 className="text-xl font-black text-[#10251f]">
-                      Greiti veiksmai
-                    </h3>
-                  </div>
-
-                  <p className="text-sm font-bold leading-6 text-[#6a7e75]">
-                    Mygtukas „Greiti veiksmai“ leidžia pasirinkti, ką kurti: gyventoją,
-                    darbuotoją, užduotį arba perdavimo įrašą.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-[#dbe6e0] bg-white p-4 shadow-sm">
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef4ef] text-lg font-black text-[#315740]">
-                      3
-                    </div>
-
-                    <h3 className="text-xl font-black text-[#10251f]">
-                      Užimtumo skaičiavimas
-                    </h3>
-                  </div>
-
-                  <p className="text-sm font-bold leading-6 text-[#6a7e75]">
-                    Užimtumas skaičiuojamas pagal kambarių vietas, o ne tik pagal
-                    gyventojų skaičių. Jei vietų nėra, sistema parodo įspėjimą.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-[#dbe6e0] bg-white p-4 shadow-sm">
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef4ef] text-lg font-black text-[#315740]">
-                      4
-                    </div>
-
-                    <h3 className="text-xl font-black text-[#10251f]">
-                      Paspaudžiami blokai
-                    </h3>
-                  </div>
-
-                  <p className="text-sm font-bold leading-6 text-[#6a7e75]">
-                    Statistikos kortelės gali nuvesti į susijusią skiltį arba
-                    parodyti detalesnę informaciją apie pasirinktą rodiklį.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-[#ead9b2] bg-[#fffdf8] p-4 shadow-sm">
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff6df] text-lg font-black text-[#8a5a13]">
-                      5
-                    </div>
-
-                    <h3 className="text-xl font-black text-[#10251f]">
-                      Įspėjimai
-                    </h3>
-                  </div>
-
-                  <p className="text-sm font-bold leading-6 text-[#7a6a4f]">
-                    Geltoni arba raudoni pranešimai rodo, kad reikia patikrinti
-                    trūkstamus duomenis, neatliktas užduotis arba sistemos klaidas.
-                  </p>
-                </div>
-              </div>
+              </section>
             </div>
 
-            <div className="flex justify-end border-t border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
-              <button
-                type="button"
-                onClick={() => setShowHelp(false)}
-                className="rounded-xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#065f46]"
-              >
-                Supratau
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-    
-      {embeddedFormRoute && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="flex h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
-                  Greitas veiksmas
-                </p>
-                <h2 className="mt-1 text-2xl font-black text-[#10251f]">
-                  {embeddedFormRoute.startsWith("/residents") ? "Naujas gyventojas" : "Naujas darbuotojas"}
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmbeddedFormRoute(null);
-                  void loadStats();
-                }}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#dbe6e0] bg-white text-[#486b5d] transition hover:bg-[#eef4f1]"
-                aria-label="Uždaryti"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <iframe
-              title={embeddedFormRoute.startsWith("/residents") ? "Naujo gyventojo forma" : "Naujo darbuotojo forma"}
-              src={embeddedFormRoute}
-              className="h-full w-full flex-1 border-0"
+            <DashboardSidePanel
+              pendingLeaves={stats.pendingLeaves}
+              todayAbsences={stats.todayAbsences}
+              expiringCertificates={stats.expiringCertificates}
+              trainingCompletion={computed.trainingCompletion}
+              lastUpdated={lastUpdated}
+              onVacations={() => router.push("/team?module=vacations")}
+              onSchedule={() => router.push("/team?module=schedule")}
+              onDocuments={() => router.push("/team?module=docs")}
             />
-          </div>
-        </div>
-      )}
+          </section>
+        ) : null}
 
+        {activeTab === "capacity" ? (
+          <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                    Pajėgumas
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black">Etatų ir pamainų santrauka</h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => router.push("/team?module=fte")}
+                  className="rounded-xl bg-[#047857] px-4 py-2 text-sm font-black text-white transition hover:bg-[#065f46]"
+                >
+                  Atidaryti Team
+                </button>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-4">
+                <FteSummaryCard label="Planuota" value={loading ? "…" : formatFte(stats.plannedFte)} />
+                <FteSummaryCard label="Užimta" value={loading ? "…" : formatFte(stats.filledFte)} tone="emerald" />
+                <FteSummaryCard label="Laisva" value={loading ? "…" : formatFte(stats.freeFte)} tone={stats.freeFte > 0 ? "red" : "emerald"} />
+                <FteSummaryCard label="Laikinai nedirba" value={loading ? "…" : formatFte(stats.temporaryUnavailableFte)} tone={stats.temporaryUnavailableFte > 0 ? "amber" : "emerald"} />
+              </div>
+
+              <CompactFteRows rows={stats.fteRows || []} />
+            </section>
+
+            <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">
+                Pamainų rizikos
+              </p>
+              <h2 className="mt-1 text-2xl font-black">Pavadavimas ir grafikas</h2>
+
+              <div className="mt-5 space-y-3">
+                <RiskAttentionCard
+                  title="Pavadavimo poreikis"
+                  text={
+                    stats.replacementNeededFte > 0
+                      ? `Reikia pavaduoti ${formatFte(stats.replacementNeededFte)} et.`
+                      : "Pavadavimo poreikio nerasta."
+                  }
+                  badge={stats.replacementNeededFte > 0 ? "Svarbu" : "Gerai"}
+                  tone={stats.replacementNeededFte > 0 ? "amber" : "emerald"}
+                  onClick={() => router.push("/team?module=schedule")}
+                />
+
+                <RiskAttentionCard
+                  title="Šiandien neatvykę"
+                  text={
+                    stats.todayAbsences > 0
+                      ? `${stats.todayAbsences} darbuotojų šiandien neatvykę.`
+                      : "Šiandien neatvykimų nėra."
+                  }
+                  badge={stats.todayAbsences > 0 ? "Tikrinti" : "Gerai"}
+                  tone={stats.todayAbsences > 0 ? "amber" : "emerald"}
+                  onClick={() => router.push("/team?module=schedule")}
+                />
+              </div>
+            </section>
+          </section>
+        ) : null}
+
+        {activeTab === "risks" ? (
+          <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+            <section className="rounded-2xl border border-red-100 bg-red-50 p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-red-700">
+                Rizikos
+              </p>
+              <h2 className="mt-1 text-2xl font-black">Reikia dėmesio</h2>
+
+              <div className="mt-5 space-y-3">
+                <RiskAttentionCard
+                  title="Atostogų / išvykimo užklausos"
+                  text={
+                    stats.pendingLeaves > 0
+                      ? `${stats.pendingLeaves} užklausos laukia patvirtinimo.`
+                      : "Laukiančių užklausų nėra."
+                  }
+                  badge={stats.pendingLeaves > 0 ? "Patvirtinti" : "Gerai"}
+                  tone={stats.pendingLeaves > 0 ? "amber" : "emerald"}
+                  onClick={() => router.push("/team?module=vacations")}
+                />
+
+                <RiskAttentionCard
+                  title="Dokumentų terminai"
+                  text={
+                    stats.expiringCertificates > 0
+                      ? `${stats.expiringCertificates} darbuotojų dokumentai baigiasi.`
+                      : "Baigiančių galioti dokumentų nėra."
+                  }
+                  badge={stats.expiringCertificates > 0 ? "Įspėjimas" : "Gerai"}
+                  tone={stats.expiringCertificates > 0 ? "amber" : "emerald"}
+                  onClick={() => router.push("/team?module=docs")}
+                />
+
+                {riskItems.map((risk) => (
+                  <RiskAttentionCard
+                    key={risk.label}
+                    title={risk.label}
+                    text={`${risk.value} įrašai · ${risk.hint}`}
+                    badge={risk.value > 0 ? "Tikrinti" : "Gerai"}
+                    tone={risk.value > 0 ? "amber" : "emerald"}
+                    onClick={risk.onClick}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                Greiti veiksmai
+              </p>
+              <h2 className="mt-1 text-2xl font-black">Kur eiti toliau?</h2>
+
+              <div className="mt-5 grid gap-3">
+                <QuickLink title="Atostogų / išvykimų patvirtinimai" onClick={() => router.push("/team?module=vacations")} />
+                <QuickLink title="Darbuotojų dokumentai" onClick={() => router.push("/team?module=docs")} />
+                <QuickLink title="Grafiko patikra" onClick={() => router.push("/team?module=schedule")} />
+                <QuickLink title="Audit žurnalas" onClick={() => router.push("/audit")} />
+              </div>
+            </section>
+          </section>
+        ) : null}
+
+        {activeTab === "activity" ? (
+          <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+            <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                Dienos eiga
+              </p>
+              <h2 className="mt-1 text-2xl font-black">Naujausi įvykiai</h2>
+
+              <div className="mt-4 space-y-3">
+                <TimelineItem color="#047857" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
+                <TimelineItem color="#8a5a13" title="Atostogų / išvykimo užklausos" meta={`${stats.pendingLeaves} laukia sprendimo`} warm />
+                <TimelineItem color="#b91c1c" title="Dokumentų terminai" meta={`${stats.expiringCertificates} įspėjimai`} danger />
+                <TimelineItem color="#2563eb" title="Mokymai" meta={`${computed.trainingCompletion}% užbaigta`} blue />
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                Veiklos kryptys
+              </p>
+              <h2 className="mt-1 text-2xl font-black">Greitos nuorodos</h2>
+
+              <div className="mt-5 grid gap-3">
+                <QuickLink title="Gyventojai" onClick={() => router.push("/residents")} />
+                <QuickLink title="Užduotys" onClick={() => router.push("/tasks")} />
+                <QuickLink title="Mokymai" onClick={() => router.push("/team?module=trainings")} />
+                <QuickLink title="Perdavimo žurnalai" onClick={() => router.push("/handover-logs")} />
+              </div>
+            </section>
+          </section>
+        ) : null}
+
+        {activeTab === "documents" ? (
+          <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+            <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                Dokumentai ir mokymai
+              </p>
+              <h2 className="mt-1 text-2xl font-black">Atitikties santrauka</h2>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                <FteSummaryCard label="Mokymai" value={`${computed.trainingCompletion}%`} tone={computed.trainingCompletion < 70 ? "amber" : "emerald"} />
+                <FteSummaryCard label="Baigiasi dokumentai" value={String(stats.expiringCertificates)} tone={stats.expiringCertificates > 0 ? "red" : "emerald"} />
+                <FteSummaryCard label="Baigta mokymų" value={String(stats.completedTrainings)} />
+                <FteSummaryCard label="Reikalaujama" value={String(stats.requiredTrainings)} />
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                Veiksmai
+              </p>
+              <h2 className="mt-1 text-2xl font-black">Dokumentų valdymas</h2>
+
+              <div className="mt-5 grid gap-3">
+                <QuickLink title="Mokymų patvirtinimai" onClick={() => router.push("/team?module=trainings")} />
+                <QuickLink title="Darbuotojų dokumentai" onClick={() => router.push("/team?module=docs")} />
+                <QuickLink title="Susipažinimai" onClick={() => router.push("/team?module=document-acknowledgements")} />
+                <QuickLink title="Ataskaitos" onClick={() => router.push("/reports")} />
+              </div>
+            </section>
+          </section>
+        ) : null}
+      </div>
+
+      {showHelp && (
+        <HelpModal onClose={() => setShowHelp(false)} />
+      )}
     </main>
   );
 }
+
 
 async function safeCount(table: string, apply?: (query: any) => any): Promise<number> {
   const result = await safeCountResult(table, apply);
@@ -528,6 +696,279 @@ async function firstWorkingCount(loaders: Array<() => Promise<{ ok: boolean; cou
   }
   return 0;
 }
+
+
+async function loadFteSummary(): Promise<{
+  plannedFte: number;
+  filledFte: number;
+  freeFte: number;
+  temporaryUnavailableFte: number;
+  replacementNeededFte: number;
+  rows?: FteRow[];
+}> {
+  const [positionsResult, membersResult, temporaryUnavailableFte] = await Promise.all([
+    safeSelectRows("personnel_positions", "id, department, position_name, planned_fte, coefficient_min, coefficient_max, active"),
+    safeSelectRows("organization_members", "user_id, role, position, department, staff_type, employment_rate, is_active, is_archived"),
+    countTemporaryUnavailableFte(),
+  ]);
+
+  const members = membersResult
+    .filter((row: any) => row?.is_active !== false && row?.is_archived !== true)
+    .map((row: any) => ({
+      ...row,
+      employment_rate: Number(row.employment_rate || 1),
+    }));
+
+  const positionRows = positionsResult.filter((row: any) => row?.active !== false);
+
+  if (!positionRows.length) {
+    const groups = new Map<string, { title: string; filled: number; planned: number; coefficient: string }>();
+
+    for (const member of members) {
+      const key = normalizeFteGroup(member.staff_type || member.department || member.position || member.role);
+      const title = fteGroupLabel(key, member);
+      const current = groups.get(key) || {
+        title,
+        filled: 0,
+        planned: 0,
+        coefficient: "—",
+      };
+
+      current.filled += Number(member.employment_rate || 1);
+      current.planned = Math.max(current.planned, Math.ceil(current.filled));
+      groups.set(key, current);
+    }
+
+    const rows = Array.from(groups.entries()).map(([key, group]) =>
+      makeFteRow({
+        key,
+        title: group.title,
+        planned: group.planned,
+        filled: group.filled,
+        coefficient: group.coefficient,
+      }),
+    );
+
+    const plannedFte = roundFte(rows.reduce((sum, row) => sum + row.planned, 0));
+    const filledFte = roundFte(rows.reduce((sum, row) => sum + row.filled, 0));
+    const freeFte = roundFte(Math.max(0, plannedFte - filledFte));
+
+    return {
+      plannedFte,
+      filledFte,
+      freeFte,
+      temporaryUnavailableFte,
+      replacementNeededFte: temporaryUnavailableFte,
+      rows,
+    };
+  }
+
+  const rows = positionRows.map((position: any) => {
+    const planned = Number(position.planned_fte || 0);
+    const title = String(position.position_name || position.department || "Pareigybė").trim();
+
+    const filled = members
+      .filter((member: any) => memberMatchesPosition(member, position))
+      .reduce((sum: number, member: any) => sum + Number(member.employment_rate || 1), 0);
+
+    const coefficient = coefficientRange(position.coefficient_min, position.coefficient_max);
+
+    return makeFteRow({
+      key: String(position.id || title),
+      title,
+      planned,
+      filled,
+      coefficient,
+    });
+  });
+
+  const plannedFte = roundFte(rows.reduce((sum, row) => sum + row.planned, 0));
+  const filledFte = roundFte(rows.reduce((sum, row) => sum + row.filled, 0));
+  const freeFte = roundFte(Math.max(0, plannedFte - filledFte));
+
+  return {
+    plannedFte,
+    filledFte,
+    freeFte,
+    temporaryUnavailableFte,
+    replacementNeededFte: temporaryUnavailableFte,
+    rows,
+  };
+}
+
+async function safeSelectRows(table: string, columns: string): Promise<any[]> {
+  try {
+    const { data, error } = await supabase.from(table).select(columns);
+    if (error || !data) return [];
+    return data as any[];
+  } catch {
+    return [];
+  }
+}
+
+async function countTemporaryUnavailableFte(): Promise<number> {
+  const today = toDateInput(new Date());
+
+  const rows = await firstWorkingRows([
+    () => safeSelectFilteredRows("vacation_requests", "employee_id, status, start_date, end_date", (q) =>
+      q.lte("start_date", today).gte("end_date", today).in("status", ["approved", "confirmed"]),
+    ),
+    () => safeSelectFilteredRows("leave_requests", "employee_id, status, start_date, end_date", (q) =>
+      q.lte("start_date", today).gte("end_date", today).in("status", ["approved", "confirmed"]),
+    ),
+    () => safeSelectFilteredRows("absence_requests", "employee_id, status, start_date, end_date", (q) =>
+      q.lte("start_date", today).gte("end_date", today).in("status", ["approved", "confirmed"]),
+    ),
+  ]);
+
+  if (!rows.length) return 0;
+
+  const employeeIds = Array.from(
+    new Set(rows.map((row: any) => row.employee_id).filter(Boolean).map(String)),
+  );
+
+  if (!employeeIds.length) return 0;
+
+  const members = await safeSelectFilteredRows(
+    "organization_members",
+    "user_id, employment_rate, is_active, is_archived",
+    (q) => q.in("user_id", employeeIds),
+  );
+
+  return roundFte(
+    members
+      .filter((member: any) => member?.is_active !== false && member?.is_archived !== true)
+      .reduce((sum: number, member: any) => sum + Number(member.employment_rate || 1), 0),
+  );
+}
+
+async function firstWorkingRows(loaders: Array<() => Promise<any[]>>): Promise<any[]> {
+  for (const loader of loaders) {
+    const rows = await loader();
+    if (rows.length) return rows;
+  }
+  return [];
+}
+
+async function safeSelectFilteredRows(
+  table: string,
+  columns: string,
+  apply: (query: any) => any,
+): Promise<any[]> {
+  try {
+    let query = supabase.from(table).select(columns);
+    query = apply(query);
+    const { data, error } = await query;
+    if (error || !data) return [];
+    return data as any[];
+  } catch {
+    return [];
+  }
+}
+
+function makeFteRow({
+  key,
+  title,
+  planned,
+  filled,
+  coefficient,
+}: {
+  key: string;
+  title: string;
+  planned: number;
+  filled: number;
+  coefficient: string;
+}): FteRow {
+  const free = roundFte(Math.max(0, planned - filled));
+  const percent = planned > 0 ? percentage(filled, planned) : filled > 0 ? 100 : 0;
+  const color = percent >= 90 ? "emerald" : percent >= 70 ? "amber" : "red";
+  const status = percent >= 90 ? "Užpildyta" : percent >= 70 ? "Stebėti" : "Trūksta";
+
+  return {
+    key,
+    title,
+    planned: roundFte(planned),
+    filled: roundFte(filled),
+    free,
+    coefficient,
+    status,
+    percent,
+    color,
+  };
+}
+
+function memberMatchesPosition(member: any, position: any) {
+  const positionName = normalizeText(position.position_name);
+  const department = normalizeText(position.department);
+  const memberPosition = normalizeText(member.position);
+  const memberDepartment = normalizeText(member.department);
+  const staffType = normalizeText(member.staff_type);
+
+  if (positionName && memberPosition && memberPosition.includes(positionName)) return true;
+  if (positionName && staffType && staffType.includes(positionName)) return true;
+  if (department && memberDepartment && memberDepartment.includes(department)) return true;
+
+  return false;
+}
+
+function normalizeFteGroup(value: unknown) {
+  const text = normalizeText(value);
+
+  if (/slaug|nurse|medic/.test(text)) return "nursing";
+  if (/social|soc/.test(text)) return "social";
+  if (/virtuv|kitchen|maist|cook|vir/.test(text)) return "kitchen";
+  if (/ūk|uk|maintenance|valy|clean|techn/.test(text)) return "facility";
+  if (/admin|direkt|vadov|owner/.test(text)) return "administration";
+
+  return text || "other";
+}
+
+function fteGroupLabel(key: string, member: any) {
+  const labels: Record<string, string> = {
+    nursing: "Slauga",
+    social: "Socialiniai darbuotojai",
+    kitchen: "Virtuvė",
+    facility: "Ūkis",
+    administration: "Administracija",
+    other: "Kita",
+  };
+
+  return labels[key] || String(member.position || member.department || member.staff_type || "Kita");
+}
+
+function coefficientRange(min: unknown, max: unknown) {
+  const minNumber = Number(min);
+  const maxNumber = Number(max);
+
+  if (Number.isFinite(minNumber) && Number.isFinite(maxNumber) && maxNumber > 0) {
+    return `${minNumber.toFixed(2)} – ${maxNumber.toFixed(2)}`;
+  }
+
+  if (Number.isFinite(minNumber) && minNumber > 0) return minNumber.toFixed(2);
+  if (Number.isFinite(maxNumber) && maxNumber > 0) return maxNumber.toFixed(2);
+
+  return "—";
+}
+
+function normalizeText(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function roundFte(value: number) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function formatFte(value: number) {
+  return roundFte(value).toLocaleString("lt-LT", {
+    minimumFractionDigits: Number.isInteger(roundFte(value)) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 
 async function countExpiringCertificates(): Promise<number> {
   const today = new Date();
@@ -561,12 +1002,16 @@ async function countExpiringCertificates(): Promise<number> {
 
 async function countTrainingProgress(): Promise<{ completed: number; required: number }> {
   const completed = await firstWorkingCount([
+    () => safeCountResult("personnel_trainings", (q) => q.not("completed_at", "is", null).in("status", ["approved", "completed", "valid", "galioja"])),
     () => safeCountResult("employee_trainings", (q) => q.not("completed_at", "is", null)),
     () => safeCountResult("staff_trainings", (q) => q.not("completed_at", "is", null)),
     () => safeCountResult("training_records", (q) => q.not("completed_at", "is", null)),
   ]);
 
   const requiredRows = await firstWorkingCount([
+    () => safeCountResult("training_requirements"),
+    () => safeCountResult("role_training_requirements"),
+    () => safeCountResult("position_training_requirements"),
     () => safeCountResult("employee_trainings"),
     () => safeCountResult("staff_trainings"),
     () => safeCountResult("training_records"),
@@ -575,6 +1020,7 @@ async function countTrainingProgress(): Promise<{ completed: number; required: n
   const roleRequirements = await firstWorkingCount([
     () => safeCountResult("role_training_requirements"),
     () => safeCountResult("position_training_requirements"),
+    () => safeCountResult("training_requirements"),
   ]);
 
   const activeEmployees = await safeCount("organization_members", (q) => q.eq("is_active", true));
@@ -614,104 +1060,887 @@ async function getOrganizationCapacity(): Promise<number | null> {
   }
 }
 
-function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <article className={`rounded-3xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}>{children}</article>;
+async function countTodayShiftEntries(): Promise<number> {
+  const today = toDateInput(new Date());
+
+  return firstWorkingCount([
+    () => safeCountResult("employee_schedules", (q) => q.eq("date", today)),
+    () => safeCountResult("staff_schedules", (q) => q.eq("date", today)),
+    () => safeCountResult("schedules", (q) => q.eq("date", today)),
+  ]);
 }
 
-function StatCard({ icon, title, value, meta, onClick }: { icon: ReactNode; title: string; value: string; meta: string; onClick: () => void }) {
+async function countTodayAbsences(): Promise<number> {
+  const today = toDateInput(new Date());
+
+  return firstWorkingCount([
+    () => safeCountResult("vacation_requests", (q) => q.lte("start_date", today).gte("end_date", today).in("status", ["approved", "confirmed"])),
+    () => safeCountResult("leave_requests", (q) => q.lte("start_date", today).gte("end_date", today).in("status", ["approved", "confirmed"])),
+    () => safeCountResult("absence_requests", (q) => q.lte("start_date", today).gte("end_date", today).in("status", ["approved", "confirmed"])),
+  ]);
+}
+
+async function countIncidentAlerts(): Promise<number> {
+  const from = toDateInput(new Date());
+
+  return firstWorkingCount([
+    () => safeCountResult("handover_logs", (q) => q.gte("created_at", from).in("priority", ["critical", "high", "skubu"])),
+    () => safeCountResult("incidents", (q) => q.gte("created_at", from).in("severity", ["critical", "high"])),
+    () => safeCountResult("resident_incidents", (q) => q.gte("created_at", from).in("severity", ["critical", "high"])),
+  ]);
+}
+
+async function countMedicationAlerts(): Promise<number> {
+  const from = toDateInput(new Date());
+
+  return firstWorkingCount([
+    () => safeCountResult("medication_logs", (q) => q.gte("created_at", from).in("status", ["missed", "error", "late", "problem"])),
+    () => safeCountResult("medicine_safety_events", (q) => q.gte("created_at", from)),
+    () => safeCountResult("medication_safety_events", (q) => q.gte("created_at", from)),
+  ]);
+}
+
+async function countActivityGaps(): Promise<number> {
+  return firstWorkingCount([
+    () => safeCountResult("resident_activities", (q) => q.in("status", ["missed", "absent", "refused"])),
+    () => safeCountResult("activity_attendance", (q) => q.in("status", ["absent", "refused"])),
+  ]);
+}
+
+
+
+
+
+function DashboardTabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
-    <button type="button" onClick={onClick} className="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-emerald-200 hover:shadow-md">
-      <div className="flex items-center gap-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 [&>svg]:h-6 [&>svg]:w-6">{icon}</div>
-        <div>
-          <p className="font-extrabold text-slate-500">{title}</p>
-          <p className="mt-1 text-4xl font-black">
-            {value} <span className="text-sm font-bold text-emerald-700">{meta}</span>
-          </p>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`shrink-0 rounded-xl px-4 py-2 transition ${
+        active
+          ? "bg-[#486b5d] text-white shadow-sm"
+          : "border border-[#dbe6e0] bg-[#f8faf8] hover:bg-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function DashboardSidePanel({
+  pendingLeaves,
+  todayAbsences,
+  expiringCertificates,
+  trainingCompletion,
+  lastUpdated,
+  onVacations,
+  onSchedule,
+  onDocuments,
+}: {
+  pendingLeaves: number;
+  todayAbsences: number;
+  expiringCertificates: number;
+  trainingCompletion: number;
+  lastUpdated: Date | null;
+  onVacations: () => void;
+  onSchedule: () => void;
+  onDocuments: () => void;
+}) {
+  return (
+    <aside className="grid content-start gap-4">
+      <section className="rounded-2xl border border-red-100 bg-red-50 p-5 shadow-sm">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-red-700">
+          Pranešimai
+        </p>
+        <h2 className="mt-1 text-2xl font-black">Reikia dėmesio</h2>
+
+        <div className="mt-4 space-y-3">
+          <RiskAttentionCard
+            title="Atostogų / išvykimo užklausos"
+            text={
+              pendingLeaves > 0
+                ? `${pendingLeaves} užklausos laukia patvirtinimo.`
+                : "Laukiančių užklausų nėra."
+            }
+            badge={pendingLeaves > 0 ? "Laukia" : "Gerai"}
+            tone={pendingLeaves > 0 ? "amber" : "emerald"}
+            onClick={onVacations}
+          />
+          <RiskAttentionCard
+            title="Šiandien neatvykę"
+            text={
+              todayAbsences > 0
+                ? `${todayAbsences} darbuotojų neatvykę šiandien.`
+                : "Šiandien neatvykimų nėra."
+            }
+            badge={todayAbsences > 0 ? "Tikrinti" : "Gerai"}
+            tone={todayAbsences > 0 ? "amber" : "emerald"}
+            onClick={onSchedule}
+          />
+          <RiskAttentionCard
+            title="Dokumentų terminai"
+            text={
+              expiringCertificates > 0
+                ? `${expiringCertificates} darbuotojų dokumentai baigiasi.`
+                : "Baigiančių galioti dokumentų nėra."
+            }
+            badge={expiringCertificates > 0 ? "Įspėjimas" : "Gerai"}
+            tone={expiringCertificates > 0 ? "amber" : "emerald"}
+            onClick={onDocuments}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+          Dienos eiga
+        </p>
+        <h2 className="mt-1 text-2xl font-black">Naujausi įvykiai</h2>
+
+        <div className="mt-4 space-y-3">
+          <TimelineItem color="#047857" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
+          <TimelineItem color="#8a5a13" title="Atostogų / išvykimo užklausos" meta={`${pendingLeaves} laukia sprendimo`} warm />
+          <TimelineItem color="#b91c1c" title="Dokumentų terminai" meta={`${expiringCertificates} įspėjimai`} danger />
+          <TimelineItem color="#2563eb" title="Mokymai" meta={`${trainingCompletion}% užbaigta`} blue />
+        </div>
+      </section>
+    </aside>
+  );
+}
+
+function CompactFteRows({ rows }: { rows: FteRow[] }) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const visibleRows = safeRows.length
+    ? safeRows
+        .slice()
+        .sort((a, b) => b.free - a.free)
+        .slice(0, 4)
+    : [
+        {
+          key: "empty",
+          title: "Pareigybių planas nesuvestas",
+          planned: 0,
+          filled: 0,
+          free: 0,
+          coefficient: "—",
+          status: "Reikia plano",
+          percent: 0,
+          color: "amber" as const,
+        },
+      ];
+
+  return (
+    <div className="mt-5 overflow-hidden rounded-2xl border border-[#dbe6e0]">
+      <div className="hidden grid-cols-[1fr_0.7fr_0.7fr_0.7fr] bg-[#f8faf8] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
+        <div>Pareigybė</div>
+        <div>Užimta</div>
+        <div>Laisva</div>
+        <div>Būsena</div>
+      </div>
+
+      <div className="divide-y divide-[#eef4f1] bg-white">
+        {visibleRows.map((row) => (
+          <div
+            key={row.key}
+            className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1fr_0.7fr_0.7fr_0.7fr] md:items-center"
+          >
+            <div>
+              <b>{row.title}</b>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
+                <div
+                  className={`h-full rounded-full ${
+                    row.color === "emerald"
+                      ? "bg-[#047857]"
+                      : row.color === "red"
+                        ? "bg-red-700"
+                        : "bg-[#ca8a04]"
+                  }`}
+                  style={{ width: `${clamp(row.percent, 0, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="font-black">{formatFte(row.filled)} / {formatFte(row.planned)}</div>
+            <div className={row.free > 0 ? "font-black text-red-700" : "font-black text-emerald-700"}>
+              {formatFte(row.free)} et.
+            </div>
+            <div>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-black ${
+                  row.color === "emerald"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : row.color === "red"
+                      ? "bg-red-50 text-red-700"
+                      : "bg-[#fff9e8] text-[#8a5a13]"
+                }`}
+              >
+                {row.status}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RoundMetric({
+  title,
+  label,
+  value,
+  center,
+  sublabel,
+  color,
+  warm,
+}: {
+  title: string;
+  label: string;
+  value: number;
+  center: string;
+  sublabel?: string;
+  color: string;
+  warm?: boolean;
+}) {
+  return (
+    <article className={`rounded-2xl border p-5 ${
+      warm ? "border-[#ead8a7] bg-[#fff9e8]" : "border-[#dbe6e0] bg-[#f8faf8]"
+    }`}>
+      <div className="mx-auto flex justify-center">
+        <div className="relative flex h-[132px] w-[132px] items-center justify-center">
+          <CircularChart value={value} label={center} stroke={color} size={132} />
+          {sublabel ? (
+            <span className="absolute mt-12 text-[10px] font-black uppercase tracking-[0.12em] text-[#6a7e75]">
+              {sublabel}
+            </span>
+          ) : null}
         </div>
       </div>
+
+      <div className="mt-4 text-center">
+        <p className="text-lg font-black text-[#10251f]">{title}</p>
+        <p className={`mt-1 text-sm font-bold ${warm ? "text-[#8a5a13]" : "text-[#6a7e75]"}`}>{label}</p>
+      </div>
+    </article>
+  );
+}
+
+
+
+function RiskAttentionCard({
+  title,
+  text,
+  badge,
+  tone,
+  onClick,
+}: {
+  title: string;
+  text: string;
+  badge: string;
+  tone: "emerald" | "amber" | "blue" | "red";
+  onClick: () => void;
+}) {
+  const classes =
+    tone === "red"
+      ? "border-red-100 bg-red-50 text-red-700"
+      : tone === "amber"
+        ? "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]"
+        : tone === "blue"
+          ? "border-blue-100 bg-blue-50 text-blue-700"
+          : "border-emerald-100 bg-emerald-50 text-emerald-700";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full rounded-2xl border p-4 text-left transition hover:shadow-sm ${classes}`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-lg font-black text-[#10251f]">{title}</p>
+          <p className="mt-1 text-sm font-bold opacity-80">{text}</p>
+        </div>
+
+        <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black">
+          {badge}
+        </span>
+      </div>
     </button>
   );
 }
 
-function ActionCard({ title, desc, onClick }: { title: string; desc: string; onClick: () => void }) {
+
+function FtePlanningSection({
+  rows,
+  plannedFte,
+  filledFte,
+  freeFte,
+  temporaryUnavailableFte,
+  replacementNeededFte,
+  loading,
+  onOpenPlan,
+  onOpenSchedule,
+}: {
+  rows: FteRow[];
+  plannedFte: number;
+  filledFte: number;
+  freeFte: number;
+  temporaryUnavailableFte: number;
+  replacementNeededFte: number;
+  loading: boolean;
+  onOpenPlan: () => void;
+  onOpenSchedule: () => void;
+}) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const visibleRows = safeRows.length
+    ? safeRows
+    : [
+        {
+          key: "empty",
+          title: "Pareigybių planas nesuvestas",
+          planned: 0,
+          filled: 0,
+          free: 0,
+          coefficient: "—",
+          status: "Reikia plano",
+          percent: 0,
+          color: "amber" as const,
+        },
+      ];
+
   return (
-    <button type="button" onClick={onClick} className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50">
-      <span>
-        <b>{title}</b>
-        <br />
-        <small className="font-semibold text-slate-500">{desc}</small>
+    <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+            Personalo analizė
+          </p>
+          <h2 className="mt-1 text-2xl font-black">Etatų užpildymas</h2>
+          <p className="mt-1 text-sm font-bold text-[#6a7e75]">
+            Planuoti etatai, faktinis etatų užimtumas ir laikinas darbuotojų trūkumas.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onOpenPlan}
+            className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
+          >
+            Personalo planas
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSchedule}
+            className="rounded-xl bg-[#047857] px-4 py-2 text-sm font-black text-white transition hover:bg-[#065f46]"
+          >
+            Grafikas
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        <FteSummaryCard label="Planuota etatų" value={loading ? "…" : formatFte(plannedFte)} />
+        <FteSummaryCard label="Užimta" value={loading ? "…" : formatFte(filledFte)} />
+        <FteSummaryCard label="Laikinai nedirba" value={loading ? "…" : formatFte(temporaryUnavailableFte)} tone="amber" />
+        <FteSummaryCard label="Laisvi etatai" value={loading ? "…" : formatFte(freeFte)} tone={freeFte > 0 ? "red" : "emerald"} />
+      </div>
+
+      <div className="mt-5 overflow-hidden rounded-2xl border border-[#dbe6e0]">
+        <div className="hidden grid-cols-[1.25fr_0.8fr_0.55fr_0.8fr_0.65fr] bg-[#f8faf8] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
+          <div>Pareigybė / grupė</div>
+          <div>Užpildyta</div>
+          <div>Laisva</div>
+          <div>Koeficientas</div>
+          <div>Statusas</div>
+        </div>
+
+        <div className="divide-y divide-[#eef4f1] bg-white">
+          {visibleRows.map((row) => (
+            <div
+              key={row.key}
+              className="grid gap-3 px-4 py-4 text-sm md:grid-cols-[1.25fr_0.8fr_0.55fr_0.8fr_0.65fr] md:items-center"
+            >
+              <div>
+                <div className="font-black text-[#10251f]">{row.title}</div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
+                  <div
+                    className={`h-full rounded-full ${
+                      row.color === "emerald"
+                        ? "bg-[#047857]"
+                        : row.color === "red"
+                          ? "bg-red-700"
+                          : "bg-[#ca8a04]"
+                    }`}
+                    style={{ width: `${clamp(row.percent, 0, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="font-black text-[#10251f]">
+                {formatFte(row.filled)} / {formatFte(row.planned)} et.
+              </div>
+
+              <div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-black ${
+                    row.free > 0
+                      ? "bg-red-50 text-red-700"
+                      : "bg-emerald-50 text-emerald-700"
+                  }`}
+                >
+                  {formatFte(row.free)} et.
+                </span>
+              </div>
+
+              <div className="font-bold text-[#6a7e75]">{row.coefficient}</div>
+
+              <div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-black ${
+                    row.color === "emerald"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : row.color === "red"
+                        ? "bg-red-50 text-red-700"
+                        : "bg-[#fff9e8] text-[#8a5a13]"
+                  }`}
+                >
+                  {row.status}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">
+          Pamainų rizikos
+        </p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-blue-200 bg-white p-4">
+            <div className="font-black text-[#10251f]">
+              {replacementNeededFte > 0
+                ? `Reikia pavaduoti ${formatFte(replacementNeededFte)} et.`
+                : "Pavadavimo poreikio nerasta"}
+            </div>
+            <div className="mt-1 text-sm font-bold text-blue-700/70">
+              Skaičiuojama pagal patvirtintus neatvykimus.
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-blue-200 bg-white p-4">
+            <div className="font-black text-[#10251f]">
+              Tikrinti minimalų pamainos komplektą
+            </div>
+            <div className="mt-1 text-sm font-bold text-blue-700/70">
+              Kitas etapas — lyginti grafiką su minimaliu pareigybių poreikiu.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FteSummaryCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "emerald" | "amber" | "red";
+}) {
+  const classes =
+    tone === "red"
+      ? "border-red-100 bg-red-50 text-red-700"
+      : tone === "amber"
+        ? "border-[#fff0c2] bg-[#fff9e8] text-[#8a5a13]"
+        : "border-[#dbe6e0] bg-[#f8faf8] text-[#10251f]";
+
+  return (
+    <article className={`rounded-2xl border p-4 ${classes}`}>
+      <p className="text-xs font-black uppercase tracking-[0.14em] opacity-70">
+        {label}
+      </p>
+      <p className="mt-2 text-3xl font-black">{value}</p>
+    </article>
+  );
+}
+
+
+function TopMetric({
+  title,
+  value,
+  meta,
+  accent,
+  onClick,
+}: {
+  title: string;
+  value: string;
+  meta: string;
+  accent?: "emerald" | "amber" | "red";
+  onClick: () => void;
+}) {
+  const valueClass = accent === "red"
+    ? "text-[#b91c1c]"
+    : accent === "amber"
+      ? "text-[#8a5a13]"
+      : accent === "emerald"
+        ? "text-[#047857]"
+        : "text-[#10251f]";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-[#f8faf8]"
+    >
+      <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">{title}</p>
+      <p className={`mt-1 text-2xl font-black ${valueClass}`}>{value}</p>
+      <p className="text-xs font-bold text-[#6a7e75]">{meta}</p>
+    </button>
+  );
+}
+
+function CriticalStrip({
+  icon,
+  title,
+  text,
+  color,
+  onClick,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  color: "red" | "amber" | "blue";
+  onClick: () => void;
+}) {
+  const styles = {
+    red: "border-red-100 bg-red-50 text-red-700",
+    amber: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
+    blue: "border-blue-100 bg-blue-50 text-blue-700",
+  }[color];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-2xl border p-4 text-left shadow-sm transition hover:shadow-md ${styles}`}
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white [&>svg]:h-5 [&>svg]:w-5">
+        {icon}
       </span>
-      <ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-emerald-700" />
+      <span>
+        <b className="block text-[#10251f]">{title}</b>
+        <small className="font-bold opacity-80">{text}</small>
+      </span>
     </button>
   );
 }
 
-function ActivityItem({ title, meta }: { title: string; meta: string }) {
-  return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-100 p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 text-slate-600">
-        <CalendarCheck className="h-5 w-5" />
-      </div>
-      <div>
-        <b>{title}</b>
-        <p className="text-sm font-bold text-slate-500">{meta}</p>
-      </div>
-    </div>
-  );
-}
-
-function SummaryCard({ title, value, muted = false }: { title: string; value: string; muted?: boolean }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <p className="font-black text-slate-800">{title}</p>
-      <p className={`mt-1 text-sm font-black ${muted ? "text-slate-600" : "text-emerald-700"}`}>{value}</p>
-    </div>
-  );
-}
-
-function PriorityCard({ title, desc, badge, color }: { title: string; desc: string; badge: string; color: "amber" | "red" | "blue" | "emerald" }) {
-  const colorClass = {
-    amber: "border-amber-100 bg-amber-50 text-amber-700",
+function PriorityActionCard({
+  title,
+  desc,
+  badge,
+  color,
+  onClick,
+}: {
+  title: string;
+  desc: string;
+  badge: string;
+  color: "amber" | "red" | "blue" | "emerald";
+  onClick: () => void;
+}) {
+  const styles = {
+    amber: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
     red: "border-red-100 bg-red-50 text-red-700",
     blue: "border-blue-100 bg-blue-50 text-blue-700",
     emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
   }[color];
 
+  const buttonStyles = {
+    amber: "bg-[#8a5a13]",
+    red: "bg-red-700",
+    blue: "bg-blue-700",
+    emerald: "bg-[#047857]",
+  }[color];
+
   return (
-    <div className={`flex items-start justify-between gap-4 rounded-2xl border p-4 ${colorClass}`}>
-      <div>
-        <p className="font-black text-slate-900">{title}</p>
-        <p className="mt-1 text-sm font-semibold text-slate-600">{desc}</p>
+    <article className={`rounded-2xl border p-4 ${styles}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.14em] opacity-90">Dėmesio</p>
+          <h3 className="mt-1 text-lg font-black text-[#10251f]">{title}</h3>
+          <p className="mt-1 text-sm font-bold opacity-80">{desc}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black">{badge}</span>
       </div>
-      <span className="shrink-0 rounded-full bg-white px-3 py-1 text-sm font-black">{badge}</span>
+
+      <button
+        type="button"
+        onClick={onClick}
+        className={`mt-4 rounded-lg px-4 py-2 text-sm font-black text-white ${buttonStyles}`}
+      >
+        Atidaryti
+      </button>
+    </article>
+  );
+}
+
+function CircularChart({
+  value,
+  label,
+  stroke,
+  size = 96,
+}: {
+  value: number;
+  label: string;
+  stroke: string;
+  size?: number;
+}) {
+  const radius = 48;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (clamp(value, 0, 100) / 100) * circumference;
+
+  return (
+    <div className="relative flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
+      <svg className="-rotate-90" width={size} height={size} viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r={radius} stroke="#e2e8f0" strokeWidth="10" fill="none" />
+        <circle
+          cx="60"
+          cy="60"
+          r={radius}
+          stroke={stroke}
+          strokeWidth="10"
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <span className="absolute text-lg font-black">{label}</span>
     </div>
   );
 }
 
-function ChartCard({ title, value, progress, color, desc }: { title: string; value: string; progress: number; color: string; desc: string }) {
-  const circumference = 301;
-  const offset = circumference - (clamp(progress, 0, 100) / 100) * circumference;
-
+function MiniCircularCard({
+  eyebrow,
+  title,
+  meta,
+  value,
+  label,
+  color,
+  warm,
+  danger,
+}: {
+  eyebrow: string;
+  title: string;
+  meta: string;
+  value: number;
+  label: string;
+  color: string;
+  warm?: boolean;
+  danger?: boolean;
+}) {
   return (
-    <article className="group overflow-hidden rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl">
+    <article className={`rounded-2xl border p-4 ${
+      danger
+        ? "border-red-100 bg-red-50"
+        : warm
+          ? "border-[#ead8a7] bg-[#fff9e8]"
+          : "border-[#dbe6e0] bg-[#f8faf8]"
+    }`}>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-extrabold uppercase tracking-wider text-slate-500">{title}</p>
-          <h3 className="mt-2 text-4xl font-black tracking-tight">{value}</h3>
+          <p className={`text-xs font-black uppercase tracking-[0.14em] ${
+            danger ? "text-red-700" : warm ? "text-[#8a5a13]" : "text-[#6a7e75]"
+          }`}>
+            {eyebrow}
+          </p>
+          <h3 className="mt-1 text-lg font-black">{title}</h3>
+          <p className={`mt-1 text-sm font-bold ${
+            danger ? "text-red-700/75" : warm ? "text-[#7a6a4f]" : "text-[#6a7e75]"
+          }`}>
+            {meta}
+          </p>
         </div>
 
-        <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
-          <svg className="-rotate-90 transform" width="96" height="96" viewBox="0 0 120 120">
-            <circle cx="60" cy="60" r="48" stroke="#e2e8f0" strokeWidth="10" fill="none" />
-            <circle cx="60" cy="60" r="48" stroke={color} strokeWidth="10" strokeLinecap="round" fill="none" strokeDasharray={circumference} strokeDashoffset={offset} />
-          </svg>
-          <span className="absolute text-lg font-black">{value}</span>
+        <CircularChart value={value} label={label} stroke={color} />
+      </div>
+    </article>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4 rounded-xl bg-[#f8faf8] px-4 py-3 text-sm font-black">
+      <span>{label}</span>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+function ShiftBox({ label, value, warn }: { label: string; value: string | number; warn?: boolean }) {
+  return (
+    <div className={`rounded-xl p-4 ${warn ? "bg-[#fff9e8] text-[#8a5a13]" : "bg-[#f8faf8] text-[#10251f]"}`}>
+      <p className="text-xs font-black uppercase tracking-[0.12em] opacity-70">{label}</p>
+      <p className="mt-1 text-2xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function QuickLink({ title, onClick }: { title: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center justify-between rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-left font-black transition hover:bg-[#eef4f1]"
+    >
+      <span>+ {title}</span>
+      <ArrowRight className="h-5 w-5 text-[#6a7e75]" />
+    </button>
+  );
+}
+
+function RiskRow({
+  label,
+  value,
+  hint,
+  color,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  color: "red" | "amber" | "blue";
+  onClick: () => void;
+}) {
+  const styles = {
+    red: "border-red-100 bg-red-50 text-red-700",
+    amber: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
+    blue: "border-blue-100 bg-blue-50 text-blue-700",
+  }[color];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center justify-between gap-4 rounded-xl border p-3 text-left transition hover:shadow-sm ${value > 0 ? styles : "border-[#dbe6e0] bg-[#f8faf8] text-[#486b5d]"}`}
+    >
+      <span>
+        <b className="block text-[#10251f]">{label}</b>
+        <small className="font-bold opacity-75">{hint}</small>
+      </span>
+      <span className="rounded-full bg-white px-3 py-1 text-sm font-black">{value}</span>
+    </button>
+  );
+}
+
+function TimelineItem({
+  color,
+  title,
+  meta,
+  warm,
+  danger,
+  blue,
+}: {
+  color: string;
+  title: string;
+  meta: string;
+  warm?: boolean;
+  danger?: boolean;
+  blue?: boolean;
+}) {
+  return (
+    <div className={`flex gap-3 rounded-xl border p-3 ${
+      danger
+        ? "border-red-100 bg-red-50"
+        : warm
+          ? "border-[#ead8a7] bg-[#fff9e8]"
+          : blue
+            ? "border-blue-100 bg-blue-50"
+            : "border-[#dbe6e0] bg-[#f8faf8]"
+    }`}>
+      <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+      <div>
+        <b>{title}</b>
+        <p className={`text-sm font-bold ${danger ? "text-red-700/75" : warm ? "text-[#7a6a4f]" : blue ? "text-blue-700/75" : "text-[#6a7e75]"}`}>
+          {meta}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function HelpModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
+          <div>
+            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#6a7e75]">
+              Trumpa instrukcija
+            </p>
+            <h1 className="text-3xl font-black text-[#10251f] sm:text-4xl">
+              Kaip naudotis pagrindiniu skydeliu?
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm font-bold leading-6 text-[#6a7e75]">
+              Čia matysi svarbiausią įstaigos dienos informaciją: užimtumą,
+              gyventojus, darbuotojus, užduotis ir įspėjimus.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#dbe6e0] bg-white text-2xl leading-none text-[#486b5d] transition hover:bg-[#eef4f1]"
+            aria-label="Uždaryti instrukciją"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="max-h-[72vh] overflow-y-auto bg-white p-5">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {[
+              ["1", "Rodiklių kortelės", "Viršuje matai gyventojų, darbuotojų, užduočių, atostogų ir dokumentų santrauką."],
+              ["2", "Veiksmų centras", "Čia rodomi darbai, kuriems reikia sprendimo arba greitos reakcijos."],
+              ["3", "Rodiklių apžvalga", "Vizualiai parodo kambarių užimtumą, mokymų būklę, užduotis ir rizikas."],
+              ["4", "Greiti veiksmai", "Leidžia iškart kurti gyventoją, darbuotoją, užduotį arba atsidaryti auditą."],
+            ].map(([number, title, desc]) => (
+              <div key={number} className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f7ef] text-lg font-black text-[#047857]">
+                    {number}
+                  </div>
+                  <h3 className="text-xl font-black text-[#10251f]">{title}</h3>
+                </div>
+                <p className="text-sm font-bold leading-6 text-[#6a7e75]">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end border-t border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#065f46]"
+          >
+            Supratau
+          </button>
         </div>
       </div>
-
-      <p className="mt-4 text-sm font-semibold text-slate-500">{desc}</p>
-    </article>
+    </div>
   );
 }
 

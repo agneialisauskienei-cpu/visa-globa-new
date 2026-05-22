@@ -39,6 +39,7 @@ import VacationRequests from "./components/Vacations/VacationRequests";
 type TabKey =
   | "overview"
   | "employees"
+  | "fte"
   | "access"
   | "docs"
   | "trainings"
@@ -119,6 +120,47 @@ type ScheduleEntry = {
   end_datetime?: string | null;
   status?: string | null;
   note?: string | null;
+};
+
+type PersonnelPosition = {
+  id: string;
+  organization_id?: string | null;
+  department: string | null;
+  position_name: string | null;
+  planned_fte: number | null;
+  coefficient_min: number | null;
+  coefficient_max: number | null;
+  minimum_day_shift: number | null;
+  minimum_night_shift: number | null;
+  active: boolean | null;
+  created_at?: string | null;
+};
+
+type PositionPlanForm = {
+  id: string;
+  department: string;
+  position_name: string;
+  planned_fte: number;
+  coefficient_min: string;
+  coefficient_max: string;
+  minimum_day_shift: number;
+  minimum_night_shift: number;
+  active: boolean;
+};
+
+type FtePlanRow = {
+  id: string;
+  department: string;
+  title: string;
+  planned: number;
+  filled: number;
+  free: number;
+  coefficient: string;
+  minimumDayShift: number;
+  minimumNightShift: number;
+  percent: number;
+  status: "Užpildyta" | "Stebėti" | "Trūksta";
+  tone: "emerald" | "amber" | "red";
 };
 
 type VacationForm = {
@@ -259,6 +301,7 @@ const EXTRA_PERMISSIONS = [
 const tabs: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
   { key: "overview", label: "Apžvalga", icon: ShieldCheck },
   { key: "employees", label: "Darbuotojai", icon: Users },
+  { key: "fte", label: "Etatų planas", icon: BriefcaseBusiness },
   { key: "schedule", label: "Grafikas", icon: CalendarDays },
   { key: "vacations", label: "Atostogos", icon: Umbrella },
   { key: "candidates", label: "Kandidatai", icon: UserPlus },
@@ -289,6 +332,181 @@ const initialNewEmployeeForm: NewEmployeeForm = {
   send_invite: true,
   candidate_id: "",
 };
+
+const initialPositionPlanForm: PositionPlanForm = {
+  id: "",
+  department: "",
+  position_name: "",
+  planned_fte: 1,
+  coefficient_min: "",
+  coefficient_max: "",
+  minimum_day_shift: 0,
+  minimum_night_shift: 0,
+  active: true,
+};
+
+
+function roundFte(value: number) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function formatFte(value: number) {
+  const rounded = roundFte(value);
+
+  return rounded.toLocaleString("lt-LT", {
+    minimumFractionDigits: Number.isInteger(rounded) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function normalizePlanText(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function positionGroupKey(employee: Employee) {
+  const text = normalizePlanText(
+    [employee.staff_type, employee.department, employee.position, employee.role].filter(Boolean).join(" "),
+  );
+
+  if (/slaug|nurse|medic|sveikat/.test(text)) return "slauga";
+  if (/social|soc|glob|uzimt/.test(text)) return "socialine sritis";
+  if (/virtuv|maitin|vir|kitchen|cook/.test(text)) return "maitinimas";
+  if (/uk|ūk|techn|sandel|valy|maintenance/.test(text)) return "ukis";
+  if (/admin|direkt|vadov|owner/.test(text)) return "administracija";
+
+  return text || "kita";
+}
+
+function groupLabel(key: string) {
+  const labels: Record<string, string> = {
+    slauga: "Slauga",
+    "socialine sritis": "Socialinė sritis",
+    maitinimas: "Maitinimas",
+    ukis: "Ūkis",
+    administracija: "Administracija",
+    kita: "Kita",
+  };
+
+  return labels[key] || key;
+}
+
+function employeeMatchesPosition(employee: Employee, position: PersonnelPosition) {
+  const positionName = normalizePlanText(position.position_name);
+  const department = normalizePlanText(position.department);
+  const employeePosition = normalizePlanText(employee.position);
+  const employeeDepartment = normalizePlanText(employee.department);
+  const employeeStaffType = normalizePlanText(employee.staff_type);
+  const group = positionGroupKey(employee);
+
+  if (positionName && employeePosition && employeePosition.includes(positionName)) return true;
+  if (positionName && employeeStaffType && employeeStaffType.includes(positionName)) return true;
+  if (department && employeeDepartment && employeeDepartment.includes(department)) return true;
+  if (department && group && group.includes(department)) return true;
+
+  return false;
+}
+
+function coefficientText(position: PersonnelPosition) {
+  const min = Number(position.coefficient_min || 0);
+  const max = Number(position.coefficient_max || 0);
+
+  if (min > 0 && max > 0) return `${min.toFixed(2)} – ${max.toFixed(2)}`;
+  if (min > 0) return min.toFixed(2);
+  if (max > 0) return max.toFixed(2);
+
+  return "—";
+}
+
+function makeFtePlanRow({
+  id,
+  department,
+  title,
+  planned,
+  filled,
+  coefficient,
+  minimumDayShift,
+  minimumNightShift,
+}: {
+  id: string;
+  department: string;
+  title: string;
+  planned: number;
+  filled: number;
+  coefficient: string;
+  minimumDayShift: number;
+  minimumNightShift: number;
+}): FtePlanRow {
+  const plannedFte = roundFte(planned);
+  const filledFte = roundFte(filled);
+  const free = roundFte(Math.max(0, plannedFte - filledFte));
+  const percent = plannedFte > 0 ? Math.round((filledFte / plannedFte) * 100) : filledFte > 0 ? 100 : 0;
+  const tone = percent >= 90 ? "emerald" : percent >= 70 ? "amber" : "red";
+  const status = percent >= 90 ? "Užpildyta" : percent >= 70 ? "Stebėti" : "Trūksta";
+
+  return {
+    id,
+    department,
+    title,
+    planned: plannedFte,
+    filled: filledFte,
+    free,
+    coefficient,
+    minimumDayShift: roundFte(minimumDayShift),
+    minimumNightShift: roundFte(minimumNightShift),
+    percent,
+    status,
+    tone,
+  };
+}
+
+function buildFtePlanRows(positions: PersonnelPosition[], employees: Employee[]): FtePlanRow[] {
+  const activePositions = positions.filter((position) => position.active !== false);
+
+  if (activePositions.length > 0) {
+    return activePositions.map((position) => {
+      const filled = employees
+        .filter((employee) => employeeMatchesPosition(employee, position))
+        .reduce((sum, employee) => sum + Number(employee.employment_rate || 1), 0);
+
+      return makeFtePlanRow({
+        id: position.id,
+        department: position.department || "",
+        title: position.position_name || "Pareigybė",
+        planned: Number(position.planned_fte || 0),
+        filled,
+        coefficient: coefficientText(position),
+        minimumDayShift: Number(position.minimum_day_shift || 0),
+        minimumNightShift: Number(position.minimum_night_shift || 0),
+      });
+    });
+  }
+
+  const groups = new Map<string, { title: string; filled: number }>();
+
+  for (const employee of employees) {
+    const key = positionGroupKey(employee);
+    const current = groups.get(key) || { title: groupLabel(key), filled: 0 };
+    current.filled += Number(employee.employment_rate || 1);
+    groups.set(key, current);
+  }
+
+  return Array.from(groups.entries()).map(([key, row]) =>
+    makeFtePlanRow({
+      id: key,
+      department: row.title,
+      title: row.title,
+      planned: Math.ceil(row.filled),
+      filled: row.filled,
+      coefficient: "—",
+      minimumDayShift: 0,
+      minimumNightShift: 0,
+    }),
+  );
+}
 
 function fmt(value?: string | null) {
   if (!value) return "—";
@@ -528,6 +746,8 @@ export default function TeamPage() {
   });
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [personnelPositions, setPersonnelPositions] = useState<PersonnelPosition[]>([]);
+  const [positionPlanForm, setPositionPlanForm] = useState<PositionPlanForm>(initialPositionPlanForm);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalMessage, setCreateModalMessage] = useState("");
@@ -589,6 +809,7 @@ export default function TeamPage() {
         invitesResult,
         trainingsResult,
         credentialsResult,
+        positionsResult,
       ] = await Promise.all([
         supabase
           .from("organization_members")
@@ -617,6 +838,12 @@ export default function TeamPage() {
           .select("id, employee_id, type, number, expires_at")
           .eq("organization_id", orgId)
           .order("expires_at", { ascending: true }),
+        supabase
+          .from("personnel_positions")
+          .select("id, organization_id, department, position_name, planned_fte, coefficient_min, coefficient_max, minimum_day_shift, minimum_night_shift, active, created_at")
+          .eq("organization_id", orgId)
+          .order("department", { ascending: true })
+          .order("position_name", { ascending: true }),
       ]);
 
       if (employeesResult.error) throw employeesResult.error;
@@ -717,6 +944,8 @@ export default function TeamPage() {
 
       if (!trainingsResult.error) setTrainings((trainingsResult.data as Training[]) || []);
       if (!credentialsResult.error) setCredentials((credentialsResult.data as Credential[]) || []);
+      if (!positionsResult.error) setPersonnelPositions((positionsResult.data as PersonnelPosition[]) || []);
+      if (positionsResult.error) setPersonnelPositions([]);
     } catch (error) {
       const readable = getReadableError(error);
 
@@ -1121,6 +1350,38 @@ export default function TeamPage() {
   }, [employees]);
   const archivedEmployees = employees.filter((employee) => employee.is_archived === true);
 
+  const ftePlanRows = useMemo(
+    () => buildFtePlanRows(personnelPositions, activeEmployees),
+    [personnelPositions, activeEmployees],
+  );
+
+  const fteTotals = useMemo(() => {
+    const planned = roundFte(ftePlanRows.reduce((sum, row) => sum + row.planned, 0));
+    const filled = roundFte(ftePlanRows.reduce((sum, row) => sum + row.filled, 0));
+    const free = roundFte(Math.max(0, planned - filled));
+    const temporaryUnavailable = roundFte(
+      vacations
+        .filter((request) => request.status === "approved")
+        .filter((request) => {
+          const today = toDateInput(new Date());
+          return request.start_date <= today && request.end_date >= today;
+        })
+        .reduce((sum, request) => {
+          const employee = employees.find((item) => item.user_id === request.employee_id);
+          return sum + Number(employee?.employment_rate || 1);
+        }, 0),
+    );
+
+    return {
+      planned,
+      filled,
+      free,
+      temporaryUnavailable,
+      replacementNeeded: temporaryUnavailable,
+      percent: planned > 0 ? Math.round((filled / planned) * 100) : 0,
+    };
+  }, [ftePlanRows, vacations, employees]);
+
   const scheduleDays = useMemo(() => {
     const first = new Date(scheduleMonth.getFullYear(), scheduleMonth.getMonth(), 1);
     const last = new Date(scheduleMonth.getFullYear(), scheduleMonth.getMonth() + 1, 0);
@@ -1385,6 +1646,111 @@ export default function TeamPage() {
     }
   }
 
+
+  function startCreatePositionPlan() {
+    setPositionPlanForm(initialPositionPlanForm);
+    setMessage("");
+    changeTab("fte");
+  }
+
+  function editPositionPlan(position: PersonnelPosition) {
+    setPositionPlanForm({
+      id: position.id || "",
+      department: position.department || "",
+      position_name: position.position_name || "",
+      planned_fte: Number(position.planned_fte || 0),
+      coefficient_min: position.coefficient_min != null ? String(position.coefficient_min) : "",
+      coefficient_max: position.coefficient_max != null ? String(position.coefficient_max) : "",
+      minimum_day_shift: Number(position.minimum_day_shift || 0),
+      minimum_night_shift: Number(position.minimum_night_shift || 0),
+      active: position.active !== false,
+    });
+    setMessage("");
+    changeTab("fte");
+  }
+
+  async function savePositionPlan() {
+    if (!organizationId) {
+      setMessage("Nepavyko nustatyti įstaigos.");
+      return;
+    }
+
+    if (!positionPlanForm.position_name.trim()) {
+      setMessage("Įrašyk pareigybės pavadinimą.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+
+    const payload = {
+      organization_id: organizationId,
+      department: positionPlanForm.department.trim() || null,
+      position_name: positionPlanForm.position_name.trim(),
+      planned_fte: Number(positionPlanForm.planned_fte || 0),
+      coefficient_min: positionPlanForm.coefficient_min ? Number(positionPlanForm.coefficient_min) : null,
+      coefficient_max: positionPlanForm.coefficient_max ? Number(positionPlanForm.coefficient_max) : null,
+      minimum_day_shift: Number(positionPlanForm.minimum_day_shift || 0),
+      minimum_night_shift: Number(positionPlanForm.minimum_night_shift || 0),
+      active: positionPlanForm.active,
+    };
+
+    try {
+      if (positionPlanForm.id) {
+        const { error } = await supabase
+          .from("personnel_positions")
+          .update(payload)
+          .eq("organization_id", organizationId)
+          .eq("id", positionPlanForm.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("personnel_positions").insert(payload);
+        if (error) throw error;
+      }
+
+      setPositionPlanForm(initialPositionPlanForm);
+      setMessage("Etatų planas išsaugotas.");
+      await loadAll();
+      changeTab("fte");
+    } catch (error) {
+      const readable = getReadableError(error);
+      if (readable.includes("personnel_positions") || readable.includes("schema cache") || readable.includes("does not exist")) {
+        setMessage("Nerasta `personnel_positions` lentelė. Paleisk SQL migraciją etatų planui.");
+      } else {
+        setMessage(readable);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deletePositionPlan(positionId: string) {
+    if (!organizationId || !positionId) return;
+    const ok = window.confirm("Ar tikrai ištrinti šią pareigybės plano eilutę?");
+    if (!ok) return;
+
+    setSaving(true);
+    setMessage("");
+
+    try {
+      const { error } = await supabase
+        .from("personnel_positions")
+        .delete()
+        .eq("organization_id", organizationId)
+        .eq("id", positionId);
+
+      if (error) throw error;
+
+      setPersonnelPositions((current) => current.filter((position) => position.id !== positionId));
+      setMessage("Pareigybės plano eilutė ištrinta.");
+    } catch (error) {
+      setMessage(getReadableError(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const dashboardActivity = [
     {
       title: "Darbuotojų registras atnaujintas",
@@ -1495,7 +1861,7 @@ export default function TeamPage() {
           </div>
         ) : null}
 
-        <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
+        <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
           <button
             type="button"
             onClick={() => changeTab("employees")}
@@ -1504,6 +1870,16 @@ export default function TeamPage() {
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">Darbuotojai</p>
             <p className="mt-1 text-2xl font-black text-[#10251f]">{activeEmployees.length}</p>
             <p className="mt-1 text-xs font-bold text-slate-500">{employees.length} registre · {archivedEmployees.length} archyve</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeTab("fte")}
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+          >
+            <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">Etatai</p>
+            <p className="mt-1 text-2xl font-black text-[#8a5a13]">{formatFte(fteTotals.free)}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">laisva iš {formatFte(fteTotals.planned)} et.</p>
           </button>
 
           <button
@@ -1792,6 +2168,22 @@ export default function TeamPage() {
               />
             ) : null}
           </Card>
+        )}
+
+        {tab === "fte" && (
+          <FtePlanModule
+            employees={activeEmployees}
+            positions={personnelPositions}
+            rows={ftePlanRows}
+            totals={fteTotals}
+            form={positionPlanForm}
+            saving={saving}
+            onFormChange={setPositionPlanForm}
+            onNew={startCreatePositionPlan}
+            onEdit={editPositionPlan}
+            onSave={() => void savePositionPlan()}
+            onDelete={(id) => void deletePositionPlan(id)}
+          />
         )}
 
         {tab === "access" && <StaffTypesModule />}
@@ -2112,6 +2504,342 @@ export default function TeamPage() {
         }
       `}</style>
     </main>
+  );
+}
+
+
+function FtePlanModule({
+  employees,
+  positions,
+  rows,
+  totals,
+  form,
+  saving,
+  onFormChange,
+  onNew,
+  onEdit,
+  onSave,
+  onDelete,
+}: {
+  employees: Employee[];
+  positions: PersonnelPosition[];
+  rows: FtePlanRow[];
+  totals: {
+    planned: number;
+    filled: number;
+    free: number;
+    temporaryUnavailable: number;
+    replacementNeeded: number;
+    percent: number;
+  };
+  form: PositionPlanForm;
+  saving: boolean;
+  onFormChange: (form: PositionPlanForm) => void;
+  onNew: () => void;
+  onEdit: (position: PersonnelPosition) => void;
+  onSave: () => void;
+  onDelete: (id: string) => void;
+}) {
+  const planIsMissing = positions.length === 0;
+
+  return (
+    <Card>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+            Personalo planas
+          </p>
+          <h2 className="mt-1 text-3xl font-black tracking-tight text-[#10251f]">
+            Etatų planas ir FTE
+          </h2>
+          <p className="mt-1 max-w-3xl font-semibold text-slate-500">
+            Čia suvedami planuojami etatai, koeficientai ir minimalus pamainų poreikis. Faktinis užimtumas skaičiuojamas iš darbuotojų etato dalių.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onNew}
+          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#065f46]"
+        >
+          <Plus className="h-4 w-4" />
+          Nauja pareigybė
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        <FteSmallStat label="Planuota etatų" value={formatFte(totals.planned)} />
+        <FteSmallStat label="Užimta" value={formatFte(totals.filled)} />
+        <FteSmallStat label="Laisvi etatai" value={formatFte(totals.free)} tone={totals.free > 0 ? "red" : "emerald"} />
+        <FteSmallStat label="Laikinai nedirba" value={formatFte(totals.temporaryUnavailable)} tone={totals.temporaryUnavailable > 0 ? "amber" : "emerald"} />
+      </div>
+
+      {planIsMissing ? (
+        <div className="mt-5 rounded-2xl border border-[#ead8a7] bg-[#fff9e8] p-4 text-sm font-bold text-[#8a5a13]">
+          Etatų planas dar nesuvestas. Žemiau matomi preliminarūs skaičiai pagal esamus darbuotojus. Įrašyk planuojamas pareigybes, kad sistema galėtų tiksliai skaičiuoti trūkumus.
+        </div>
+      ) : null}
+
+      <section className="mt-5 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <Field label="Padalinys">
+            <input
+              value={form.department}
+              onChange={(event) => onFormChange({ ...form, department: event.target.value })}
+              className="input"
+              placeholder="Pvz., Slauga"
+            />
+          </Field>
+
+          <Field label="Pareigybė">
+            <input
+              value={form.position_name}
+              onChange={(event) => onFormChange({ ...form, position_name: event.target.value })}
+              className="input"
+              placeholder="Pvz., Slaugytojas"
+            />
+          </Field>
+
+          <Field label="Planuota etatų">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.planned_fte}
+              onChange={(event) => onFormChange({ ...form, planned_fte: Number(event.target.value) })}
+              className="input"
+            />
+          </Field>
+
+          <Field label="Koef. nuo">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.coefficient_min}
+              onChange={(event) => onFormChange({ ...form, coefficient_min: event.target.value })}
+              className="input"
+              placeholder="1.05"
+            />
+          </Field>
+
+          <Field label="Koef. iki">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.coefficient_max}
+              onChange={(event) => onFormChange({ ...form, coefficient_max: event.target.value })}
+              className="input"
+              placeholder="1.35"
+            />
+          </Field>
+
+          <div className="flex items-end gap-2">
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="h-[50px] flex-1 rounded-2xl bg-[#047857] px-4 font-black text-white transition hover:bg-[#065f46] disabled:opacity-60"
+            >
+              {saving ? "Saugoma..." : form.id ? "Atnaujinti" : "Pridėti"}
+            </button>
+            {form.id ? (
+              <button
+                type="button"
+                onClick={onNew}
+                className="h-[50px] rounded-2xl border border-[#dbe6e0] bg-white px-4 font-black text-[#486b5d]"
+              >
+                Naujas
+              </button>
+            ) : null}
+          </div>
+
+          <Field label="Min. dienos pamaina">
+            <input
+              type="number"
+              min="0"
+              step="0.25"
+              value={form.minimum_day_shift}
+              onChange={(event) => onFormChange({ ...form, minimum_day_shift: Number(event.target.value) })}
+              className="input"
+            />
+          </Field>
+
+          <Field label="Min. nakties pamaina">
+            <input
+              type="number"
+              min="0"
+              step="0.25"
+              value={form.minimum_night_shift}
+              onChange={(event) => onFormChange({ ...form, minimum_night_shift: Number(event.target.value) })}
+              className="input"
+            />
+          </Field>
+
+          <label className="flex items-center gap-3 rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 font-black text-[#486b5d] md:col-span-2 xl:col-span-2">
+            <input
+              type="checkbox"
+              checked={form.active}
+              onChange={(event) => onFormChange({ ...form, active: event.target.checked })}
+              className="h-5 w-5 accent-emerald-700"
+            />
+            Aktyvi pareigybė
+          </label>
+        </div>
+      </section>
+
+      <div className="mt-5 overflow-hidden rounded-2xl border border-[#dbe6e0]">
+        <div className="hidden grid-cols-[1.2fr_0.65fr_0.65fr_0.65fr_0.85fr_0.7fr] bg-[#f8faf8] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] lg:grid">
+          <div>Pareigybė</div>
+          <div>Užpildyta</div>
+          <div>Laisva</div>
+          <div>Koef.</div>
+          <div>Min. pamaina</div>
+          <div>Veiksmai</div>
+        </div>
+
+        <div className="divide-y divide-[#eef4f1] bg-white">
+          {rows.length === 0 ? (
+            <EmptyState text="Etatų plano eilučių dar nėra." />
+          ) : (
+            rows.map((row) => {
+              const source = positions.find((position) => position.id === row.id);
+
+              return (
+                <div
+                  key={row.id}
+                  className="grid gap-3 px-4 py-4 text-sm lg:grid-cols-[1.2fr_0.65fr_0.65fr_0.65fr_0.85fr_0.7fr] lg:items-center"
+                >
+                  <div>
+                    <div className="font-black text-[#10251f]">{row.title}</div>
+                    <div className="mt-1 text-xs font-bold text-[#6a7e75]">{row.department || "Padalinys nenurodytas"}</div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
+                      <div
+                        className={`h-full rounded-full ${
+                          row.tone === "emerald"
+                            ? "bg-[#047857]"
+                            : row.tone === "red"
+                              ? "bg-red-700"
+                              : "bg-[#ca8a04]"
+                        }`}
+                        style={{ width: `${Math.max(0, Math.min(100, row.percent))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="font-black">{formatFte(row.filled)} / {formatFte(row.planned)} et.</div>
+
+                  <div>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-black ${
+                        row.free > 0 ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {formatFte(row.free)} et.
+                    </span>
+                  </div>
+
+                  <div className="font-bold text-[#6a7e75]">{row.coefficient}</div>
+
+                  <div className="text-xs font-bold text-[#6a7e75]">
+                    Diena: {formatFte(row.minimumDayShift)} · Naktis: {formatFte(row.minimumNightShift)}
+                    <div className="mt-1">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-black ${
+                          row.tone === "emerald"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : row.tone === "red"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-[#fff9e8] text-[#8a5a13]"
+                        }`}
+                      >
+                        {row.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {source ? (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(source)}
+                        className="rounded-xl border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
+                      >
+                        Redaguoti
+                      </button>
+                    ) : null}
+                    {source ? (
+                      <button
+                        type="button"
+                        onClick={() => onDelete(source.id)}
+                        className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-black text-red-700"
+                      >
+                        Ištrinti
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <section className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">
+          Pamainų rizikos
+        </p>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-blue-200 bg-white p-4">
+            <div className="font-black text-[#10251f]">
+              {totals.replacementNeeded > 0
+                ? `Reikia pavaduoti ${formatFte(totals.replacementNeeded)} et.`
+                : "Pavadavimo poreikio nerasta"}
+            </div>
+            <div className="mt-1 text-sm font-bold text-blue-700/70">
+              Skaičiuojama pagal šiandien patvirtintus neatvykimus.
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-blue-200 bg-white p-4">
+            <div className="font-black text-[#10251f]">
+              Minimalios pamainos: {rows.reduce((sum, row) => sum + row.minimumDayShift, 0)} d. / {rows.reduce((sum, row) => sum + row.minimumNightShift, 0)} n.
+            </div>
+            <div className="mt-1 text-sm font-bold text-blue-700/70">
+              Kitas žingsnis — lyginti grafiką su minimaliu pareigybių poreikiu.
+            </div>
+          </div>
+        </div>
+      </section>
+    </Card>
+  );
+}
+
+function FteSmallStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "emerald" | "amber" | "red";
+}) {
+  const classes =
+    tone === "red"
+      ? "border-red-100 bg-red-50 text-red-700"
+      : tone === "amber"
+        ? "border-[#fff0c2] bg-[#fff9e8] text-[#8a5a13]"
+        : tone === "emerald"
+          ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+          : "border-[#dbe6e0] bg-[#f8faf8] text-[#10251f]";
+
+  return (
+    <article className={`rounded-2xl border p-4 ${classes}`}>
+      <p className="text-xs font-black uppercase tracking-[0.14em] opacity-70">{label}</p>
+      <p className="mt-2 text-3xl font-black">{value}</p>
+    </article>
   );
 }
 

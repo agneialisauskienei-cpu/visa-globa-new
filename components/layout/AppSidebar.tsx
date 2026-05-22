@@ -214,7 +214,7 @@ export default function AppSidebar() {
     access?.role === "super_admin"
       ? "/admin"
       : access?.role === "employee"
-        ? "/employee-dashboard"
+        ? "/dashboard"
         : "/dashboard"
 
   const visibleMenu = useMemo(() => {
