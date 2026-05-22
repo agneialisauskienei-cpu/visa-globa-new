@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -23,13 +23,6 @@ type Employee = {
   position?: string | null;
   department?: string | null;
   staff_type?: string | null;
-  employment_start_date?: string | null;
-  employment_end_date?: string | null;
-  employment_rate?: number | string | null;
-  fte?: number | string | null;
-  employment_fte?: number | string | null;
-  weekly_hours?: number | string | null;
-  contract_weekly_hours?: number | string | null;
 };
 
 type VacationRequest = {
@@ -64,29 +57,6 @@ type FilterKey =
   | "risk"
   | "history";
 
-
-
-type VacationBalanceAdjustment = {
-  id: string;
-  employee_id: string;
-  year: number;
-  type: "initial" | "carry_over" | "manual";
-  days: number;
-  reason: string;
-  created_at: string;
-};
-
-type VacationBalanceDraft = {
-  employee_id: string;
-  year: number;
-  initialDays: string;
-  carryOverDays: string;
-  manualDays: string;
-  reason: string;
-};
-
-const BALANCE_STORAGE_KEY = "vacationBalanceAdjustments.v1";
-
 type Props = {
   employees: Employee[];
   requests: VacationRequest[];
@@ -112,79 +82,6 @@ function toDateInput(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-
-function parseNumber(value: number | string | null | undefined) {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(String(value).replace(",", ".").trim());
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function yearStart(year: number) {
-  return new Date(year, 0, 1);
-}
-
-function yearEnd(year: number) {
-  return new Date(year, 11, 31);
-}
-
-function clampDateToYear(date: Date, year: number) {
-  if (date < yearStart(year)) return yearStart(year);
-  if (date > yearEnd(year)) return yearEnd(year);
-  return date;
-}
-
-function diffDaysInclusive(start: Date, end: Date) {
-  const day = 24 * 60 * 60 * 1000;
-  const from = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
-  const to = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
-  return Math.max(0, Math.floor((to - from) / day) + 1);
-}
-
-function daysInYear(year: number) {
-  return diffDaysInclusive(yearStart(year), yearEnd(year));
-}
-
-function currentVacationYear() {
-  return new Date().getFullYear();
-}
-
-function getEmploymentRate(employee?: Employee | null) {
-  const raw =
-    parseNumber(employee?.employment_rate) ??
-    parseNumber(employee?.employment_fte) ??
-    parseNumber(employee?.fte);
-  if (raw === null || raw <= 0) return 1;
-  return Math.min(raw, 2);
-}
-
-function getEmployeeStartDate(employee?: Employee | null) {
-  const value = String(employee?.employment_start_date || "").trim();
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function getEmployeeEndDate(employee?: Employee | null) {
-  const value = String(employee?.employment_end_date || "").trim();
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function accruedVacationDays(employee: Employee | null | undefined, annualDays: number, year: number) {
-  const today = new Date();
-  const calculationEnd = today.getFullYear() === year ? today : yearEnd(year);
-  const employmentStart = getEmployeeStartDate(employee);
-  const employmentEnd = getEmployeeEndDate(employee);
-  const start = clampDateToYear(employmentStart && employmentStart > yearStart(year) ? employmentStart : yearStart(year), year);
-  const endCandidate = employmentEnd && employmentEnd < calculationEnd ? employmentEnd : calculationEnd;
-  const end = clampDateToYear(endCandidate, year);
-  if (end < start) return 0;
-  const fte = getEmploymentRate(employee);
-  const ratio = diffDaysInclusive(start, end) / daysInYear(year);
-  return Math.round(annualDays * ratio * fte * 100) / 100;
 }
 
 function datesBetween(start: string, end: string) {
@@ -402,77 +299,39 @@ export default function VacationRequests({
     null,
   );
   const filter = activeFilter || localFilter;
+  const [optimisticRequests, setOptimisticRequests] = useState<VacationRequest[]>([]);
   const employeeMap = useMemo(
     () => new Map(employees.map((employee) => [employee.user_id, employee])),
     [employees],
   );
-  const [balanceYear, setBalanceYear] = useState(() => currentVacationYear());
-  const [balanceAdjustments, setBalanceAdjustments] = useState<VacationBalanceAdjustment[]>([]);
-  const [balanceDraft, setBalanceDraft] = useState<VacationBalanceDraft>(() => ({
-    employee_id: form.employee_id || employees[0]?.user_id || "",
-    year: currentVacationYear(),
-    initialDays: "",
-    carryOverDays: "",
-    manualDays: "",
-    reason: "Pradinis likutis / korekcija",
-  }));
 
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(BALANCE_STORAGE_KEY);
-      if (stored) setBalanceAdjustments(JSON.parse(stored));
-    } catch {}
-  }, []);
+  const allRequests = useMemo(() => {
+    const map = new Map<string, VacationRequest>();
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(BALANCE_STORAGE_KEY, JSON.stringify(balanceAdjustments));
-    } catch {}
-  }, [balanceAdjustments]);
+    optimisticRequests.forEach((request) => {
+      map.set(request.id, request);
+    });
 
-  useEffect(() => {
-    if (!balanceDraft.employee_id && form.employee_id) {
-      setBalanceDraft((prev) => ({ ...prev, employee_id: form.employee_id }));
-    }
-  }, [form.employee_id, balanceDraft.employee_id]);
+    requests.forEach((request) => {
+      map.set(request.id, request);
+    });
 
-  function saveBalanceDraft() {
-    const employeeId = balanceDraft.employee_id || form.employee_id;
-    if (!employeeId) return;
-    const year = balanceYear;
-    const reason = balanceDraft.reason.trim() || "Rankinė atostogų likučio korekcija";
-    const rows: VacationBalanceAdjustment[] = [];
-    const initial = parseNumber(balanceDraft.initialDays);
-    const carryOver = parseNumber(balanceDraft.carryOverDays);
-    const manual = parseNumber(balanceDraft.manualDays);
+    return Array.from(map.values()).sort((a, b) => {
+      const statusOrder: Record<string, number> = {
+        submitted: 0,
+        approved: 1,
+        rejected: 2,
+      };
 
-    if (initial !== null) {
-      rows.push({ id: `${Date.now()}-initial-${employeeId}`, employee_id: employeeId, year, type: "initial", days: initial, reason, created_at: new Date().toISOString() });
-    }
-    if (carryOver !== null) {
-      rows.push({ id: `${Date.now()}-carry-${employeeId}`, employee_id: employeeId, year, type: "carry_over", days: carryOver, reason, created_at: new Date().toISOString() });
-    }
-    if (manual !== null && manual !== 0) {
-      rows.push({ id: `${Date.now()}-manual-${employeeId}`, employee_id: employeeId, year, type: "manual", days: manual, reason, created_at: new Date().toISOString() });
-    }
-    if (!rows.length) return;
+      const aStatus = statusOrder[normalizedStatus(a.status)] ?? 9;
+      const bStatus = statusOrder[normalizedStatus(b.status)] ?? 9;
 
-    setBalanceAdjustments((prev) => [
-      ...prev.filter(
-        (item) =>
-          !(item.employee_id === employeeId && item.year === year && rows.some((row) => row.type === item.type && row.type !== "manual")),
-      ),
-      ...rows,
-    ]);
-    setBalanceYear(year);
-    setBalanceDraft((prev) => ({ ...prev, initialDays: "", carryOverDays: "", manualDays: "" }));
-  }
-
-  function removeBalanceAdjustment(id: string) {
-    const ok = window.confirm("Ar tikrai pašalinti šią korekciją? Veiksmas bus matomas tik šiame įrenginyje, kol nėra prijungta DB lentelė.");
-    if (!ok) return;
-    setBalanceAdjustments((prev) => prev.filter((item) => item.id !== id));
-  }
+      if (aStatus !== bStatus) return aStatus - bStatus;
+      return String(b.created_at || b.start_date || "").localeCompare(
+        String(a.created_at || a.start_date || ""),
+      );
+    });
+  }, [requests, optimisticRequests]);
 
   function update<K extends keyof VacationForm>(
     key: K,
@@ -501,7 +360,7 @@ export default function VacationRequests({
 
   function usedAnnualDays(employee?: Employee | null) {
     if (!employee) return 0;
-    return requests
+    return allRequests
       .filter(
         (request) =>
           request.employee_id === employee.user_id &&
@@ -513,7 +372,7 @@ export default function VacationRequests({
 
   function reservedAnnualDays(employee?: Employee | null) {
     if (!employee) return 0;
-    return requests
+    return allRequests
       .filter(
         (request) =>
           request.employee_id === employee.user_id &&
@@ -523,45 +382,19 @@ export default function VacationRequests({
       .reduce((sum, request) => sum + requestDays(request), 0);
   }
 
-  function adjustmentsFor(employee?: Employee | null, year = balanceYear) {
-    if (!employee) return [];
-    return balanceAdjustments.filter(
-      (item) => item.employee_id === employee.user_id && item.year === year,
-    );
-  }
-
-  function adjustmentSum(employee?: Employee | null, year = balanceYear, type?: VacationBalanceAdjustment["type"]) {
-    return adjustmentsFor(employee, year)
-      .filter((item) => (type ? item.type === type : true))
-      .reduce((sum, item) => sum + item.days, 0);
-  }
-
   function remainingAnnualDays(employee?: Employee | null) {
     const entitlement = vacationEntitlement(employee);
-    const annualNorm = entitlement.days;
-    const accrued = employee ? accruedVacationDays(employee, annualNorm, balanceYear) : 0;
     const used = usedAnnualDays(employee);
     const reserved = reservedAnnualDays(employee);
-    const initial = adjustmentSum(employee, balanceYear, "initial");
-    const carryOver = adjustmentSum(employee, balanceYear, "carry_over");
-    const manual = adjustmentSum(employee, balanceYear, "manual");
-    const correctionTotal = initial + carryOver + manual;
-    const availableBeforeRequests = accrued + correctionTotal - used;
-    const rawLeft = availableBeforeRequests - reserved;
-
+    const leftBeforeReservations = entitlement.days - used;
     return {
-      entitlement: annualNorm,
+      entitlement: entitlement.days,
       weeks: entitlement.weeks,
-      accrued,
       used,
       reserved,
-      initial,
-      carryOver,
-      manual,
-      correctionTotal,
-      leftBeforeReservations: availableBeforeRequests,
-      left: Math.max(0, rawLeft),
-      rawLeft,
+      leftBeforeReservations,
+      left: Math.max(0, leftBeforeReservations - reserved),
+      rawLeft: leftBeforeReservations - reserved,
       basis: entitlement.basis,
     };
   }
@@ -582,7 +415,7 @@ export default function VacationRequests({
     let worstDay = request.start_date;
 
     for (const day of days) {
-      const off = requests.filter((item) => {
+      const off = allRequests.filter((item) => {
         const status = normalizedStatus(item.status);
         if (status === "rejected") return false;
         if (isTemporaryLeave(item.type)) return false;
@@ -614,18 +447,18 @@ export default function VacationRequests({
     );
   }
 
-  const submitted = requests.filter(
+  const submitted = allRequests.filter(
     (request) => normalizedStatus(request.status) === "submitted",
   );
-  const approved = requests.filter(
+  const approved = allRequests.filter(
     (request) => normalizedStatus(request.status) === "approved",
   );
-  const rejected = requests.filter(
+  const rejected = allRequests.filter(
     (request) => normalizedStatus(request.status) === "rejected",
   );
-  const riskCount = requests.filter(isRisk).length;
+  const riskCount = allRequests.filter(isRisk).length;
 
-  const filteredRequests = requests.filter((request) => {
+  const filteredRequests = allRequests.filter((request) => {
     const status = normalizedStatus(request.status);
     if (filter === "all") return true;
     if (filter === "history") return true;
@@ -667,16 +500,94 @@ export default function VacationRequests({
   const previewOverBalance =
     isAnnual(form.type) && previewDays > selectedBalance.left;
 
+  async function submitRequest(allowNegativeBalance = false) {
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticRequest: VacationRequest = {
+      id: optimisticId,
+      employee_id: form.employee_id,
+      type: form.type,
+      start_date: form.start_date,
+      end_date: isTemporaryLeave(form.type) ? form.start_date : form.end_date,
+      status: "submitted",
+      requested_days: isTemporaryLeave(form.type)
+        ? 0
+        : daysBetween(form.start_date, form.end_date),
+      note: isTemporaryLeave(form.type)
+        ? `${normalizeTimeInput(form.start_time)}-${normalizeTimeInput(form.end_time)}${form.note ? ` · ${form.note}` : ""}`
+        : form.note || null,
+      created_at: new Date().toISOString(),
+    };
+
+    setOptimisticRequests((previous) => [optimisticRequest, ...previous]);
+
+    try {
+      await onSubmit(allowNegativeBalance ? { allowNegativeBalance: true } : undefined);
+    } catch (error) {
+      setOptimisticRequests((previous) =>
+        previous.filter((request) => request.id !== optimisticId),
+      );
+      throw error;
+    }
+  }
+
+  async function approveRequest(id: string) {
+    setOptimisticRequests((previous) => {
+      const existing =
+        previous.find((request) => request.id === id) ||
+        allRequests.find((request) => request.id === id);
+
+      if (!existing) return previous;
+
+      return [
+        { ...existing, status: "approved" },
+        ...previous.filter((request) => request.id !== id),
+      ];
+    });
+
+    try {
+      await onApprove(id);
+    } catch (error) {
+      setOptimisticRequests((previous) =>
+        previous.filter((request) => request.id !== id),
+      );
+      throw error;
+    }
+  }
+
+  async function rejectRequest(id: string) {
+    setOptimisticRequests((previous) => {
+      const existing =
+        previous.find((request) => request.id === id) ||
+        allRequests.find((request) => request.id === id);
+
+      if (!existing) return previous;
+
+      return [
+        { ...existing, status: "rejected" },
+        ...previous.filter((request) => request.id !== id),
+      ];
+    });
+
+    try {
+      await onReject(id);
+    } catch (error) {
+      setOptimisticRequests((previous) =>
+        previous.filter((request) => request.id !== id),
+      );
+      throw error;
+    }
+  }
+
   return (
     <section className="vr-card">
       <style>{css}</style>
 
       <div className="vr-header">
         <div className="vr-title-block">
-          <span className="vr-eyebrow">Atostogų prašymai</span>
+          <span className="vr-eyebrow">Prašymai</span>
           <h2>Atostogos ir trumpi išvykimai</h2>
           <p>
-            Laukiantys prašymai rezervuoja laiką grafike. Patvirtinti įrašai automatiškai perduodami į darbo grafiką. Likutis kaupiamas pagal pareigybę, metus ir patvirtintas atostogas.
+            Vadovas mato visų darbuotojų pateiktus prašymus. Kol nepatvirtinta, grafike rodoma rezervacija; patvirtinus — įrašas perduodamas į grafiką.
           </p>
         </div>
         <div className="vr-summary" aria-label="Prašymų filtrai">
@@ -685,7 +596,7 @@ export default function VacationRequests({
             className={filter === "all" ? "vr-filter active" : "vr-filter"}
             onClick={() => setFilter("all")}
           >
-            <b>{requests.length}</b> visi
+            <b>{allRequests.length}</b> visi
           </button>
           <button
             type="button"
@@ -804,10 +715,10 @@ export default function VacationRequests({
 Ar leisti atostogas į minusą?`,
               );
               if (!ok) return;
-              void onSubmit({ allowNegativeBalance: true });
+              void submitRequest(true);
               return;
             }
-            void onSubmit();
+            void submitRequest();
           }}
         >
           <Plus size={16} /> Pateikti prašymą
@@ -815,68 +726,16 @@ Ar leisti atostogas į minusą?`,
       </div>
 
       {selectedEmployee ? (
-        <>
-          <div className="vr-balance-panel">
-            <div className="vr-balance-main">
-              <div className="vr-balance-kicker"><Umbrella size={18} /> Darbuotojo likutis</div>
-              <div className="vr-balance-name">{employeeDisplayName(selectedEmployee)}</div>
-              <div className="vr-balance-numbers">
-                <span><b>{selectedBalance.left}</b> liko</span>
-                <span>{selectedBalance.accrued} sukaupta</span>
-                <span>{selectedBalance.used} panaudota</span>
-                <span>{selectedBalance.reserved} rezervuota</span>
-              </div>
-              <div className="vr-progress"><i style={{ width: `${Math.max(0, Math.min(100, (selectedBalance.left / Math.max(1, selectedBalance.entitlement)) * 100))}%` }} /></div>
-              <small>{selectedBalance.basis}</small>
-            </div>
-            <div className="vr-balance-stat">
-              <span>Metinė norma</span><b>{selectedBalance.entitlement} d.</b>
-            </div>
-            <div className="vr-balance-stat">
-              <span>Pradinis / perkeltas</span><b>{selectedBalance.initial + selectedBalance.carryOver} d.</b>
-            </div>
-            <div className="vr-balance-stat">
-              <span>Po šio prašymo</span><b className={selectedBalance.rawLeft - previewDays < 0 ? "danger" : ""}>{isAnnual(form.type) ? selectedBalance.rawLeft - previewDays : selectedBalance.rawLeft} d.</b>
-            </div>
-          </div>
-
-          <div className="vr-balance-editor">
-            <div className="vr-editor-title">
-              <div>
-                <span>Pradinis likutis ir korekcijos</span>
-                <p>Įveskite tik pirmą kartą arba kai reikia pagrįstos korekcijos. Kiekvienas pakeitimas lieka istorijoje.</p>
-              </div>
-              <select value={balanceYear} onChange={(event) => { const year = Number(event.target.value); setBalanceYear(year); setBalanceDraft((prev) => ({ ...prev, year })); }}>
-                {[currentVacationYear() - 1, currentVacationYear(), currentVacationYear() + 1].map((year) => <option key={year} value={year}>{year}</option>)}
-              </select>
-            </div>
-            <div className="vr-editor-grid">
-              <select value={balanceDraft.employee_id || selectedEmployee.user_id} onChange={(event) => setBalanceDraft((prev) => ({ ...prev, employee_id: event.target.value }))}>
-                {employees.map((employee) => <option key={employee.user_id} value={employee.user_id}>{employeeDisplayName(employee)}{employeePositionText(employee) ? ` — ${employeePositionText(employee)}` : ""}</option>)}
-              </select>
-              <input value={balanceDraft.initialDays} onChange={(event) => setBalanceDraft((prev) => ({ ...prev, initialDays: event.target.value }))} placeholder="Pradinis likutis, d." />
-              <input value={balanceDraft.carryOverDays} onChange={(event) => setBalanceDraft((prev) => ({ ...prev, carryOverDays: event.target.value }))} placeholder="Perkelta, d." />
-              <input value={balanceDraft.manualDays} onChange={(event) => setBalanceDraft((prev) => ({ ...prev, manualDays: event.target.value }))} placeholder="Korekcija +/- d." />
-              <input value={balanceDraft.reason} onChange={(event) => setBalanceDraft((prev) => ({ ...prev, reason: event.target.value }))} placeholder="Priežastis" />
-              <button type="button" onClick={saveBalanceDraft}>Išsaugoti likutį</button>
-            </div>
-            <div className="vr-rules">
-              <div><b>Administracija</b><span>20 d. d. / 24 d. d. jei 6 d. savaitė</span></div>
-              <div><b>Slauga, socialinė, globos darbuotojai</b><span>30 d. d. / 36 d. d. jei 6 d. savaitė; kintantis grafikas — 6 savaitės</span></div>
-              <div><b>Skaičiavimas</b><span>Sukaupiama proporcingai metams ir etatui. Tik kasmetinės atostogos mažina pagrindinį likutį.</span></div>
-            </div>
-            {adjustmentsFor(selectedEmployee).length ? (
-              <div className="vr-adjustments">
-                {adjustmentsFor(selectedEmployee).slice().reverse().map((item) => (
-                  <button key={item.id} type="button" onClick={() => removeBalanceAdjustment(item.id)} title="Spauskite pašalinti korekciją">
-                    <b>{item.type === "initial" ? "Pradinis" : item.type === "carry_over" ? "Perkelta" : "Korekcija"}: {item.days > 0 ? "+" : ""}{item.days} d.</b>
-                    <span>{item.reason} · {new Date(item.created_at).toLocaleDateString("lt-LT")}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </>
+        <div className="vr-balance">
+          <Umbrella size={18} />
+          <b>{employeeDisplayName(selectedEmployee)}</b>
+          <span>Priklauso: {selectedBalance.entitlement} d.</span>
+          <span>Panaudota: {selectedBalance.used} d.</span>
+          <span>Rezervuota: {selectedBalance.reserved} d.</span>
+          <span className={selectedBalance.left <= 0 ? "vr-balance-warning" : ""}>Likutis: {selectedBalance.left} d.</span>
+          {isAnnual(form.type) ? <span>Po prašymo: {selectedBalance.rawLeft - previewDays} d.</span> : null}
+          <small>{selectedBalance.basis} Etatas dienų skaičiaus nemažina.</small>
+        </div>
       ) : null}
 
       {previewImpact ? (
@@ -1033,7 +892,7 @@ Ar leisti atostogas į minusą?`,
                           type="button"
                           className="vr-approve"
                           disabled={saving}
-                          onClick={() => void onApprove(request.id)}
+                          onClick={() => void approveRequest(request.id)}
                         >
                           Patvirtinti
                         </button>
@@ -1041,7 +900,7 @@ Ar leisti atostogas į minusą?`,
                           type="button"
                           className="vr-reject"
                           disabled={saving}
-                          onClick={() => void onReject(request.id)}
+                          onClick={() => void rejectRequest(request.id)}
                         >
                           Atmesti
                         </button>
@@ -1085,7 +944,7 @@ Ar leisti atostogas į minusą?`,
         {historyEmployee ? (
           (() => {
             const balance = remainingAnnualDays(historyEmployee);
-            const employeeRequests = requests
+            const employeeRequests = allRequests
               .filter(
                 (request) => request.employee_id === historyEmployee.user_id,
               )
@@ -1162,78 +1021,50 @@ Ar leisti atostogas į minusą?`,
 }
 
 const css = `
-.vr-card { width:min(100%,1500px); margin:0 auto; background:#fff; border:1px solid #c9d8d0; border-radius:22px; box-shadow:0 18px 42px rgba(15,23,42,.06); overflow:hidden; container-type:inline-size; }
-.vr-header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:20px; align-items:start; background:#486b5d; color:#fff; padding:22px 24px; margin:0; }
-.vr-eyebrow { display:block; margin-bottom:8px; color:rgba(255,255,255,.72); font-size:12px; letter-spacing:.18em; text-transform:uppercase; font-weight:950; }
-.vr-header h2 { margin:0 0 8px; font-size:clamp(24px,2.5vw,36px); line-height:1.04; color:#fff; font-weight:950; letter-spacing:-.03em; }
-.vr-header p { margin:0; color:rgba(255,255,255,.82); font-weight:800; max-width:900px; line-height:1.45; }
-.vr-summary { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; max-width:760px; }
-.vr-filter { border:1px solid rgba(255,255,255,.18); border-radius:10px; padding:10px 13px; color:rgba(255,255,255,.86); font-weight:950; background:rgba(255,255,255,.10); cursor:pointer; display:inline-flex; gap:8px; align-items:center; white-space:nowrap; }
-.vr-filter.active { background:#fff; border-color:#fff; color:#486b5d; }
+.vr-card { width:min(100%,1280px); margin:0 auto; background:#fff; border:1px solid #dbe6f3; border-radius:28px; padding:28px; box-shadow:0 18px 46px rgba(15,23,42,.07); overflow:hidden; container-type:inline-size; }
+.vr-header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:20px; margin-bottom:22px; align-items:start; }
+.vr-eyebrow { display:block; margin-bottom:8px; color:#007a5a; font-size:13px; letter-spacing:.18em; text-transform:uppercase; font-weight:950; }
+.vr-header h2 { margin:0 0 8px; font-size:clamp(24px,2.5vw,34px); line-height:1.05; color:#03081f; font-weight:950; letter-spacing:-.03em; }
+.vr-header p { margin:0; color:#63718b; font-weight:800; max-width:880px; line-height:1.45; }
+.vr-summary { display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; max-width:760px; }
+.vr-filter { border:1px solid #dbe6f3; border-radius:999px; padding:12px 16px; color:#334155; font-weight:950; background:#f8fbff; cursor:pointer; display:inline-flex; gap:8px; align-items:center; white-space:nowrap; box-shadow:0 10px 20px rgba(15,23,42,.03); }
+.vr-filter.active { background:#007f63; border-color:#007f63; color:#fff; }
 .vr-filter.danger:not(.active) { background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
-.vr-form { display:grid; grid-template-columns:minmax(240px,1.35fr) minmax(210px,1fr) minmax(145px,.75fr) minmax(145px,.75fr) minmax(170px,1fr) minmax(180px,.9fr); gap:10px; padding:18px 20px; background:#eef4f1; border-bottom:1px solid #dbe6e0; }
-.vr-form select,.vr-form input { width:100%; min-width:0; min-height:46px; border:1px solid #c2d3ca; border-radius:10px; padding:0 13px; color:#10251f; font-weight:850; background:#fff; outline:none; font-size:14px; }
-.vr-form select:focus,.vr-form input:focus { border-color:#486b5d; box-shadow:0 0 0 4px rgba(72,107,93,.10); }
-.vr-form button { border:0; border-radius:10px; background:#486b5d; color:#fff; font-weight:950; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; min-height:46px; font-size:14px; }
+.vr-form { display:grid; grid-template-columns:minmax(240px,1.35fr) minmax(210px,1fr) minmax(145px,.75fr) minmax(145px,.75fr) minmax(170px,1fr) minmax(180px,.9fr); gap:12px; margin-bottom:14px; }
+.vr-form select,.vr-form input { width:100%; min-width:0; min-height:54px; border:1px solid #d7e1ef; border-radius:18px; padding:0 16px; color:#07122a; font-weight:850; background:#fff; outline:none; font-size:15px; }
+.vr-form select:focus,.vr-form input:focus { border-color:#007f63; box-shadow:0 0 0 4px rgba(0,127,99,.10); }
+.vr-form button { border:0; border-radius:18px; background:#007f63; color:#fff; font-weight:950; display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; min-height:54px; font-size:15px; box-shadow:0 14px 26px rgba(0,127,99,.18); }
 .vr-form button:disabled,.vr-actions button:disabled { opacity:.55; cursor:not-allowed; box-shadow:none; }
-.vr-balance-panel { display:grid; grid-template-columns: minmax(260px,1.4fr) repeat(3,minmax(150px,.6fr)); gap:0; border-bottom:1px solid #dbe6e0; background:#fff; }
-.vr-balance-main { padding:18px 20px; border-right:1px solid #dbe6e0; }
-.vr-balance-kicker { display:flex; align-items:center; gap:8px; color:#486b5d; font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:950; }
-.vr-balance-name { margin-top:8px; font-size:20px; font-weight:950; color:#10251f; }
-.vr-balance-numbers { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-.vr-balance-numbers span { border:1px solid #dbe6e0; background:#f8faf8; color:#40594f; border-radius:999px; padding:7px 10px; font-weight:850; font-size:12px; }
-.vr-balance-numbers b { color:#10251f; }
-.vr-progress { margin-top:12px; height:8px; border-radius:999px; background:#e6eee9; overflow:hidden; }
-.vr-progress i { display:block; height:100%; background:#486b5d; border-radius:999px; }
-.vr-balance-main small { display:block; margin-top:8px; color:#6a7e75; font-weight:750; }
-.vr-balance-stat { padding:18px 20px; border-right:1px solid #dbe6e0; display:grid; align-content:center; gap:6px; }
-.vr-balance-stat:last-child{ border-right:0; }
-.vr-balance-stat span { color:#6a7e75; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:950; }
-.vr-balance-stat b { color:#10251f; font-size:22px; font-weight:950; }
-.vr-balance-stat b.danger { color:#9a3412; }
-.vr-balance-editor { padding:18px 20px; border-bottom:1px solid #dbe6e0; background:#fbfcfb; }
-.vr-editor-title { display:flex; justify-content:space-between; gap:14px; align-items:start; margin-bottom:12px; }
-.vr-editor-title span { display:block; color:#10251f; font-weight:950; }
-.vr-editor-title p { margin:4px 0 0; color:#6a7e75; font-size:13px; font-weight:750; }
-.vr-editor-title select { height:38px; border:1px solid #c2d3ca; border-radius:9px; background:#fff; padding:0 10px; font-weight:900; color:#10251f; }
-.vr-editor-grid { display:grid; grid-template-columns:minmax(220px,1.2fr) repeat(3,minmax(110px,.55fr)) minmax(180px,1fr) auto; gap:8px; }
-.vr-editor-grid select,.vr-editor-grid input { height:40px; border:1px solid #c2d3ca; border-radius:9px; background:#fff; padding:0 10px; font-weight:850; color:#10251f; min-width:0; }
-.vr-editor-grid button { border:0; background:#486b5d; color:#fff; font-weight:950; border-radius:9px; padding:0 14px; }
-.vr-rules { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
-.vr-rules div { border:1px solid #dbe6e0; border-radius:12px; background:#fff; padding:12px; }
-.vr-rules b { display:block; color:#10251f; font-size:13px; }
-.vr-rules span { display:block; margin-top:4px; color:#6a7e75; font-size:12px; line-height:1.35; font-weight:750; }
-.vr-adjustments { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
-.vr-adjustments button { text-align:left; border:1px solid #dbe6e0; background:#fff; border-radius:12px; padding:9px 11px; cursor:pointer; }
-.vr-adjustments b { display:block; color:#10251f; font-size:12px; }
-.vr-adjustments span { display:block; color:#6a7e75; font-size:11px; margin-top:2px; }
-.vr-impact { display:flex; flex-wrap:wrap; align-items:center; gap:10px; border-bottom:1px solid #dbe6e0; background:#f8faf8; color:#40594f; padding:14px 20px; font-weight:900; }
-.vr-impact-risk { background:#fff7ed; color:#9a3412; } .vr-impact strong{ display:inline-flex; align-items:center; gap:6px; }
-.vr-table-shell { margin:18px 20px; border:1px solid #dbe6e0; border-radius:14px; overflow:hidden; max-width:100%; background:#fff; }
-.vr-table-head { display:grid; grid-template-columns:minmax(170px,1.1fr) minmax(240px,1.5fr) minmax(170px,.9fr) minmax(135px,.75fr) minmax(150px,.85fr) minmax(160px,.8fr); gap:12px; padding:13px 16px; background:#dce7e2; color:#40594f; text-transform:uppercase; font-size:12px; letter-spacing:.04em; font-weight:950; }
+.vr-balance { display:flex; flex-wrap:wrap; align-items:center; gap:10px; border:1px solid #bbf7d0; background:#ecfdf5; color:#065f46; border-radius:18px; padding:14px 16px; margin:12px 0; font-weight:900; }
+.vr-balance svg { color:#007f63; } .vr-balance small { color:#64748b; font-weight:850; }
+.vr-balance-warning { color:#b45309; background:#fff7ed; border-radius:999px; padding:4px 8px; }
+.vr-impact { display:flex; flex-wrap:wrap; align-items:center; gap:10px; border:1px solid #bfdbfe; background:#eff6ff; color:#1e3a8a; border-radius:18px; padding:14px 16px; margin-bottom:18px; font-weight:900; }
+.vr-impact-risk { border-color:#fed7aa; background:#fff7ed; color:#9a3412; } .vr-impact strong{ display:inline-flex; align-items:center; gap:6px; }
+.vr-table-shell { border:1px solid #e2eaf5; border-radius:22px; overflow:hidden; max-width:100%; background:#fff; }
+.vr-table-head { display:grid; grid-template-columns:minmax(180px,1.1fr) minmax(260px,1.5fr) minmax(170px,.9fr) minmax(140px,.75fr) minmax(150px,.85fr) minmax(170px,.8fr); gap:12px; padding:14px 16px; background:#f4f8fc; color:#52657e; text-transform:uppercase; font-size:12px; letter-spacing:.04em; font-weight:950; }
 .vr-list { display:grid; }
-.vr-row { display:grid; grid-template-columns:minmax(170px,1.1fr) minmax(240px,1.5fr) minmax(170px,.9fr) minmax(135px,.75fr) minmax(150px,.85fr) minmax(160px,.8fr); gap:12px; align-items:center; border-top:1px solid #dbe6e0; padding:15px 16px; background:#fff; }
+.vr-row { display:grid; grid-template-columns:minmax(180px,1.1fr) minmax(260px,1.5fr) minmax(170px,.9fr) minmax(140px,.75fr) minmax(150px,.85fr) minmax(170px,.8fr); gap:12px; align-items:center; border-top:1px solid #e2eaf5; padding:16px; background:#fff; }
 .vr-row-pending { background:linear-gradient(90deg,#fffdf5,#fff); }
 .vr-person { display:flex; align-items:center; gap:12px; min-width:0; text-align:left; border:0; background:transparent; padding:0; cursor:pointer; } .vr-person:hover strong{ text-decoration:underline; }
-.vr-avatar{ flex:0 0 auto; width:40px; height:40px; border-radius:13px; background:#eef4f1; color:#486b5d; display:grid; place-items:center; font-weight:950; }
-.vr-person strong{ display:block; color:#10251f; font-weight:950; overflow:hidden; text-overflow:ellipsis; } .vr-person small{ color:#6a7e75; font-weight:850; display:block; overflow:hidden; text-overflow:ellipsis; }
-.vr-meta { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:#40594f; font-weight:850; min-width:0; } .vr-meta span{ background:#f8faf8; border:1px solid #dbe6e0; border-radius:999px; padding:7px 10px; } .vr-type b{ color:#486b5d; } .vr-note{ border-radius:10px!important; max-width:100%; white-space:normal; }
-.vr-balance-cell { display:grid; gap:3px; color:#40594f; font-weight:900; } .vr-balance-cell small { color:#6a7e75; font-weight:800; }
-.vr-status{ display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:999px; padding:8px 11px; font-weight:950; white-space:nowrap; } .vr-status-submitted{ background:#fff7e6; color:#9a5a00; } .vr-status-approved{ background:#eaf7f1; color:#486b5d; } .vr-status-rejected{ background:#fff0f0; color:#a11919; }
-.vr-decision{ display:grid; gap:2px; border-radius:12px; padding:9px; background:#eaf7f1; color:#486b5d; text-align:center; font-weight:950; } .vr-decision small{ font-weight:850; } .vr-decision-risk{ background:#fff0f0; color:#a11919; }
-.vr-actions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; } .vr-actions button{ border:0; border-radius:10px; padding:9px 11px; font-weight:950; cursor:pointer; } .vr-approve{ background:#486b5d; color:#fff; } .vr-reject{ background:#fff0f0; color:#9f1239; }
-.vr-empty{ border-top:1px solid #dbe6e0; padding:32px; text-align:center; color:#6a7e75; font-weight:900; background:#f8faf8; }
-.vr-history { margin:18px 20px 20px; border:1px solid #dbe6e0; border-radius:14px; padding:18px; background:#fbfcfb; }
+.vr-avatar{ flex:0 0 auto; width:46px; height:46px; border-radius:16px; background:#e9fff6; color:#007f63; display:grid; place-items:center; font-weight:950; box-shadow:0 10px 20px rgba(15,23,42,.06); }
+.vr-person strong{ display:block; color:#07122a; font-weight:950; overflow:hidden; text-overflow:ellipsis; } .vr-person small{ color:#607089; font-weight:850; display:block; overflow:hidden; text-overflow:ellipsis; }
+.vr-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px; color:#334155; font-weight:850; min-width:0; } .vr-meta span{ background:#f8fbff; border:1px solid #e2eaf5; border-radius:999px; padding:7px 10px; } .vr-type b{ color:#007f63; } .vr-note{ border-radius:12px!important; max-width:100%; white-space:normal; }
+.vr-balance-cell { display:grid; gap:3px; color:#334155; font-weight:900; } .vr-balance-cell small { color:#64748b; font-weight:800; }
+.vr-status{ display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:999px; padding:9px 12px; font-weight:950; white-space:nowrap; } .vr-status-submitted{ background:#fff7e6; color:#9a5a00; } .vr-status-approved{ background:#eafff4; color:#007f63; } .vr-status-rejected{ background:#fff0f0; color:#a11919; }
+.vr-decision{ display:grid; gap:2px; border-radius:16px; padding:10px; background:#eafff4; color:#007f63; text-align:center; font-weight:950; } .vr-decision small{ font-weight:850; } .vr-decision-risk{ background:#fff0f0; color:#a11919; }
+.vr-actions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; } .vr-actions button{ border:0; border-radius:14px; padding:10px 12px; font-weight:950; cursor:pointer; } .vr-approve{ background:#007f63; color:#fff; } .vr-reject{ background:#fff0f0; color:#9f1239; }
+.vr-empty{ border-top:1px solid #e2eaf5; padding:34px; text-align:center; color:#607089; font-weight:900; background:#fbfdff; }
+.vr-history { margin-top:18px; border:1px solid #e2eaf5; border-radius:22px; padding:18px; background:#fbfdff; }
 .vr-history-title{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
-.vr-history h3 { margin:0; display:flex; align-items:center; gap:8px; color:#10251f; font-weight:950; }
-.vr-history-title select{ min-height:42px; border:1px solid #c2d3ca; border-radius:10px; padding:0 14px; font-weight:900; color:#10251f; background:#fff; min-width:min(420px,100%); }
+.vr-history h3 { margin:0; display:flex; align-items:center; gap:8px; color:#07122a; font-weight:950; }
+.vr-history-title select{ min-height:46px; border:1px solid #cfdbea; border-radius:16px; padding:0 14px; font-weight:900; color:#07122a; background:#fff; min-width:min(420px,100%); }
 .vr-history-panel{ display:grid; gap:12px; }
-.vr-history-person{ display:flex; align-items:center; gap:12px; } .vr-history-person b{ display:block; color:#10251f; } .vr-history-person small{ color:#6a7e75; font-weight:800; }
-.vr-history-balance { display:flex; flex-wrap:wrap; gap:6px; } .vr-history-balance span { border-radius:999px; padding:7px 10px; background:#eef4f1; font-weight:850; color:#40594f; }
-.vr-history-table{ border:1px solid #dbe6e0; border-radius:12px; overflow:hidden; background:#fff; }
+.vr-history-person{ display:flex; align-items:center; gap:12px; } .vr-history-person b{ display:block; color:#07122a; } .vr-history-person small{ color:#64748b; font-weight:800; }
+.vr-history-balance { display:flex; flex-wrap:wrap; gap:6px; } .vr-history-balance span { border-radius:999px; padding:7px 10px; background:#f4f8fc; font-weight:850; color:#334155; }
+.vr-history-table{ border:1px solid #e2eaf5; border-radius:16px; overflow:hidden; background:#fff; }
 .vr-history-head,.vr-history-line{ display:grid; grid-template-columns:minmax(170px,1fr) minmax(180px,1fr) 90px 150px minmax(120px,1fr); gap:10px; padding:10px 12px; align-items:center; }
-.vr-history-head{ background:#dce7e2; color:#40594f; text-transform:uppercase; font-size:12px; letter-spacing:.04em; font-weight:950; }
-.vr-history-line{ border-top:1px solid #dbe6e0; color:#40594f; font-weight:800; }
-@container (max-width: 1180px){ .vr-header{ grid-template-columns:1fr; } .vr-summary{ justify-content:flex-start; } .vr-form{ grid-template-columns:1fr 1fr; } .vr-balance-panel{ grid-template-columns:1fr 1fr; } .vr-editor-grid{ grid-template-columns:1fr 1fr; } .vr-rules{ grid-template-columns:1fr; } .vr-table-head{ display:none; } .vr-row{ grid-template-columns:1fr 1fr; border-top:1px solid #dbe6e0; } .vr-actions{ justify-content:flex-start; } }
-@container (max-width: 720px){ .vr-form{ grid-template-columns:1fr; } .vr-balance-panel{ grid-template-columns:1fr; } .vr-editor-grid{ grid-template-columns:1fr; } .vr-row{ grid-template-columns:1fr; } .vr-history-head{ display:none; } .vr-history-line{ grid-template-columns:1fr; } }
+.vr-history-head{ background:#f4f8fc; color:#52657e; text-transform:uppercase; font-size:12px; letter-spacing:.04em; font-weight:950; }
+.vr-history-line{ border-top:1px solid #e2eaf5; color:#334155; font-weight:800; }
+@container (max-width: 1180px){ .vr-header{ grid-template-columns:1fr; } .vr-summary{ justify-content:flex-start; } .vr-form{ grid-template-columns:1fr 1fr; } .vr-table-head{ display:none; } .vr-row{ grid-template-columns:1fr 1fr; border-top:1px solid #e2eaf5; } .vr-actions{ justify-content:flex-start; } }
+@container (max-width: 720px){ .vr-card{ padding:18px; } .vr-form{ grid-template-columns:1fr; } .vr-row{ grid-template-columns:1fr; } .vr-history-head{ display:none; } .vr-history-line{ grid-template-columns:1fr; } }
 `;

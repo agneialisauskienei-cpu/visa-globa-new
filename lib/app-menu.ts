@@ -27,18 +27,6 @@ export const APP_MENU: AppMenuItem[] = [
     icon: "tasks",
   },
   {
-    label: "Grafikas",
-    href: "/my-schedule",
-    permission: "schedule.view",
-    icon: "calendar",
-  },
-  {
-    label: "Pranešimai",
-    href: "/notifications",
-    permission: "notifications.view",
-    icon: "bell",
-  },
-  {
     label: "Mano profilis",
     href: "/my-profile",
     permission: "dashboard.view",
