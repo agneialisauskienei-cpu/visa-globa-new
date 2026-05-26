@@ -2415,51 +2415,7 @@ export default function TeamPage() {
         )}
 
         {tab === "invites" && (
-          <Card>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                  Kvietimai
-                </p>
-                <h2 className="mt-1 text-2xl font-black tracking-tight">
-                  Kvietimai prisijungti
-                </h2>
-                <p className="mt-1 font-semibold text-slate-500">
-                  Čia matomi pakviesti darbuotojai. Kai darbuotojas priims kvietimą ir prisijungs, jis bus valdomas darbuotojų registre.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => { setCreateModalMessage(""); setShowCreateModal(true); }}
-                className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 font-extrabold text-white shadow-sm transition hover:bg-slate-800"
-              >
-                <Plus className="h-4 w-4" />
-                Naujas kvietimas
-              </button>
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              {invites.length === 0 && <EmptyState text="Kvietimų nėra." />}
-
-              {invites.map((invite) => (
-                <article key={invite.id} className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="font-black text-slate-950">{invite.email || "Kvietimas"}</h3>
-                      <p className="mt-1 text-sm font-semibold text-[#526174]">
-                        Rolė: {invite.role || "employee"} · Sukurta: {fmt(invite.created_at)}
-                      </p>
-                    </div>
-
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-emerald-700">
-                      {invite.status || "pending"}
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </Card>
+          <InvitesModule />
         )}
       </div>
 
