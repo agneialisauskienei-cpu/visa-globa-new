@@ -140,6 +140,42 @@ const CARE_LEVEL_OPTIONS = [
   { value: "intensyvi_slauga", label: "Intensyvi slauga" },
 ] as const;
 
+
+type ResidentListTab =
+  | "active"
+  | "gyvena"
+  | "netrukus_atvyks"
+  | "ligonineje"
+  | "laikinai_isvykes"
+  | "archived";
+
+const RESIDENT_LIST_TABS: Array<{
+  key: ResidentListTab;
+  label: string;
+  icon: React.ElementType;
+}> = [
+  { key: "active", label: "Aktyvūs", icon: Users },
+  { key: "gyvena", label: "Gyvena", icon: CheckCircle2 },
+  { key: "netrukus_atvyks", label: "Netrukus atvyks", icon: Bed },
+  { key: "ligonineje", label: "Ligoninėje", icon: HeartHandshake },
+  { key: "laikinai_isvykes", label: "Laikinai išvykę", icon: Phone },
+  { key: "archived", label: "Archyvas", icon: X },
+];
+
+
+type ResidentPopupTab = "main" | "contacts" | "staff" | "notes";
+
+const RESIDENT_POPUP_TABS: Array<{
+  key: ResidentPopupTab;
+  label: string;
+  icon: React.ElementType;
+}> = [
+  { key: "main", label: "Pagrindinė info", icon: User },
+  { key: "contacts", label: "Artimieji", icon: HeartHandshake },
+  { key: "staff", label: "Atsakingi", icon: Users },
+  { key: "notes", label: "Pastabos", icon: Info },
+];
+
 function emptyContactForm(): ResidentContactForm {
   return {
     full_name: "",
@@ -268,9 +304,9 @@ function statusClass(status: string | null) {
   const normalized = normalizeResidentStatus(status);
 
   if (normalized === "gyvena")
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-[#a7f3d0] bg-emerald-50 text-[#047857]";
   if (normalized === "netrukus_atvyks")
-    return "border-blue-200 bg-white text-slate-700";
+    return "border-blue-200 bg-white text-[#486b5d]";
   if (normalized === "ligonineje")
     return "border-amber-200 bg-amber-50 text-amber-700";
   if (normalized === "laikinai_isvykes")
@@ -279,7 +315,7 @@ function statusClass(status: string | null) {
   if (normalized === "sutartis_nutraukta")
     return "border-red-200 bg-red-50 text-red-700";
 
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return "border-[#dbe6e0] bg-[#f8faf8] text-[#526174]";
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -346,6 +382,52 @@ function isValidBirthDate(value: string) {
   return Number.isFinite(date.getTime()) && date >= min && date <= today;
 }
 
+
+async function writeAuditLog(input: {
+  organizationId: string;
+  tableName: string;
+  recordId: string | null;
+  action: string;
+  changes?: Record<string, unknown>;
+}) {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const payload = {
+      organization_id: input.organizationId,
+      table_name: input.tableName,
+      record_id: input.recordId,
+      action: input.action,
+      changed_by: user?.id || null,
+      changed_at: new Date().toISOString(),
+      changes: input.changes || {},
+    };
+
+    const attempts = [
+      supabase.from("audit_log").insert(payload),
+      supabase.from("audit_logs").insert({
+        organization_id: payload.organization_id,
+        table_name: payload.table_name,
+        record_id: payload.record_id,
+        action: payload.action,
+        user_id: payload.changed_by,
+        created_at: payload.changed_at,
+        changes: payload.changes,
+        metadata: payload.changes,
+      } as any),
+    ];
+
+    for (const attempt of attempts) {
+      const { error } = await attempt;
+      if (!error) return;
+    }
+  } catch {
+    // Auditas neturi sustabdyti pagrindinio veiksmo.
+  }
+}
+
 function cleanBirthDateInput(value: string | null | undefined) {
   const clean = String(value || "").trim();
 
@@ -379,6 +461,7 @@ export default function ResidentsPage() {
   const [statusFilter, setStatusFilter] = useState<
     "active" | "all" | "archived" | "hospital_or_away" | ResidentStatus
   >("active");
+  const [activeListTab, setActiveListTab] = useState<ResidentListTab>("active");
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingResident, setEditingResident] = useState<Resident | null>(null);
@@ -703,13 +786,7 @@ export default function ResidentsPage() {
       organization_id: organizationId,
       resident_id: residentId,
       user_id: userId,
-      assigned_by: currentUserId,
-      assigned_at: new Date().toISOString(),
       is_primary: index === 0,
-      notes:
-        index === 0
-          ? "Pagrindinis atsakingas darbuotojas"
-          : "Papildomas atsakingas darbuotojas",
     }));
 
     const { error: insertError } = await supabase
@@ -718,10 +795,20 @@ export default function ResidentsPage() {
 
     if (insertError) {
       console.warn("resident_assignments insert failed", insertError);
-      setMessage(
-        `Gyventojas išsaugotas, bet nepavyko įrašyti priskirtų darbuotojų: ${getReadableError(insertError)}`,
-      );
+      // Gyventojas jau turi assigned_to reikšmę, todėl papildomos lentelės klaida neturi gadinti išsaugojimo.
+      return;
     }
+
+    await writeAuditLog({
+      organizationId,
+      tableName: "resident_assignments",
+      recordId: residentId,
+      action: "update",
+      changes: {
+        Veiksmas: "Priskirti atsakingi darbuotojai",
+        Darbuotojai: uniqueStaffIds,
+      },
+    });
   }
 
   async function handleSaveResident(event: React.FormEvent) {
@@ -845,6 +932,21 @@ export default function ResidentsPage() {
         }
       }
 
+      await writeAuditLog({
+        organizationId,
+        tableName: "residents",
+        recordId: residentId,
+        action: editingResident ? "update" : "insert",
+        changes: {
+          Veiksmas: editingResident ? "Gyventojo duomenys atnaujinti" : "Gyventojas sukurtas",
+          Gyventojas: cleanName,
+          Statusas: form.current_status,
+          Kambarys: form.room_id || null,
+          Atsakingas: primaryAssignedTo,
+          Priežiūros_ligis: form.care_level || null,
+        },
+      });
+
       setMessage(
         editingResident
           ? "Gyventojo duomenys atnaujinti."
@@ -939,6 +1041,23 @@ export default function ResidentsPage() {
     return { total, active, soon, living, hospitalOrAway, archived };
   }, [residents]);
 
+
+  function changeListTab(nextTab: ResidentListTab) {
+    setActiveListTab(nextTab);
+
+    if (nextTab === "archived") {
+      setStatusFilter("archived");
+      return;
+    }
+
+    if (nextTab === "active") {
+      setStatusFilter("active");
+      return;
+    }
+
+    setStatusFilter(nextTab);
+  }
+
   function getRoomName(roomId: string | null) {
     if (!roomId) return "—";
     return rooms.find((room) => room.id === roomId)?.name || "—";
@@ -956,32 +1075,32 @@ export default function ResidentsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
-        <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="font-bold text-slate-600">Kraunama...</p>
+      <main className="min-h-screen bg-[#f3f6f4] p-6 text-[#10251f]">
+        <div className="mx-auto max-w-7xl rounded-3xl border border-[#dbe6e0] bg-white p-8 shadow-sm">
+          <p className="font-bold text-[#526174]">Kraunama...</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+    <main className="min-h-screen bg-[#f3f6f4] p-6 text-[#10251f]">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-[#486b5d] shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
+          <div className="flex flex-col gap-6 px-7 py-7 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-5">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
+              <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-[#e8f7ef] text-[#486b5d]">
                 <Users className="h-7 w-7" />
               </div>
 
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                <p className="text-sm font-black uppercase tracking-[0.28em] text-emerald-100/80">
                   Gyventojų modulis
                 </p>
-                <h1 className="mt-2 text-4xl font-black tracking-tight">
+                <h1 className="mt-2 text-5xl font-black tracking-[-0.04em] text-white">
                   Gyventojai
                 </h1>
-                <p className="mt-2 text-lg font-semibold text-slate-500">
+                <p className="mt-3 max-w-3xl text-lg font-semibold leading-8 text-emerald-50/90">
                   Gyventojų sąrašas, kambariai, statusai ir atsakingi
                   darbuotojai vienoje vietoje.
                 </p>
@@ -992,7 +1111,7 @@ export default function ResidentsPage() {
               <button
                 type="button"
                 onClick={() => void loadData()}
-                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-extrabold text-emerald-700 transition hover:bg-emerald-100"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white px-5 py-3 font-black text-[#486b5d] shadow-sm transition hover:bg-[#ecfdf5]"
               >
                 <RefreshCw className="h-4 w-4" />
                 Atnaujinti
@@ -1001,7 +1120,7 @@ export default function ResidentsPage() {
               <button
                 type="button"
                 onClick={openCreateModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 font-extrabold text-white shadow-sm transition hover:bg-emerald-800"
+                className="inline-flex items-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#036747]"
               >
                 <Plus className="h-4 w-4" />
                 Naujas gyventojas
@@ -1010,8 +1129,33 @@ export default function ResidentsPage() {
           </div>
         </section>
 
+        <section className="rounded-[24px] border border-[#c9d8d0] bg-[#eef4f1] p-3 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+          <div className="flex flex-wrap gap-2">
+            {RESIDENT_LIST_TABS.map((item) => {
+              const Icon = item.icon;
+              const active = activeListTab === item.key;
 
-        <section className="rounded-3xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-bold leading-6 text-emerald-900">
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => changeListTab(item.key)}
+                  className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                    active
+                      ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                      : "text-[#486b5d] hover:bg-white/70 hover:text-[#10251f]"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+
+        <section className="rounded-[24px] border border-emerald-100 bg-emerald-50/80 px-5 py-3 text-sm font-bold leading-6 text-[#03543f]">
           <span className="font-black">Greitai:</span> viršuje esančios kortelės veikia kaip filtrai. Spausk gyventojo vardą, kad atidarytum kortelę. Naują gyventoją kurk per žalią mygtuką, o artimuosius, kambarį ir atsakingus darbuotojus pildyk lange.
           <button
             type="button"
@@ -1024,7 +1168,7 @@ export default function ResidentsPage() {
         </section>
 
         {message ? (
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 px-5 py-4 font-bold text-emerald-800">
+          <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/80 px-5 py-3 font-bold text-[#036747]">
             {message}
           </div>
         ) : null}
@@ -1034,37 +1178,37 @@ export default function ResidentsPage() {
             title="Viso"
             value={stats.total}
             active={statusFilter === "all"}
-            onClick={() => setStatusFilter("all")}
+            onClick={() => { setActiveListTab("active"); setStatusFilter("all"); }}
           />
           <StatCard
             title="Aktyvūs"
             value={stats.active}
             active={statusFilter === "active"}
-            onClick={() => setStatusFilter("active")}
+            onClick={() => changeListTab("active")}
           />
           <StatCard
             title="Netrukus atvyks"
             value={stats.soon}
             active={statusFilter === "netrukus_atvyks"}
-            onClick={() => setStatusFilter("netrukus_atvyks")}
+            onClick={() => changeListTab("netrukus_atvyks")}
           />
           <StatCard
             title="Gyvena"
             value={stats.living}
             active={statusFilter === "gyvena"}
-            onClick={() => setStatusFilter("gyvena")}
+            onClick={() => changeListTab("gyvena")}
           />
           <StatCard
             title="Ligoninėje / išvykę"
             value={stats.hospitalOrAway}
             active={statusFilter === "hospital_or_away"}
-            onClick={() => setStatusFilter("hospital_or_away")}
+            onClick={() => { setActiveListTab("ligonineje"); setStatusFilter("hospital_or_away"); }}
           />
           <StatCard
             title="Archyvas"
             value={stats.archived}
             active={statusFilter === "archived"}
-            onClick={() => setStatusFilter("archived")}
+            onClick={() => changeListTab("archived")}
           />
         </section>
 
@@ -1073,24 +1217,24 @@ export default function ResidentsPage() {
           text="Spustelėjus filtrų kortelę sąrašas iš karto persifiltruoja. „Aktyvūs“ rodo visus nearchyvuotus gyventojus, „Ligoninėje / išvykę“ padeda greitai rasti laikinai nesančius, o „Archyvas“ skirtas mirusiems arba sutartį nutraukusiems gyventojams."
         />
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-[30px] border border-[#c9d8d0] bg-white p-6 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="text-2xl font-black tracking-tight">
+              <h2 className="text-2xl font-black tracking-[-0.02em] text-[#10251f]">
                 Gyventojų sąrašas
               </h2>
-              <p className="mt-1 font-semibold text-slate-500">
+              <p className="mt-1 font-semibold text-[#526174]">
                 Greita paieška, statusai ir pagrindinė informacija.
               </p>
             </div>
 
             <label className="relative block w-full lg:w-[420px]">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a9a91]" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Ieškoti pagal vardą, telefoną, kambarį ar darbuotoją..."
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-emerald-300 focus:bg-white"
+                className="w-full rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-[#047857] focus:bg-white focus:ring-4 focus:ring-[#047857]/10"
               />
             </label>
           </div>
@@ -1105,9 +1249,9 @@ export default function ResidentsPage() {
 
           <div className="mt-6 grid gap-4">
             {filteredResidents.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <div className="rounded-3xl border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-8 text-center">
                 <p className="text-xl font-black">Gyventojų nerasta</p>
-                <p className="mt-2 font-semibold text-slate-500">
+                <p className="mt-2 font-semibold text-[#66756c]">
                   Pridėk naują gyventoją arba pakeisk filtrą.
                 </p>
               </div>
@@ -1118,11 +1262,11 @@ export default function ResidentsPage() {
                 return (
                   <article
                     key={resident.id}
-                    className="rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:border-emerald-200 hover:bg-emerald-50/40"
+                    className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5 transition hover:border-[#a7f3d0] hover:bg-[#ecfdf5]/40"
                   >
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                       <div className="flex items-start gap-4">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#eef4f1] text-[#486b5d] shadow-sm">
                           <User className="h-6 w-6" />
                         </div>
 
@@ -1130,21 +1274,23 @@ export default function ResidentsPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <button
                               type="button"
-                              onClick={() =>
-                                router.push(`/residents/${resident.id}`)
-                              }
-                              className="text-left text-xl font-black text-slate-950 transition hover:text-emerald-700 hover:underline"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                router.push(`/residents/${resident.id}`);
+                              }}
+                              className="text-left text-xl font-black text-[#10251f] transition hover:text-[#047857] hover:underline"
                             >
                               {residentName(resident)}
                             </button>
                             <span
-                              className={`rounded-full border px-3 py-1 text-xs font-black ${statusClass(resident.current_status)}`}
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${statusClass(resident.current_status)}`}
                             >
                               {statusLabel(resident.current_status)}
                             </span>
                           </div>
 
-                          <div className="mt-3 grid gap-2 text-sm font-semibold text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
+                          <div className="mt-3 grid gap-2 text-sm font-semibold text-[#526174] sm:grid-cols-2 lg:grid-cols-4">
                             <span className="inline-flex items-center gap-2">
                               <Bed className="h-4 w-4" />
                               Kambarys {getRoomName(resident.current_room_id)}
@@ -1155,13 +1301,13 @@ export default function ResidentsPage() {
                             </span>
                           </div>
 
-                          <p className="mt-2 text-sm font-semibold text-slate-500">
+                          <p className="mt-2 text-sm font-semibold text-[#66756c]">
                             Priskirti darbuotojai:{" "}
                             {assignedNames.length
                               ? assignedNames.join(", ")
                               : "Nepriskirta"}
                           </p>
-                          <p className="mt-1 text-sm font-semibold text-slate-500">
+                          <p className="mt-1 text-sm font-semibold text-[#66756c]">
                             Artimieji:{" "}
                             {residentContacts[resident.id]?.filter(
                               (c) => c.full_name || c.phone || c.relationship,
@@ -1170,14 +1316,25 @@ export default function ResidentsPage() {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(resident)}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 font-extrabold text-emerald-700 transition hover:bg-emerald-50"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                        Redaguoti
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/residents/${resident.id}`)}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#047857] px-4 py-3 font-extrabold text-white transition hover:bg-[#036747]"
+                        >
+                          <User className="h-4 w-4" />
+                          Atidaryti kortelę
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(resident)}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 font-extrabold text-[#486b5d] transition hover:bg-[#eef4f1]"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                          Redaguoti
+                        </button>
+                      </div>
                     </div>
                   </article>
                 );
@@ -1188,17 +1345,17 @@ export default function ResidentsPage() {
       </div>
 
       {showHelpModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <section className="w-full max-w-3xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-6 backdrop-blur-sm">
+          <section className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+            <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                <p className="text-sm font-black uppercase tracking-[0.28em] text-emerald-100/80">
                   Pagalba
                 </p>
-                <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                <h2 className="mt-1 text-3xl font-black tracking-[-0.04em] text-white">
                   Kaip naudotis gyventojų moduliu
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+                <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-white/80">
                   Bendra informacija darbuotojams vienoje vietoje — be ilgų
                   instrukcijų pačiame sąraše.
                 </p>
@@ -1207,10 +1364,10 @@ export default function ResidentsPage() {
               <button
                 type="button"
                 onClick={() => setShowHelpModal(false)}
-                className="rounded-2xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
                 aria-label="Uždaryti pagalbą"
               >
-                <X className="h-5 w-5" />
+                <X size={28} strokeWidth={2.1} />
               </button>
             </div>
 
@@ -1250,7 +1407,7 @@ export default function ResidentsPage() {
                 />
               </div>
 
-              <div className="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-emerald-900">
+              <div className="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-[#03543f]">
                 Patarimas: sąraše laikome tik greitą administravimą. Detali
                 priežiūros, medicinos, rizikų ir ISGP informacija turi būti
                 tvarkoma gyventojo kortelėje, kad duomenys nesidubliuotų.
@@ -1297,7 +1454,7 @@ function InfoBox({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white text-xs font-black text-slate-600 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 ${
+        className={`inline-flex items-center gap-2 rounded-full border border-[#dbe6e0] bg-white text-xs font-black text-[#526174] shadow-sm transition hover:border-[#a7f3d0] hover:bg-[#ecfdf5] hover:text-[#036747] ${
           compact ? "px-3 py-1.5" : "px-4 py-2"
         }`}
         title={title}
@@ -1307,18 +1464,18 @@ function InfoBox({
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-6 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+            <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#e8f7ef] text-[#486b5d]">
                   <Info className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                  <p className="text-sm font-black uppercase tracking-[0.28em] text-emerald-100/80">
                     Pagalba
                   </p>
-                  <h3 className="mt-1 text-xl font-black text-slate-950">
+                  <h3 className="mt-1 text-2xl font-black tracking-[-0.03em] text-white">
                     {title}
                   </h3>
                 </div>
@@ -1327,15 +1484,15 @@ function InfoBox({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-500 transition hover:bg-slate-100"
+                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
                 aria-label="Uždaryti pagalbą"
               >
-                <X className="h-5 w-5" />
+                <X size={28} strokeWidth={2.1} />
               </button>
             </div>
 
             <div className="px-6 py-5">
-              <p className="text-sm font-semibold leading-7 text-slate-600">
+              <p className="text-sm font-semibold leading-7 text-[#526174]">
                 {text}
               </p>
             </div>
@@ -1361,14 +1518,10 @@ function StatCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-3xl border bg-white p-5 text-left shadow-sm transition ${
-        active
-          ? "border-emerald-300 ring-2 ring-emerald-100"
-          : "border-slate-200 hover:border-emerald-200 hover:bg-emerald-50/40"
-      }`}
+      className={`rounded-[18px] border bg-white px-5 py-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.10)] transition ${active ? "border-[#047857] ring-2 ring-[#d1fae5]" : "border-[#c9d8d0] hover:border-[#a7f3d0] hover:bg-[#f8faf8]"}`}
     >
-      <p className="font-extrabold text-slate-500">{title}</p>
-      <p className="mt-2 text-4xl font-black text-slate-950">{value}</p>
+      <p className="font-extrabold text-[#66756c]">{title}</p>
+      <p className="mt-2 text-4xl font-black tracking-[-0.04em] text-[#10251f]">{value}</p>
     </button>
   );
 }
@@ -1395,21 +1548,26 @@ function ResidentModal({
   onSubmit: (event: React.FormEvent) => void;
 }) {
   const [staffSearch, setStaffSearch] = useState("");
+  const [popupTab, setPopupTab] = useState<ResidentPopupTab>("main");
+  const staffSearchActive = staffSearch.trim().length >= 2;
 
   const filteredStaffMembers = useMemo(() => {
     const query = staffSearch.trim().toLowerCase();
 
-    if (!query) return staffMembers;
+    if (query.length < 2) return [];
 
-    return staffMembers.filter((member) =>
-      [staffName(member), member.email || "", staffRoleLabel(member)]
-        .join(" ")
-        .toLowerCase()
-        .includes(query),
-    );
+    return staffMembers
+      .filter((member) =>
+        [staffName(member), member.email || "", staffRoleLabel(member)]
+          .join(" ")
+          .toLowerCase()
+          .includes(query),
+      )
+      .slice(0, 8);
   }, [staffMembers, staffSearch]);
 
   function toggleStaff(userId: string) {
+    setStaffSearch("");
     setForm((prev) => {
       const exists = prev.assigned_staff_ids.includes(userId);
 
@@ -1469,32 +1627,59 @@ function ResidentModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
-      <section className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[32px] bg-white shadow-2xl">
-        <div className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-slate-100 bg-white px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950/50 p-4 backdrop-blur-sm md:p-6">
+      <section className="flex max-h-[calc(100vh-48px)] w-full max-w-[1180px] flex-col overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+        <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
           <div>
-            <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100/80">
               Gyventojo duomenys
             </p>
-            <h2 className="mt-1 text-3xl font-black tracking-tight">{title}</h2>
-            <p className="mt-2 font-semibold text-slate-500">{subtitle}</p>
+            <h2 className="mt-1 text-3xl font-black tracking-[-0.04em] text-white md:text-4xl">{title}</h2>
+            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-white/80">{subtitle}</p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-500 transition hover:bg-slate-100"
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
+            aria-label="Uždaryti"
           >
-            <X className="h-5 w-5" />
+            <X size={28} strokeWidth={2.1} />
           </button>
         </div>
 
-        <div className="overflow-y-auto px-6 py-5">
-          <form onSubmit={onSubmit} className="space-y-6">
+        <div className="border-b border-[#dbe6e0] bg-[#eef4f1] px-5 py-3 md:px-6">
+          <div className="flex flex-wrap gap-2">
+            {RESIDENT_POPUP_TABS.map((item) => {
+              const Icon = item.icon;
+              const active = popupTab === item.key;
+
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setPopupTab(item.key)}
+                  className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                    active
+                      ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                      : "text-[#486b5d] hover:bg-white/70 hover:text-[#10251f]"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="max-h-[calc(100vh-238px)] overflow-y-auto bg-[#f3f6f4] px-5 py-5 md:px-6">
+          <form onSubmit={onSubmit} className="space-y-5">
             <InfoBox
               title="Kaip pildyti šią formą"
               text="Šiame lange kuriamas arba redaguojamas gyventojo sąrašo įrašas. Pirmiausia įrašyk gyventojo vardą, statusą ir kambarį, tada pridėk artimuosius bei atsakingus darbuotojus. Detalesnė slaugos, rizikų, mitybos, judėjimo ir ISGP informacija pildoma jau gyventojo kortelėje."
             />
+            {popupTab === "main" ? (
             <FormSection
               icon={<User className="h-5 w-5" />}
               title="Gyventojo duomenys"
@@ -1535,7 +1720,7 @@ function ResidentModal({
                     }
                     className={inputClass}
                   />
-                  <span className="mt-1 block text-xs font-semibold text-slate-400">
+                  <span className="mt-1 block text-xs font-semibold text-[#8a9a91]">
                     Galima palikti tuščią. Neleidžiamos ateities datos ir datos
                     iki 1900-01-01.
                   </span>
@@ -1643,7 +1828,9 @@ function ResidentModal({
                 </Field>
               </div>
             </FormSection>
+            ) : null}
 
+            {popupTab === "contacts" ? (
             <FormSection
               icon={<HeartHandshake className="h-5 w-5" />}
               title="Artimųjų / kontaktinių asmenų duomenys"
@@ -1659,16 +1846,16 @@ function ResidentModal({
                 {form.contacts.map((contact, index) => (
                   <div
                     key={index}
-                    className="rounded-3xl border border-slate-200 bg-white p-4"
+                    className="rounded-[18px] border border-[#dbe6e0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.06)]"
                   >
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div>
-                        <h4 className="font-black text-slate-950">
+                        <h4 className="font-black text-[#10251f]">
                           {index === 0
                             ? "Pagrindinis kontaktas"
                             : `Kontaktas ${index + 1}`}
                         </h4>
-                        <p className="text-sm font-semibold text-slate-500">
+                        <p className="text-sm font-semibold text-[#66756c]">
                           Vesk tik būtinus kontaktinius duomenis.
                         </p>
                       </div>
@@ -1749,7 +1936,7 @@ function ResidentModal({
                       </Field>
                     </div>
 
-                    <div className="mt-4 rounded-3xl border border-slate-200 bg-white p-4">
+                    <div className="mt-4 rounded-3xl border border-[#dbe6e0] bg-white p-4">
                       <label className="flex cursor-pointer items-start gap-3">
                         <input
                           type="checkbox"
@@ -1768,11 +1955,11 @@ function ResidentModal({
                           className="mt-1 h-5 w-5 accent-emerald-700"
                         />
                         <span>
-                          <span className="block font-black text-slate-950">
+                          <span className="block font-black text-[#10251f]">
                             Šis kontaktinis asmuo turi teisę gauti informaciją
                             apie gyventoją
                           </span>
-                          <span className="mt-1 block text-sm font-semibold text-slate-600">
+                          <span className="mt-1 block text-sm font-semibold text-[#526174]">
                             Pažymėk tik kai yra pagrindas: gyventojo sutikimas,
                             įgaliojimas arba teisėtas atstovavimas.
                           </span>
@@ -1825,14 +2012,16 @@ function ResidentModal({
                 <button
                   type="button"
                   onClick={addContact}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 font-extrabold text-emerald-700 transition hover:bg-emerald-100"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#a7f3d0] bg-emerald-50 px-4 py-3 font-extrabold text-[#047857] transition hover:bg-emerald-100"
                 >
                   <Plus className="h-4 w-4" />
                   Pridėti dar vieną artimąjį
                 </button>
               </div>
             </FormSection>
+            ) : null}
 
+            {popupTab === "staff" ? (
             <FormSection
               icon={<Users className="h-5 w-5" />}
               title="Priskirti darbuotojai"
@@ -1844,9 +2033,9 @@ function ResidentModal({
                 text="Pažymėti darbuotojai matys gyventoją pagal tavo teisių logiką. Pirmas pasirinktas darbuotojas laikomas pagrindiniu atsakingu, o kitus galima priskirti kaip papildomus."
               />
 
-              <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mt-4 rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
                 {staffMembers.length === 0 ? (
-                  <p className="font-semibold text-slate-500">
+                  <p className="font-semibold text-[#66756c]">
                     Aktyvių darbuotojų nerasta. Pirmiausia pridėk darbuotojus
                     komandos modulyje.
                   </p>
@@ -1854,24 +2043,28 @@ function ResidentModal({
                   <div className="space-y-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <label className="relative block w-full lg:max-w-md">
-                        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a9a91]" />
                         <input
                           value={staffSearch}
                           onChange={(event) =>
                             setStaffSearch(event.target.value)
                           }
-                          placeholder="Ieškoti darbuotojo pagal vardą ar pareigas..."
-                          className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-emerald-300"
+                          placeholder="Rašyk vardą, el. paštą ar pareigas..."
+                          className="w-full rounded-2xl border border-[#dbe6e0] bg-white py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-[#047857]"
                         />
                       </label>
 
-                      <p className="text-sm font-black text-slate-500">
+                      <p className="text-sm font-black text-[#66756c]">
                         Pasirinkta: {form.assigned_staff_ids.length}
                       </p>
                     </div>
 
                     {form.assigned_staff_ids.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
+                      <div>
+                        <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-[#526174]">
+                          Pasirinkti darbuotojai
+                        </p>
+                        <div className="flex flex-wrap gap-2">
                         {form.assigned_staff_ids.map((userId, index) => {
                           const member = staffMembers.find(
                             (item) => item.user_id === userId,
@@ -1882,23 +2075,29 @@ function ResidentModal({
                               key={userId}
                               type="button"
                               onClick={() => toggleStaff(userId)}
-                              className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-700 transition hover:bg-emerald-100"
+                              className="rounded-full border border-[#a7f3d0] bg-emerald-50 px-3 py-2 text-sm font-black text-[#047857] transition hover:bg-emerald-100"
                             >
                               {staffName(member)}
                               {index === 0 ? " · pagrindinis" : ""} ×
                             </button>
                           );
                         })}
+                        </div>
                       </div>
                     ) : null}
 
-                    <div className="max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white">
-                      {filteredStaffMembers.length === 0 ? (
-                        <p className="p-4 font-semibold text-slate-500">
+                    <div className="rounded-2xl border border-[#dbe6e0] bg-white">
+                      {!staffSearchActive ? (
+                        <div className="p-4 text-sm font-bold leading-6 text-[#526174]">
+                          Pradėk rašyti bent 2 raides — tada parodysime iki 8 tinkamų darbuotojų. Taip nereikia slinkti per visą darbuotojų sąrašą.
+                        </div>
+                      ) : filteredStaffMembers.length === 0 ? (
+                        <p className="p-4 font-semibold text-[#66756c]">
                           Pagal paiešką darbuotojų nerasta.
                         </p>
                       ) : (
-                        filteredStaffMembers.map((member) => {
+                        <div className="max-h-72 overflow-y-auto">
+                        {filteredStaffMembers.map((member) => {
                           const checked = form.assigned_staff_ids.includes(
                             member.user_id,
                           );
@@ -1909,7 +2108,7 @@ function ResidentModal({
                           return (
                             <div
                               key={member.user_id}
-                              className={`flex items-center justify-between gap-3 border-b border-slate-100 p-3 last:border-b-0 ${
+                              className={`flex items-center justify-between gap-3 border-b border-[#eef4f1] p-3 last:border-b-0 ${
                                 checked ? "bg-emerald-50" : "bg-white"
                               }`}
                             >
@@ -1922,10 +2121,10 @@ function ResidentModal({
                                 />
 
                                 <span className="min-w-0">
-                                  <span className="block truncate font-black text-slate-950">
+                                  <span className="block truncate font-black text-[#10251f]">
                                     {staffName(member)}
                                   </span>
-                                  <span className="block truncate text-sm font-semibold text-slate-500">
+                                  <span className="block truncate text-sm font-semibold text-[#66756c]">
                                     {staffRoleLabel(member) || "Darbuotojas"}
                                     {isPrimary ? " · pagrindinis" : ""}
                                   </span>
@@ -1938,21 +2137,24 @@ function ResidentModal({
                                   onClick={() =>
                                     moveStaffToPrimary(member.user_id)
                                   }
-                                  className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-black text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-100"
+                                  className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-black text-[#047857] ring-1 ring-emerald-200 transition hover:bg-emerald-100"
                                 >
                                   Pagrindinis
                                 </button>
                               ) : null}
                             </div>
                           );
-                        })
+                        })}
+                        </div>
                       )}
                     </div>
                   </div>
                 )}
               </div>
             </FormSection>
+            ) : null}
 
+            {popupTab === "notes" ? (
             <FormSection
               title="Papildoma informacija"
               description="Vidinės pastabos darbuotojams. Nerašyk perteklinių ar nebūtinų jautrių duomenų."
@@ -1979,12 +2181,13 @@ function ResidentModal({
                 </Field>
               </div>
             </FormSection>
+            ) : null}
 
-            <div className="sticky bottom-0 -mx-6 flex flex-col-reverse gap-3 border-t border-slate-100 bg-white px-6 py-4 sm:flex-row sm:justify-end">
+            <div className="sticky bottom-0 -mx-5 flex flex-col-reverse gap-3 border-t border-[#dbe6e0] bg-white/95 px-5 py-4 backdrop-blur sm:flex-row sm:justify-end md:-mx-6 md:px-6">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-2xl border border-slate-200 bg-white px-6 py-3 font-extrabold text-slate-700 transition hover:bg-slate-50"
+                className="rounded-[14px] border border-[#dbe6e0] bg-white px-6 py-3 font-extrabold text-[#486b5d] transition hover:bg-[#f8faf8]"
               >
                 Atšaukti
               </button>
@@ -1992,7 +2195,7 @@ function ResidentModal({
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-6 py-3 font-extrabold text-white transition hover:bg-emerald-800 disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#047857] px-6 py-3 font-extrabold text-white transition hover:bg-[#036747] disabled:opacity-60"
               >
                 <CheckCircle2 className="h-5 w-5" />
                 {saving ? "Saugoma..." : "Išsaugoti gyventoją"}
@@ -2007,9 +2210,9 @@ function ResidentModal({
 
 function HelpCard({ title, text }: { title: string; text: string }) {
   return (
-    <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-      <h3 className="text-base font-black text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+    <article className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+      <h3 className="text-base font-black text-[#10251f]">{title}</h3>
+      <p className="mt-2 text-sm font-semibold leading-6 text-[#526174]">
         {text}
       </p>
     </article>
@@ -2028,19 +2231,19 @@ function FormSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+    <section className="rounded-[28px] border border-[#dbe6e0] bg-[#f8faf8] p-5">
       <div className="mb-5 flex items-start gap-3">
         {icon ? (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#047857] shadow-sm">
             {icon}
           </div>
         ) : null}
         <div>
-          <h3 className="text-xl font-black tracking-tight text-slate-950">
+          <h3 className="text-xl font-black tracking-tight text-[#10251f]">
             {title}
           </h3>
           {description ? (
-            <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+            <p className="mt-1 text-sm font-semibold leading-6 text-[#66756c]">
               {description}
             </p>
           ) : null}
@@ -2060,7 +2263,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">
+      <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-[#66756c]">
         {label}
       </span>
       {children}
@@ -2069,4 +2272,4 @@ function Field({
 }
 
 const inputClass =
-  "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold outline-none transition focus:border-emerald-300 focus:bg-white";
+  "w-full rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 font-semibold outline-none transition focus:border-[#047857] focus:bg-white focus:ring-4 focus:ring-[#047857]/10";

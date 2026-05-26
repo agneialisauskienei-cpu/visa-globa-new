@@ -11,6 +11,8 @@ import {
   Umbrella,
   XCircle,
 } from "lucide-react";
+import { getChangedFields, logAudit } from "@/lib/audit";
+import { getCurrentOrganizationId } from "@/lib/current-organization";
 
 type Employee = {
   user_id: string;
@@ -320,6 +322,30 @@ function normalizeTimeInput(value?: string) {
   return `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+
+async function writeVacationAudit(args: {
+  tableName?: string;
+  recordId?: string | null;
+  action: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+}) {
+  try {
+    const organizationId = await getCurrentOrganizationId();
+    if (!organizationId) return;
+
+    await logAudit({
+      organizationId,
+      tableName: args.tableName || "vacation_requests",
+      recordId: args.recordId || null,
+      action: args.action,
+      changes: getChangedFields(args.before || {}, args.after || {}),
+    });
+  } catch (error) {
+    console.warn("[vacation-requests] audit failed", error);
+  }
+}
+
 function timeRangeHours(start?: string, end?: string) {
   const from = normalizeTimeInput(start);
   const to = normalizeTimeInput(end);
@@ -613,6 +639,11 @@ export default function VacationRequests({
 
     try {
       await onSubmit(allowNegativeBalance ? { allowNegativeBalance: true } : undefined);
+      await writeVacationAudit({
+        recordId: optimisticId,
+        action: "vacation_request.created",
+        after: optimisticRequest as unknown as Record<string, unknown>,
+      });
     } catch (error) {
       setOptimisticRequests((previous) =>
         previous.filter((request) => request.id !== optimisticId),
@@ -637,6 +668,15 @@ export default function VacationRequests({
 
     try {
       await onApprove(id);
+      const existing = allRequests.find((request) => request.id === id);
+      if (existing) {
+        await writeVacationAudit({
+          recordId: id,
+          action: "vacation_request.approved",
+          before: existing as unknown as Record<string, unknown>,
+          after: { ...(existing as unknown as Record<string, unknown>), status: "approved" },
+        });
+      }
     } catch (error) {
       setOptimisticRequests((previous) =>
         previous.filter((request) => request.id !== id),
@@ -661,6 +701,15 @@ export default function VacationRequests({
 
     try {
       await onReject(id);
+      const existing = allRequests.find((request) => request.id === id);
+      if (existing) {
+        await writeVacationAudit({
+          recordId: id,
+          action: "vacation_request.rejected",
+          before: existing as unknown as Record<string, unknown>,
+          after: { ...(existing as unknown as Record<string, unknown>), status: "rejected" },
+        });
+      }
     } catch (error) {
       setOptimisticRequests((previous) =>
         previous.filter((request) => request.id !== id),

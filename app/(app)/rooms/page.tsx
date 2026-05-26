@@ -10,6 +10,7 @@ import {
   Bed,
   Building2,
   CheckCircle2,
+  CalendarDays,
   DoorOpen,
   Download,
   Hammer,
@@ -29,6 +30,7 @@ type Gender = "male" | "female" | "mixed" | ""
 type RoomType = "single" | "double" | "triple" | "quad" | "other"
 type AssignMode = "active" | "arriving_soon" | "hospital" | "temporary_leave"
 type ModalMode = "details" | "reserve"
+type RoomTab = "overview" | "rooms" | "occupancy" | "reservations" | "repairs" | "export"
 
 type RoomRow = {
   id: string
@@ -344,6 +346,12 @@ function normalizeRoom(row: RoomRow, residents: Resident[]): Room {
       isReservedResidentStatus(resident)
   )
 
+  const legacyOccupied =
+    row.occupied_by && activeResidents.length === 0 && reservedResidents.length === 0 ? 1 : 0
+
+  const legacyReserved =
+    row.reserved_for && reservedResidents.length === 0 ? 1 : 0
+
   return {
     id: row.id,
     organization_id: row.organization_id,
@@ -368,8 +376,8 @@ function normalizeRoom(row: RoomRow, residents: Resident[]): Room {
     reserved_for: row.reserved_for || null,
     reserved_until: row.reserved_until || null,
     room_status: row.room_status || null,
-    occupied: activeResidents.length + (row.occupied_by ? 1 : 0),
-    reserved: reservedResidents.length + (row.reserved_for ? 1 : 0),
+    occupied: activeResidents.length + legacyOccupied,
+    reserved: reservedResidents.length + legacyReserved,
   }
 }
 
@@ -423,11 +431,11 @@ function Badge({
   tone?: "green" | "blue" | "warning" | "danger" | "neutral"
 }) {
   const tones = {
-    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    green: "border-[#a7f3d0] bg-[#eefaf3] text-[#047857]",
     blue: "border-blue-200 bg-blue-50 text-blue-700",
     warning: "border-amber-200 bg-amber-50 text-amber-700",
     danger: "border-red-200 bg-red-50 text-red-700",
-    neutral: "border-slate-200 bg-slate-50 text-slate-600",
+    neutral: "border-[#dbe6e0] bg-[#f8faf8] text-[#526174]",
   }
 
   return (
@@ -449,33 +457,33 @@ function StatCard({
   badge?: ReactNode
 }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-[24px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eefaf3] text-[#047857]">
           {icon}
         </div>
         {badge}
       </div>
-      <div className="text-3xl font-black tracking-[-0.04em] text-slate-950">{value}</div>
-      <div className="mt-1 text-sm font-bold text-slate-500">{label}</div>
+      <div className="text-3xl font-black tracking-[-0.04em] text-white">{value}</div>
+      <div className="mt-1 text-sm font-bold text-[#66756c]">{label}</div>
     </div>
   )
 }
 
 function CompactRoomInfo({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-2xl font-black text-slate-950">{value}</div>
-      <div className="mt-1 text-sm font-bold text-slate-500">{label}</div>
+    <div className="rounded-[22px] border border-[#dbe6e0] bg-white p-4 shadow-sm">
+      <div className="text-2xl font-black text-[#10251f]">{value}</div>
+      <div className="mt-1 text-sm font-bold text-[#66756c]">{label}</div>
     </div>
   )
 }
 
 function Panel({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-[22px] border border-[#c9d8d0] bg-white shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
       <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-5">
-        <h3 className="text-[17px] font-black tracking-tight text-slate-950">{title}</h3>
+        <h3 className="text-[17px] font-black tracking-tight text-[#10251f]">{title}</h3>
         {action}
       </div>
       <div className="px-5 pb-5 pt-2">{children}</div>
@@ -486,8 +494,8 @@ function Panel({ title, children, action }: { title: string; children: ReactNode
 function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="grid grid-cols-[130px_1fr] gap-3 text-sm">
-      <div className="font-bold text-slate-500">{label}</div>
-      <div className="font-black text-slate-800">{value}</div>
+      <div className="font-bold text-[#66756c]">{label}</div>
+      <div className="font-black text-[#10251f]">{value}</div>
     </div>
   )
 }
@@ -495,17 +503,27 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="space-y-2">
-      <span className="block text-sm font-black text-slate-700">{label}</span>
+      <span className="block text-sm font-black text-[#486b5d]">{label}</span>
       {children}
     </label>
   )
 }
 
 const inputClass =
-  "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+  "h-12 w-full rounded-2xl border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
 
 const textareaClass =
-  "min-h-[104px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+  "min-h-[104px] w-full rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+
+
+const ROOM_TABS: Array<{ value: RoomTab; label: string; icon: ReactNode }> = [
+  { value: "overview", label: "Apžvalga", icon: <Home size={16} /> },
+  { value: "rooms", label: "Kambariai", icon: <DoorOpen size={16} /> },
+  { value: "occupancy", label: "Užimtumas", icon: <Users size={16} /> },
+  { value: "reservations", label: "Rezervacijos", icon: <CalendarDays size={16} /> },
+  { value: "repairs", label: "Remontas", icon: <Hammer size={16} /> },
+  { value: "export", label: "Eksportas", icon: <Download size={16} /> },
+]
 
 export default function RoomsPage() {
   const [organizationId, setOrganizationId] = useState<string | null>(null)
@@ -522,6 +540,7 @@ export default function RoomsPage() {
   const [floorFilter, setFloorFilter] = useState<string>("all")
   const [genderFilter, setGenderFilter] = useState<Gender | "all">("all")
   const [featureFilter, setFeatureFilter] = useState<string>("all")
+  const [activeTab, setActiveTab] = useState<RoomTab>("overview")
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [modalMode, setModalMode] = useState<ModalMode>("details")
@@ -629,6 +648,55 @@ export default function RoomsPage() {
 
     return { capacity, occupied, reserved, free }
   }, [rooms])
+
+  const reservationRows = useMemo(() => {
+    return residents.filter(
+      (resident) =>
+        resident.is_active !== false &&
+        !resident.archived_at &&
+        (isReservedResidentStatus(resident) || Boolean(resident.room_reserved_until))
+    )
+  }, [residents])
+
+  const repairRooms = useMemo(() => {
+    return rooms.filter((room) => room.room_status === "repair" || room.room_status === "preparing" || room.room_status === "inactive")
+  }, [rooms])
+
+  const roomAlerts = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const capacityAlerts = rooms
+      .filter((room) => room.occupied + room.reserved > room.capacity)
+      .map((room) => ({
+        title: `Viršyta talpa · ${room.name}`,
+        text: `Talpa ${room.capacity}, užimta ${room.occupied}, rezervuota ${room.reserved}.`,
+        tone: "danger" as const,
+      }))
+
+    const expiredReservations = reservationRows
+      .filter((resident) => {
+        if (!resident.room_reserved_until) return false
+        const date = new Date(resident.room_reserved_until)
+        date.setHours(0, 0, 0, 0)
+        return Number.isFinite(date.getTime()) && date < today
+      })
+      .map((resident) => ({
+        title: `Pasibaigusi rezervacija · ${residentName(resident)}`,
+        text: `Rezervuota iki ${formatDate(resident.room_reserved_until)}. Reikia pratęsti arba patvirtinti atvykimą.`,
+        tone: "warning" as const,
+      }))
+
+    const repairAlerts = repairRooms.map((room) => ({
+      
+      title: `${room.room_status === "repair" ? "Remontuojamas" : room.room_status === "preparing" ? "Ruošiamas" : "Neaktyvus"} · ${room.name}`,
+      text: `${room.floor ?? "—"} aukštas · ${formatType(room.room_type)} · ${room.notes || "Pastabų nėra."}`,
+      tone: room.room_status === "repair" || room.room_status === "inactive" ? ("danger" as const) : ("warning" as const),
+    }))
+
+    return [...capacityAlerts, ...expiredReservations, ...repairAlerts].slice(0, 8)
+  }, [rooms, reservationRows, repairRooms])
+
 
   async function loadOrganization() {
     setLoading(true)
@@ -1020,7 +1088,7 @@ export default function RoomsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f5f7f4] px-4 py-8 lg:px-8">
-        <div className="mx-auto max-w-[1520px] rounded-[28px] border border-slate-200 bg-white p-8 text-sm font-black text-slate-500 shadow-sm">
+        <div className="mx-auto max-w-[1500px] rounded-[28px] border border-[#dbe6e0] bg-white p-8 text-sm font-black text-[#66756c] shadow-sm">
           Kraunamas kambarių modulis...
         </div>
       </div>
@@ -1028,22 +1096,22 @@ export default function RoomsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f7f4] px-4 py-6 text-slate-950 lg:px-8">
-      <div className="mx-auto max-w-[1520px]">
-        <section className="mb-6 rounded-[30px] border border-slate-200 bg-white p-7 shadow-sm">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+    <div className="min-h-screen bg-[#f3f6f4] px-4 py-6 text-[#10251f] lg:px-8">
+      <div className="mx-auto max-w-[1500px]">
+        <section className="mb-5 overflow-hidden rounded-[30px] border border-emerald-900/10 bg-[#486b5d] shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
+          <div className="flex flex-col gap-6 px-7 py-7 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-center gap-5">
-              <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-emerald-50 text-emerald-700">
+              <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[28px] bg-[#e8f7ef] text-[#486b5d]">
                 <Home size={36} />
               </div>
               <div>
-                <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-emerald-100/80">
                   Kambariai / Užimtumas / Rezervacijos
                 </div>
-                <h1 className="text-4xl font-black tracking-[-0.04em] text-slate-950">
+                <h1 className="text-4xl font-black tracking-[-0.04em] text-white">
                   Kambarių valdymas
                 </h1>
-                <p className="mt-2 text-base font-bold text-slate-500">
+                <p className="mt-2 text-base font-bold text-emerald-50/90">
                   Kambariai, gyventojai, privalumai, rezervacijos ir paruošimo būsenos vienoje vietoje.
                 </p>
               </div>
@@ -1053,7 +1121,7 @@ export default function RoomsPage() {
               <button
                 type="button"
                 onClick={() => setBulkOpen((prev) => !prev)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8]"
               >
                 <Layers size={17} />
                 Masinis kūrimas
@@ -1061,7 +1129,7 @@ export default function RoomsPage() {
               <button
                 type="button"
                 onClick={exportRooms}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8]"
               >
                 <Download size={17} />
                 Eksportuoti
@@ -1069,12 +1137,42 @@ export default function RoomsPage() {
               <button
                 type="button"
                 onClick={openNewRoom}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800"
+                className="inline-flex items-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747]"
               >
                 <Plus size={18} />
                 Naujas kambarys
               </button>
             </div>
+          </div>
+        </section>
+
+        <section className="mb-5 rounded-[24px] border border-[#c9d8d0] bg-[#eef4f1] p-3 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+          <div className="flex flex-wrap gap-2">
+            {ROOM_TABS.map((tab) => {
+              const isActive = activeTab === tab.value
+
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.value)
+                    if (tab.value === "export") exportRooms()
+                    if (tab.value === "reservations") setStatusFilter("reserved")
+                    if (tab.value === "repairs") setStatusFilter("repair")
+                    if (tab.value === "rooms") setStatusFilter("all")
+                  }}
+                  className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                    isActive
+                      ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                      : "text-[#486b5d] hover:bg-white/70"
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              )
+            })}
           </div>
         </section>
 
@@ -1085,7 +1183,7 @@ export default function RoomsPage() {
         ) : null}
 
         {success ? (
-          <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+          <div className="mb-5 rounded-2xl border border-[#a7f3d0] bg-[#eefaf3] px-4 py-3 text-sm font-bold text-[#047857]">
             {success}
           </div>
         ) : null}
@@ -1098,19 +1196,95 @@ export default function RoomsPage() {
           <StatCard icon={<CheckCircle2 size={21} />} value={stats.free} label="Laisvų vietų" badge={<Badge tone="green">Laisva</Badge>} />
         </section>
 
+        <section className="mb-5 rounded-[26px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-black uppercase tracking-[0.18em] text-[#047857]">Reikia dėmesio</div>
+              <h2 className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#10251f]">Kambarių rizikos ir veiksmai</h2>
+              <p className="mt-1 text-sm font-bold text-[#526174]">
+                Čia rodomi pasibaigusių rezervacijų, remontuojamų kambarių ir talpos konfliktų signalai.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Badge tone="warning">Rezervacijų: {reservationRows.length}</Badge>
+              <Badge tone="danger">Remontas / neaktyvūs: {repairRooms.length}</Badge>
+              <Badge tone="green">Laisva vietų: {stats.free}</Badge>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            {roomAlerts.length ? (
+              roomAlerts.map((alert) => (
+                <div
+                  key={`${alert.title}-${alert.text}`}
+                  className={`rounded-[18px] border p-4 ${
+                    alert.tone === "danger"
+                      ? "border-red-200 bg-red-50 text-red-900"
+                      : "border-amber-200 bg-amber-50 text-amber-900"
+                  }`}
+                >
+                  <div className="font-black">{alert.title}</div>
+                  <p className="mt-1 text-sm font-bold leading-6 opacity-85">{alert.text}</p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-bold text-[#526174] lg:col-span-3">
+                Šiuo metu kritinių kambarių įspėjimų nėra.
+              </div>
+            )}
+          </div>
+        </section>
+
+        {activeTab === "reservations" ? (
+          <section className="mb-5 rounded-[26px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-black tracking-[-0.03em] text-[#10251f]">Rezervacijų sąrašas</h2>
+                <p className="mt-1 text-sm font-bold text-[#526174]">Visi gyventojai su statusu „Netrukus atvyks“ arba rezervacijos data.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("reserved")}
+                className="rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-sm font-black text-[#486b5d] hover:bg-[#eef4f1]"
+              >
+                Filtruoti kambarius
+              </button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {reservationRows.length ? (
+                reservationRows.map((resident) => (
+                  <div key={resident.id} className="rounded-[18px] border border-amber-200 bg-amber-50 p-4">
+                    <div className="font-black text-amber-950">{residentName(resident)}</div>
+                    <div className="mt-1 text-sm font-bold text-amber-800">
+                      {statusLabel(resident.current_status || resident.status)} · kambarys {rooms.find((room) => matchesRoom(resident, room))?.name || "nepriskirtas"}
+                    </div>
+                    <div className="mt-2 text-sm font-bold text-amber-800">Iki: {formatDate(resident.room_reserved_until)}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-[18px] border border-dashed border-[#dbe6e0] bg-[#f8faf8] p-5 text-sm font-bold text-[#526174]">
+                  Aktyvių rezervacijų nėra.
+                </div>
+              )}
+            </div>
+          </section>
+        ) : null}
+
         {bulkOpen ? (
-          <section className="mb-5 rounded-[26px] border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="mb-5 rounded-[26px] border border-[#dbe6e0] bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-black tracking-[-0.03em]">Masinis kambarių kūrimas</h2>
-                <p className="mt-1 text-sm font-bold text-slate-500">
+                <p className="mt-1 text-sm font-bold text-[#66756c]">
                   Greitai sukurk vienviečius, dviviečius, triviečius ar kitus kambarius.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setBulkOpen(false)}
-                className="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-slate-100 text-[#526174] transition hover:bg-slate-200"
               >
                 <X size={17} />
               </button>
@@ -1165,7 +1339,7 @@ export default function RoomsPage() {
                 type="button"
                 onClick={bulkCreateRooms}
                 disabled={saving}
-                className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                className="rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
               >
                 {saving ? "Kuriama..." : "Sukurti kambarius"}
               </button>
@@ -1173,9 +1347,9 @@ export default function RoomsPage() {
           </section>
         ) : null}
 
-        <section className="mb-5 grid gap-3 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm lg:grid-cols-[1.4fr_repeat(6,1fr)_auto]">
+        <section className="mb-5 grid gap-3 rounded-[24px] border border-[#c9d8d0] bg-white p-3 shadow-[0_1px_3px_rgba(16,37,31,0.10)] lg:grid-cols-[1.4fr_repeat(6,1fr)_auto]">
           <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94a39b]" />
             <input
               className={`${inputClass} pl-11`}
               value={query}
@@ -1253,7 +1427,7 @@ export default function RoomsPage() {
               setTypeFilter("all")
               setFeatureFilter("all")
             }}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+            className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] hover:bg-[#f8faf8]"
           >
             Valyti
           </button>
@@ -1272,11 +1446,11 @@ export default function RoomsPage() {
             const percent = room.capacity ? Math.min((used / room.capacity) * 100, 100) : 0
 
             return (
-              <article key={room.id} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-                <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-5">
+              <article key={room.id} className="overflow-hidden rounded-[28px] border border-[#c9d8d0] bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)]">
+                <div className="flex items-start justify-between gap-3 border-b border-[#dbe6e0] p-5">
                   <div>
-                    <div className="text-2xl font-black tracking-[-0.04em] text-slate-950">{room.name}</div>
-                    <div className="mt-1 text-sm font-bold text-slate-500">
+                    <div className="text-2xl font-black tracking-[-0.04em] text-[#10251f]">{room.name}</div>
+                    <div className="mt-1 text-sm font-bold text-[#66756c]">
                       {room.floor ?? "—"} aukštas · {formatType(room.room_type)} · {formatGender(room.gender)}
                     </div>
                   </div>
@@ -1285,27 +1459,27 @@ export default function RoomsPage() {
 
                 <div className="p-5">
                   <div className="mb-4 grid grid-cols-3 gap-3">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-2xl font-black text-slate-950">{room.capacity}</div>
-                      <div className="text-xs font-bold text-slate-500">talpa</div>
+                    <div className="rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
+                      <div className="text-2xl font-black text-[#10251f]">{room.capacity}</div>
+                      <div className="text-xs font-bold text-[#66756c]">talpa</div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-2xl font-black text-slate-950">{room.occupied}</div>
-                      <div className="text-xs font-bold text-slate-500">gyvena</div>
+                    <div className="rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
+                      <div className="text-2xl font-black text-[#10251f]">{room.occupied}</div>
+                      <div className="text-xs font-bold text-[#66756c]">gyvena</div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-2xl font-black text-slate-950">{room.reserved}</div>
-                      <div className="text-xs font-bold text-slate-500">rezerv.</div>
+                    <div className="rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
+                      <div className="text-2xl font-black text-[#10251f]">{room.reserved}</div>
+                      <div className="text-xs font-bold text-[#66756c]">rezerv.</div>
                     </div>
                   </div>
 
-                  <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-[#eef4f1]">
                     <div className={`h-full rounded-full ${visual.bar}`} style={{ width: `${percent}%` }} />
                   </div>
 
                   <div className="mb-4 flex flex-wrap gap-2">
                     {featureList(room).slice(0, 5).map((feature) => (
-                      <span key={feature} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">
+                      <span key={feature} className="rounded-full border border-[#dbe6e0] bg-[#f8faf8] px-3 py-1 text-xs font-black text-[#526174]">
                         {feature}
                       </span>
                     ))}
@@ -1314,10 +1488,10 @@ export default function RoomsPage() {
                   <div className="grid gap-2">
                     {residentsInRoom.length ? (
                       residentsInRoom.slice(0, 3).map((resident) => (
-                        <div key={resident.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <div key={resident.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
                           <div>
-                            <div className="text-sm font-black text-slate-950">{residentName(resident)}</div>
-                            <div className="mt-0.5 text-xs font-bold text-slate-500">
+                            <div className="text-sm font-black text-[#10251f]">{residentName(resident)}</div>
+                            <div className="mt-0.5 text-xs font-bold text-[#66756c]">
                               {statusLabel(resident.current_status || resident.status)}
                               {resident.room_reserved_until ? ` · iki ${formatDate(resident.room_reserved_until)}` : ""}
                             </div>
@@ -1333,7 +1507,7 @@ export default function RoomsPage() {
                         {room.reserved_until ? ` · iki ${formatDate(room.reserved_until)}` : ""}
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                      <div className="rounded-2xl border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-4 text-sm font-bold text-[#66756c]">
                         Kambarys laisvas arba gyventojai nepriskirti.
                       </div>
                     )}
@@ -1343,14 +1517,14 @@ export default function RoomsPage() {
                     <button
                       type="button"
                       onClick={() => openRoom(room)}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                      className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] hover:bg-[#f8faf8]"
                     >
                       Detalės
                     </button>
                     <button
                       type="button"
                       onClick={() => openRoom(room, "reserve")}
-                      className="rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800"
+                      className="rounded-2xl bg-[#047857] px-4 py-3 text-sm font-black text-white transition hover:bg-[#036747]"
                     >
                       Rezervuoti
                     </button>
@@ -1361,33 +1535,26 @@ export default function RoomsPage() {
           })}
 
           {!filteredRooms.length ? (
-            <div className="col-span-full rounded-[28px] border border-dashed border-slate-300 bg-white p-10 text-center text-sm font-bold text-slate-500">
+            <div className="col-span-full rounded-[28px] border border-dashed border-[#c9d8d0] bg-white p-10 text-center text-sm font-bold text-[#66756c]">
               Pagal pasirinktus filtrus kambarių nerasta.
             </div>
           ) : null}
         </section>
 
         {selectedRoomId ? (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/45 px-4 py-6">
-            <button
-              type="button"
-              onClick={closeModal}
-              className="fixed right-4 top-4 z-[60] grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-xl hover:bg-slate-50"
-              aria-label="Uždaryti"
-            >
-              <X size={20} />
-            </button>
-            <div className="mx-auto max-w-[1280px] overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
-              <div className="sticky top-0 z-20 flex flex-col gap-4 border-b border-slate-200 bg-white p-6 xl:flex-row xl:items-start xl:justify-between">
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950/50 p-6 backdrop-blur-sm">
+            
+            <div className="w-full max-w-[1180px] max-h-[calc(100vh-48px)] overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+              <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
                 <div className="flex items-center gap-4">
-                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-emerald-50 text-2xl font-black text-emerald-700">
+                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-[#eefaf3] text-2xl font-black text-[#047857]">
                     {selectedRoomId === "new" ? "+" : selectedRoom?.name}
                   </div>
                   <div>
-                    <div className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                    <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-emerald-100/80">
                       Kambario detalės
                     </div>
-                    <h2 className="text-3xl font-black tracking-[-0.04em] text-slate-950">
+                    <h2 className="text-3xl font-black tracking-[-0.04em] text-white">
                       {selectedRoomId === "new" ? "Naujas kambarys" : modalMode === "reserve" ? `Rezervuoti vietą · ${selectedRoom?.name}` : `Kambarys ${selectedRoom?.name}`}
                     </h2>
                     {selectedRoom ? (
@@ -1408,7 +1575,7 @@ export default function RoomsPage() {
                       type="button"
                       onClick={() => deleteRoom(selectedRoom.id)}
                       disabled={saving}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 hover:bg-red-100 disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 hover:bg-red-100 disabled:opacity-60"
                     >
                       <Trash2 size={17} />
                       Ištrinti
@@ -1417,16 +1584,16 @@ export default function RoomsPage() {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                    className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
                   >
-                    <X size={18} />
+                    <X size={28} strokeWidth={2.1} />
                   </button>
                 </div>
               </div>
 
               {modalMode === "reserve" && selectedRoom ? (
-                <div className="p-6">
-                  <div className="mx-auto max-w-3xl">
+                <div className="max-h-[calc(100vh-172px)] overflow-y-auto bg-[#f3f6f4] p-5">
+                  <div className="mx-auto max-w-[720px]">
                     <Panel
                       title="Rezervuoti vietą"
                       action={<Badge tone="warning">Tik rezervacija</Badge>}
@@ -1508,7 +1675,7 @@ export default function RoomsPage() {
                             type="button"
                             onClick={assignResident}
                             disabled={saving}
-                            className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                            className="rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
                           >
                             {saving
                               ? "Saugoma..."
@@ -1520,7 +1687,7 @@ export default function RoomsPage() {
                           <button
                             type="button"
                             onClick={() => setModalMode("details")}
-                            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                            className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] hover:bg-[#f8faf8]"
                           >
                             Atidaryti visas detales
                           </button>
@@ -1536,7 +1703,7 @@ export default function RoomsPage() {
                   </div>
                 </div>
               ) : (
-              <div className="grid gap-5 p-6 xl:grid-cols-[340px_1fr_340px]">
+              <div className="max-h-[calc(100vh-190px)] overflow-y-auto bg-[#f3f6f4] p-6"><div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)_300px]">
                 <div className="grid gap-5">
                   <Panel title="Pagrindinė informacija">
                     <div className="grid gap-4">
@@ -1594,7 +1761,7 @@ export default function RoomsPage() {
                         ["functional_bed", "Funkcinė lova"],
                         ["wheelchair_accessible", "Pritaikyta vežimėliui"],
                       ].map(([key, label]) => (
-                        <label key={key} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
+                        <label key={key} className="flex items-center gap-3 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-sm font-black text-[#486b5d]">
                           <input
                             type="checkbox"
                             checked={Boolean(roomForm[key as keyof RoomForm])}
@@ -1617,7 +1784,7 @@ export default function RoomsPage() {
                           <option value="inactive">Neaktyvus</option>
                         </select>
                       </Field>
-                      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
+                      <label className="flex items-center gap-3 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-sm font-black text-[#486b5d]">
                         <input
                           type="checkbox"
                           checked={roomForm.is_active}
@@ -1632,7 +1799,7 @@ export default function RoomsPage() {
                         type="button"
                         onClick={saveRoom}
                         disabled={saving}
-                        className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                        className="rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
                       >
                         {saving ? "Saugoma..." : "Išsaugoti kambarį"}
                       </button>
@@ -1640,13 +1807,14 @@ export default function RoomsPage() {
                   </Panel>
                 </div>
 
+                {selectedRoomId !== "new" ? (
                 <div className="grid gap-5">
                   <Panel
                     title="Lovos / vietos"
                     action={selectedRoom ? <Badge tone={roomVisual(selectedRoom).tone}>{roomVisual(selectedRoom).label}</Badge> : null}
                   >
                     {selectedRoomId === "new" ? (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-bold text-slate-500">
+                      <div className="rounded-2xl border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-6 text-sm font-bold text-[#66756c]">
                         Išsaugok kambarį, tada galėsi priskirti ar rezervuoti gyventojus.
                       </div>
                     ) : (
@@ -1662,19 +1830,19 @@ export default function RoomsPage() {
                           const bedName = `Lova ${String.fromCharCode(65 + index)}`
 
                           return (
-                            <div key={bedName} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div key={bedName} className="rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
                               <div className="mb-3 flex items-center justify-between gap-3">
-                                <div className="font-black text-slate-950">{bedName}</div>
+                                <div className="font-black text-[#10251f]">{bedName}</div>
                                 <Badge tone={resident ? (resident.current_status === "arriving_soon" ? "warning" : "green") : "neutral"}>
                                   {resident ? statusLabel(resident.current_status || resident.status) : "Laisva"}
                                 </Badge>
                               </div>
 
                               {resident ? (
-                                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex flex-col gap-3 rounded-2xl border border-[#dbe6e0] bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                                   <div>
-                                    <div className="font-black text-slate-950">{residentName(resident)}</div>
-                                    <div className="mt-1 text-sm font-bold text-slate-500">
+                                    <div className="font-black text-[#10251f]">{residentName(resident)}</div>
+                                    <div className="mt-1 text-sm font-bold text-[#66756c]">
                                       {resident.care_level || "Priežiūros lygis nenurodytas"}
                                       {resident.room_reserved_until ? ` · Rezervuota iki ${formatDate(resident.room_reserved_until)}` : ""}
                                     </div>
@@ -1682,7 +1850,7 @@ export default function RoomsPage() {
                                   <div className="flex gap-2">
                                     <Link
                                       href={`/residents/${resident.id}`}
-                                      className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                                      className="rounded-2xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f8faf8]"
                                     >
                                       Kortelė
                                     </Link>
@@ -1690,7 +1858,7 @@ export default function RoomsPage() {
                                       <button
                                         type="button"
                                         onClick={() => confirmArrival(resident.id)}
-                                        className="rounded-2xl bg-emerald-700 px-3 py-2 text-xs font-black text-white hover:bg-emerald-800"
+                                        className="rounded-2xl bg-[#047857] px-3 py-2 text-xs font-black text-white hover:bg-[#036747]"
                                       >
                                         Atvyko
                                       </button>
@@ -1705,7 +1873,7 @@ export default function RoomsPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-sm font-bold text-slate-500">
+                                <div className="rounded-2xl border border-dashed border-[#c9d8d0] bg-white p-4 text-sm font-bold text-[#66756c]">
                                   Vieta laisva. Galima priskirti ar rezervuoti gyventoją.
                                 </div>
                               )}
@@ -1760,7 +1928,7 @@ export default function RoomsPage() {
                           type="button"
                           onClick={assignResident}
                           disabled={saving}
-                          className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                          className="rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
                         >
                           {saving ? "Saugoma..." : assignForm.mode === "arriving_soon" ? "Rezervuoti" : "Priskirti"}
                         </button>
@@ -1779,14 +1947,43 @@ export default function RoomsPage() {
                   </Panel>
                 </div>
 
+                ) : null}
+
                 <div className="grid gap-5">
+                  {selectedRoomId === "new" ? (
+                    <Panel title="Ką daryti toliau?">
+                      <div className="grid gap-4">
+                        <div className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-bold leading-6 text-[#526174]">
+                          Įvesk kambario pavadinimą, talpą, tipą ir privalumus. Išsaugojus kambarį atsiras lovų / vietų valdymas, gyventojo priskyrimas ir rezervacijos.
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={saveRoom}
+                          disabled={saving}
+                          className="inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
+                        >
+                          {saving ? "Saugoma..." : "Išsaugoti kambarį"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={closeModal}
+                          className="rounded-[14px] border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
+                        >
+                          Atšaukti
+                        </button>
+                      </div>
+                    </Panel>
+                  ) : (
+                  <>
                   <Panel title="Greiti veiksmai">
                     <div className="grid gap-3">
                       <button
                         type="button"
                         onClick={() => updateRoomStatus(null)}
                         disabled={!selectedRoom || selectedRoomId === "new"}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#047857] px-4 py-3 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
                       >
                         <CheckCircle2 size={17} />
                         Pažymėti kaip paruoštą
@@ -1804,7 +2001,7 @@ export default function RoomsPage() {
                         type="button"
                         onClick={() => updateRoomStatus("repair")}
                         disabled={!selectedRoom || selectedRoomId === "new"}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 hover:bg-red-100 disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-2 rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:opacity-60"
                       >
                         <Hammer size={17} />
                         Uždaryti remontui
@@ -1813,7 +2010,7 @@ export default function RoomsPage() {
                         type="button"
                         onClick={() => setAssignForm((prev) => ({ ...prev, mode: "arriving_soon" }))}
                         disabled={!selectedRoom || selectedRoomId === "new"}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] hover:bg-[#f8faf8] disabled:opacity-60"
                       >
                         <ArrowRightLeft size={17} />
                         Rezervuoti / perkelti
@@ -1842,12 +2039,14 @@ export default function RoomsPage() {
                       ) : null}
 
                       {!selectedRoom || (!selectedRoom.reserved && selectedRoom.occupied + selectedRoom.reserved < selectedRoom.capacity && selectedRoom.room_status !== "repair") ? (
-                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold leading-6 text-emerald-800">
+                        <div className="rounded-2xl border border-[#a7f3d0] bg-[#eefaf3] p-4 text-sm font-bold leading-6 text-[#036747]">
                           Kritinių įspėjimų nėra.
                         </div>
                       ) : null}
                     </div>
                   </Panel>
+                  </>
+                  )}
 
                   <Panel title="Kambario santrauka">
                     <div className="space-y-3">
@@ -1859,6 +2058,7 @@ export default function RoomsPage() {
                     </div>
                   </Panel>
                 </div>
+              </div>
               </div>
               )}
             </div>

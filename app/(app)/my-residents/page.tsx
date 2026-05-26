@@ -10,6 +10,9 @@ import {
   ClipboardList,
   Clock,
   Search,
+  Sparkles,
+  Stethoscope,
+  Wrench,
   Users,
   X,
 } from "lucide-react"
@@ -341,11 +344,11 @@ export default function MyResidentsPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-slate-950">
-        <div className="rounded-3xl border border-slate-200/70 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" />
-          <p className="mt-4 text-lg font-black text-slate-700">Kraunama...</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
+      <main className="flex min-h-screen items-center justify-center bg-[#f3f6f4] p-6 text-[#10251f]">
+        <div className="rounded-3xl border border-[#dbe6e0] bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-emerald-600" />
+          <p className="mt-4 text-lg font-black text-[#486b5d]">Kraunama...</p>
+          <p className="mt-1 text-sm font-semibold text-white/80">
             Ruošiame tavo priskirtų gyventojų ir užduočių sąrašą.
           </p>
         </div>
@@ -354,36 +357,47 @@ export default function MyResidentsPage() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-slate-50 pb-28 text-slate-950">
-      <section className="overflow-hidden rounded-b-[34px] bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-950 px-5 pb-7 pt-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.18)]">
-        <div className="flex items-start justify-between gap-4">
-          <button
-            type="button"
-            onClick={() => router.push(ROUTES.employeeDashboard)}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur transition active:scale-[0.98]"
-            aria-label="Grįžti į dashboard"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
+    <main className="min-h-screen overflow-x-hidden bg-[#f3f6f4] pb-28 text-[#10251f]">
+      <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]">
+        <div className="bg-[#486b5d] px-5 pb-6 pt-5 text-white">
+          <div className="flex items-start justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => router.push(ROUTES.employeeDashboard)}
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-[#e8f7ef] text-[#486b5d] shadow-sm transition active:scale-[0.98]"
+              aria-label="Grįžti į dashboard"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
 
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur">
-            <Users className="h-6 w-6" />
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-white/10 text-white backdrop-blur">
+              <Users className="h-6 w-6" />
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-100/80">
+              Mano gyventojai
+            </p>
+            <h1 className="mt-3 text-[34px] font-black leading-[1.04] tracking-[-0.04em]">
+              Priskirti gyventojai
+            </h1>
+            <p className="mt-3 max-w-[360px] text-[15px] font-semibold leading-6 text-white/85">
+              Tavo gyventojai, aktyvios užduotys ir svarbiausi veiksmai vienoje vietoje.
+            </p>
           </div>
         </div>
 
-        <div className="mt-5">
-          <p className="text-xs font-black uppercase tracking-[0.32em] text-emerald-100">
-            Mano gyventojai
-          </p>
-          <h1 className="mt-3 text-[34px] font-black leading-[1.04] tracking-[-0.04em]">
-            Priskirti gyventojai
-          </h1>
-          <p className="mt-3 max-w-[330px] text-[15px] font-semibold leading-6 text-emerald-50/90">
-            Tavo gyventojai, aktyvios užduotys ir svarbiausi veiksmai vienoje vietoje.
-          </p>
+        <div className="border-t border-emerald-900/10 bg-[#eef4f1] p-3">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <ResidentTab active icon={<Users className="h-4 w-4" />} label="Gyventojai" count={items.length} />
+            <ResidentTab icon={<ClipboardList className="h-4 w-4" />} label="Užduotys" count={openTasks.length} onClick={() => setShowTasksModal(true)} />
+            <ResidentTab icon={<Clock className="h-4 w-4" />} label="Vėluoja" count={lateTasks.length} onClick={() => setShowTasksModal(true)} />
+            <ResidentTab icon={<BedSingle className="h-4 w-4" />} label="Kambariai" count={roomsCount} />
+          </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 p-4">
           <MobileHeroStat label="Gyventojai" value={items.length} />
           <MobileHeroStat label="Aktyvūs" value={activeCount} />
           <MobileHeroStat label="Užduotys" value={openTasks.length} />
@@ -398,12 +412,12 @@ export default function MyResidentsPage() {
         ) : null}
 
         <label className="relative block">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8ea0b5]" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Ieškoti gyventojo, kambario, užduoties..."
-            className="h-14 w-full rounded-[24px] border border-slate-200/70 bg-white pl-12 pr-4 text-[15px] font-black text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.05)] outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+            className="h-14 w-full rounded-[20px] border border-[#dbe6e0] bg-white pl-12 pr-4 text-[15px] font-black text-[#10251f] shadow-[0_1px_3px_rgba(16,37,31,0.08)] outline-none transition placeholder:text-[#8ea0b5] focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
           />
         </label>
 
@@ -426,7 +440,7 @@ export default function MyResidentsPage() {
             <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
               Sąrašas
             </p>
-            <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+            <h2 className="mt-1 text-2xl font-black tracking-tight text-[#10251f]">
               Dabar svarbu
             </h2>
           </div>
@@ -434,7 +448,7 @@ export default function MyResidentsPage() {
           <button
             type="button"
             onClick={() => setShowTasksModal(true)}
-            className="rounded-2xl border border-slate-200/70 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm"
+            className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm"
           >
             Užduotys
           </button>
@@ -464,7 +478,7 @@ export default function MyResidentsPage() {
         )}
 
         {filteredUnassignedTasks.length > 0 ? (
-          <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+          <section className="rounded-[28px] border border-[#dbe6e0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
@@ -472,7 +486,7 @@ export default function MyResidentsPage() {
                 </p>
                 <h3 className="mt-1 text-xl font-black">Be gyventojo</h3>
               </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-black text-slate-700">
+              <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-sm font-black text-[#486b5d]">
                 {filteredUnassignedTasks.length}
               </span>
             </div>
@@ -503,11 +517,45 @@ export default function MyResidentsPage() {
   )
 }
 
+function ResidentTab({
+  label,
+  icon,
+  count,
+  active = false,
+  onClick,
+}: {
+  label: string
+  icon: React.ReactNode
+  count?: number
+  active?: boolean
+  onClick?: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex shrink-0 items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+        active
+          ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+          : "text-[#486b5d] hover:bg-white/70"
+      }`}
+    >
+      {icon}
+      {label}
+      {typeof count === "number" ? (
+        <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+          {count}
+        </span>
+      ) : null}
+    </button>
+  )
+}
+
 function MobileHeroStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[24px] bg-white/15 p-4 backdrop-blur">
-      <div className="text-2xl font-black text-white">{value}</div>
-      <div className="mt-1 text-[11px] font-black uppercase tracking-wide text-emerald-50">
+    <div className="rounded-[18px] bg-[#eef4f1] px-4 py-3">
+      <div className="text-2xl font-black text-[#10251f]">{value}</div>
+      <div className="mt-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#526174]">
         {label}
       </div>
     </div>
@@ -531,10 +579,10 @@ function MobileMetricCard({
         {icon}
       </div>
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-[#8ea0b5]">
           {title}
         </p>
-        <p className="mt-1 text-3xl font-black text-slate-950">{value}</p>
+        <p className="mt-1 text-3xl font-black text-[#10251f]">{value}</p>
       </div>
     </>
   )
@@ -544,7 +592,7 @@ function MobileMetricCard({
       <button
         type="button"
         onClick={onClick}
-        className="flex items-center gap-3 rounded-[26px] border border-slate-200/70 bg-white p-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.05)] active:scale-[0.99]"
+        className="flex items-center gap-3 rounded-[26px] border border-[#dbe6e0] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] active:scale-[0.99]"
       >
         {content}
       </button>
@@ -552,7 +600,7 @@ function MobileMetricCard({
   }
 
   return (
-    <article className="flex items-center gap-3 rounded-[26px] border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+    <article className="flex items-center gap-3 rounded-[26px] border border-[#dbe6e0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
       {content}
     </article>
   )
@@ -577,32 +625,33 @@ function MobileResidentCard({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-[28px] border border-slate-200/70 bg-white p-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition active:scale-[0.99]"
+      className={`w-full rounded-[24px] border bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition active:scale-[0.99] ${
+        lateCount > 0 ? "border-rose-100 border-l-[7px] border-l-rose-600" : "border-[#dbe6e0] border-l-[7px] border-l-[#486b5d]"
+      }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-lg font-black text-emerald-700">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#e8f7ef] text-lg font-black text-[#047857]">
             {getResidentInitials(resident)}
           </div>
 
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-black text-slate-950">
+            <h3 className="truncate text-lg font-black tracking-[-0.02em] text-[#10251f]">
               {formatResidentName(resident)}
             </h3>
-            <p className="mt-1 text-sm font-bold text-slate-500">
-              Kambarys: {resident?.room_number || "—"}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-bold text-[#526174]">
+              <span>Kambarys {resident?.room_number || "—"}</span>
+              <span className="text-[#8ea0b5]">•</span>
+              <span>{status}</span>
+            </div>
           </div>
         </div>
 
-        <ArrowRight className="mt-3 h-5 w-5 shrink-0 text-slate-400" />
+        <ArrowRight className="mt-3 h-5 w-5 shrink-0 text-[#8ea0b5]" />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
-          {status}
-        </span>
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+        <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-xs font-black text-[#486b5d]">
           {openTasks.length} aktyvios
         </span>
         {lateCount > 0 ? (
@@ -612,11 +661,11 @@ function MobileResidentCard({
         ) : null}
       </div>
 
-      <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
-        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
+      <div className="mt-4 rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#8ea0b5]">
           Artimiausia užduotis
         </p>
-        <p className="mt-1 line-clamp-2 font-black text-slate-800">
+        <p className="mt-1 line-clamp-2 font-black text-[#10251f]">
           {nextTask?.title || "Aktyvių užduočių nėra"}
         </p>
       </div>
@@ -629,21 +678,21 @@ function TaskRow({ task }: { task: ResidentTask }) {
 
   return (
     <div
-      className={`rounded-2xl border p-4 ${
-        late ? "border-rose-100 bg-rose-50" : "border-slate-100 bg-slate-50"
+      className={`rounded-[18px] border bg-white p-4 ${
+        late ? "border-rose-100 border-l-[6px] border-l-rose-600" : "border-[#dbe6e0] border-l-[6px] border-l-[#486b5d]"
       }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="font-black text-slate-900">{task.title || "Užduotis"}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
+          <p className="font-black text-[#10251f]">{task.title || "Užduotis"}</p>
+          <p className="mt-1 text-sm font-semibold text-white/80">
             {getTaskTypeLabel(task.type)} · {task.due_date ? formatDate(task.due_date) : "Be termino"}
           </p>
         </div>
 
         <span
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
-            late ? "bg-white text-rose-700" : "bg-white text-slate-700"
+            late ? "bg-rose-50 text-rose-700" : "bg-[#eef4f1] text-[#486b5d]"
           }`}
         >
           {late ? "Vėluoja" : normalizeTaskStatus(task.status)}
@@ -655,12 +704,12 @@ function TaskRow({ task }: { task: ResidentTask }) {
 
 function MobileEmptyState({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-[28px] border border-slate-200/70 bg-white p-8 text-center shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+    <div className="rounded-[28px] border border-[#dbe6e0] bg-white p-8 text-center shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
         <Users className="h-7 w-7" />
       </div>
-      <p className="mt-4 text-lg font-black text-slate-800">{title}</p>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">{text}</p>
+      <p className="mt-4 text-lg font-black text-[#10251f]">{title}</p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-[#526174]">{text}</p>
     </div>
   )
 }
@@ -678,9 +727,9 @@ function ResidentModal({
   const openTasks = tasks.filter((task) => isOpenTask(task.status))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/45 p-3 backdrop-blur-sm sm:items-center sm:justify-center">
-      <section className="max-h-[92vh] w-full overflow-y-auto rounded-[2rem] bg-white shadow-2xl sm:max-w-3xl">
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 p-5 backdrop-blur">
+    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center sm:justify-center">
+      <section className="max-h-[92vh] w-full overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-2xl sm:max-w-3xl">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-[#486b5d] p-5 text-white">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-lg font-black text-emerald-700">
               {getResidentInitials(resident)}
@@ -690,7 +739,7 @@ function ResidentModal({
               <h2 className="truncate text-2xl font-black tracking-tight">
                 {formatResidentName(resident)}
               </h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
+              <p className="mt-1 text-sm font-semibold text-white/80">
                 Gyventojo informacija ir užduotys
               </p>
             </div>
@@ -699,7 +748,7 @@ function ResidentModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition active:scale-[0.98]"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition active:scale-[0.98]"
             aria-label="Uždaryti"
           >
             <X className="h-6 w-6" />
@@ -714,7 +763,7 @@ function ResidentModal({
             <DetailBox label="Atviros užduotys" value={String(openTasks.length)} />
           </div>
 
-          <section className="rounded-[28px] border border-slate-200/70 bg-white p-4">
+          <section className="rounded-[28px] border border-[#dbe6e0] bg-white p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
@@ -729,9 +778,9 @@ function ResidentModal({
             </div>
 
             {tasks.length === 0 ? (
-              <div className="mt-4 rounded-2xl bg-slate-50 p-5 text-center">
-                <p className="font-black text-slate-700">Užduočių nėra</p>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
+              <div className="mt-4 rounded-2xl bg-[#f8faf8] p-5 text-center">
+                <p className="font-black text-[#486b5d]">Užduočių nėra</p>
+                <p className="mt-1 text-sm font-semibold text-white/80">
                   Kai atsiras susijusių užduočių, jos bus rodomos čia.
                 </p>
               </div>
@@ -757,9 +806,9 @@ function TasksModal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/45 p-3 backdrop-blur-sm sm:items-center sm:justify-center">
-      <section className="max-h-[92vh] w-full overflow-y-auto rounded-[2rem] bg-white shadow-2xl sm:max-w-3xl">
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 p-5 backdrop-blur">
+    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center sm:justify-center">
+      <section className="max-h-[92vh] w-full overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-2xl sm:max-w-3xl">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-[#486b5d] p-5 text-white">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
               Užduotys
@@ -772,7 +821,7 @@ function TasksModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition active:scale-[0.98]"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition active:scale-[0.98]"
             aria-label="Uždaryti"
           >
             <X className="h-6 w-6" />
@@ -796,11 +845,11 @@ function TasksModal({
 
 function DetailBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
+    <div className="rounded-2xl bg-[#f8faf8] p-4">
+      <p className="text-xs font-extrabold uppercase tracking-widest text-[#8ea0b5]">
         {label}
       </p>
-      <p className="mt-1 font-black text-slate-800">{value || "—"}</p>
+      <p className="mt-1 font-black text-[#10251f]">{value || "—"}</p>
     </div>
   )
 }

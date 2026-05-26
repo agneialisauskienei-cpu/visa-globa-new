@@ -1,44 +1,45 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { getChangedFields, logAudit } from "@/lib/audit";
 
 type EmployeeOption = {
-  id: string
-  full_name?: string | null
-  name?: string | null
-  role?: string | null
-}
+  id: string;
+  full_name?: string | null;
+  name?: string | null;
+  role?: string | null;
+};
 
 type CredentialRecord = {
-  id: string
-  organization_id?: string | null
-  employee_id: string
-  type: string | null
-  number?: string | null
-  issuer?: string | null
-  issued_at?: string | null
-  expires_at?: string | null
-  status?: string | null
-  note?: string | null
-}
+  id: string;
+  organization_id?: string | null;
+  employee_id: string;
+  type: string | null;
+  number?: string | null;
+  issuer?: string | null;
+  issued_at?: string | null;
+  expires_at?: string | null;
+  status?: string | null;
+  note?: string | null;
+};
 
 type MissingDocumentRecord = {
-  employee_id: string
-  employee_name?: string | null
-  type: string
-}
+  employee_id: string;
+  employee_name?: string | null;
+  type: string;
+};
 
 type DocumentsModuleProps = {
-  organizationId: string | null | undefined
-  currentUserId?: string | null
-  employees: EmployeeOption[]
-  credentials: CredentialRecord[]
-  requiredDocuments?: string[]
-  onRefresh?: () => void | Promise<void>
-}
+  organizationId: string | null | undefined;
+  currentUserId?: string | null;
+  employees: EmployeeOption[];
+  credentials: CredentialRecord[];
+  requiredDocuments?: string[];
+  onRefresh?: () => void | Promise<void>;
+};
 
-type DocsFilter = "all" | "valid" | "expiring" | "expired" | "missing"
+type DocsFilter = "all" | "valid" | "expiring" | "expired" | "missing";
 
 const CREDENTIAL_TYPES = [
   "Sveikatos pažyma",
@@ -46,46 +47,51 @@ const CREDENTIAL_TYPES = [
   "Pirmos pagalbos pažymėjimas",
   "Higienos pažymėjimas",
   "Kita",
-]
+];
 
-const DEFAULT_REQUIRED_DOCUMENTS = ["Sveikatos pažyma"]
+const DEFAULT_REQUIRED_DOCUMENTS = ["Sveikatos pažyma"];
 
 const CHECK_METHODS = [
   "Matytas originalas vietoje",
   "Patikrinta oficialiame registre",
   "Pateikta darbuotojo informacija",
   "Patikrinta pagal vidinę tvarką",
-]
+];
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toISOString().slice(0, 10);
 }
 
 function normalizeCredentialType(value?: string | null) {
-  const raw = String(value || "").trim()
-  if (!raw) return CREDENTIAL_TYPES[0]
+  const raw = String(value || "").trim();
+  if (!raw) return CREDENTIAL_TYPES[0];
 
-  const lower = raw.toLowerCase()
-  if (lower.includes("sveikat")) return "Sveikatos pažyma"
-  if (lower.includes("licenc")) return "Profesinė licencija"
-  if (lower.includes("pirmos") || lower.includes("pagalb")) return "Pirmos pagalbos pažymėjimas"
-  if (lower.includes("higien")) return "Higienos pažymėjimas"
+  const lower = raw.toLowerCase();
+  if (lower.includes("sveikat")) return "Sveikatos pažyma";
+  if (lower.includes("licenc")) return "Profesinė licencija";
+  if (lower.includes("pirmos") || lower.includes("pagalb"))
+    return "Pirmos pagalbos pažymėjimas";
+  if (lower.includes("higien")) return "Higienos pažymėjimas";
 
-  return raw
+  return raw;
 }
 
 function parseDate(value?: string | null) {
-  if (!value) return null
-  const date = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return null
-  return date
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
 }
 
 function diffDays(date: Date) {
-  const today = parseDate(todayIso())!
-  const clean = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const cleanToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  return Math.ceil((clean.getTime() - cleanToday.getTime()) / 86400000)
+  const today = parseDate(todayIso())!;
+  const clean = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const cleanToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  return Math.ceil((clean.getTime() - cleanToday.getTime()) / 86400000);
 }
 
 function getDocumentStatus(record?: CredentialRecord | null) {
@@ -94,26 +100,26 @@ function getDocumentStatus(record?: CredentialRecord | null) {
       key: "missing" as const,
       label: "Trūksta",
       className: "bg-[#eef4f1] text-[#40594f]",
-    }
+    };
   }
 
-  const expires = parseDate(record.expires_at)
+  const expires = parseDate(record.expires_at);
   if (!expires) {
     return {
       key: "valid" as const,
       label: "Galioja",
       className: "bg-[#dce7e2] text-[#486b5d]",
-    }
+    };
   }
 
-  const daysLeft = diffDays(expires)
+  const daysLeft = diffDays(expires);
 
   if (daysLeft < 0) {
     return {
       key: "expired" as const,
       label: "Pasibaigė",
       className: "bg-red-100 text-red-800",
-    }
+    };
   }
 
   if (daysLeft <= 30) {
@@ -121,19 +127,19 @@ function getDocumentStatus(record?: CredentialRecord | null) {
       key: "expiring" as const,
       label: "Baigiasi",
       className: "bg-amber-100 text-amber-800",
-    }
+    };
   }
 
   return {
     key: "valid" as const,
     label: "Galioja",
     className: "bg-[#dce7e2] text-[#486b5d]",
-  }
+  };
 }
 
 function employeeName(employees: EmployeeOption[], id: string) {
-  const employee = employees.find((item) => item.id === id)
-  return employee?.full_name || employee?.name || "Darbuotojas"
+  const employee = employees.find((item) => item.id === id);
+  return employee?.full_name || employee?.name || "Darbuotojas";
 }
 
 function makeMissingDocuments(
@@ -141,28 +147,29 @@ function makeMissingDocuments(
   credentials: CredentialRecord[],
   requiredDocuments: string[],
 ) {
-  const rows: MissingDocumentRecord[] = []
+  const rows: MissingDocumentRecord[] = [];
 
   for (const employee of employees) {
     for (const required of requiredDocuments) {
       const exists = credentials.some(
         (credential) =>
           credential.employee_id === employee.id &&
-          normalizeCredentialType(credential.type) === normalizeCredentialType(required) &&
+          normalizeCredentialType(credential.type) ===
+            normalizeCredentialType(required) &&
           getDocumentStatus(credential).key !== "expired",
-      )
+      );
 
       if (!exists) {
         rows.push({
           employee_id: employee.id,
           employee_name: employee.full_name || employee.name || "Darbuotojas",
           type: normalizeCredentialType(required),
-        })
+        });
       }
     }
   }
 
-  return rows
+  return rows;
 }
 
 export default function DocumentsModule({
@@ -173,30 +180,30 @@ export default function DocumentsModule({
   requiredDocuments = DEFAULT_REQUIRED_DOCUMENTS,
   onRefresh,
 }: DocumentsModuleProps) {
-  const [filter, setFilter] = useState<DocsFilter>("all")
-  const [employeeId, setEmployeeId] = useState("")
-  const [type, setType] = useState(CREDENTIAL_TYPES[0])
-  const [number, setNumber] = useState("")
-  const [issuer, setIssuer] = useState("")
-  const [issuedAt, setIssuedAt] = useState(todayIso())
-  const [expiresAt, setExpiresAt] = useState("")
-  const [note, setNote] = useState("")
-  const [checkMethod, setCheckMethod] = useState(CHECK_METHODS[0])
-  const [checkedAt, setCheckedAt] = useState(todayIso())
-  const [checkedByText, setCheckedByText] = useState("")
-  const [confirmed, setConfirmed] = useState(false)
+  const [filter, setFilter] = useState<DocsFilter>("all");
+  const [employeeId, setEmployeeId] = useState("");
+  const [type, setType] = useState(CREDENTIAL_TYPES[0]);
+  const [number, setNumber] = useState("");
+  const [issuer, setIssuer] = useState("");
+  const [issuedAt, setIssuedAt] = useState(todayIso());
+  const [expiresAt, setExpiresAt] = useState("");
+  const [note, setNote] = useState("");
+  const [checkMethod, setCheckMethod] = useState(CHECK_METHODS[0]);
+  const [checkedAt, setCheckedAt] = useState(todayIso());
+  const [checkedByText, setCheckedByText] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
 
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{
-    type: "success" | "error"
-    text: string
-    details?: string
-  } | null>(null)
+    type: "success" | "error";
+    text: string;
+    details?: string;
+  } | null>(null);
 
   const missingDocuments = useMemo(
     () => makeMissingDocuments(employees, credentials, requiredDocuments),
     [employees, credentials, requiredDocuments],
-  )
+  );
 
   const credentialRows = useMemo(() => {
     const existing = credentials.map((record) => ({
@@ -209,22 +216,23 @@ export default function DocumentsModule({
       expires_at: record.expires_at || "—",
       status: getDocumentStatus(record),
       record,
-    }))
+    }));
 
     const missing = missingDocuments.map((row) => ({
       kind: "missing" as const,
       id: `missing-${row.employee_id}-${row.type}`,
       employee_id: row.employee_id,
-      employee_name: row.employee_name || employeeName(employees, row.employee_id),
+      employee_name:
+        row.employee_name || employeeName(employees, row.employee_id),
       type: normalizeCredentialType(row.type),
       number: "—",
       expires_at: "—",
       status: getDocumentStatus(null),
       record: null,
-    }))
+    }));
 
-    return [...existing, ...missing]
-  }, [credentials, employees, missingDocuments])
+    return [...existing, ...missing];
+  }, [credentials, employees, missingDocuments]);
 
   const counts = useMemo(() => {
     const base = {
@@ -233,160 +241,254 @@ export default function DocumentsModule({
       expiring: 0,
       expired: 0,
       missing: 0,
-    }
+    };
 
     for (const row of credentialRows) {
-      base[row.status.key] += 1
+      base[row.status.key] += 1;
     }
 
-    return base
-  }, [credentialRows])
+    return base;
+  }, [credentialRows]);
 
   const compliancePercent = useMemo(() => {
-    const total = counts.valid + counts.expiring + counts.expired + counts.missing
-    if (!total) return 100
-    return Math.round(((counts.valid + counts.expiring) / total) * 100)
-  }, [counts])
+    const total =
+      counts.valid + counts.expiring + counts.expired + counts.missing;
+    if (!total) return 100;
+    return Math.round(((counts.valid + counts.expiring) / total) * 100);
+  }, [counts]);
 
   const filteredRows = credentialRows.filter((row) => {
-    if (filter === "all") return true
-    return row.status.key === filter
-  })
+    if (filter === "all") return true;
+    return row.status.key === filter;
+  });
 
-  function fillFromMissing(row: MissingDocumentRecord | { employee_id: string; type: string }) {
-    setEmployeeId(row.employee_id)
-    setType(normalizeCredentialType(row.type))
-    setNumber("")
-    setIssuer("")
-    setIssuedAt(todayIso())
-    setExpiresAt("")
-    setNote("")
-    setCheckMethod(CHECK_METHODS[0])
-    setCheckedAt(todayIso())
-    setCheckedByText("")
-    setConfirmed(false)
-    setMessage(null)
+  function fillFromMissing(
+    row: MissingDocumentRecord | { employee_id: string; type: string },
+  ) {
+    setEmployeeId(row.employee_id);
+    setType(normalizeCredentialType(row.type));
+    setNumber("");
+    setIssuer("");
+    setIssuedAt(todayIso());
+    setExpiresAt("");
+    setNote("");
+    setCheckMethod(CHECK_METHODS[0]);
+    setCheckedAt(todayIso());
+    setCheckedByText("");
+    setConfirmed(false);
+    setMessage(null);
     window.requestAnimationFrame(() => {
       document.getElementById("documents-form")?.scrollIntoView({
         behavior: "smooth",
         block: "start",
-      })
-    })
+      });
+    });
+  }
+
+  function compactPayload<T extends Record<string, unknown>>(payload: T) {
+    return Object.fromEntries(
+      Object.entries(payload).filter(([, value]) => value !== undefined),
+    ) as T;
+  }
+
+  async function insertCredentialWithFallback(
+    fullPayload: Record<string, unknown>,
+  ) {
+    const attempts = [
+      fullPayload,
+      compactPayload({
+        organization_id: fullPayload.organization_id,
+        employee_id: fullPayload.employee_id,
+        type: fullPayload.type,
+        number: fullPayload.number,
+        expires_at: fullPayload.expires_at,
+        status: fullPayload.status,
+      }),
+      compactPayload({
+        organization_id: fullPayload.organization_id,
+        employee_id: fullPayload.employee_id,
+        type: fullPayload.type,
+        number: fullPayload.number,
+        expires_at: fullPayload.expires_at,
+      }),
+    ];
+
+    let lastError: unknown = null;
+
+    for (const payload of attempts) {
+      const { data, error } = await supabase
+        .from("personnel_credentials")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (!error) return data as { id?: string | null } | null;
+      lastError = error;
+
+      const message = String(error.message || "");
+      const retryable =
+        message.includes("schema cache") ||
+        message.includes("column") ||
+        message.includes("issuer") ||
+        message.includes("issued_at") ||
+        message.includes("status") ||
+        message.includes("note");
+
+      if (!retryable) break;
+    }
+
+    throw lastError;
+  }
+
+  async function trySaveVerification(credentialId: string | null | undefined) {
+    try {
+      const { error } = await supabase.from("document_verifications").insert({
+        organization_id: organizationId,
+        employee_id: employeeId,
+        credential_id: credentialId || null,
+        type: normalizeCredentialType(type),
+        method: checkMethod,
+        checked_at: checkedAt || todayIso(),
+        checked_by: currentUserId || null,
+        checked_by_text: checkedByText.trim() || null,
+        result: "confirmed",
+        note: note.trim() || null,
+      });
+
+      if (error) {
+        console.warn(
+          "[DocumentsModule] document_verifications insert skipped",
+          error,
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.warn(
+        "[DocumentsModule] document_verifications insert skipped",
+        error,
+      );
+      return false;
+    }
+  }
+
+  async function tryAuditDocument(
+    credentialId: string | null | undefined,
+    verificationSaved: boolean,
+  ) {
+    try {
+      await logAudit({
+        organizationId: organizationId || null,
+        tableName: "personnel_credentials",
+        recordId: credentialId || null,
+        action: "document.checked",
+        changes: getChangedFields(
+          {},
+          {
+            employee_id: employeeId,
+            type: normalizeCredentialType(type),
+            number: number.trim() || null,
+            issuer: issuer.trim() || null,
+            issued_at: issuedAt || null,
+            expires_at: expiresAt || null,
+            status: "active",
+            check_method: checkMethod,
+            checked_at: checkedAt || todayIso(),
+            checked_by_text: checkedByText.trim() || null,
+            verification_saved: verificationSaved,
+            note: note.trim() || null,
+          },
+        ),
+      });
+    } catch (error) {
+      console.warn("[DocumentsModule] audit skipped", error);
+    }
   }
 
   async function handleSave() {
-    setMessage(null)
+    setMessage(null);
 
     if (!organizationId) {
       setMessage({
         type: "error",
         text: "Nepavyko išsaugoti: nenustatyta organizacija.",
-      })
-      return
+      });
+      return;
     }
 
     if (!employeeId) {
       setMessage({
         type: "error",
         text: "Pasirink darbuotoją.",
-      })
-      return
+      });
+      return;
     }
 
     if (!type.trim()) {
       setMessage({
         type: "error",
         text: "Pasirink dokumento tipą.",
-      })
-      return
+      });
+      return;
     }
 
     if (!confirmed) {
       setMessage({
         type: "error",
         text: "Pažymėk patvirtinimą, kad dokumentas patikrintas dėl darbo.",
-      })
-      return
+      });
+      return;
     }
 
-    setSaving(true)
+    setSaving(true);
 
     try {
-      const { data: credential, error: credentialError } = await supabase
-        .from("personnel_credentials")
-        .insert({
-          organization_id: organizationId,
-          employee_id: employeeId,
-          type: normalizeCredentialType(type),
-          number: number.trim() || null,
-          issuer: issuer.trim() || null,
-          issued_at: issuedAt || null,
-          expires_at: expiresAt || null,
-          status: "active",
-          note: note.trim() || null,
-        })
-        .select("id")
-        .single()
+      const credentialPayload = compactPayload({
+        organization_id: organizationId,
+        employee_id: employeeId,
+        type: normalizeCredentialType(type),
+        number: number.trim() || null,
+        issuer: issuer.trim() || null,
+        issued_at: issuedAt || null,
+        expires_at: expiresAt || null,
+        status: "active",
+        note: note.trim() || null,
+      });
 
-      if (credentialError) {
-        setMessage({
-          type: "error",
-          text: "Nepavyko išsaugoti dokumento.",
-          details: credentialError.message,
-        })
-        return
-      }
-
-      const { error: verificationError } = await supabase
-        .from("document_verifications")
-        .insert({
-          organization_id: organizationId,
-          employee_id: employeeId,
-          credential_id: credential?.id || null,
-          type: normalizeCredentialType(type),
-          method: checkMethod,
-          checked_at: checkedAt || todayIso(),
-          checked_by: currentUserId || null,
-          checked_by_text: checkedByText.trim() || null,
-          result: "confirmed",
-          note: note.trim() || null,
-        })
-
-      if (verificationError) {
-        setMessage({
-          type: "error",
-          text: "Dokumentas išsaugotas, bet nepavyko išsaugoti patikrinimo fakto.",
-          details: verificationError.message,
-        })
-        await onRefresh?.()
-        return
-      }
+      const credential = await insertCredentialWithFallback(credentialPayload);
+      const verificationSaved = await trySaveVerification(
+        credential?.id || null,
+      );
+      await tryAuditDocument(credential?.id || null, verificationSaved);
 
       setMessage({
         type: "success",
-        text: "Dokumentas ir patikrinimo faktas išsaugoti.",
-      })
+        text: verificationSaved
+          ? "Dokumentas ir patikrinimo faktas išsaugoti."
+          : "Dokumentas išsaugotas. Patikrinimo faktui reikės DB lentelės `document_verifications` arba RLS leidimo.",
+      });
 
-      setFilter("all")
-      setNumber("")
-      setIssuer("")
-      setIssuedAt(todayIso())
-      setExpiresAt("")
-      setNote("")
-      setCheckMethod(CHECK_METHODS[0])
-      setCheckedAt(todayIso())
-      setCheckedByText("")
-      setConfirmed(false)
+      setFilter("all");
+      setNumber("");
+      setIssuer("");
+      setIssuedAt(todayIso());
+      setExpiresAt("");
+      setNote("");
+      setCheckMethod(CHECK_METHODS[0]);
+      setCheckedAt(todayIso());
+      setCheckedByText("");
+      setConfirmed(false);
 
-      await onRefresh?.()
-    } catch (error) {
+      await onRefresh?.();
+    } catch (error: any) {
       setMessage({
         type: "error",
         text: "Klaida saugant dokumentą.",
-        details: error instanceof Error ? error.message : String(error),
-      })
+        details: error?.message || error?.details || String(error),
+      });
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -407,17 +509,20 @@ export default function DocumentsModule({
         </div>
 
         <div className="rounded-xl border border-[#dce7e2] bg-[#eef4f1] px-6 py-4 text-center">
-          <div className="text-2xl font-black text-[#486b5d]">{compliancePercent}%</div>
+          <div className="text-2xl font-black text-[#486b5d]">
+            {compliancePercent}%
+          </div>
           <div className="text-xs font-black uppercase tracking-wide text-[#486b5d]">
             Atitiktis
           </div>
         </div>
       </div>
 
-      {(counts.expiring > 0 || counts.expired > 0 || counts.missing > 0) ? (
+      {counts.expiring > 0 || counts.expired > 0 || counts.missing > 0 ? (
         <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
-          Yra dokumentų rizikų: {counts.expiring} baigiasi, {counts.expired} pasibaigę,
-          {" "}{counts.missing} trūksta. Tokius darbuotojus grafike verta žymėti įspėjimu.
+          Yra dokumentų rizikų: {counts.expiring} baigiasi, {counts.expired}{" "}
+          pasibaigę, {counts.missing} trūksta. Tokius darbuotojus grafike verta
+          žymėti įspėjimu.
         </div>
       ) : (
         <div className="mb-5 rounded-lg border border-[#c9d8d0] bg-[#eef4f1] px-5 py-4 text-sm font-black text-[#10251f]">
@@ -450,15 +555,23 @@ export default function DocumentsModule({
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[0.85fr_1.35fr]">
-        <div id="documents-form" className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8]/70 p-5">
-          <h3 className="text-2xl font-black text-[#10251f]">Pridėti dokumentą</h3>
+        <div
+          id="documents-form"
+          className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8]/70 p-5"
+        >
+          <h3 className="text-2xl font-black text-[#10251f]">
+            Pridėti dokumentą
+          </h3>
           <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
-            Įvedamas dokumento faktas ir privalomas patikrinimas. Failų kelti nereikia.
+            Įvedamas dokumento faktas ir privalomas patikrinimas. Failų kelti
+            nereikia.
           </p>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
-              <span className="text-sm font-black text-[#40594f]">Darbuotojas</span>
+              <span className="text-sm font-black text-[#40594f]">
+                Darbuotojas
+              </span>
               <select
                 value={employeeId}
                 onChange={(event) => setEmployeeId(event.target.value)}
@@ -474,13 +587,21 @@ export default function DocumentsModule({
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-[#40594f]">Dokumento tipas</span>
+              <span className="text-sm font-black text-[#40594f]">
+                Dokumento tipas
+              </span>
               <select
                 value={type}
                 onChange={(event) => setType(event.target.value)}
                 className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
               >
-                {Array.from(new Set([...CREDENTIAL_TYPES, ...requiredDocuments, type].filter(Boolean))).map((item) => (
+                {Array.from(
+                  new Set(
+                    [...CREDENTIAL_TYPES, ...requiredDocuments, type].filter(
+                      Boolean,
+                    ),
+                  ),
+                ).map((item) => (
                   <option key={item} value={normalizeCredentialType(item)}>
                     {normalizeCredentialType(item)}
                   </option>
@@ -499,7 +620,9 @@ export default function DocumentsModule({
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-[#40594f]">Išdavė / kur patikrinta</span>
+              <span className="text-sm font-black text-[#40594f]">
+                Išdavė / kur patikrinta
+              </span>
               <input
                 value={issuer}
                 onChange={(event) => setIssuer(event.target.value)}
@@ -509,7 +632,9 @@ export default function DocumentsModule({
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-[#40594f]">Galioja nuo</span>
+              <span className="text-sm font-black text-[#40594f]">
+                Galioja nuo
+              </span>
               <input
                 type="date"
                 value={issuedAt}
@@ -519,7 +644,9 @@ export default function DocumentsModule({
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-black text-[#40594f]">Galioja iki</span>
+              <span className="text-sm font-black text-[#40594f]">
+                Galioja iki
+              </span>
               <input
                 type="date"
                 value={expiresAt}
@@ -536,21 +663,27 @@ export default function DocumentsModule({
 
             <div className="mt-4 grid gap-4">
               <label className="space-y-2">
-                <span className="text-sm font-black text-[#40594f]">Patikrinimo būdas</span>
+                <span className="text-sm font-black text-[#40594f]">
+                  Patikrinimo būdas
+                </span>
                 <select
                   value={checkMethod}
                   onChange={(event) => setCheckMethod(event.target.value)}
                   className="h-10 w-full rounded-lg border border-amber-200 bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                 >
                   {CHECK_METHODS.map((method) => (
-                    <option key={method} value={method}>{method}</option>
+                    <option key={method} value={method}>
+                      {method}
+                    </option>
                   ))}
                 </select>
               </label>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-sm font-black text-[#40594f]">Patikrinimo data</span>
+                  <span className="text-sm font-black text-[#40594f]">
+                    Patikrinimo data
+                  </span>
                   <input
                     type="date"
                     value={checkedAt}
@@ -560,7 +693,9 @@ export default function DocumentsModule({
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-black text-[#40594f]">Kas patikrino</span>
+                  <span className="text-sm font-black text-[#40594f]">
+                    Kas patikrino
+                  </span>
                   <input
                     value={checkedByText}
                     onChange={(event) => setCheckedByText(event.target.value)}
@@ -591,7 +726,8 @@ export default function DocumentsModule({
               className="mt-1 h-5 w-5 rounded border-[#c2d3ca] text-[#486b5d] focus:ring-[#486b5d]"
             />
             <span className="text-sm font-black leading-6 text-[#40594f]">
-              Patvirtinu, kad dokumentas patikrintas dėl darbo ir įvesti duomenys yra teisingi.
+              Patvirtinu, kad dokumentas patikrintas dėl darbo ir įvesti
+              duomenys yra teisingi.
             </span>
           </label>
 
@@ -628,9 +764,20 @@ export default function DocumentsModule({
         <div className="rounded-xl border border-[#dbe6e0] bg-white p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-2xl font-black text-[#10251f]">Dokumentų sąrašas</h3>
+              <h3 className="text-2xl font-black text-[#10251f]">
+                Dokumentų sąrašas
+              </h3>
               <p className="text-sm font-bold text-[#6a7e75]">
-                Filtras: {filter === "all" ? "Visi" : filter === "valid" ? "Galioja" : filter === "expiring" ? "Baigiasi" : filter === "expired" ? "Pasibaigę" : "Trūksta"}
+                Filtras:{" "}
+                {filter === "all"
+                  ? "Visi"
+                  : filter === "valid"
+                    ? "Galioja"
+                    : filter === "expiring"
+                      ? "Baigiasi"
+                      : filter === "expired"
+                        ? "Pasibaigę"
+                        : "Trūksta"}
               </p>
             </div>
 
@@ -659,12 +806,16 @@ export default function DocumentsModule({
                 {filteredRows.length ? (
                   filteredRows.map((row) => (
                     <tr key={row.id}>
-                      <td className="px-4 py-3 font-semibold text-slate-900">{row.employee_name}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-900">
+                        {row.employee_name}
+                      </td>
                       <td className="px-4 py-3">{row.type}</td>
                       <td className="px-4 py-3">{row.number}</td>
                       <td className="px-4 py-3">{row.expires_at}</td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-3 py-1 text-xs font-black ${row.status.className}`}>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-black ${row.status.className}`}
+                        >
                           {row.status.label}
                         </span>
                       </td>
@@ -672,7 +823,12 @@ export default function DocumentsModule({
                         {row.kind === "missing" ? (
                           <button
                             type="button"
-                            onClick={() => fillFromMissing({ employee_id: row.employee_id, type: row.type })}
+                            onClick={() =>
+                              fillFromMissing({
+                                employee_id: row.employee_id,
+                                type: row.type,
+                              })
+                            }
                             className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
                           >
                             Pridėti dokumentą
@@ -680,7 +836,12 @@ export default function DocumentsModule({
                         ) : (
                           <button
                             type="button"
-                            onClick={() => fillFromMissing({ employee_id: row.employee_id, type: row.type })}
+                            onClick={() =>
+                              fillFromMissing({
+                                employee_id: row.employee_id,
+                                type: row.type,
+                              })
+                            }
                             className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
                           >
                             Atnaujinti
@@ -691,7 +852,10 @@ export default function DocumentsModule({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center font-bold text-[#6a7e75]">
+                    <td
+                      colSpan={6}
+                      className="px-4 py-10 text-center font-bold text-[#6a7e75]"
+                    >
                       Dokumentų pagal pasirinktą filtrą nėra.
                     </td>
                   </tr>
@@ -702,5 +866,5 @@ export default function DocumentsModule({
         </div>
       </div>
     </section>
-  )
+  );
 }

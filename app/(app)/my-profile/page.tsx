@@ -40,6 +40,8 @@ import { formatDate } from "@/lib/format";
 import { ROUTES } from "@/lib/routes";
 import { supabase } from "@/lib/supabase";
 
+const MY_SCHEDULE_ROUTE = "/my-schedule";
+
 type ProfileRow = {
   id: string;
   email: string | null;
@@ -816,8 +818,8 @@ export default function MyProfilePage() {
   }
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="rounded-3xl bg-white px-6 py-4 text-lg font-black text-slate-600 shadow-sm">
+      <div className="flex min-h-screen items-center justify-center bg-[#f8faf8]">
+        <div className="rounded-3xl bg-white px-6 py-4 text-lg font-black text-[#526174] shadow-sm">
           Kraunama...
         </div>
       </div>
@@ -828,97 +830,103 @@ export default function MyProfilePage() {
   const photo = profile?.avatar_url;
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 pt-0 pb-28 text-slate-950 sm:p-6 sm:pb-24">
+    <main className="min-h-screen bg-[#f3f6f4] px-4 py-5 pb-28 text-[#10251f] sm:p-6 sm:pb-24">
       <div className="mx-auto max-w-7xl space-y-5 sm:space-y-6">
-        <section className="overflow-hidden rounded-b-[34px] bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-950 px-5 pb-8 pt-7 text-white shadow-[0_18px_42px_rgba(2,6,23,0.18)] sm:rounded-[34px] sm:border sm:border-slate-200/70 sm:bg-white sm:bg-none sm:px-7 sm:pt-7 sm:text-slate-950 sm:shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
-          <div className="flex items-start justify-between gap-4">
-            <button
-              type="button"
-              onClick={() => router.push(ROUTES.employeeDashboard)}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] bg-white/12 text-white backdrop-blur transition hover:bg-white/18 active:scale-[0.98] sm:bg-slate-100 sm:text-slate-700 sm:hover:bg-slate-200"
-              aria-label="Į skydelį"
-            >
-              <Home className="h-5 w-5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void loadData()}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] bg-white/12 text-white backdrop-blur transition hover:bg-white/18 active:scale-[0.98] sm:bg-slate-100 sm:text-slate-700 sm:hover:bg-slate-200"
-              aria-label="Atnaujinti"
-            >
-              <RefreshCw className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="mt-8 flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-100 sm:text-emerald-700">
-                Mano profilis
-              </p>
-
-              <h1 className="mt-3 break-words text-4xl font-black leading-tight tracking-tight text-white sm:text-5xl sm:text-slate-950">
-                {fullName}
-              </h1>
-
-              <p className="mt-3 max-w-[340px] text-sm font-semibold leading-6 text-emerald-50/90 sm:text-base sm:text-slate-500">
-                {organizationName || "Mano profilis"} ·{" "}
-                {roleLabel(membership?.role || profile?.role)}
-              </p>
-            </div>
-
-            <div className="flex shrink-0 flex-col items-center gap-2">
+        <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
+          <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-5">
               <button
                 type="button"
-                onClick={() => photoInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="group relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-[28px] bg-white/90 text-xl font-black text-emerald-950 shadow-sm transition hover:ring-4 hover:ring-white/20 disabled:opacity-60 sm:bg-slate-100 sm:hover:ring-emerald-100"
-                aria-label="Įkelti profilio nuotrauką"
+                onClick={() => router.push(ROUTES.employeeDashboard)}
+                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[24px] bg-[#e8f7ef] text-[#486b5d] shadow-sm transition hover:bg-white active:scale-[0.98]"
+                aria-label="Į skydelį"
               >
-                {photo ? (
-                  <img
-                    src={photo}
-                    alt="Profilio nuotrauka"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  initials(profile)
-                )}
-                <span className="absolute inset-x-2 bottom-2 flex items-center justify-center rounded-xl bg-slate-950/75 px-2 py-1 text-white opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
-                  <Camera className="h-4 w-4" />
-                </span>
+                <Home className="h-6 w-6" />
               </button>
 
+              <div className="min-w-0">
+                <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-100/80">
+                  Mano profilis
+                </p>
+
+                <h1 className="mt-3 break-words text-4xl font-black leading-tight tracking-[-0.04em] text-white sm:text-5xl">
+                  {fullName}
+                </h1>
+
+                <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-white/85">
+                  {organizationName || "Mano profilis"} · {roleLabel(membership?.role || profile?.role)}
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="rounded-full bg-white/15 px-4 py-2 text-sm font-black text-white ring-1 ring-white/15">
+                    {positionLabel(membership?.position)}
+                  </span>
+                  <span className="rounded-full bg-white/15 px-4 py-2 text-sm font-black text-white ring-1 ring-white/15">
+                    {departmentLabel(membership?.department)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
               <button
                 type="button"
-                onClick={() => photoInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="text-xs font-black text-emerald-50 underline-offset-4 hover:underline disabled:opacity-60 sm:text-emerald-700"
+                onClick={() => void loadData()}
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-white/10 text-white backdrop-blur transition hover:bg-white/20 active:scale-[0.98]"
+                aria-label="Atnaujinti"
               >
-                {uploadingPhoto ? "Keliama..." : photo ? "Keisti foto" : "Įkelti foto"}
+                <RefreshCw className="h-5 w-5" />
               </button>
+
+              <div className="flex shrink-0 flex-col items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="group relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-[28px] bg-[#e8f7ef] text-2xl font-black text-[#486b5d] shadow-sm transition hover:ring-4 hover:ring-white/20 disabled:opacity-60"
+                  aria-label="Įkelti profilio nuotrauką"
+                >
+                  {photo ? (
+                    <img
+                      src={photo}
+                      alt="Profilio nuotrauka"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initials(profile)
+                  )}
+                  <span className="absolute inset-x-2 bottom-2 flex items-center justify-center rounded-xl bg-[#047857]/75 px-2 py-1 text-white opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
+                    <Camera className="h-4 w-4" />
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="text-xs font-black text-emerald-100 underline-offset-4 hover:underline disabled:opacity-60"
+                >
+                  {uploadingPhoto ? "Keliama..." : photo ? "Keisti foto" : "Įkelti foto"}
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            <div className="rounded-[28px] bg-white/15 p-4 backdrop-blur sm:bg-slate-100">
-              <div className="text-2xl font-black text-white sm:text-slate-950">{pendingVacations.length}</div>
-              <div className="mt-1 text-[11px] font-black uppercase tracking-wide text-emerald-50 sm:text-slate-500">
-                Atostogos
-              </div>
+          <div className="border-t border-emerald-900/10 bg-[#eef4f1] p-3">
+            <div className="flex flex-wrap gap-2">
+              <ProfileTab active label="Apžvalga" icon={<UserRound className="h-4 w-4" />} />
+              <ProfileTab label="Mokymai" count={trainings.length} icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setShowTrainingModal(true)} />
+              <ProfileTab label="Prašymai" count={pendingVacations.length} icon={<CalendarCheck className="h-4 w-4" />} onClick={() => setShowVacationModal(true)} />
+              <ProfileTab label="Mano grafikas" icon={<CalendarCheck className="h-4 w-4" />} onClick={() => router.push(MY_SCHEDULE_ROUTE)} />
+              <ProfileTab label="Kontaktai" icon={<Edit3 className="h-4 w-4" />} onClick={() => setShowProfileModal(true)} />
+              <ProfileTab label="Dokumentai" icon={<FileText className="h-4 w-4" />} onClick={openDocuments} />
             </div>
-            <div className="rounded-[28px] bg-white/15 p-4 backdrop-blur sm:bg-slate-100">
-              <div className="text-2xl font-black text-white sm:text-slate-950">{trainings.length}</div>
-              <div className="mt-1 text-[11px] font-black uppercase tracking-wide text-emerald-50 sm:text-slate-500">
-                Mokymai
-              </div>
-            </div>
-            <div className="rounded-[28px] bg-white/15 p-4 backdrop-blur sm:bg-slate-100">
-              <div className="text-2xl font-black text-white sm:text-slate-950">{missingProfileCount}</div>
-              <div className="mt-1 text-[11px] font-black uppercase tracking-wide text-emerald-50 sm:text-slate-500">
-                Trūksta
-              </div>
-            </div>
+          </div>
+
+          <div className="grid gap-3 p-5 md:grid-cols-3">
+            <HeroMetric label="Atostogos" value={String(pendingVacations.length)} />
+            <HeroMetric label="Mokymai" value={String(trainings.length)} />
+            <HeroMetric label="Trūksta" value={String(missingProfileCount)} tone={missingProfileCount > 0 ? "warning" : "normal"} />
           </div>
         </section>
 
@@ -971,7 +979,7 @@ export default function MyProfilePage() {
               <h2 className="text-2xl font-black tracking-tight">
                 Greiti veiksmai
               </h2>
-              <p className="mt-1 font-semibold text-slate-500">
+              <p className="mt-1 font-semibold text-[#526174]">
                 Dažniausiai naudojami profilio veiksmai.
               </p>
 
@@ -987,6 +995,12 @@ export default function MyProfilePage() {
                   title="Pateikti prašymą"
                   desc="Atostogos arba išvykimas"
                   onClick={() => setShowVacationModal(true)}
+                />
+                <ActionCard
+                  icon={<CalendarCheck />}
+                  title="Mano grafikas"
+                  desc="Pamainos ir grafiko istorija"
+                  onClick={() => router.push(MY_SCHEDULE_ROUTE)}
                 />
                 <ActionCard
                   icon={<Edit3 />}
@@ -1009,7 +1023,7 @@ export default function MyProfilePage() {
                   <h2 className="text-2xl font-black tracking-tight">
                     Mano mokymai
                   </h2>
-                  <p className="mt-1 font-semibold text-slate-500">
+                  <p className="mt-1 font-semibold text-[#526174]">
                     Įveskite išklausytus mokymus, o administratorius juos
                     patvirtins.
                   </p>
@@ -1017,7 +1031,7 @@ export default function MyProfilePage() {
                 <button
                   type="button"
                   onClick={() => setShowTrainingModal(true)}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747]"
                 >
                   <Plus className="h-4 w-4" />
                   Pridėti
@@ -1046,12 +1060,12 @@ export default function MyProfilePage() {
                   <h2 className="mt-1 text-2xl font-black tracking-tight">
                     Darbuotojo santrauka
                   </h2>
-                  <p className="mt-1 font-semibold text-slate-500">
+                  <p className="mt-1 font-semibold text-[#526174]">
                     Kontaktai, dokumentai ir atostogų būsena vienoje vietoje.
                   </p>
                 </div>
 
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-emerald-700">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef4f1] text-emerald-700">
                   <Info className="h-6 w-6" />
                 </div>
               </div>
@@ -1088,7 +1102,7 @@ export default function MyProfilePage() {
                   <h2 className="mt-1 text-2xl font-black tracking-tight">
                     Reikia dėmesio
                   </h2>
-                  <p className="mt-1 font-semibold text-slate-500">
+                  <p className="mt-1 font-semibold text-[#526174]">
                     Profilio, dokumentų ir prašymų klausimai.
                   </p>
                 </div>
@@ -1131,7 +1145,7 @@ export default function MyProfilePage() {
                   />
                 ) : null}
                 {missingProfileCount === 0 && pendingVacations.length === 0 ? (
-                  <div className="rounded-2xl bg-slate-100 p-4 font-black text-emerald-700">
+                  <div className="rounded-2xl bg-[#eef4f1] p-4 font-black text-emerald-700">
                     Viskas tvarkoje.
                   </div>
                 ) : null}
@@ -1148,7 +1162,7 @@ export default function MyProfilePage() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="group relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 text-2xl font-black text-slate-950 shadow-sm transition hover:ring-4 hover:ring-emerald-100 disabled:opacity-60"
+                  className="group relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl border border-[#dbe6e0] bg-[#eef4f1] text-2xl font-black text-[#10251f] shadow-sm transition hover:ring-4 hover:ring-emerald-100 disabled:opacity-60"
                   aria-label="Įkelti profilio nuotrauką"
                 >
                   {photo ? (
@@ -1165,7 +1179,7 @@ export default function MyProfilePage() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="inline-flex items-center gap-1 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
+                  className="inline-flex items-center gap-1 rounded-xl bg-[#047857] px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
                 >
                   <Camera className="h-4 w-4" />
                   {uploadingPhoto ? "Keliama..." : photo ? "Keisti foto" : "Įkelti foto"}
@@ -1180,7 +1194,7 @@ export default function MyProfilePage() {
                   {fullName}
                 </h2>
 
-                <div className="mt-5 divide-y divide-slate-200 rounded-2xl border border-slate-100">
+                <div className="mt-5 divide-y divide-slate-200 rounded-2xl border border-[#dbe6e0]">
                   <ProfileInfoRow
                     icon={<Mail />}
                     label="El. paštas"
@@ -1206,7 +1220,7 @@ export default function MyProfilePage() {
                 <button
                   type="button"
                   onClick={() => setShowProfileModal(true)}
-                  className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                  className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
                 >
                   <Edit3 className="h-4 w-4" />
                   Redaguoti kontaktus
@@ -1224,7 +1238,7 @@ export default function MyProfilePage() {
                 <h2 className="mt-1 text-2xl font-black tracking-tight">
                   Mano prašymai
                 </h2>
-                <p className="mt-1 font-semibold text-slate-500">
+                <p className="mt-1 font-semibold text-[#526174]">
                   Atostogos, liga, mamadienis, tėvadienis arba trumpas
                   išvykimas.
                 </p>
@@ -1232,7 +1246,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowVacationModal(true)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
+                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747]"
               >
                 <CalendarPlus className="h-4 w-4" />
                 Pateikti
@@ -1274,7 +1288,7 @@ export default function MyProfilePage() {
 
         <section
           ref={documentsRef}
-          className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)] sm:p-6"
+          className="rounded-[24px] border border-[#dbe6e0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -1284,7 +1298,7 @@ export default function MyProfilePage() {
               <h2 className="mt-1 text-2xl font-black tracking-tight">
                 Dokumentų būsena
               </h2>
-              <p className="mt-1 font-semibold text-slate-500">
+              <p className="mt-1 font-semibold text-[#526174]">
                 Medicininės pažymos, licencijos ir kiti galiojimai.
               </p>
             </div>
@@ -1292,7 +1306,7 @@ export default function MyProfilePage() {
             <button
               type="button"
               onClick={() => setShowDocumentsModal(true)}
-              className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-200"
+              className="rounded-2xl bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-slate-200"
             >
               Redaguoti
             </button>
@@ -1321,13 +1335,13 @@ export default function MyProfilePage() {
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)] sm:p-5">
+        <section className="rounded-[28px] border border-[#dbe6e0]/70 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)] sm:p-5">
           <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr_1fr_1fr]">
             <div>
               <p className="text-lg font-black tracking-tight">
                 Paskyros nustatymai
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
+              <p className="mt-1 text-sm font-semibold text-[#526174]">
                 Tvarkykite savo paskyros saugumą ir pranešimų nustatymus.
               </p>
             </div>
@@ -1396,7 +1410,7 @@ export default function MyProfilePage() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="group relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-slate-100 text-2xl font-black text-slate-900 transition hover:ring-4 hover:ring-emerald-100 disabled:opacity-60"
+                  className="group relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-[#eef4f1] text-2xl font-black text-[#10251f] transition hover:ring-4 hover:ring-emerald-100 disabled:opacity-60"
                 >
                   {photo ? (
                     <img
@@ -1407,23 +1421,23 @@ export default function MyProfilePage() {
                   ) : (
                     initials(profile)
                   )}
-                  <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-xl bg-slate-950/75 px-2 py-1 text-xs font-black text-white">
+                  <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-xl bg-[#047857]/75 px-2 py-1 text-xs font-black text-white">
                     <Camera className="h-4 w-4" />
                     Įkelti
                   </span>
                 </button>
                 <div>
-                  <p className="font-black text-slate-900">
+                  <p className="font-black text-[#10251f]">
                     Profilio nuotrauka
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                  <p className="mt-1 text-sm font-semibold text-[#526174]">
                     JPG, PNG arba WEBP iki 5 MB.
                   </p>
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
                     disabled={uploadingPhoto}
-                    className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                    className="mt-3 rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8] disabled:opacity-60"
                   >
                     {uploadingPhoto ? "Keliama..." : "Įkelti nuotrauką"}
                   </button>
@@ -1478,7 +1492,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowProfileModal(false)}
-                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
               >
                 Atšaukti
               </button>
@@ -1486,7 +1500,7 @@ export default function MyProfilePage() {
                 type="button"
                 disabled={saving || uploadingPhoto}
                 onClick={() => void updateProfileInfo()}
-                className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
+                className="rounded-2xl bg-[#047857] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
               >
                 {saving ? "Saugoma..." : "Išsaugoti"}
               </button>
@@ -1557,7 +1571,7 @@ export default function MyProfilePage() {
               </div>
             </ModalSection>
 
-            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-slate-100/70 p-4 text-sm font-semibold text-emerald-900">
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-[#eef4f1]/70 p-4 text-sm font-semibold text-emerald-900">
               <Info className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
               <p>
                 Įrašas bus pateiktas administratoriui patvirtinti, kad
@@ -1569,7 +1583,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowDocumentsModal(false)}
-                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
               >
                 Atšaukti
               </button>
@@ -1577,7 +1591,7 @@ export default function MyProfilePage() {
                 type="button"
                 disabled={saving}
                 onClick={() => void updateDocumentsInfo()}
-                className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
+                className="rounded-2xl bg-[#047857] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
               >
                 {saving ? "Siunčiama..." : "Pateikti patvirtinimui"}
               </button>
@@ -1694,7 +1708,7 @@ export default function MyProfilePage() {
               </Field>
             </ModalSection>
 
-            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-slate-100/70 p-4 text-sm font-semibold text-emerald-900">
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-[#eef4f1]/70 p-4 text-sm font-semibold text-emerald-900">
               <Info className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
               <p>
                 Įrašas bus pateiktas administratoriui patvirtinti, kad
@@ -1706,7 +1720,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowTrainingModal(false)}
-                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
               >
                 Atšaukti
               </button>
@@ -1714,7 +1728,7 @@ export default function MyProfilePage() {
                 type="button"
                 disabled={saving}
                 onClick={() => void submitTraining()}
-                className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
+                className="rounded-2xl bg-[#047857] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
               >
                 {saving ? "Saugoma..." : "Pateikti mokymus"}
               </button>
@@ -1852,7 +1866,7 @@ export default function MyProfilePage() {
               />
             </Field>
 
-            <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-emerald-800">
+            <p className="rounded-2xl bg-[#eef4f1] p-4 text-sm font-bold text-emerald-800">
               Prašymas bus pateiktas administratoriui patvirtinti.
             </p>
 
@@ -1860,7 +1874,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowVacationModal(false)}
-                className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700"
+                className="rounded-2xl border border-[#dbe6e0] px-5 py-3 text-sm font-black text-[#486b5d]"
               >
                 Atšaukti
               </button>
@@ -1868,7 +1882,7 @@ export default function MyProfilePage() {
                 type="button"
                 disabled={saving}
                 onClick={() => void submitVacation()}
-                className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white hover:bg-slate-800 disabled:opacity-60"
+                className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
               >
                 {saving ? "Saugoma..." : "Pateikti prašymą"}
               </button>
@@ -1877,6 +1891,61 @@ export default function MyProfilePage() {
         </Modal>
       ) : null}
     </main>
+  );
+}
+
+function ProfileTab({
+  label,
+  icon,
+  count,
+  active = false,
+  onClick,
+}: {
+  label: string;
+  icon: ReactNode;
+  count?: number;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+        active
+          ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+          : "text-[#486b5d] hover:bg-white/70"
+      }`}
+    >
+      {icon}
+      {label}
+      {typeof count === "number" ? (
+        <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+          {count}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function HeroMetric({
+  label,
+  value,
+  tone = "normal",
+}: {
+  label: string;
+  value: string;
+  tone?: "normal" | "warning";
+}) {
+  return (
+    <div className="rounded-[18px] bg-[#eef4f1] px-5 py-4">
+      <div className="text-2xl font-black text-[#10251f]">{value}</div>
+      <div className={`mt-1 text-[11px] font-black uppercase tracking-[0.16em] ${
+        tone === "warning" ? "text-amber-700" : "text-[#526174]"
+      }`}>
+        {label}
+      </div>
+    </div>
   );
 }
 
@@ -1889,7 +1958,7 @@ function Card({
 }) {
   return (
     <article
-      className={`rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)] sm:p-6 ${className}`}
+      className={`rounded-[28px] border border-[#dbe6e0]/70 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)] sm:p-6 ${className}`}
     >
       {children}
     </article>
@@ -1910,15 +1979,15 @@ function StatCard({
   warning?: boolean;
 }) {
   return (
-    <article className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)] sm:p-6 transition hover:border-emerald-200 hover:shadow-md">
+    <article className="rounded-[24px] border border-[#dbe6e0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6 transition hover:border-emerald-200 hover:shadow-md">
       <div className="flex items-center gap-4">
         <div
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl [&>svg]:h-6 [&>svg]:w-6 ${warning ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-emerald-700"}`}
+          className={`flex h-14 w-14 items-center justify-center rounded-2xl [&>svg]:h-6 [&>svg]:w-6 ${warning ? "bg-amber-50 text-amber-600" : "bg-[#eef4f1] text-emerald-700"}`}
         >
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="font-extrabold text-slate-500">{title}</p>
+          <p className="font-extrabold text-[#526174]">{title}</p>
           <p className="mt-1 truncate text-2xl font-black">
             {value}{" "}
             <span
@@ -1948,19 +2017,19 @@ function ActionCard({
     <button
       type="button"
       onClick={onClick}
-      className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-slate-100"
+      className="group flex items-center justify-between rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left transition hover:border-emerald-200 hover:bg-[#eef4f1]"
     >
       <span className="flex items-center gap-4">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-500 shadow-sm [&>svg]:h-5 [&>svg]:w-5">
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#526174] shadow-sm [&>svg]:h-5 [&>svg]:w-5">
           {icon}
         </span>
         <span>
           <b>{title}</b>
           <br />
-          <small className="font-semibold text-slate-500">{desc}</small>
+          <small className="font-semibold text-[#526174]">{desc}</small>
         </span>
       </span>
-      <ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-emerald-700" />
+      <ArrowRight className="h-5 w-5 text-[#8ea0b5] transition group-hover:translate-x-1 group-hover:text-emerald-700" />
     </button>
   );
 }
@@ -1975,10 +2044,10 @@ function SummaryCard({
   muted?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <p className="font-black text-slate-800">{title}</p>
+    <div className="rounded-2xl bg-[#f8faf8] p-4">
+      <p className="font-black text-[#10251f]">{title}</p>
       <p
-        className={`mt-1 truncate text-sm font-black ${muted ? "text-slate-600" : "text-emerald-700"}`}
+        className={`mt-1 truncate text-sm font-black ${muted ? "text-[#526174]" : "text-emerald-700"}`}
       >
         {value}
       </p>
@@ -2001,7 +2070,7 @@ function PriorityCard({
     amber: "border-amber-100 bg-amber-50 text-amber-700",
     red: "border-red-100 bg-red-50 text-red-700",
     blue: "border-blue-100 bg-blue-50 text-blue-700",
-    emerald: "border-emerald-100 bg-slate-100 text-emerald-700",
+    emerald: "border-emerald-100 bg-[#eef4f1] text-emerald-700",
   }[color];
 
   return (
@@ -2009,8 +2078,8 @@ function PriorityCard({
       className={`flex items-start justify-between gap-4 rounded-2xl border p-4 ${styles}`}
     >
       <div>
-        <p className="font-black text-slate-900">{title}</p>
-        <p className="mt-1 text-sm font-semibold text-slate-600">{desc}</p>
+        <p className="font-black text-[#10251f]">{title}</p>
+        <p className="mt-1 text-sm font-semibold text-[#526174]">{desc}</p>
       </div>
       <span className="shrink-0 rounded-full bg-white px-3 py-1 text-sm font-black">
         {badge}
@@ -2024,12 +2093,12 @@ function TrainingCard({ item }: { item: TrainingRow }) {
 
   return (
     <div
-      className={`group rounded-2xl border p-4 transition ${verified ? "border-emerald-100 bg-slate-100 hover:border-emerald-200" : "border-amber-100 bg-amber-50 hover:border-amber-200"}`}
+      className={`group rounded-2xl border p-4 transition ${verified ? "border-emerald-100 bg-[#eef4f1] hover:border-emerald-200" : "border-amber-100 bg-amber-50 hover:border-amber-200"}`}
     >
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="font-black text-slate-900">{item.title || "Mokymai"}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-600">
+          <p className="font-black text-[#10251f]">{item.title || "Mokymai"}</p>
+          <p className="mt-1 text-sm font-semibold text-[#526174]">
             {formatDate(item.completed_at || null)} · {Number(item.hours || 0)}{" "}
             val.
             {item.expires_at
@@ -2059,14 +2128,14 @@ function VacationCard({ item }: { item: VacationRow }) {
 
   return (
     <div
-      className={`group rounded-2xl border p-4 transition ${approved ? "border-emerald-100 bg-slate-100" : rejected ? "border-rose-100 bg-rose-50" : "border-amber-100 bg-amber-50"}`}
+      className={`group rounded-2xl border p-4 transition ${approved ? "border-emerald-100 bg-[#eef4f1]" : rejected ? "border-rose-100 bg-rose-50" : "border-amber-100 bg-amber-50"}`}
     >
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="font-black text-slate-900">
+          <p className="font-black text-[#10251f]">
             {vacationTypeLabel(item.type)}
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-600">
+          <p className="mt-1 text-sm font-semibold text-[#526174]">
             {formatDate(item.start_date || null)}
             {item.type === "temporary_leave"
               ? item.note?.includes("Išvykimo laikas:")
@@ -2099,14 +2168,14 @@ function ProfileInfoRow({
   return (
     <div className="flex items-center gap-4 p-4">
       <div
-        className={`flex h-10 w-10 items-center justify-center rounded-2xl [&>svg]:h-5 [&>svg]:w-5 ${warning ? "bg-amber-50 text-amber-600" : "bg-slate-50 text-slate-600"}`}
+        className={`flex h-10 w-10 items-center justify-center rounded-2xl [&>svg]:h-5 [&>svg]:w-5 ${warning ? "bg-amber-50 text-amber-600" : "bg-[#f8faf8] text-[#526174]"}`}
       >
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-bold text-slate-500">{label}</p>
+        <p className="text-sm font-bold text-[#526174]">{label}</p>
         <p
-          className={`truncate font-black ${warning ? "text-amber-700" : "text-slate-900"}`}
+          className={`truncate font-black ${warning ? "text-amber-700" : "text-[#10251f]"}`}
         >
           {value}
         </p>
@@ -2128,15 +2197,15 @@ function InfoStat({
 }) {
   return (
     <div
-      className={`rounded-2xl p-4 ${tone === "green" ? "bg-slate-100" : "bg-amber-50"}`}
+      className={`rounded-2xl p-4 ${tone === "green" ? "bg-[#eef4f1]" : "bg-amber-50"}`}
     >
-      <p className="text-sm font-black text-slate-600">{title}</p>
+      <p className="text-sm font-black text-[#526174]">{title}</p>
       <p
         className={`mt-1 text-2xl font-black ${tone === "green" ? "text-emerald-700" : "text-amber-700"}`}
       >
         {value}
       </p>
-      <p className="mt-1 text-xs font-bold text-slate-500">{hint}</p>
+      <p className="mt-1 text-xs font-bold text-[#526174]">{hint}</p>
     </div>
   );
 }
@@ -2152,11 +2221,11 @@ function DocumentItem({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-4 rounded-2xl border p-4 ${tone === "amber" ? "border-amber-100 bg-amber-50" : "border-slate-100 bg-slate-50"}`}
+      className={`flex items-center justify-between gap-4 rounded-2xl border p-4 ${tone === "amber" ? "border-amber-100 bg-amber-50" : "border-[#dbe6e0] bg-[#f8faf8]"}`}
     >
       <div className="flex items-center gap-3">
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-white ${tone === "amber" ? "text-amber-600" : "text-slate-600"}`}
+          className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-white ${tone === "amber" ? "text-amber-600" : "text-[#526174]"}`}
         >
           {tone === "amber" ? (
             <FileWarning className="h-5 w-5" />
@@ -2164,10 +2233,10 @@ function DocumentItem({
             <FileCheck2 className="h-5 w-5" />
           )}
         </div>
-        <p className="font-black text-slate-900">{title}</p>
+        <p className="font-black text-[#10251f]">{title}</p>
       </div>
       <span
-        className={`rounded-full bg-white px-3 py-1 text-sm font-black ${tone === "amber" ? "text-amber-700" : "text-slate-600"}`}
+        className={`rounded-full bg-white px-3 py-1 text-sm font-black ${tone === "amber" ? "text-amber-700" : "text-[#526174]"}`}
       >
         {badge}
       </span>
@@ -2188,21 +2257,21 @@ function SettingsButton({
     <button
       type="button"
       onClick={onClick}
-      className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-slate-100"
+      className="group flex items-center justify-between rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left transition hover:border-emerald-200 hover:bg-[#eef4f1]"
     >
       <span>
         <b>{title}</b>
         <br />
-        <small className="font-semibold text-slate-500">{desc}</small>
+        <small className="font-semibold text-[#526174]">{desc}</small>
       </span>
-      <ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-emerald-700" />
+      <ArrowRight className="h-5 w-5 text-[#8ea0b5] transition group-hover:translate-x-1 group-hover:text-emerald-700" />
     </button>
   );
 }
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center font-bold text-slate-500">
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-[#f8faf8] p-5 text-center font-bold text-[#526174]">
       {text}
     </div>
   );
@@ -2219,10 +2288,10 @@ function Field({
 }) {
   return (
     <label className="grid gap-2">
-      <span className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+      <span className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.16em] text-[#526174]">
         {label}
         {hint ? (
-          <span className="normal-case tracking-normal text-slate-400">
+          <span className="normal-case tracking-normal text-[#8ea0b5]">
             {hint}
           </span>
         ) : null}
@@ -2242,8 +2311,8 @@ function ModalSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-      <div className="mb-4 flex items-center gap-2 text-sm font-black text-slate-900">
+    <section className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8]/80 p-4 sm:p-5">
+      <div className="mb-4 flex items-center gap-2 text-sm font-black text-[#10251f]">
         <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm">
           {icon}
         </span>
@@ -2256,7 +2325,7 @@ function ModalSection({
 
 function ModalFooter({ children }: { children: ReactNode }) {
   return (
-    <div className="-mx-1 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+    <div className="-mx-1 flex flex-col-reverse gap-3 border-t border-[#dbe6e0] pt-5 sm:flex-row sm:justify-end">
       {children}
     </div>
   );
@@ -2274,15 +2343,15 @@ function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-white px-5 py-5 sm:px-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#047857]/50 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[2rem] border border-[#dbe6e0] bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-[#dbe6e0] bg-white px-5 py-5 sm:px-6">
           <div>
-            <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+            <h2 className="text-2xl font-black tracking-tight text-[#10251f] sm:text-3xl">
               {title}
             </h2>
             {subtitle ? (
-              <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-slate-500">
+              <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-[#526174]">
                 {subtitle}
               </p>
             ) : null}
@@ -2290,7 +2359,7 @@ function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 hover:text-slate-950"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eef4f1] text-[#526174] transition hover:bg-slate-200 hover:text-[#10251f]"
             aria-label="Uždaryti"
           >
             <X className="h-5 w-5" />

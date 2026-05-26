@@ -717,37 +717,85 @@ function escapeHtml(value: string | number | null | undefined) {
     .replace(/"/g, "&quot;");
 }
 
-function downloadExcelHtml(filename: string, html: string) {
-  const excelDocument = `<!doctype html>
+const EXPORT_STYLE = `
+  @page { size: A4 landscape; margin: 5mm; mso-page-orientation: landscape; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; color: #17352f; background: #ffffff; margin: 0; zoom: 0.78; }
+  table { border-collapse: collapse; table-layout: fixed; border-spacing: 0; }
+  th, td { border: 1.5px solid #89a89d; padding: 0; font-size: 10px; vertical-align: middle; mso-number-format: "\\@"; }
+  .schedule-table th, .schedule-table td { border-color: #89a89d; }
+  th { background: #dbe8e2; font-weight: 800; text-align: center; color: #17352f; }
+  .schedule-table { width: auto; }
+  .issues-table { margin-top: 18px; width: 100%; table-layout: auto; }
+  .legend { margin-top: 12px; table-layout: auto; }
+  .title { background: #486b5d; color: #fff; font-size: 18px; font-weight: 800; text-align: left; padding: 8px 10px; }
+  .subtitle { background: #eef5f1; color: #486b5d; font-weight: 700; text-align: left; padding: 7px 10px; }
+  .section-title { background: #cfe0d8; color: #17352f; font-size: 14px; font-weight: 800; text-align: left; padding: 8px 10px; }
+  .employee-head { width: 132px; min-width: 132px; padding: 5px 4px; }
+  .role-head { width: 105px; min-width: 105px; padding: 5px 4px; }
+  .small-head { width: 52px; padding: 5px 3px; }
+  .norm-head { width: 72px; padding: 5px 3px; }
+  .day-head { width: 36px; min-width: 36px; height: 38px; padding: 0; border-left: 2px solid #6f978b; border-right: 1.25px solid #89a89d; border-top: 1.25px solid #89a89d; border-bottom: 1.25px solid #89a89d; }
+  .day-head .day-number { display: block; font-size: 13px; line-height: 15px; font-weight: 900; color: #16342d; }
+  .day-head .weekday { display: block; margin-top: 1px; font-size: 9px; line-height: 10px; font-weight: 800; color: #5d6f68; text-transform: lowercase; }
+  .employee { background: #f8faf9; font-weight: 800; white-space: nowrap; padding: 5px 5px; width: 132px; }
+  .role-cell { background: #fbfcfb; color: #51645e; padding: 5px 5px; width: 105px; }
+  .meta { background: #fbfcfb; color: #51645e; padding: 5px 4px; }
+  .center { text-align: center; }
+  .shift-cell { width: 36px; min-width: 36px; height: 38px; text-align: center; border-left: 2px solid #6f978b; border-right: 1.25px solid #89a89d; border-top: 1.25px solid #89a89d; border-bottom: 1.25px solid #89a89d; padding: 1px; mso-number-format: "\@"; }
+  .shift-empty { background: #f7fbf9; color: #9aaaa3; }
+  .weekend { background: #fbf0ec; }
+  .holiday { background: #fbf2d9; }
+  .weekday-bg { background: #f7fbf9; }
+  .excel-text { mso-number-format: "\\@"; white-space: nowrap; }
+  .shiftbox { display: block; min-height: 24px; border-radius: 5px; border: 1.5px solid transparent; padding: 2px 1px; line-height: 10px; font-size: 10px; font-weight: 900; text-align: center; mso-number-format: "\@"; white-space: nowrap; }
+  .shiftbox small { display: block; margin-top: 1px; font-size: 8px; line-height: 9px; font-weight: 800; }
+  .work .shiftbox { background: #f5c94b; border-color: #df9f1b; color: #3f3108; }
+  .night .shiftbox { background: #76629a; border-color: #5c4a7d; color: #ffffff; }
+  .duty .shiftbox { background: #6a558c; border-color: #4e3e69; color: #ffffff; }
+  .off .shiftbox { background: #b8e0c8; border-color: #8bc7a2; color: #234132; }
+  .vacation .shiftbox { background: #f4b6b6; border-color: #de8f8f; color: #7f1d1d; }
+  .sick .shiftbox { background: #9bb7f5; border-color: #7395dc; color: #1e3a8a; }
+  .reserved .shiftbox { background: #edf0ef; border-color: #cfd8d4; color: #43534c; }
+  .total { background: #eef4f1; font-weight: 800; text-align: center; white-space: nowrap; padding: 7px 6px; }
+  .bad { background: #fff1f0; color: #8a2f27; font-weight: 800; padding: 6px 7px; }
+  .warn { background: #fff8df; color: #8a5a13; font-weight: 800; padding: 6px 7px; }
+  .ok { background: #eef7f1; color: #166534; font-weight: 800; padding: 6px 7px; }
+  .issues-table th, .issues-table td { padding: 6px 7px; font-size: 11px; }
+  .legend td { padding: 6px 8px; font-size: 11px; }
+  .legend-sample { width: 52px; height: 28px; text-align: center; font-weight: 900; border-radius: 6px; }
+  .coverage-cell { background: #e7f0eb; color: #6b8178; font-weight: 900; text-align: center; border: 2px solid #8fb0a5; }
+  .small-day { width: 28px; min-width: 28px; border-left: 2px solid #6f978b !important; border-right: 1.5px solid #89a89d !important; }
+  .timesheet-cell { width: 28px; min-width: 28px; height: 25px; text-align: center; font-weight: 900; border-left: 2px solid #6f978b; border-right: 1.25px solid #89a89d; border-top: 1.25px solid #89a89d; border-bottom: 1.25px solid #89a89d; padding: 1px; mso-number-format: "\@"; }
+  .shortLeave, .shortLeave .shiftbox { display: block; min-height: 24px; border-radius: 5px; border: 1.5px solid transparent; padding: 2px 1px; line-height: 10px; font-size: 10px; font-weight: 900; text-align: center; mso-number-format: "\@"; white-space: nowrap; }
+  .legend-label { background: #eef5f1; font-weight: 900; padding: 6px 8px; }
+  @media print {
+    body { zoom: 0.48; }
+    .schedule-table { page-break-inside: avoid; }
+    .legend { page-break-inside: avoid; }
+  }
+`;
+
+function buildExportDocument(html: string) {
+  return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <style>
-    @page { margin: 0.5in; }
-    body { font-family: Arial, sans-serif; color: #16342d; }
-    table { border-collapse: collapse; }
-    th, td { border: 1px solid #c8d9d2; padding: 5px 7px; font-size: 11px; vertical-align: middle; }
-    th { background: #dce7e2; font-weight: 700; text-align: center; }
-    .title { background: #486b5d; color: #fff; font-size: 18px; font-weight: 700; text-align: left; }
-    .subtitle { background: #eef4f1; color: #486b5d; font-weight: 700; text-align: left; }
-    .employee { background: #f7f8f7; font-weight: 700; white-space: nowrap; }
-    .meta { background: #fbfcfb; color: #51645e; }
-    .weekend { background: #f8f4f2; }
-    .holiday { background: #f6f3e8; }
-    .work { background: #fff7d8; color: #5b4310; font-weight: 700; text-align: center; }
-    .night { background: #e9eef8; color: #263a66; font-weight: 700; text-align: center; }
-    .duty { background: #efe7f4; color: #583b67; font-weight: 700; text-align: center; }
-    .off { background: #eef2ef; color: #53635d; font-weight: 700; text-align: center; }
-    .vacation { background: #f7eadf; color: #7a4d24; font-weight: 700; text-align: center; }
-    .sick { background: #f7e6e3; color: #8a2f27; font-weight: 700; text-align: center; }
-    .reserved { background: #edf0ef; color: #43534c; font-weight: 700; text-align: center; }
-    .total { background: #eef4f1; font-weight: 700; text-align: center; }
-    .bad { background: #fff1f0; color: #8a2f27; font-weight: 700; }
-    .warn { background: #fff8df; color: #8a5a13; font-weight: 700; }
-  </style>
+  <style>${EXPORT_STYLE}</style>
 </head>
 <body>${html}</body>
 </html>`;
+}
+
+function exportCellText(value: string | number | null | undefined) {
+  const text = String(value ?? "");
+  if (!text) return "";
+  // Zero-width space + text CSS neleidžia Excel paversti 7-19 į Jul-19 / Aug-17.
+  return `<span class="excel-text">&#8203;${escapeHtml(text)}</span>`;
+}
+
+function downloadExcelHtml(filename: string, html: string) {
+  const excelDocument = buildExportDocument(html);
   const blob = new Blob(["\ufeff" + excelDocument], {
     type: "application/vnd.ms-excel;charset=utf-8",
   });
@@ -759,6 +807,24 @@ function downloadExcelHtml(filename: string, html: string) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function openPrintPdf(title: string, html: string) {
+  const printWindow = window.open("", "_blank", "width=1400,height=900");
+  if (!printWindow) return false;
+
+  const documentHtml = buildExportDocument(html);
+  printWindow.document.open();
+  printWindow.document.write(documentHtml);
+  printWindow.document.close();
+  printWindow.document.title = title;
+  printWindow.focus();
+  window.setTimeout(() => {
+    printWindow.focus();
+    printWindow.print();
+  }, 650);
+
+  return true;
 }
 
 function emptySettings(): TemplateSettings {
@@ -1082,15 +1148,10 @@ export default function ScheduleBlock({
       vacationReservations,
     );
 
-    const incomingHasValues = normalizedIncoming.some((row) =>
-      row.slice(1).some((value) => cleanText(String(value || ""))),
-    );
-
-    if (incomingHasValues) {
-      setGrid(normalizedIncoming);
-      return;
-    }
-
+    // Svarbu: po saugojimo tėvinis komponentas kartais dar grąžina seną
+    // scheduleGridData. Todėl lokaliai išsaugotą grafiko kopiją ne ignoruojame,
+    // o uždedame ant naujai atėjusio grid'o. Taip pakeitimai nepradingsta
+    // po mėnesio perjungimo, refresh ar kol Supabase query dar negrąžina naujų eilučių.
     try {
       const cached = window.localStorage.getItem(gridCacheKey);
       if (cached) {
@@ -1102,40 +1163,32 @@ export default function ScheduleBlock({
           | unknown[][];
 
         if (!Array.isArray(parsed) && parsed?.byEmployee) {
-          const restored = applyReservationsToGridRows(
-            employees.map((employee) => {
-              const row: unknown[] = [employee.user_id];
-              scheduleDays.forEach((date) => {
-                row.push(parsed.byEmployee?.[employee.user_id]?.[dayKey(date)] || "");
-              });
-              return row;
-            }),
-            employees,
-            scheduleDays,
-            vacationReservations,
-          );
-          setGrid(restored);
+          const restored = normalizedIncoming.map((row) => [...row]);
+          employees.forEach((employee, rowIndex) => {
+            if (!restored[rowIndex]) restored[rowIndex] = [employee.user_id];
+            scheduleDays.forEach((date, dayIndex) => {
+              const cachedValue = parsed.byEmployee?.[employee.user_id]?.[dayKey(date)];
+              if (cachedValue !== undefined) restored[rowIndex][dayIndex + 1] = cachedValue;
+            });
+          });
+
+          setGrid(applyReservationsToGridRows(restored, employees, scheduleDays, vacationReservations));
           return;
         }
 
         // Senas lokalus cache buvo saugomas pagal eilutės indeksą.
-        // Jei darbuotojų kiekis pasikeitė, jo nenaudojame, nes taip gali
-        // „dingti“ darbuotojas arba jo grafikas persikelti kitam žmogui.
         if (Array.isArray(parsed) && parsed.length === employees.length) {
-          const restored = applyReservationsToGridRows(
-            employees.map((employee, rowIndex) => {
-              const source = parsed[rowIndex] || [];
-              const row: unknown[] = [source[0] || employee.user_id];
-              scheduleDays.forEach((_, dayIndex) => {
-                row.push(source[dayIndex + 1] || "");
-              });
-              return row;
-            }),
-            employees,
-            scheduleDays,
-            vacationReservations,
-          );
-          setGrid(restored);
+          const restored = normalizedIncoming.map((row) => [...row]);
+          employees.forEach((employee, rowIndex) => {
+            const source = parsed[rowIndex] || [];
+            if (!restored[rowIndex]) restored[rowIndex] = [employee.user_id];
+            scheduleDays.forEach((_, dayIndex) => {
+              const cachedValue = source[dayIndex + 1];
+              if (cachedValue !== undefined) restored[rowIndex][dayIndex + 1] = cachedValue;
+            });
+          });
+
+          setGrid(applyReservationsToGridRows(restored, employees, scheduleDays, vacationReservations));
           return;
         }
       }
@@ -2057,6 +2110,124 @@ export default function ScheduleBlock({
         : "Saugomas grafiko juodraštis...",
     );
 
+    const errorMessage = (error: unknown) =>
+      typeof error === "object" && error && "message" in error
+        ? String((error as { message?: string }).message || "")
+        : String(error || "");
+
+    const isMissingColumnError = (error: unknown, column: string) => {
+      const message = errorMessage(error);
+      return (
+        message.includes(`column employee_schedules.${column} does not exist`) ||
+        message.includes(`Could not find the '${column}' column`) ||
+        message.includes(`'${column}' column`) ||
+        message.includes(`${column} column`)
+      );
+    };
+
+    const missingColumnFromError = (error: unknown) => {
+      const message = errorMessage(error);
+      const patterns = [
+        /column employee_schedules\.([a-zA-Z0-9_]+) does not exist/,
+        /Could not find the '([a-zA-Z0-9_]+)' column/,
+        /'([a-zA-Z0-9_]+)' column/,
+      ];
+
+      for (const pattern of patterns) {
+        const match = message.match(pattern);
+        if (match?.[1]) return match[1];
+      }
+
+      return null;
+    };
+
+    const safeDeleteSchedules = async (
+      organizationId: string,
+      employeeId: string,
+      shiftDate: string,
+      splitParentMarker: string,
+    ) => {
+      const idColumns = ["user_id", "employee_id"] as const;
+      const dateColumns = ["shift_date", "date"] as const;
+
+      for (const idColumn of idColumns) {
+        for (const dateColumn of dateColumns) {
+          const { error } = await supabase
+            .from("employee_schedules")
+            .delete()
+            .eq("organization_id", organizationId)
+            .eq(idColumn, employeeId)
+            .eq(dateColumn, shiftDate);
+
+          if (error) {
+            if (isMissingColumnError(error, idColumn) || isMissingColumnError(error, dateColumn)) continue;
+            throw error;
+          }
+        }
+      }
+
+      // Jei grafikas buvo skeltas per parą, papildomai bandome ištrinti tęsinio eilutę pagal notes markerį.
+      for (const idColumn of idColumns) {
+        const { error } = await supabase
+          .from("employee_schedules")
+          .delete()
+          .eq("organization_id", organizationId)
+          .eq(idColumn, employeeId)
+          .ilike("notes", `%${splitParentMarker}%`);
+
+        if (error && !isMissingColumnError(error, idColumn) && !isMissingColumnError(error, "notes")) throw error;
+      }
+    };
+
+    const insertSchedulesWithFallback = async (
+      basePayloads: Array<Record<string, unknown>>,
+    ) => {
+      if (basePayloads.length === 0) return;
+
+      let payloads = basePayloads.map((payload) => ({ ...payload }));
+      let lastError: unknown = null;
+
+      // Skirtingose migracijose employee_schedules buvo naudoti skirtingi stulpeliai
+      // (date/shift_date, start_datetime/start_time, employee_id/user_id).
+      // Todėl pradedame nuo pilno payload ir, jei PostgREST praneša apie neegzistuojantį
+      // stulpelį, tą stulpelį pašaliname ir bandome dar kartą.
+      for (let attempt = 0; attempt < 16; attempt += 1) {
+        const { error } = await supabase.from("employee_schedules").insert(payloads);
+        if (!error) return;
+
+        lastError = error;
+        const missingColumn = missingColumnFromError(error);
+
+        if (missingColumn) {
+          payloads = payloads.map(({ [missingColumn]: _removed, ...payload }) => payload);
+          continue;
+        }
+
+        const message = errorMessage(error);
+
+        // Jei viena iš porinių ID reikšmių sukelia NOT NULL / FK problemą,
+        // bandome minimalistinį variantą, kuris dažniausiai tinka senai lentelei.
+        if (message.includes("violates not-null constraint") || message.includes("violates foreign key constraint")) {
+          payloads = payloads.map(({
+            date,
+            start_datetime,
+            end_datetime,
+            is_published,
+            published_at,
+            published_by,
+            ...payload
+          }) => payload);
+          continue;
+        }
+
+        throw error;
+      }
+
+      throw lastError instanceof Error
+        ? lastError
+        : new Error("Nepavyko įrašyti grafiko į employee_schedules.");
+    };
+
     try {
       const {
         data: { user },
@@ -2073,8 +2244,7 @@ export default function ScheduleBlock({
       const fallbackOrganizationId =
         (membership as { organization_id?: string | null } | null)
           ?.organization_id ||
-        (schedule.find((item) => item.organization_id)?.organization_id ??
-          null);
+        (schedule.find((item) => item.organization_id)?.organization_id ?? null);
 
       if (!fallbackOrganizationId) {
         throw new Error(
@@ -2089,17 +2259,14 @@ export default function ScheduleBlock({
 
         const shiftDate = dayKey(date);
         const parsed = parseShiftValue(newValue);
-
         const splitParentMarker = `split_parent=${shiftDate}`;
 
-        const { error: deleteError } = await supabase
-          .from("employee_schedules")
-          .delete()
-          .eq("organization_id", fallbackOrganizationId)
-          .eq("user_id", employee.user_id)
-          .or(`shift_date.eq.${shiftDate},notes.ilike.%${splitParentMarker}%`);
-
-        if (deleteError) throw deleteError;
+        await safeDeleteSchedules(
+          fallbackOrganizationId,
+          employee.user_id,
+          shiftDate,
+          splitParentMarker,
+        );
 
         if (!parsed.normalized || parsed.kind === "empty") continue;
 
@@ -2110,25 +2277,34 @@ export default function ScheduleBlock({
           ? `Neatvykimas: ${reservation.label || reservation.type || reservation.code}${reservation.note ? ` · ${reservation.note}` : ""}`
           : null;
 
-        const payloads = splitShiftForDb(parsed, shiftDate).map((part) => ({
-          organization_id: fallbackOrganizationId,
-          user_id: employee.user_id,
-          shift_date: part.shift_date,
-          start_time: part.start_time,
-          end_time: part.end_time,
-          shift_type: part.shift_type,
-          status: mode,
-          is_published: publish,
-          published_at: publish ? new Date().toISOString() : null,
-          published_by: publish ? user?.id || null : null,
-          notes: reservationNote || part.notes,
-        }));
+        const payloads = splitShiftForDb(parsed, shiftDate).map((part) => {
+          const startDateTime = part.start_time
+            ? `${part.shift_date}T${part.start_time}:00`
+            : null;
+          const endDateTime = part.end_time
+            ? `${part.shift_date}T${part.end_time}:00`
+            : null;
 
-        const { error: insertError } = await supabase
-          .from("employee_schedules")
-          .insert(payloads);
+          return {
+            organization_id: fallbackOrganizationId,
+            user_id: employee.user_id,
+            employee_id: employee.user_id,
+            shift_date: part.shift_date,
+            date: part.shift_date,
+            start_time: part.start_time,
+            end_time: part.end_time,
+            start_datetime: startDateTime,
+            end_datetime: endDateTime,
+            shift_type: part.shift_type,
+            status: mode,
+            is_published: publish,
+            published_at: publish ? new Date().toISOString() : null,
+            published_by: publish ? user?.id || null : null,
+            notes: reservationNote || part.notes,
+          };
+        });
 
-        if (insertError) throw insertError;
+        await insertSchedulesWithFallback(payloads);
       }
 
       try {
@@ -2138,10 +2314,16 @@ export default function ScheduleBlock({
       }
 
       try {
+        const snapshot = grid.map((row) => [...row]);
+        effectiveChanges.forEach(([row, col, , newValue]) => {
+          if (!snapshot[row]) snapshot[row] = [employees[row]?.user_id || ""];
+          snapshot[row][col] = newValue;
+        });
+
         const byEmployee: Record<string, Record<string, string>> = {};
         employees.forEach((employee, rowIndex) => {
           scheduleDays.forEach((date, dayIndex) => {
-            const value = cleanText(getValue(rowIndex, dayIndex + 1));
+            const value = cleanText(String(snapshot[rowIndex]?.[dayIndex + 1] || ""));
             if (!value) return;
             if (!byEmployee[employee.user_id]) byEmployee[employee.user_id] = {};
             byEmployee[employee.user_id][dayKey(date)] = value;
@@ -2177,6 +2359,25 @@ export default function ScheduleBlock({
       setPublishing(false);
     }
   };
+
+
+  // Automatinis juodraščio išsaugojimas.
+  // Pakeitimai pirmiausia įrašomi į lokalų grid per queueChanges(),
+  // tada po trumpos pauzės išsaugomi taip pat, kaip paspaudus „Išsaugoti juodraštį“.
+  useEffect(() => {
+    if (pendingChanges.length === 0) return;
+    if (localSaving || saving || publishing) return;
+
+    const timer = window.setTimeout(() => {
+      void saveScheduleChanges("draft");
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+    // Sąmoningai klausomės tik būsenų, kurios turi paleisti autosave.
+    // saveScheduleChanges yra komponento funkcija, todėl jos nededame į dependency,
+    // kad autosave nepersikurtų be realių pakeitimų.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingChanges.length, localSaving, saving, publishing]);
 
   const undo = () => {
     const item = undoStack[0];
@@ -2464,85 +2665,344 @@ export default function ScheduleBlock({
     return "meta";
   };
 
+  const compactTimeForExport = (time: string) => {
+    return time.replace(/^0/, "").replace(":00", "");
+  };
+
+  const exportCellClass = (parsed: ParsedShift) => {
+    if (!parsed.normalized || parsed.kind === "empty") return "shift-empty";
+    if ((parsed.kind === "work" || parsed.kind === "night") && parsed.grossHours === 24) return "duty";
+    if (parsed.kind === "work") return "work";
+    if (parsed.kind === "night") return "night";
+    if (parsed.kind === "off") return "off";
+    if (parsed.kind === "vacation") return "vacation";
+    if (parsed.kind === "sick") return "sick";
+    if (parsed.kind === "reserved") return "reserved";
+    if (parsed.kind === "shortLeave") return "shortLeave";
+    return "meta";
+  };
+
+  const graphExportValue = (parsed: ParsedShift) => {
+    if (!parsed.normalized || parsed.kind === "empty") return "";
+
+    if (
+      (parsed.kind === "work" || parsed.kind === "night") &&
+      parsed.startMinutes !== null &&
+      parsed.endMinutes !== null
+    ) {
+      const start = compactTimeForExport(normalizeTime(parsed.startMinutes));
+      const end =
+        parsed.endMinutes >= 1440 && parsed.grossHours === 24
+          ? "24"
+          : compactTimeForExport(normalizeTime(parsed.endMinutes));
+      return `${start}-${end}`;
+    }
+
+    if (parsed.kind === "off") return "P";
+    if (parsed.kind === "vacation") {
+      const code = cleanText(parsed.normalized).toUpperCase();
+      if (code === "MD") return "M";
+      if (code === "TD") return "T";
+      return code || "A";
+    }
+    if (parsed.kind === "sick") return "L";
+    if (parsed.kind === "reserved") return "R";
+    if (parsed.kind === "shortLeave") return "TI";
+    return parsed.normalized;
+  };
+
+  const timesheetDayValue = (parsed: ParsedShift) => {
+    if (!parsed.normalized || parsed.kind === "empty") return "";
+
+    if (parsed.kind === "off") return "P";
+    if (parsed.kind === "vacation") {
+      const code = cleanText(parsed.normalized).toUpperCase();
+      if (code === "MD") return "M";
+      if (code === "TD") return "T";
+      return code || "A";
+    }
+    if (parsed.kind === "sick") return "L";
+    if (parsed.kind === "reserved") return "R";
+    if (parsed.kind === "shortLeave") return "TI";
+
+    if ((parsed.kind === "work" || parsed.kind === "night") && parsed.grossHours !== null) {
+      const gross = parsed.grossHours;
+      let hours = gross;
+
+      // Tabelyje rodome tabelines valandas, ne pilną įrašo tekstą.
+      // 08-17 tipiniu grafiku skaičiuojama kaip 8 val.; 12/24 val. pamainos lieka kaip pamainos trukmė.
+      if (gross >= 8.5 && gross <= 9) hours = 8;
+      else if (gross >= 11.5 && gross <= 12.5) hours = 12;
+      else if (gross >= 23.5) hours = 24;
+
+      return formatHours(hours).replace(".", ",");
+    }
+
+    return parsed.normalized;
+  };
+
+  const timesheetCountHours = (parsed: ParsedShift) => {
+    if (!(parsed.kind === "work" || parsed.kind === "night") || parsed.grossHours === null) return 0;
+
+    const gross = parsed.grossHours;
+    if (gross >= 8.5 && gross <= 9) return 8;
+    if (gross >= 11.5 && gross <= 12.5) return 12;
+    if (gross >= 23.5) return 24;
+    return Number(formatHours(gross));
+  };
+
   const exportSchedule = () => {
     const monthTitle = monthLabel(scheduleMonth);
-    const totalColumns = 5 + scheduleDays.length + 3;
-    const coverageRow = scheduleDays
-      .map((date, dayIndex) => {
-        const planned = employees.reduce((count, employee, rowIndex) => {
-          const parsed = parseShiftValue(getValue(rowIndex, dayIndex + 1));
-          const previousParsed =
-            dayIndex > 0 ? parseShiftValue(getValue(rowIndex, dayIndex)) : null;
-          const isCoveredByShift =
-            parsed.kind === "work" ||
-            parsed.kind === "night" ||
-            Boolean(previousParsed && isOvernightOrDutyShift(previousParsed));
-          return count + (isCoveredByShift ? 1 : 0);
-        }, 0);
-        const target = Math.max(1, Math.ceil(employees.length * 0.55));
-        const className = isWeekend(date) ? "weekend" : isHoliday(date) ? "holiday" : "meta";
-        return `<td class="${className}" style="text-align:center;font-weight:700">${escapeHtml(planned)}/${escapeHtml(target)}</td>`;
-      })
-      .join("");
+    const totalColumns = 4 + scheduleDays.length + 2;
+
+    const colgroup = `<colgroup>
+      <col style="width:132px" />
+      <col style="width:105px" />
+      <col style="width:52px" />
+      <col style="width:72px" />
+      ${scheduleDays.map(() => '<col style="width:34px" />').join("")}
+      <col style="width:68px" />
+      <col style="width:72px" />
+    </colgroup>`;
 
     const dayHeader = scheduleDays
       .map((date) => {
-        const className = isWeekend(date) ? "weekend" : isHoliday(date) ? "holiday" : "";
-        return `<th class="${className}">${escapeHtml(pad2(date.getDate()))}<br/>${escapeHtml(weekdayLabel(date))}</th>`;
+        const className = isHoliday(date)
+          ? "holiday"
+          : isWeekend(date)
+            ? "weekend"
+            : "weekday-bg";
+        return `<th class="${className} day-head"><span class="day-number">${escapeHtml(pad2(date.getDate()))}</span><span class="weekday">${escapeHtml(weekdayLabel(date))}</span></th>`;
       })
       .join("");
 
+    const coverageRow = `<tr>
+      <td class="section-title" colspan="4">Dienos padengimas</td>
+      ${scheduleDays.map(() => '<td class="coverage-cell">+</td>').join("")}
+      <td class="section-title" colspan="2"></td>
+    </tr>`;
+
     const bodyRows = employees
       .map((employee, rowIndex) => {
-        const validation = validationByEmployee.get(employee.user_id);
+        let totalHours = 0;
         const dayCells = scheduleDays
           .map((date, dayIndex) => {
             const parsed = parseShiftValue(getValue(rowIndex, dayIndex + 1));
-            const value = parsed.normalized || "";
-            const baseClass = excelShiftClass(parsed) || (isWeekend(date) ? "weekend" : isHoliday(date) ? "holiday" : "");
-            return `<td class="${baseClass}" style="text-align:center;min-width:54px">${escapeHtml(value)}</td>`;
+            totalHours += timesheetCountHours(parsed);
+            const dayClass = isHoliday(date)
+              ? "holiday"
+              : isWeekend(date)
+                ? "weekend"
+                : "weekday-bg";
+            const shiftClassName = exportCellClass(parsed);
+            const value = graphExportValue(parsed);
+            const baseClass = value ? `${shiftClassName} ${dayClass}` : `shift-empty ${dayClass}`;
+            const content = value ? `<span class="shiftbox"><span>${exportCellText(value)}</span></span>` : "";
+            return `<td class="${baseClass} shift-cell">${content}</td>`;
           })
           .join("");
-        const balance = validation?.monthlyBalanceHours || 0;
-        const statusClass = validation?.issues.length ? "bad" : validation?.warnings.length ? "warn" : "";
+
+        const monthlyNorm = getMonthlyContractHours(scheduleDays, employee);
+        const balance = totalHours - monthlyNorm;
 
         return `<tr>
           <td class="employee">${escapeHtml(getName(employee))}</td>
-          <td class="meta">${escapeHtml(getRole(employee))}</td>
-          <td class="meta" style="text-align:center">${escapeHtml(formatEmploymentRate(employee))}</td>
-          <td class="meta" style="text-align:center">${escapeHtml(formatHours(getWeeklyContractHours(employee)))} val.</td>
-          <td class="meta" style="text-align:center">${escapeHtml(formatHours(validation?.monthlyContractHours || 0))} val.</td>
+          <td class="role-cell">${escapeHtml(getRole(employee))}</td>
+          <td class="meta center">${escapeHtml(formatEmploymentRate(employee))}</td>
+          <td class="meta center">${escapeHtml(formatHours(monthlyNorm))} val.</td>
           ${dayCells}
-          <td class="total">${escapeHtml(formatHours(validation?.plannedHours || 0))} val.</td>
-          <td class="total">${balance > 0 ? "+" : ""}${escapeHtml(formatHours(balance))} val.</td>
-          <td class="${statusClass}">${escapeHtml(validation?.statusLabel || "Be neatitikimų")}</td>
+          <td class="total">${escapeHtml(formatHours(totalHours))} val.</td>
+          <td class="total ${balance > 0 || balance < -8 ? "warn" : ""}">${balance > 0 ? "+" : ""}${escapeHtml(formatHours(balance))} val.</td>
         </tr>`;
       })
       .join("");
 
-    const html = `<table>
-      <tr><td class="title" colspan="${totalColumns}">Darbo grafikas · ${escapeHtml(monthTitle)}</td></tr>
-      <tr><td class="subtitle" colspan="${totalColumns}">Eksportuota taip, kaip rodoma grafike: darbuotojai, dienos, pamainų spalvos, savaitgaliai, šventinės dienos ir suvestinės.</td></tr>
+    const legendHtml = `<table class="legend">
       <tr>
-        <th>Darbuotojas</th>
-        <th>Pareigybė</th>
-        <th>Etatas</th>
-        <th>Savaitės norma</th>
-        <th>Mėnesio norma</th>
-        ${dayHeader}
-        <th>Iš viso</th>
-        <th>Balansas</th>
-        <th>Statusas</th>
+        <td class="legend-label">Žymėjimai</td>
+        <td class="legend-sample work"><span class="shiftbox">8-17</span></td><td>Darbo valandos</td>
+        <td class="legend-sample night"><span class="shiftbox">19-7</span></td><td>Naktinė / per parą pereinanti pamaina</td>
+        <td class="legend-sample off"><span class="shiftbox">P</span></td><td>Poilsis</td>
+        <td class="legend-sample vacation"><span class="shiftbox">A</span></td><td>Atostogos / M / T / NA</td>
+        <td class="legend-sample sick"><span class="shiftbox">L</span></td><td>Liga</td>
+        <td class="legend-sample shortLeave"><span class="shiftbox">TI</span></td><td>Trumpa išvyka</td>
       </tr>
-      <tr>
-        <td class="subtitle" colspan="5">Dienos padengimas</td>
-        ${coverageRow}
-        <td class="subtitle" colspan="3"></td>
-      </tr>
-      ${bodyRows}
     </table>`;
 
-    downloadExcelHtml(`grafikas-${monthTitle}.xls`, html);
+    const html = `<table class="schedule-table">
+      ${colgroup}
+      <tr><td class="title" colspan="${totalColumns}">Galutinis darbuotojų grafikas · ${escapeHtml(monthTitle)}</td></tr>
+      <tr><td class="subtitle" colspan="${totalColumns}">Langeliuose rodomos darbo valandos taip, kaip grafike: 8-17, 7-19, 19-7, 7-24. Pažeidimai šiame darbuotojams skirtame eksporte nerodomi.</td></tr>
+      <tr>
+        <th class="employee-head">Darbuotojas</th>
+        <th class="role-head">Pareigybė</th>
+        <th class="small-head">Etatas</th>
+        <th class="norm-head">Mėnesio norma</th>
+        ${dayHeader}
+        <th class="norm-head">Iš viso</th>
+        <th class="norm-head">Balansas</th>
+      </tr>
+      ${coverageRow}
+      ${bodyRows}
+    </table>
+    ${legendHtml}`;
+
+    openPrintPdf(`grafikas-${monthTitle}`, html);
+  };
+
+  const exportTimesheet = () => {
+    const monthTitle = monthLabel(scheduleMonth);
+    const totalColumns = 4 + scheduleDays.length + 8;
+
+    const colgroup = `<colgroup>
+      <col style="width:132px" />
+      <col style="width:58px" />
+      <col style="width:70px" />
+      <col style="width:105px" />
+      ${scheduleDays.map(() => '<col style="width:30px" />').join("")}
+      <col style="width:76px" />
+      <col style="width:76px" />
+      <col style="width:76px" />
+      <col style="width:76px" />
+      <col style="width:76px" />
+      <col style="width:76px" />
+      <col style="width:76px" />
+      <col style="width:76px" />
+    </colgroup>`;
+
+    const dayHeader = scheduleDays
+      .map((date) => {
+        const className = isHoliday(date)
+          ? "holiday"
+          : isWeekend(date)
+            ? "weekend"
+            : "weekday-bg";
+        return `<th class="${className} day-head small-day"><span class="day-number">${escapeHtml(pad2(date.getDate()))}</span><span class="weekday">${escapeHtml(weekdayLabel(date))}</span></th>`;
+      })
+      .join("");
+
+    let totals = {
+      norm: 0,
+      worked: 0,
+      night: 0,
+      vacation: 0,
+      sick: 0,
+      unpaid: 0,
+      shortLeave: 0,
+      balance: 0,
+    };
+
+    const bodyRows = employees
+      .map((employee, rowIndex) => {
+        const monthlyNorm = getMonthlyContractHours(scheduleDays, employee);
+        let worked = 0;
+        let night = 0;
+        let vacation = 0;
+        let sick = 0;
+        let unpaid = 0;
+        let shortLeave = 0;
+
+        const dayCells = scheduleDays
+          .map((date, dayIndex) => {
+            const parsed = parseShiftValue(getValue(rowIndex, dayIndex + 1));
+            const value = timesheetDayValue(parsed);
+            const hours = timesheetCountHours(parsed);
+            const dayClass = isHoliday(date)
+              ? "holiday"
+              : isWeekend(date)
+                ? "weekend"
+                : "weekday-bg";
+            const shiftClassName = exportCellClass(parsed);
+
+            if (parsed.kind === "work" || parsed.kind === "night") {
+              worked += hours;
+              if (parsed.kind === "night") night += hours;
+            } else if (parsed.kind === "vacation") {
+              const code = cleanText(parsed.normalized).toUpperCase();
+              if (code === "NA") unpaid += 8;
+              else vacation += 8;
+            } else if (parsed.kind === "sick") {
+              sick += 8;
+            } else if (parsed.kind === "shortLeave") {
+              // Trumpos išvykos tabelyje matomos, bet valandų normoje neskaičiuojamos.
+              shortLeave += 0;
+            }
+
+            const baseClass = value ? `${shiftClassName} ${dayClass}` : `shift-empty ${dayClass}`;
+            return `<td class="${baseClass} timesheet-cell">${exportCellText(value)}</td>`;
+          })
+          .join("");
+
+        const allHours = worked + vacation + sick + unpaid;
+        const balance = allHours - monthlyNorm;
+
+        totals.norm += monthlyNorm;
+        totals.worked += worked;
+        totals.night += night;
+        totals.vacation += vacation;
+        totals.sick += sick;
+        totals.unpaid += unpaid;
+        totals.shortLeave += shortLeave;
+        totals.balance += balance;
+
+        return `<tr>
+          <td class="employee">${escapeHtml(getName(employee))}</td>
+          <td class="meta center">${escapeHtml(formatEmploymentRate(employee))}</td>
+          <td class="meta center">${escapeHtml(formatHours(monthlyNorm))}</td>
+          <td class="meta center">${escapeHtml(getRole(employee))}</td>
+          ${dayCells}
+          <td class="total">${escapeHtml(formatHours(worked))}</td>
+          <td class="total">${escapeHtml(formatHours(night))}</td>
+          <td class="total">${escapeHtml(formatHours(vacation))}</td>
+          <td class="total">${escapeHtml(formatHours(sick))}</td>
+          <td class="total">${escapeHtml(formatHours(unpaid))}</td>
+          <td class="total">${escapeHtml(formatHours(shortLeave))}</td>
+          <td class="total">${escapeHtml(formatHours(allHours))}</td>
+          <td class="total ${balance > 0 || balance < -8 ? "warn" : ""}">${balance > 0 ? "+" : ""}${escapeHtml(formatHours(balance))}</td>
+        </tr>`;
+      })
+      .join("");
+
+    const summaryRow = `<tr>
+      <td class="employee">IŠ VISO</td>
+      <td class="total"></td>
+      <td class="total">${escapeHtml(formatHours(totals.norm))}</td>
+      <td class="total"></td>
+      ${scheduleDays.map(() => '<td class="total"></td>').join("")}
+      <td class="total">${escapeHtml(formatHours(totals.worked))}</td>
+      <td class="total">${escapeHtml(formatHours(totals.night))}</td>
+      <td class="total">${escapeHtml(formatHours(totals.vacation))}</td>
+      <td class="total">${escapeHtml(formatHours(totals.sick))}</td>
+      <td class="total">${escapeHtml(formatHours(totals.unpaid))}</td>
+      <td class="total">${escapeHtml(formatHours(totals.shortLeave))}</td>
+      <td class="total">${escapeHtml(formatHours(totals.worked + totals.vacation + totals.sick + totals.unpaid))}</td>
+      <td class="total ${totals.balance > 0 || totals.balance < -8 ? "warn" : ""}">${totals.balance > 0 ? "+" : ""}${escapeHtml(formatHours(totals.balance))}</td>
+    </tr>`;
+
+    const html = `<table class="schedule-table">
+      ${colgroup}
+      <tr><td class="title" colspan="${totalColumns}">KR tabelis · ${escapeHtml(monthTitle)}</td></tr>
+      <tr><td class="subtitle" colspan="${totalColumns}">PDF tabelyje rodomas visas mėnesio kalendorius. Darbo pamainos rodomos valandomis, pvz. 8 arba 12; neatvykimai – A, M, T, L, P, NA. Trumpos išvykos matomos, bet į darbo valandas neskaičiuojamos.</td></tr>
+      <tr>
+        <th class="employee-head">Darbuotojas</th>
+        <th class="small-head">Etatas</th>
+        <th class="norm-head">Norma</th>
+        <th class="role-head">Pareigybė</th>
+        ${dayHeader}
+        <th class="norm-head">Dirbta</th>
+        <th class="norm-head">Naktinės</th>
+        <th class="norm-head">A/M/T</th>
+        <th class="norm-head">Liga</th>
+        <th class="norm-head">NA</th>
+        <th class="norm-head">Trumpi išv.</th>
+        <th class="norm-head">Iš viso</th>
+        <th class="norm-head">Likutis</th>
+      </tr>
+      ${bodyRows}
+      ${summaryRow}
+    </table>`;
+
+    openPrintPdf(`tabelis-${monthTitle}`, html);
   };
 
   const beginDrag = (value: string) => {
@@ -2700,7 +3160,10 @@ export default function ScheduleBlock({
             Kitas <ChevronRight size={16} />
           </button>
           <button type="button" className="btn" onClick={exportSchedule}>
-            <Download size={16} /> Eksportuoti
+            <Download size={16} /> Eksportuoti grafiką PDF
+          </button>
+          <button type="button" className="btn" onClick={exportTimesheet}>
+            <Download size={16} /> Tabelis PDF
           </button>
           <button
             type="button"

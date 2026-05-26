@@ -98,8 +98,14 @@ type IsgpGoal = {
 type HandoverEntry = {
   id: string;
   category: string | null;
+  title?: string | null;
   note: string | null;
   needs_follow_up: boolean | null;
+  is_important?: boolean | null;
+  priority?: string | null;
+  shift_date?: string | null;
+  shift_type?: string | null;
+  archived?: boolean | null;
   created_at: string | null;
 };
 
@@ -202,7 +208,6 @@ function uniqueValues(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
-
 function firstParamValue(value: unknown) {
   if (Array.isArray(value)) return value[0] ? String(value[0]) : "";
   if (typeof value === "string") return value;
@@ -233,7 +238,9 @@ function resolveResidentId(
     searchParams?.get("residentId") || "",
     searchParams?.get("resident_id") || "",
     searchParams?.get("gyventojasId") || "",
-    typeof window !== "undefined" ? getResidentIdFromPathname(window.location.pathname) : "",
+    typeof window !== "undefined"
+      ? getResidentIdFromPathname(window.location.pathname)
+      : "",
   ];
 
   return candidates.find((value) => isUuid(value)) || "";
@@ -257,6 +264,20 @@ function toDateInput(value: unknown) {
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return "";
   return date.toISOString().slice(0, 10);
+}
+
+function formatEntryDate(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
+
+  return date.toLocaleString("lt-LT", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function statusLabel(status?: string | null) {
@@ -332,6 +353,73 @@ function getReadableError(error: unknown) {
   return String(error);
 }
 
+async function writeAuditLog(input: {
+  organizationId: string | null | undefined;
+  tableName: string;
+  recordId: string | null;
+  action: string;
+  changes?: Record<string, unknown>;
+}) {
+  if (!input.organizationId) return;
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const payload = {
+      organization_id: input.organizationId,
+      table_name: input.tableName,
+      record_id: input.recordId,
+      action: input.action,
+      changed_by: user?.id || null,
+      changed_at: new Date().toISOString(),
+      changes: input.changes || {},
+    };
+
+    const attempts = [
+      supabase.from("audit_log").insert(payload),
+      supabase.from("audit_logs").insert({
+        organization_id: payload.organization_id,
+        table_name: payload.table_name,
+        record_id: payload.record_id,
+        action: payload.action,
+        user_id: payload.changed_by,
+        created_at: payload.changed_at,
+        changes: payload.changes,
+        metadata: payload.changes,
+      } as any),
+    ];
+
+    for (const attempt of attempts) {
+      const { error } = await attempt;
+      if (!error) return;
+    }
+  } catch {
+    // Auditas neturi nulaužti pagrindinio veiksmo.
+  }
+}
+
+function localGoalsKey(residentId: string) {
+  return `resident-isgp-goals:${residentId}`;
+}
+
+function loadLocalGoals(residentId: string): IsgpGoal[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(
+      window.localStorage.getItem(localGoalsKey(residentId)) || "[]",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalGoals(residentId: string, rows: IsgpGoal[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(localGoalsKey(residentId), JSON.stringify(rows));
+}
+
 function Badge({
   children,
   tone = "neutral",
@@ -340,11 +428,11 @@ function Badge({
   tone?: "green" | "blue" | "warning" | "danger" | "neutral";
 }) {
   const tones = {
-    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    green: "border-[#c9d8d0] bg-white/10 text-white",
     blue: "border-blue-200 bg-blue-50 text-blue-700",
     warning: "border-amber-200 bg-amber-50 text-amber-700",
     danger: "border-red-200 bg-red-50 text-red-700",
-    neutral: "border-slate-200 bg-slate-50 text-slate-600",
+    neutral: "border-[#dbe6e0] bg-[#f8faf8] text-[#526174]",
   };
 
   return (
@@ -366,9 +454,9 @@ function Card({
   action?: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-[24px] border border-[#dbe6e0] bg-white shadow-sm">
       <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-5">
-        <h2 className="text-[17px] font-black tracking-tight text-slate-950">
+        <h2 className="text-[17px] font-black tracking-tight text-[#10251f]">
           {title}
         </h2>
         {action}
@@ -394,7 +482,7 @@ function InfoNotice({
   };
 
   return (
-    <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
+    <div className={`rounded-[18px] border p-4 ${tones[tone]}`}>
       <div className="mb-1 flex items-center gap-2 text-sm font-black">
         <ShieldAlert size={16} />
         {title}
@@ -415,10 +503,10 @@ function InfoRow({
 }) {
   return (
     <div className="grid grid-cols-[120px_1fr] gap-3 text-sm">
-      <div className="font-semibold text-slate-500">{label}</div>
-      <div className="break-words font-extrabold text-slate-800">
+      <div className="font-semibold text-[#66756c]">{label}</div>
+      <div className="break-words font-extrabold text-[#10251f]">
         {masked ? (
-          <span className="inline-flex rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-500">
+          <span className="inline-flex rounded-lg bg-[#eef4f1] px-2 py-1 text-xs font-black text-[#66756c]">
             {value}
           </span>
         ) : (
@@ -439,16 +527,16 @@ function CompactStat({
   label: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-[14px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
       <div className="flex items-center gap-3">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#eef4f1] text-[#486b5d]">
           {icon}
         </div>
         <div className="min-w-0">
-          <div className="truncate text-2xl font-black leading-none text-slate-950">
+          <div className="truncate text-2xl font-black leading-none text-[#10251f]">
             {value}
           </div>
-          <div className="mt-1 text-sm font-bold text-slate-500">{label}</div>
+          <div className="mt-1 text-sm font-bold text-[#66756c]">{label}</div>
         </div>
       </div>
     </div>
@@ -458,16 +546,16 @@ function CompactStat({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="space-y-2">
-      <span className="block text-sm font-black text-slate-700">{label}</span>
+      <span className="block text-sm font-black text-[#486b5d]">{label}</span>
       {children}
     </label>
   );
 }
 
 const inputClass =
-  "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50";
+  "h-12 w-full rounded-[18px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10";
 const textareaClass =
-  "min-h-[108px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50";
+  "min-h-[108px] w-full rounded-[18px] border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10";
 
 const emptyContact = {
   full_name: "",
@@ -686,7 +774,9 @@ export default function ResidentDetailPage() {
   async function loadData() {
     if (!residentId) {
       setLoading(false);
-      setErrorText("Nepavyko nustatyti gyventojo ID iš puslapio adreso. Patikrink, ar šis failas įdėtas į dinaminį maršrutą app/(app)/residents/[id]/page.tsx, o ne į app/(app)/residents/page.tsx.");
+      setErrorText(
+        "Nepavyko nustatyti gyventojo ID iš puslapio adreso. Patikrink, ar šis failas įdėtas į dinaminį maršrutą app/(app)/residents/[id]/page.tsx, o ne į app/(app)/residents/page.tsx.",
+      );
       return;
     }
 
@@ -816,25 +906,22 @@ export default function ResidentDetailPage() {
             .order("is_primary", { ascending: false }),
         ),
       );
-      setGoals(
-        await safeSelect<IsgpGoal>("resident_isgp_goals", (q) =>
-          q
-            .eq("resident_id", residentId)
-            .order("created_at", { ascending: false }),
-        ),
-      );
+      setGoals(loadLocalGoals(residentId));
       setEntries(
-        await safeSelect<HandoverEntry>("resident_handover_entries", (q) =>
+        await safeSelect<HandoverEntry>("handover_logs", (q) =>
           q
             .eq("resident_id", residentId)
-            .order("created_at", { ascending: false }),
+            .neq("archived", true)
+            .order("shift_date", { ascending: false })
+            .order("created_at", { ascending: false })
+            .limit(50),
         ),
       );
       setIncidents(
         await safeSelect<Incident>("resident_incidents", (q) =>
           q
             .eq("resident_id", residentId)
-            .order("occurred_at", { ascending: false }),
+            .order("created_at", { ascending: false }),
         ),
       );
       setMedications(
@@ -910,6 +997,19 @@ export default function ResidentDetailPage() {
         .single();
       if (error) throw error;
       setResident(data as Resident);
+      await writeAuditLog({
+        organizationId: resident?.organization_id,
+        tableName: "residents",
+        recordId: residentId,
+        action: "update",
+        changes: {
+          Veiksmas: "Gyventojo kortelė atnaujinta",
+          Gyventojas: form.full_name.trim() || residentName,
+          Statusas: form.current_status,
+          Kambarys: form.current_room_id || null,
+          Priežiūros_ligis: form.care_level || null,
+        },
+      });
       setSuccessText("Gyventojo kortelė išsaugota.");
     } catch (error) {
       setErrorText(getReadableError(error));
@@ -929,12 +1029,29 @@ export default function ResidentDetailPage() {
     setSuccessText("");
 
     try {
-      const { error } = await supabase.from(table).insert({
-        organization_id: resident?.organization_id || null,
-        resident_id: residentId,
-        ...payload,
-      });
+      const { data, error } = await supabase
+        .from(table)
+        .insert({
+          organization_id: resident?.organization_id || null,
+          resident_id: residentId,
+          ...payload,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+
+      await writeAuditLog({
+        organizationId: resident?.organization_id,
+        tableName: table,
+        recordId: data?.id || residentId,
+        action: "insert",
+        changes: {
+          Veiksmas: success,
+          Gyventojas: residentName,
+          ...payload,
+        },
+      });
+
       setSuccessText(success);
       await loadData();
     } catch (error) {
@@ -952,7 +1069,54 @@ export default function ResidentDetailPage() {
     try {
       const { error } = await supabase.from(table).delete().eq("id", id);
       if (error) throw error;
+
+      await writeAuditLog({
+        organizationId: resident?.organization_id,
+        tableName: table,
+        recordId: id,
+        action: "delete",
+        changes: {
+          Veiksmas: success,
+          Gyventojas: residentName,
+        },
+      });
+
       setSuccessText(success);
+      await loadData();
+    } catch (error) {
+      setErrorText(getReadableError(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function archiveHandoverEntry(entry: HandoverEntry) {
+    setSaving(true);
+    setErrorText("");
+    setSuccessText("");
+
+    try {
+      const { error } = await supabase
+        .from("handover_logs")
+        .update({ archived: true, updated_at: new Date().toISOString() })
+        .eq("id", entry.id);
+
+      if (error) throw error;
+
+      await writeAuditLog({
+        organizationId: resident?.organization_id,
+        tableName: "handover_logs",
+        recordId: entry.id,
+        action: "update",
+        changes: {
+          Veiksmas: "Perdavimo įrašas archyvuotas",
+          Gyventojas: residentName,
+          Pavadinimas: entry.title || entry.category || "Perdavimo įrašas",
+          archived: { from: false, to: true },
+        },
+      });
+
+      setSuccessText("Perdavimo įrašas archyvuotas.");
       await loadData();
     } catch (error) {
       setErrorText(getReadableError(error));
@@ -988,18 +1152,35 @@ export default function ResidentDetailPage() {
       return;
     }
 
-    await insertRow(
-      "resident_isgp_goals",
-      {
-        title: goalForm.title.trim(),
-        description: goalForm.description.trim() || null,
-        actions: goalForm.actions.trim() || null,
-        responsible: goalForm.responsible.trim() || null,
-        status: goalForm.status || "aktyvus",
-        review_date: goalForm.review_date || null,
+    const nextGoal: IsgpGoal = {
+      id: `local-${Date.now()}`,
+      title: goalForm.title.trim(),
+      description: goalForm.description.trim() || null,
+      actions: goalForm.actions.trim() || null,
+      responsible: goalForm.responsible.trim() || null,
+      status: goalForm.status || "aktyvus",
+      review_date: goalForm.review_date || null,
+    };
+
+    const nextGoals = [nextGoal, ...goals];
+    setGoals(nextGoals);
+    saveLocalGoals(residentId, nextGoals);
+
+    await writeAuditLog({
+      organizationId: resident?.organization_id,
+      tableName: "resident_isgp_goals",
+      recordId: residentId,
+      action: "insert",
+      changes: {
+        Veiksmas: "ISGP tikslas pridėtas",
+        Gyventojas: residentName,
+        Pavadinimas: nextGoal.title,
+        Atsakingas: nextGoal.responsible,
+        Statusas: nextGoal.status,
       },
-      "ISGP tikslas pridėtas.",
-    );
+    });
+
+    setSuccessText("ISGP tikslas pridėtas.");
     setGoalForm(emptyGoal);
   }
 
@@ -1010,13 +1191,21 @@ export default function ResidentDetailPage() {
     }
 
     await insertRow(
-      "resident_handover_entries",
+      "handover_logs",
       {
+        shift_date: new Date().toISOString().slice(0, 10),
+        shift_type: "day",
         category: entryForm.category.trim() || "Bendra",
+        priority: entryForm.needs_follow_up ? "high" : "medium",
+        title: entryForm.category.trim() || "Perdavimo įrašas",
         note: entryForm.note.trim(),
+        is_important: Boolean(entryForm.needs_follow_up),
         needs_follow_up: entryForm.needs_follow_up,
+        archived: false,
+        created_by: currentUserId || null,
+        updated_by: currentUserId || null,
       },
-      "Įrašas pridėtas.",
+      "Perdavimo įrašas pridėtas.",
     );
     setEntryForm(emptyEntry);
   }
@@ -1034,7 +1223,7 @@ export default function ResidentDetailPage() {
         severity: incidentForm.severity || "vidutinis",
         description: incidentForm.description.trim(),
         action_taken: incidentForm.action_taken.trim() || null,
-        occurred_at: incidentForm.occurred_at
+        created_at: incidentForm.occurred_at
           ? new Date(incidentForm.occurred_at).toISOString()
           : new Date().toISOString(),
       },
@@ -1097,6 +1286,26 @@ export default function ResidentDetailPage() {
 
       if (error) throw error;
       setCareInfo({ ...emptyCareInfo, ...(data as Partial<CareInfo>) });
+      await writeAuditLog({
+        organizationId: resident?.organization_id,
+        tableName: "resident_care_information",
+        recordId: residentId,
+        action: "upsert",
+        changes: {
+          Veiksmas: "Priežiūros informacija išsaugota",
+          Gyventojas: residentName,
+          Alergijos: nextCareInfo.allergies || null,
+          Mityba: nextCareInfo.nutrition_type || null,
+          Judėjimas: nextCareInfo.mobility_level || null,
+          Rizikos: [
+            nextCareInfo.fall_risk ? "kritimo" : "",
+            nextCareInfo.diabetes ? "diabeto" : "",
+            nextCareInfo.pressure_sore_risk ? "pragulų" : "",
+            nextCareInfo.choking_risk ? "springimo" : "",
+            nextCareInfo.wandering_risk ? "paklydimo" : "",
+          ].filter(Boolean),
+        },
+      });
       setSuccessText("Priežiūros informacija išsaugota.");
       setCareModalOpen(false);
     } catch (error) {
@@ -1132,7 +1341,7 @@ export default function ResidentDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f5f7f4] px-4 py-8 lg:px-8">
-        <div className="mx-auto max-w-[1520px] rounded-[28px] border border-slate-200 bg-white p-8 text-sm font-black text-slate-500 shadow-sm">
+        <div className="mx-auto max-w-[1500px] rounded-[22px] border border-[#dbe6e0] bg-white p-8 text-sm font-black text-[#66756c] shadow-sm">
           Kraunama gyventojo kortelė...
         </div>
       </div>
@@ -1142,16 +1351,16 @@ export default function ResidentDetailPage() {
   if (!resident) {
     return (
       <div className="min-h-screen bg-[#f5f7f4] px-4 py-8 lg:px-8">
-        <div className="mx-auto max-w-[1520px] rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="mx-auto max-w-[1500px] rounded-[22px] border border-[#dbe6e0] bg-white p-8 shadow-sm">
           <button
             type="button"
             onClick={() => router.push("/residents")}
-            className="mb-5 inline-flex items-center gap-2 text-sm font-black text-emerald-700"
+            className="mb-5 inline-flex items-center gap-2 text-sm font-black text-[#486b5d]"
           >
             <ArrowLeft size={18} />
             Grįžti į gyventojus
           </button>
-          <h1 className="text-2xl font-black text-slate-950">
+          <h1 className="text-2xl font-black text-[#10251f]">
             Gyventojas nerastas
           </h1>
           {errorText ? (
@@ -1163,13 +1372,13 @@ export default function ResidentDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f7f4] px-4 py-5 text-slate-950 lg:px-8">
-      <div className="mx-auto max-w-[1520px]">
+    <div className="min-h-screen bg-[#f3f6f4] px-4 py-5 text-[#10251f] lg:px-8">
+      <div className="mx-auto max-w-[1500px]">
         <div className="mb-4 flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={() => router.push("/residents")}
-            className="inline-flex items-center gap-2 rounded-xl px-1 py-2 text-sm font-black text-emerald-700 hover:text-emerald-900"
+            className="inline-flex items-center gap-2 rounded-xl px-1 py-2 text-sm font-black text-[#486b5d] hover:text-[#10251f]"
           >
             <ArrowLeft size={18} />
             Grįžti į gyventojus
@@ -1180,7 +1389,7 @@ export default function ResidentDetailPage() {
               type="button"
               onClick={saveResident}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-[14px] border border-[#c9d8d0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] disabled:opacity-60"
             >
               <Save size={17} />
               {saving ? "Saugoma..." : "Išsaugoti"}
@@ -1188,7 +1397,7 @@ export default function ResidentDetailPage() {
             <button
               type="button"
               onClick={() => setWriteOffOpen(true)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800"
+              className="inline-flex items-center gap-2 rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747]"
             >
               <Plus size={18} />
               Nurašyti prekę
@@ -1197,27 +1406,27 @@ export default function ResidentDetailPage() {
         </div>
 
         {errorText ? (
-          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          <div className="mb-4 rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
             {errorText}
           </div>
         ) : null}
         {successText ? (
-          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+          <div className="mb-4 rounded-[18px] border border-[#c9d8d0] bg-emerald-50 px-4 py-3 text-sm font-bold text-[#486b5d]">
             {successText}
           </div>
         ) : null}
 
-        <section className="mb-5 rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="grid gap-5 lg:grid-cols-[1fr_380px] lg:items-center">
+        <section className="mb-5 overflow-hidden rounded-[22px] border border-[#c9d8d0] bg-white shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+          <div className="grid gap-5 bg-[#486b5d] p-5 text-white lg:grid-cols-[1fr_420px] lg:items-center">
             <div className="flex items-center gap-5">
-              <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-emerald-50 text-3xl font-black text-emerald-700">
+              <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-emerald-50 text-3xl font-black text-[#486b5d]">
                 {initials(residentName)}
               </div>
               <div className="min-w-0">
-                <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">
                   Gyventojo kortelė
                 </div>
-                <h1 className="truncate text-4xl font-black tracking-[-0.04em] text-slate-950">
+                <h1 className="truncate text-3xl font-black tracking-[-0.035em] text-white lg:text-4xl">
                   {residentName}
                 </h1>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -1241,12 +1450,12 @@ export default function ResidentDetailPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm">
-              <div className="mb-2 flex items-center gap-2 font-black text-slate-700">
+            <div className="rounded-[22px] border border-white/20 bg-white p-4 text-sm text-[#10251f] shadow-sm">
+              <div className="mb-2 flex items-center gap-2 font-black text-[#486b5d]">
                 <ShieldAlert size={17} className="text-amber-600" />
                 BDAR saugi peržiūra
               </div>
-              <p className="leading-6 text-slate-600">
+              <p className="leading-6 text-[#526174]">
                 Rodomi tik darbui būtini duomenys. Jautri informacija maskuojama
                 arba rodoma tik pagal teises.
               </p>
@@ -1282,7 +1491,7 @@ export default function ResidentDetailPage() {
           />
         </div>
 
-        <div className="mb-5 flex flex-wrap gap-2 rounded-[22px] border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="mb-5 flex flex-wrap gap-2 rounded-[22px] border border-[#c9d8d0] bg-[#eef4f1] p-3 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.value;
             return (
@@ -1290,10 +1499,10 @@ export default function ResidentDetailPage() {
                 key={tab.value}
                 type="button"
                 onClick={() => setActiveTab(tab.value)}
-                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black transition ${isActive ? "border border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-3 text-sm font-black transition ${isActive ? "border border-[#c9d8d0] bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]" : "text-[#526174] hover:bg-white/70 hover:text-[#10251f]"}`}
               >
-                {tab.icon}
-                {tab.label}
+                <span className="text-inherit">{tab.icon}</span>
+                <span>{tab.label}</span>
               </button>
             );
           })}
@@ -1328,7 +1537,7 @@ export default function ResidentDetailPage() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("kontaktai")}
-                    className="text-xs font-black text-emerald-700"
+                    className="text-xs font-black text-[#486b5d]"
                   >
                     Pildyti
                   </button>
@@ -1339,15 +1548,15 @@ export default function ResidentDetailPage() {
                     {contacts.slice(0, 2).map((contact) => (
                       <div
                         key={contact.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                        className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-3"
                       >
-                        <div className="font-black text-slate-900">
+                        <div className="font-black text-[#10251f]">
                           {text(contact.full_name, "Kontaktas")}
                         </div>
-                        <div className="mt-1 text-sm font-bold text-slate-500">
+                        <div className="mt-1 text-sm font-bold text-[#66756c]">
                           {text(contact.relationship)}
                         </div>
-                        <div className="mt-2 flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <div className="mt-2 flex items-center gap-2 text-sm font-bold text-[#486b5d]">
                           <Phone size={15} />
                           {text(contact.phone)}
                         </div>
@@ -1355,7 +1564,7 @@ export default function ResidentDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                  <div className="rounded-[18px] border border-dashed border-slate-300 bg-[#f8faf8] p-4 text-sm font-bold text-[#66756c]">
                     Kontaktų dar nėra.
                   </div>
                 )}
@@ -1374,13 +1583,13 @@ export default function ResidentDetailPage() {
             </div>
 
             <div className="grid gap-5">
-              <section className="rounded-[26px] border border-slate-200 bg-white p-6 shadow-sm">
+              <section className="rounded-[26px] border border-[#dbe6e0] bg-white p-6 shadow-sm">
                 <div className="mb-5 flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-2xl font-black tracking-[-0.03em]">
                       Redaguojama kortelės santrauka
                     </h2>
-                    <p className="mt-1 text-sm font-bold text-slate-500">
+                    <p className="mt-1 text-sm font-bold text-[#66756c]">
                       Naujo gyventojo kūrimo forma neliečiama.
                     </p>
                   </div>
@@ -1388,7 +1597,7 @@ export default function ResidentDetailPage() {
                     type="button"
                     onClick={saveResident}
                     disabled={saving}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-emerald-800 disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
                   >
                     <Save size={17} />
                     {saving ? "Saugoma..." : "Išsaugoti"}
@@ -1570,7 +1779,7 @@ export default function ResidentDetailPage() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("planas")}
-                    className="text-xs font-black text-emerald-700"
+                    className="text-xs font-black text-[#486b5d]"
                   >
                     Pildyti planą
                   </button>
@@ -1581,7 +1790,7 @@ export default function ResidentDetailPage() {
                     {goals.slice(0, 4).map((goal) => (
                       <div
                         key={goal.id}
-                        className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"
+                        className="rounded-[18px] border border-emerald-100 bg-emerald-50 p-4"
                       >
                         <div className="font-black text-emerald-900">
                           {text(goal.title)}
@@ -1593,7 +1802,7 @@ export default function ResidentDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                  <div className="rounded-[18px] border border-dashed border-slate-300 bg-[#f8faf8] p-4 text-sm font-bold text-[#66756c]">
                     ISGP tikslų dar nėra. Eik į „Planas“ ir pridėk.
                   </div>
                 )}
@@ -1636,7 +1845,7 @@ export default function ResidentDetailPage() {
                   </div>
 
                   {careInfo.transfer_two_staff ? (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-black text-red-800">
+                    <div className="rounded-[18px] border border-red-200 bg-red-50 p-3 text-sm font-black text-red-800">
                       Reikia 2 darbuotojų perkėlimui.
                     </div>
                   ) : null}
@@ -1647,7 +1856,7 @@ export default function ResidentDetailPage() {
                       setCareTab("slauga");
                       setCareModalOpen(true);
                     }}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747]"
                   >
                     <ShieldAlert size={17} />
                     Atidaryti priežiūros informaciją
@@ -1664,13 +1873,13 @@ export default function ResidentDetailPage() {
                     medications.slice(0, 4).map((log) => (
                       <div
                         key={log.id}
-                        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                        className="flex items-center justify-between rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-3"
                       >
                         <div>
                           <div className="font-black">
                             {text(log.medication_name)}
                           </div>
-                          <div className="text-sm font-bold text-slate-500">
+                          <div className="text-sm font-bold text-[#66756c]">
                             {text(log.dose)} · {text(log.taken_at)}
                           </div>
                         </div>
@@ -1678,7 +1887,7 @@ export default function ResidentDetailPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                    <div className="rounded-[18px] border border-dashed border-slate-300 bg-[#f8faf8] p-4 text-sm font-bold text-[#66756c]">
                       Vaistų įrašų dar nėra.
                     </div>
                   )}
@@ -1691,7 +1900,7 @@ export default function ResidentDetailPage() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("irasai")}
-                    className="text-xs font-black text-emerald-700"
+                    className="text-xs font-black text-[#486b5d]"
                   >
                     Pildyti
                   </button>
@@ -1702,23 +1911,23 @@ export default function ResidentDetailPage() {
                     entries.slice(0, 3).map((entry) => (
                       <div
                         key={entry.id}
-                        className="grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                        className="grid grid-cols-[72px_1fr] gap-3 rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-3"
                       >
-                        <div className="text-xs font-black text-slate-500">
-                          {toDateInput(entry.created_at)}
+                        <div className="text-xs font-black text-[#66756c]">
+                          {toDateInput(entry.shift_date || entry.created_at)}
                         </div>
                         <div>
-                          <div className="text-sm font-black text-slate-950">
+                          <div className="text-sm font-black text-[#10251f]">
                             {text(entry.category)}
                           </div>
-                          <p className="mt-1 text-sm font-bold leading-5 text-slate-600">
+                          <p className="mt-1 text-sm font-bold leading-5 text-[#526174]">
                             {text(entry.note)}
                           </p>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                    <div className="rounded-[18px] border border-dashed border-slate-300 bg-[#f8faf8] p-4 text-sm font-bold text-[#66756c]">
                       Perdavimo įrašų dar nėra.
                     </div>
                   )}
@@ -1775,7 +1984,7 @@ export default function ResidentDetailPage() {
                     }
                   />
                 </Field>
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <label className="flex items-center gap-2 text-sm font-bold text-[#486b5d]">
                   <input
                     type="checkbox"
                     checked={contactForm.can_receive_info}
@@ -1788,7 +1997,7 @@ export default function ResidentDetailPage() {
                   />{" "}
                   Leidžiama informuoti
                 </label>
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <label className="flex items-center gap-2 text-sm font-bold text-[#486b5d]">
                   <input
                     type="checkbox"
                     checked={contactForm.is_primary}
@@ -1805,7 +2014,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={addContact}
                   disabled={saving}
-                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white"
+                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white"
                 >
                   Pridėti kontaktą
                 </button>
@@ -1821,10 +2030,10 @@ export default function ResidentDetailPage() {
                   contacts.map((contact) => (
                     <div
                       key={contact.id}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4"
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <div className="text-lg font-black text-slate-950">
+                        <div className="text-lg font-black text-[#10251f]">
                           {text(contact.full_name, "Kontaktas")}
                         </div>
                         <button
@@ -1836,7 +2045,7 @@ export default function ResidentDetailPage() {
                               "Kontaktas pašalintas.",
                             )
                           }
-                          className="rounded-xl p-2 text-red-600 hover:bg-red-50"
+                          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-slate-100 text-[#526174] transition hover:bg-slate-200"
                         >
                           <Trash2 size={17} />
                         </button>
@@ -1866,7 +2075,7 @@ export default function ResidentDetailPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="text-sm font-bold text-slate-500">
+                  <div className="text-sm font-bold text-[#66756c]">
                     Kontaktų dar nėra.
                   </div>
                 )}
@@ -1938,7 +2147,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={addGoal}
                   disabled={saving}
-                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white"
+                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white"
                 >
                   Pridėti tikslą
                 </button>
@@ -1951,10 +2160,10 @@ export default function ResidentDetailPage() {
                   goals.map((goal) => (
                     <div
                       key={goal.id}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4"
                     >
                       <div className="mb-2 flex items-start justify-between gap-2">
-                        <div className="font-black text-slate-950">
+                        <div className="font-black text-[#10251f]">
                           {text(goal.title)}
                         </div>
                         <button
@@ -1966,12 +2175,12 @@ export default function ResidentDetailPage() {
                               "Tikslas pašalintas.",
                             )
                           }
-                          className="rounded-xl p-2 text-red-600 hover:bg-red-50"
+                          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-slate-100 text-[#526174] transition hover:bg-slate-200"
                         >
                           <Trash2 size={17} />
                         </button>
                       </div>
-                      <p className="text-sm font-bold leading-6 text-slate-600">
+                      <p className="text-sm font-bold leading-6 text-[#526174]">
                         {text(goal.description)}
                       </p>
                       <p className="mt-2 text-sm font-bold leading-6 text-emerald-800">
@@ -1990,7 +2199,7 @@ export default function ResidentDetailPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="text-sm font-bold text-slate-500">
+                  <div className="text-sm font-bold text-[#66756c]">
                     ISGP tikslų dar nėra.
                   </div>
                 )}
@@ -2021,7 +2230,7 @@ export default function ResidentDetailPage() {
                     }
                   />
                 </Field>
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <label className="flex items-center gap-2 text-sm font-bold text-[#486b5d]">
                   <input
                     type="checkbox"
                     checked={entryForm.needs_follow_up}
@@ -2038,7 +2247,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={addEntry}
                   disabled={saving}
-                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white"
+                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white"
                 >
                   Pridėti įrašą
                 </button>
@@ -2049,41 +2258,48 @@ export default function ResidentDetailPage() {
               <div className="grid gap-3">
                 {entries.length ? (
                   entries.map((entry) => (
-                    <div
+                    <article
                       key={entry.id}
-                      className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[140px_1fr_auto]"
+                      className="rounded-[20px] border border-[#dbe6e0] bg-[#f8faf8] p-4 shadow-sm"
                     >
-                      <div className="text-sm font-black text-slate-500">
-                        {text(entry.created_at)}
-                      </div>
-                      <div>
-                        <div className="font-black text-slate-950">
-                          {text(entry.category)}
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d] ring-1 ring-[#dbe6e0]">
+                              {formatEntryDate(entry.created_at)}
+                            </span>
+                            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
+                              {text(entry.category)}
+                            </span>
+                            {entry.needs_follow_up ? (
+                              <Badge tone="warning">Reikia veiksmo</Badge>
+                            ) : null}
+                          </div>
+
+                          {entry.title ? (
+                            <h3 className="mt-3 break-words text-[17px] font-black leading-6 text-[#10251f]">
+                              {entry.title}
+                            </h3>
+                          ) : null}
+
+                          <p className="mt-2 whitespace-pre-wrap break-words text-[15px] font-bold leading-7 text-[#10251f]">
+                            {text(entry.note)}
+                          </p>
                         </div>
-                        <div className="mt-1 text-sm font-bold leading-6 text-slate-600">
-                          {text(entry.note)}
-                        </div>
-                        {entry.needs_follow_up ? (
-                          <Badge tone="warning">Reikia veiksmo</Badge>
-                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => void archiveHandoverEntry(entry)}
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#526174] ring-1 ring-[#dbe6e0] transition hover:bg-slate-100"
+                          aria-label="Pašalinti perdavimo įrašą"
+                        >
+                          <Trash2 size={17} />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          deleteRow(
-                            "resident_handover_entries",
-                            entry.id,
-                            "Įrašas pašalintas.",
-                          )
-                        }
-                        className="rounded-xl p-2 text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 size={17} />
-                      </button>
-                    </div>
+                    </article>
                   ))
                 ) : (
-                  <div className="text-sm font-bold text-slate-500">
+                  <div className="text-sm font-bold text-[#66756c]">
                     Įrašų dar nėra.
                   </div>
                 )}
@@ -2170,7 +2386,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={addIncident}
                   disabled={saving}
-                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white"
+                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white"
                 >
                   Pridėti incidentą
                 </button>
@@ -2183,7 +2399,7 @@ export default function ResidentDetailPage() {
                   incidents.map((incident) => (
                     <div
                       key={incident.id}
-                      className="rounded-2xl border border-amber-200 bg-amber-50 p-4"
+                      className="rounded-[18px] border border-amber-200 bg-amber-50 p-4"
                     >
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <div>
@@ -2213,14 +2429,14 @@ export default function ResidentDetailPage() {
                         {text(incident.description)}
                       </p>
                       {incident.action_taken ? (
-                        <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                        <p className="mt-2 text-sm font-bold leading-6 text-[#486b5d]">
                           Veiksmai: {incident.action_taken}
                         </p>
                       ) : null}
                     </div>
                   ))
                 ) : (
-                  <div className="text-sm font-bold text-slate-500">
+                  <div className="text-sm font-bold text-[#66756c]">
                     Incidentų nėra.
                   </div>
                 )}
@@ -2237,7 +2453,7 @@ export default function ResidentDetailPage() {
                 <button
                   type="button"
                   onClick={() => setWriteOffOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white hover:bg-emerald-800"
+                  className="inline-flex items-center gap-2 rounded-[18px] bg-[#047857] px-4 py-2.5 text-sm font-black text-white hover:bg-[#036747]"
                 >
                   <Plus size={17} />
                   Nurašyti prekę
@@ -2249,26 +2465,26 @@ export default function ResidentDetailPage() {
                   inventory.map((item) => (
                     <div
                       key={item.id}
-                      className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_110px_160px]"
+                      className="grid gap-2 rounded-[18px] border border-[#dbe6e0] bg-white p-4 md:grid-cols-[1fr_110px_160px]"
                     >
                       <div>
-                        <div className="font-black text-slate-950">
+                        <div className="font-black text-[#10251f]">
                           {text(item.item_name)}
                         </div>
-                        <div className="mt-1 text-sm font-bold text-slate-500">
+                        <div className="mt-1 text-sm font-bold text-[#66756c]">
                           {text(item.reason)} · {text(item.note)}
                         </div>
                       </div>
-                      <div className="font-black text-slate-950">
+                      <div className="font-black text-[#10251f]">
                         {text(item.quantity)} vnt.
                       </div>
-                      <div className="text-sm font-bold text-slate-500">
+                      <div className="text-sm font-bold text-[#66756c]">
                         {text(item.created_at)}
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm font-bold leading-6 text-slate-500">
+                  <div className="rounded-[18px] border border-dashed border-slate-300 bg-[#f8faf8] p-6 text-sm font-bold leading-6 text-[#66756c]">
                     Prekių nurašymų dar nėra.
                   </div>
                 )}
@@ -2300,17 +2516,17 @@ export default function ResidentDetailPage() {
 
       {careModalOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6">
-          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[30px] border border-[#dbe6e0] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[#dbe6e0] px-6 py-5">
               <div>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <Badge tone="danger">Ribota prieiga</Badge>
                   <Badge tone="neutral">Atskira nuo ISGP</Badge>
                 </div>
-                <h2 className="text-2xl font-black tracking-[-0.03em] text-slate-950">
+                <h2 className="text-2xl font-black tracking-[-0.03em] text-[#10251f]">
                   Priežiūros informacija
                 </h2>
-                <p className="mt-1 text-sm font-bold text-slate-500">
+                <p className="mt-1 text-sm font-bold text-[#66756c]">
                   {residentName} · pildoma tik darbui būtina slaugos, rizikų,
                   mitybos ir judėjimo informacija.
                 </p>
@@ -2318,13 +2534,13 @@ export default function ResidentDetailPage() {
               <button
                 type="button"
                 onClick={() => setCareModalOpen(false)}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-[18px] border border-[#dbe6e0] text-[#66756c] hover:bg-[#f8faf8]"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
               <div className="flex flex-wrap gap-2">
                 {CARE_TABS.map((tab) => {
                   const isActive = careTab === tab.value;
@@ -2333,7 +2549,7 @@ export default function ResidentDetailPage() {
                       key={tab.value}
                       type="button"
                       onClick={() => setCareTab(tab.value)}
-                      className={`rounded-2xl px-4 py-2.5 text-sm font-black transition ${isActive ? "bg-emerald-700 text-white shadow-sm" : "bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"}`}
+                      className={`rounded-[18px] px-4 py-2.5 text-sm font-black transition ${isActive ? "bg-[#047857] text-white shadow-sm" : "bg-white text-[#526174] hover:bg-emerald-50 hover:text-emerald-800"}`}
                     >
                       {tab.label}
                     </button>
@@ -2399,7 +2615,7 @@ export default function ResidentDetailPage() {
                     ].map(([key, label]) => (
                       <label
                         key={key}
-                        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-800"
+                        className="flex items-center gap-3 rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-black text-[#10251f]"
                       >
                         <input
                           type="checkbox"
@@ -2516,7 +2732,7 @@ export default function ResidentDetailPage() {
                         placeholder="Vaikštynė, lazdelė, vežimėlis..."
                       />
                     </Field>
-                    <label className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-black text-red-800 md:col-span-2">
+                    <label className="flex items-center gap-3 rounded-[18px] border border-red-200 bg-red-50 p-4 text-sm font-black text-red-800 md:col-span-2">
                       <input
                         type="checkbox"
                         checked={careInfo.transfer_two_staff}
@@ -2540,7 +2756,7 @@ export default function ResidentDetailPage() {
                 <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
                   <Field label="Pastabos darbuotojams">
                     <textarea
-                      className="min-h-[220px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+                      className="min-h-[220px] w-full rounded-[18px] border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10"
                       value={careInfo.staff_notes}
                       onChange={(event) =>
                         updateCareInfo({ staff_notes: event.target.value })
@@ -2564,8 +2780,8 @@ export default function ResidentDetailPage() {
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-6 py-4">
-              <div className="text-xs font-bold text-slate-500">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#dbe6e0] px-6 py-4">
+              <div className="text-xs font-bold text-[#66756c]">
                 ISGP tikslai lieka „Planas“ skiltyje; ši informacija skirta
                 priežiūros saugai ir pamainos perspėjimams.
               </div>
@@ -2573,7 +2789,7 @@ export default function ResidentDetailPage() {
                 <button
                   type="button"
                   onClick={() => setCareModalOpen(false)}
-                  className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                  className="rounded-[18px] border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] hover:bg-[#f8faf8]"
                 >
                   Atšaukti
                 </button>
@@ -2581,7 +2797,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={saveCareInfo}
                   disabled={saving}
-                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
                 >
                   {saving ? "Saugoma..." : "Išsaugoti priežiūros informaciją"}
                 </button>
@@ -2593,20 +2809,20 @@ export default function ResidentDetailPage() {
 
       {writeOffOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 px-4 py-6">
-          <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+          <div className="w-full max-w-2xl overflow-hidden rounded-[22px] border border-[#dbe6e0] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#dbe6e0] px-6 py-5">
               <div>
-                <h2 className="text-2xl font-black tracking-[-0.03em] text-slate-950">
+                <h2 className="text-2xl font-black tracking-[-0.03em] text-[#10251f]">
                   Nurašyti prekę gyventojui
                 </h2>
-                <p className="mt-1 text-sm font-bold text-slate-500">
+                <p className="mt-1 text-sm font-bold text-[#66756c]">
                   {residentName}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setWriteOffOpen(false)}
-                className="grid h-10 w-10 place-items-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                className="grid h-10 w-10 place-items-center rounded-[18px] border border-[#dbe6e0] text-[#66756c] hover:bg-[#f8faf8]"
               >
                 <X size={18} />
               </button>
@@ -2676,7 +2892,7 @@ export default function ResidentDetailPage() {
                 <button
                   type="button"
                   onClick={() => setWriteOffOpen(false)}
-                  className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                  className="rounded-[18px] border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] hover:bg-[#f8faf8]"
                 >
                   Atšaukti
                 </button>
@@ -2684,7 +2900,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={submitWriteOff}
                   disabled={saving}
-                  className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white hover:bg-emerald-800 disabled:opacity-60"
+                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
                 >
                   {saving ? "Saugoma..." : "Nurašyti"}
                 </button>

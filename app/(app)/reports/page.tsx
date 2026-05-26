@@ -72,24 +72,24 @@ const reports = [
 
 export default function ReportsPage() {
   return (
-    <div className="min-h-screen bg-[#f6f8f7] px-6 py-8 lg:px-10">
+    <div className="min-h-screen bg-[#f3f6f4] px-6 py-8 lg:px-10">
       <div className="mx-auto max-w-[1480px] space-y-6">
-        <section className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-sm">
+        <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-[#486b5d] p-8 text-white shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
           <div className="flex items-start gap-5">
-            <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-emerald-50 text-emerald-700">
+            <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#e8f7ef] text-[#486b5d]">
               <ClipboardList className="h-8 w-8" />
             </div>
 
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
+              <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-100/80">
                 ĮSTAIGOS ATASKAITOS
               </p>
 
-              <h1 className="mt-3 text-5xl font-black tracking-tight text-slate-950">
+              <h1 className="mt-3 text-5xl font-black tracking-tight text-white">
                 Ataskaitos
               </h1>
 
-              <p className="mt-3 max-w-4xl text-lg font-bold text-slate-500">
+              <p className="mt-3 max-w-4xl text-lg font-bold text-emerald-50/90">
                 Pirmiausia atsidaryk norimą ataskaitos polapį, peržiūrėk diagramas,
                 lenteles, rizikas ir tada eksportuok PDF, XLS arba CSV pagal pasirinktus filtrus.
               </p>
@@ -105,30 +105,30 @@ export default function ReportsPage() {
               <a
                 key={item.href}
                 href={item.href}
-                className="group rounded-[28px] border border-slate-200 bg-white p-7 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+                className="group rounded-[28px] border border-[#c9d8d0] bg-white p-7 shadow-sm transition hover:border-[#a7f3d0] hover:bg-[#ecfdf5]/50"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-emerald-50 text-emerald-700 shadow-sm">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-emerald-50 text-[#047857] shadow-sm">
                       <Icon className="h-7 w-7" />
                     </div>
-                    <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                    <span className="rounded-full bg-[#f8faf8] px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-[#526174]">
                       {item.tag}
                     </span>
                   </div>
 
-                  <ArrowRight className="h-5 w-5 text-slate-300 transition group-hover:text-emerald-700" />
+                  <ArrowRight className="h-5 w-5 text-slate-300 transition group-hover:text-[#047857]" />
                 </div>
 
-                <h2 className="mt-6 text-3xl font-black text-slate-950">
+                <h2 className="mt-6 text-3xl font-black text-[#10251f]">
                   {item.title}
                 </h2>
 
-                <p className="mt-3 text-base font-bold leading-7 text-slate-500">
+                <p className="mt-3 text-base font-bold leading-7 text-[#526174]">
                   {item.description}
                 </p>
 
-                <div className="mt-6 text-sm font-black text-emerald-700">
+                <div className="mt-6 text-sm font-black text-[#047857]">
                   Peržiūrėti ataskaitą →
                 </div>
               </a>

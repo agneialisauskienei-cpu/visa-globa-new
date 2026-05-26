@@ -29,6 +29,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getCurrentOrganizationId } from "@/lib/current-organization";
 import { getReadableError } from "@/lib/errors";
+import { getChangedFields, logAudit } from "@/lib/audit";
 import CandidatesModule from "./components/Candidates/CandidatesModule";
 import TrainingModule from "./components/Trainings/TrainingModule";
 import DocumentAcknowledgementsModule from "./components/DocumentAcknowledgements/DocumentAcknowledgementsModule";
@@ -560,6 +561,34 @@ function removeUndefinedValues<T extends Record<string, unknown>>(payload: T) {
   ) as T;
 }
 
+function compactAuditPayload(payload: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined),
+  ) as Record<string, unknown>;
+}
+
+async function safeAuditLog(input: {
+  organizationId?: string | null;
+  tableName: string;
+  recordId?: string | null;
+  action: string;
+  changes: Record<string, unknown>;
+}) {
+  if (!input.organizationId) return;
+
+  try {
+    await logAudit({
+      organizationId: input.organizationId,
+      tableName: input.tableName,
+      recordId: input.recordId || undefined,
+      action: input.action,
+      changes: input.changes,
+    });
+  } catch (error) {
+    console.warn("[TeamPage] audit log failed", error);
+  }
+}
+
 
 function addMonths(date: Date, amount: number) {
   return new Date(date.getFullYear(), date.getMonth() + amount, 1);
@@ -748,6 +777,7 @@ export default function TeamPage() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [personnelPositions, setPersonnelPositions] = useState<PersonnelPosition[]>([]);
   const [positionPlanForm, setPositionPlanForm] = useState<PositionPlanForm>(initialPositionPlanForm);
+  const [showPositionPlanModal, setShowPositionPlanModal] = useState(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalMessage, setCreateModalMessage] = useState("");
@@ -1079,6 +1109,35 @@ export default function TeamPage() {
         birth_date: editForm.birth_date || null,
       });
 
+      const previousMemberAudit = compactAuditPayload({
+        position: editingEmployee.position || null,
+        department: editingEmployee.department || null,
+        staff_type: editingEmployee.staff_type || null,
+        extra_permissions: normalizeExtraPermissions(editingEmployee.extra_permissions),
+        role: editingEmployee.role || "employee",
+        contract_number: editingEmployee.contract_number || null,
+        employment_rate: Number(editingEmployee.employment_rate || 1),
+        weekly_hours: Number(editingEmployee.weekly_hours || 40),
+        employment_type: editingEmployee.employment_type || "full_time",
+        employment_start_date: normalizeDateInput(editingEmployee.employment_start_date) || null,
+        termination_date: normalizeDateInput(editingEmployee.termination_date) || null,
+        is_archived: editingEmployee.is_archived === true,
+        archive_reason: editingEmployee.archive_reason || null,
+        professional_license_number: editingEmployee.professional_license_number || null,
+        professional_license_valid_until: normalizeDateInput(editingEmployee.professional_license_valid_until) || null,
+        occupational_health_valid_until: normalizeDateInput(editingEmployee.occupational_health_valid_until) || null,
+        is_active: editingEmployee.is_active !== false,
+      });
+
+      const previousProfileAudit = compactAuditPayload({
+        first_name: editingEmployee.first_name || null,
+        last_name: editingEmployee.last_name || null,
+        full_name: editingEmployee.full_name || null,
+        email: editingEmployee.email || null,
+        phone: editingEmployee.phone || null,
+        birth_date: normalizeDateInput(editingEmployee.birth_date) || null,
+      });
+
       console.log("[TeamPage] employee save payload", {
         memberPayload,
         profilePayload,
@@ -1129,6 +1188,22 @@ export default function TeamPage() {
 
       console.log("[TeamPage] profiles rpc update ok", {
         userId: editingEmployee.user_id,
+      });
+
+      await safeAuditLog({
+        organizationId,
+        tableName: "organization_members",
+        recordId: editingEmployee.member_id || editingEmployee.user_id,
+        action: editForm.is_archived && editingEmployee.is_archived !== true ? "employee.archived" : "employee.updated",
+        changes: getChangedFields(previousMemberAudit, compactAuditPayload(memberPayload)),
+      });
+
+      await safeAuditLog({
+        organizationId,
+        tableName: "profiles",
+        recordId: editingEmployee.user_id,
+        action: "employee.updated",
+        changes: getChangedFields(previousProfileAudit, compactAuditPayload(profilePayload)),
       });
 
       setEmployees((prev) =>
@@ -1230,19 +1305,33 @@ export default function TeamPage() {
 
         if (inviteError) throw inviteError;
 
-        setInvites((previous) => [
-          {
-            id: invite?.id || crypto.randomUUID(),
-            email,
-            role: invitePayload.role,
-            status: "pending",
-            created_at: new Date().toISOString(),
-          },
-          ...previous,
-        ]);
+        const inviteRecord = {
+          id: invite?.id || crypto.randomUUID(),
+          email,
+          role: invitePayload.role,
+          status: "pending",
+          created_at: new Date().toISOString(),
+        };
+
+        await safeAuditLog({
+          organizationId,
+          tableName: "organization_invites",
+          recordId: inviteRecord.id,
+          action: "employee.created",
+          changes: getChangedFields({}, inviteRecord as Record<string, unknown>),
+        });
+
+        setInvites((previous) => [inviteRecord, ...previous]);
       }
 
       if (candidate) {
+        await safeAuditLog({
+          organizationId,
+          tableName: "candidates",
+          recordId: (candidate as Candidate).id,
+          action: "candidate.created",
+          changes: getChangedFields({}, candidate as unknown as Record<string, unknown>),
+        });
         setCandidates((previous) => [candidate as Candidate, ...previous]);
       }
 
@@ -1578,6 +1667,14 @@ export default function TeamPage() {
         end_date: (data as VacationRequest).end_date || vacationForm.end_date,
       };
 
+      await safeAuditLog({
+        organizationId,
+        tableName: "vacation_requests",
+        recordId: created.id,
+        action: "vacation.created",
+        changes: getChangedFields({}, created as unknown as Record<string, unknown>),
+      });
+
       setVacations((current) => [created, ...current]);
       setVacationForm({
         employee_id: vacationForm.employee_id,
@@ -1608,6 +1705,19 @@ export default function TeamPage() {
       const request = vacations.find((item) => item.id === id);
       const { error } = await supabase.from("vacation_requests").update({ status }).eq("id", id);
       if (error) throw error;
+
+      if (request) {
+        await safeAuditLog({
+          organizationId,
+          tableName: "vacation_requests",
+          recordId: id,
+          action: status === "approved" ? "vacation.approved" : "vacation.rejected",
+          changes: getChangedFields(request as unknown as Record<string, unknown>, {
+            ...(request as unknown as Record<string, unknown>),
+            status,
+          }),
+        });
+      }
 
       if (status === "approved" && request && !isTemporaryVacation(request.type)) {
         const meta = absenceTypeMeta(request.type);
@@ -1651,6 +1761,7 @@ export default function TeamPage() {
     setPositionPlanForm(initialPositionPlanForm);
     setMessage("");
     changeTab("fte");
+    setShowPositionPlanModal(true);
   }
 
   function editPositionPlan(position: PersonnelPosition) {
@@ -1667,6 +1778,7 @@ export default function TeamPage() {
     });
     setMessage("");
     changeTab("fte");
+    setShowPositionPlanModal(true);
   }
 
   async function savePositionPlan() {
@@ -1696,6 +1808,10 @@ export default function TeamPage() {
     };
 
     try {
+      const previousPosition = positionPlanForm.id
+        ? personnelPositions.find((position) => position.id === positionPlanForm.id) || null
+        : null;
+
       if (positionPlanForm.id) {
         const { error } = await supabase
           .from("personnel_positions")
@@ -1709,7 +1825,19 @@ export default function TeamPage() {
         if (error) throw error;
       }
 
+      await safeAuditLog({
+        organizationId,
+        tableName: "personnel_positions",
+        recordId: positionPlanForm.id || undefined,
+        action: positionPlanForm.id ? "position_plan.updated" : "position_plan.created",
+        changes: getChangedFields(
+          previousPosition ? (previousPosition as unknown as Record<string, unknown>) : {},
+          payload as unknown as Record<string, unknown>,
+        ),
+      });
+
       setPositionPlanForm(initialPositionPlanForm);
+      setShowPositionPlanModal(false);
       setMessage("Etatų planas išsaugotas.");
       await loadAll();
       changeTab("fte");
@@ -1741,6 +1869,15 @@ export default function TeamPage() {
         .eq("id", positionId);
 
       if (error) throw error;
+
+      const deletedPosition = personnelPositions.find((position) => position.id === positionId) || null;
+      await safeAuditLog({
+        organizationId,
+        tableName: "personnel_positions",
+        recordId: positionId,
+        action: "position_plan.deleted",
+        changes: getChangedFields(deletedPosition as unknown as Record<string, unknown>, {}),
+      });
 
       setPersonnelPositions((current) => current.filter((position) => position.id !== positionId));
       setMessage("Pareigybės plano eilutė ištrinta.");
@@ -1776,7 +1913,7 @@ export default function TeamPage() {
         <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" />
           <p className="mt-4 text-lg font-black text-slate-700">Kraunama...</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
+          <p className="mt-1 text-sm font-semibold text-[#526174]">
             Ruošiame personalo modulį.
           </p>
         </div>
@@ -2302,11 +2439,11 @@ export default function TeamPage() {
               {invites.length === 0 && <EmptyState text="Kvietimų nėra." />}
 
               {invites.map((invite) => (
-                <article key={invite.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                <article key={invite.id} className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className="font-black text-slate-950">{invite.email || "Kvietimas"}</h3>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">
+                      <p className="mt-1 text-sm font-semibold text-[#526174]">
                         Rolė: {invite.role || "employee"} · Sukurta: {fmt(invite.created_at)}
                       </p>
                     </div>
@@ -2335,9 +2472,9 @@ export default function TeamPage() {
               void createEmployee();
             }}
           >
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <div className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
               <h3 className="text-xl font-black">1. Darbuotojo duomenys</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
+              <p className="mt-1 text-sm font-semibold text-[#526174]">
                 Čia redaguojami pagrindiniai darbuotojo duomenys. Pavyzdžiai laukeliuose yra tik pagalba — jų trinti nereikia, tiesiog įrašykite tikrą reikšmę.
               </p>
 
@@ -2486,6 +2623,123 @@ export default function TeamPage() {
 
 
 
+      {showPositionPlanModal && (
+        <Modal
+          title={positionPlanForm.id ? "Redaguoti pareigybę" : "Nauja pareigybė"}
+          desc="Suveskite planuojamą pareigybę, etatų kiekį, koeficientus ir minimalų pamainos poreikį."
+          onClose={() => setShowPositionPlanModal(false)}
+        >
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void savePositionPlan();
+            }}
+          >
+            <div className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
+              <h3 className="text-xl font-black text-[#10251f]">Pareigybės planas</h3>
+              <p className="mt-1 text-sm font-semibold text-[#526174]">
+                Šie duomenys naudojami FTE trūkumams, užimtumui ir minimaliam pamainų poreikiui skaičiuoti.
+              </p>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <Field label="Padalinys">
+                  <input
+                    value={positionPlanForm.department}
+                    onChange={(event) => setPositionPlanForm((prev) => ({ ...prev, department: event.target.value }))}
+                    className="input"
+                    placeholder="Pvz., Slauga"
+                  />
+                </Field>
+
+                <Field label="Pareigybė">
+                  <input
+                    value={positionPlanForm.position_name}
+                    onChange={(event) => setPositionPlanForm((prev) => ({ ...prev, position_name: event.target.value }))}
+                    className="input"
+                    placeholder="Pvz., Slaugytojas"
+                  />
+                </Field>
+
+                <Field label="Planuota etatų">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={positionPlanForm.planned_fte}
+                    onChange={(event) => setPositionPlanForm((prev) => ({ ...prev, planned_fte: Number(event.target.value) }))}
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="Koef. nuo">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={positionPlanForm.coefficient_min}
+                    onChange={(event) => setPositionPlanForm((prev) => ({ ...prev, coefficient_min: event.target.value }))}
+                    className="input"
+                    placeholder="1.05"
+                  />
+                </Field>
+
+                <Field label="Koef. iki">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={positionPlanForm.coefficient_max}
+                    onChange={(event) => setPositionPlanForm((prev) => ({ ...prev, coefficient_max: event.target.value }))}
+                    className="input"
+                    placeholder="1.35"
+                  />
+                </Field>
+
+                <Field label="Min. dienos pamaina">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.25"
+                    value={positionPlanForm.minimum_day_shift}
+                    onChange={(event) => setPositionPlanForm((prev) => ({ ...prev, minimum_day_shift: Number(event.target.value) }))}
+                    className="input"
+                  />
+                </Field>
+
+                <Field label="Min. nakties pamaina">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.25"
+                    value={positionPlanForm.minimum_night_shift}
+                    onChange={(event) => setPositionPlanForm((prev) => ({ ...prev, minimum_night_shift: Number(event.target.value) }))}
+                    className="input"
+                  />
+                </Field>
+
+                <label className="flex items-center gap-3 rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 font-black text-[#486b5d]">
+                  <input
+                    type="checkbox"
+                    checked={positionPlanForm.active}
+                    onChange={(event) => setPositionPlanForm((prev) => ({ ...prev, active: event.target.checked }))}
+                    className="h-5 w-5 accent-emerald-700"
+                  />
+                  Aktyvi pareigybė
+                </label>
+              </div>
+            </div>
+
+            <ModalFooter
+              saving={saving}
+              onCancel={() => setShowPositionPlanModal(false)}
+              submitText={positionPlanForm.id ? "Atnaujinti pareigybę" : "Pridėti pareigybę"}
+            />
+          </form>
+        </Modal>
+      )}
+
+
       <style jsx global>{`
         .input {
           width: 100%;
@@ -2560,7 +2814,7 @@ function FtePlanModule({
         <button
           type="button"
           onClick={onNew}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#065f46]"
+          className="inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#047857] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#036747]"
         >
           <Plus className="h-4 w-4" />
           Nauja pareigybė
@@ -2648,7 +2902,7 @@ function FtePlanModule({
               <button
                 type="button"
                 onClick={onNew}
-                className="h-[50px] rounded-2xl border border-[#dbe6e0] bg-white px-4 font-black text-[#486b5d]"
+                className="h-[50px] rounded-[14px] border border-[#dbe6e0] bg-white px-4 font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
               >
                 Naujas
               </button>
@@ -3402,7 +3656,7 @@ function ListRow({
     <div className="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
       <div>
         <p className="font-black text-slate-900">{title}</p>
-        <p className="mt-1 text-sm font-semibold text-slate-500">{desc}</p>
+        <p className="mt-1 text-sm font-semibold text-[#526174]">{desc}</p>
       </div>
 
       <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-slate-700">
@@ -3432,25 +3686,28 @@ function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm md:p-4">
-      <section className="max-h-[94vh] w-full max-w-5xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
-        <div className="sticky top-0 z-30 flex items-start justify-between gap-4 border-b border-slate-100 bg-white p-4 md:gap-6 md:p-7">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950/50 p-4 backdrop-blur-sm md:p-6">
+      <section className="max-h-[calc(100vh-48px)] w-full max-w-[1180px] overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+        <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
           <div>
-            <h2 className="text-2xl font-black tracking-tight md:text-4xl">{title}</h2>
-            <p className="mt-2 font-semibold text-slate-500">{desc}</p>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100/80">
+              Personalo valdymas
+            </p>
+            <h2 className="mt-1 text-3xl font-black tracking-[-0.04em] text-white md:text-4xl">{title}</h2>
+            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-white/80">{desc}</p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200 active:scale-[0.98] md:h-14 md:w-14"
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20 active:scale-[0.98]"
             aria-label="Uždaryti"
           >
-            <X className="h-7 w-7" />
+            <X size={28} strokeWidth={2.1} />
           </button>
         </div>
 
-        <div className="max-h-[calc(94vh-104px)] overflow-y-auto p-4 md:max-h-[calc(94vh-132px)] md:p-7">{children}</div>
+        <div className="max-h-[calc(100vh-178px)] overflow-y-auto bg-[#f3f6f4] p-5 md:p-6">{children}</div>
       </section>
     </div>
   );
@@ -3467,7 +3724,7 @@ function Field({
 }) {
   return (
     <label className={`block ${full ? "md:col-span-2" : ""}`}>
-      <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">
+      <span className="mb-2 block text-sm font-black uppercase tracking-[0.14em] text-[#526174]">
         {label}
       </span>
       {children}
@@ -3491,7 +3748,7 @@ function ModalFooter({
       <button
         type="button"
         onClick={onCancel}
-        className="rounded-2xl border border-slate-200 bg-white px-5 py-3 font-black text-slate-700 transition hover:bg-slate-50"
+        className="rounded-[14px] border border-[#dbe6e0] bg-white px-5 py-3 font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
       >
         Atšaukti
       </button>
@@ -3500,7 +3757,7 @@ function ModalFooter({
         type={onSave ? "button" : "submit"}
         onClick={onSave}
         disabled={saving}
-        className="rounded-2xl bg-slate-950 px-5 py-3 font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
+        className="rounded-[14px] bg-[#047857] px-5 py-3 font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
       >
         {saving ? "Saugoma..." : submitText}
       </button>

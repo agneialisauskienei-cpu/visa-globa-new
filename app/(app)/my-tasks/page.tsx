@@ -94,6 +94,7 @@ function getTaskCardStyle(task: TaskRow): React.CSSProperties {
   if (task.status === 'done') {
     return {
       border: '1px solid #bbf7d0',
+      borderLeft: '8px solid #047857',
       background: '#f0fdf4',
     }
   }
@@ -101,7 +102,8 @@ function getTaskCardStyle(task: TaskRow): React.CSSProperties {
   if (isTaskLate(task)) {
     return {
       border: '1px solid #fecaca',
-      background: '#fef2f2',
+      borderLeft: '8px solid #be123c',
+      background: '#fff7f7',
     }
   }
 
@@ -133,7 +135,7 @@ function getTaskCardStyle(task: TaskRow): React.CSSProperties {
       }
     default:
       return {
-        border: '1px solid #e2e8f0',
+        border: '1px solid #dbe6e0',
         background: '#ffffff',
       }
   }
@@ -400,21 +402,34 @@ export default function MyTasksPage() {
                   <span style={styles.badge}>{getTaskStatusLabel(task.status)}</span>
                 </div>
 
-                <p style={styles.description}>{task.description || 'Aprašymo nėra.'}</p>
+                {task.description ? (
+                  <p style={styles.description}>{task.description}</p>
+                ) : null}
 
-                <div style={styles.metaGrid}>
-                  <div style={styles.meta}>Prioritetas: {getPriorityLabel(task.priority)}</div>
-                  <div style={styles.meta}>Terminas: {formatDateTime(task.due_date)}</div>
-                  <div style={styles.meta}>
-                    Gyventojas: {task.resident_id ? residentsMap[task.resident_id] || '—' : '—'}
-                  </div>
-                  <div style={styles.meta}>
-                    Kartojasi kas: {task.interval_days ? `${task.interval_days} d.` : '—'}
-                  </div>
-                  <div style={styles.meta}>
-                    Paskutinį kartą atlikta: {formatDate(task.last_done_at)}
-                  </div>
-                  <div style={styles.meta}>Sukurta: {formatDateTime(task.created_at)}</div>
+                <div style={styles.taskInfoLine}>
+                  <span style={styles.inlineMetaItem}>
+                    <b style={styles.inlineMetaLabel}>Gyventojas:</b>{' '}
+                    {task.resident_id ? residentsMap[task.resident_id] || '—' : '—'}
+                  </span>
+                  <span style={styles.inlineMetaItem}>
+                    <b style={styles.inlineMetaLabel}>Prioritetas:</b> {getPriorityLabel(task.priority)}
+                  </span>
+                  <span style={styles.inlineMetaItem}>
+                    <b style={styles.inlineMetaLabel}>Terminas:</b> {formatDateTime(task.due_date)}
+                  </span>
+                </div>
+
+                <div style={{ ...styles.taskInfoLine, ...styles.mutedLine }}>
+                  <span style={styles.inlineMetaItem}>
+                    <b style={styles.inlineMetaLabel}>Kartojimas:</b>{' '}
+                    {task.interval_days ? `Kas ${task.interval_days} d.` : '—'}
+                  </span>
+                  <span style={styles.inlineMetaItem}>
+                    <b style={styles.inlineMetaLabel}>Atlikta:</b> {formatDate(task.last_done_at)}
+                  </span>
+                  <span style={styles.inlineMetaItem}>
+                    <b style={styles.inlineMetaLabel}>Sukurta:</b> {formatDateTime(task.created_at)}
+                  </span>
                 </div>
 
                 {isTaskLate(task) ? (
@@ -465,7 +480,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: '100vh',
-    background: '#f8fafc',
+    background: '#f8faf8',
     display: 'flex',
     flexDirection: 'column',
   },
@@ -483,7 +498,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f8fafc',
+    background: '#f8faf8',
   },
   loadingText: {
     color: '#475569',
@@ -492,17 +507,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   headerCard: {
     background: '#fff',
-    border: '1px solid #e2e8f0',
-    borderRadius: 24,
+    border: '1px solid #dbe6e0',
+    borderRadius: 28,
     padding: 18,
     display: 'grid',
     gap: 14,
   },
   backButton: {
-    border: '1px solid #cbd5e1',
+    border: '1px solid #dbe6e0',
     borderRadius: 12,
     background: '#fff',
-    color: '#0f172a',
+    color: '#10251f',
     padding: '10px 12px',
     fontWeight: 700,
     cursor: 'pointer',
@@ -510,13 +525,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: {
     margin: 0,
-    color: '#0f172a',
+    color: '#10251f',
     fontSize: 28,
     fontWeight: 800,
   },
   subtitle: {
     margin: '6px 0 0',
-    color: '#64748b',
+    color: '#526174',
     fontSize: 15,
     fontWeight: 600,
   },
@@ -526,21 +541,21 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 10,
   },
   smallStat: {
-    background: '#f8fafc',
-    border: '1px solid #e2e8f0',
+    background: '#f8faf8',
+    border: '1px solid #dbe6e0',
     borderRadius: 16,
     padding: 12,
   },
   smallStatValue: {
     fontSize: 24,
     fontWeight: 800,
-    color: '#0f172a',
+    color: '#10251f',
     lineHeight: 1,
     marginBottom: 6,
   },
   smallStatLabel: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#526174',
     fontWeight: 700,
   },
   filtersRow: {
@@ -549,7 +564,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: 'wrap',
   },
   select: {
-    border: '1px solid #cbd5e1',
+    border: '1px solid #dbe6e0',
     borderRadius: 12,
     padding: '12px 14px',
     fontSize: 14,
@@ -569,7 +584,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 20,
     padding: 24,
     textAlign: 'center',
-    color: '#64748b',
+    color: '#526174',
     background: '#fff',
     fontWeight: 700,
   },
@@ -578,10 +593,11 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 14,
   },
   card: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 22,
+    padding: 18,
     display: 'grid',
-    gap: 10,
+    gap: 12,
+    boxShadow: '0 1px 5px rgba(16,37,31,0.08)',
   },
   rowTop: {
     display: 'flex',
@@ -596,9 +612,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cardTitle: {
     margin: 0,
-    color: '#0f172a',
-    fontSize: 18,
-    fontWeight: 800,
+    color: '#10251f',
+    fontSize: 20,
+    fontWeight: 900,
+    letterSpacing: '-0.02em',
   },
   typeText: {
     fontSize: 13,
@@ -619,19 +636,31 @@ const styles: Record<string, React.CSSProperties> = {
   },
   description: {
     margin: 0,
-    color: '#475569',
-    lineHeight: 1.6,
+    color: '#486b5d',
+    lineHeight: 1.55,
     fontSize: 14,
+    fontWeight: 700,
   },
-  metaGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: 8,
-  },
-  meta: {
-    color: '#64748b',
+  taskInfoLine: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px 16px',
+    color: '#10251f',
     fontSize: 14,
-    fontWeight: 600,
+    fontWeight: 800,
+  },
+  inlineMetaItem: {
+    minWidth: 140,
+  },
+  inlineMetaLabel: {
+    color: '#8ea0b5',
+    fontSize: 11,
+    fontWeight: 900,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  mutedLine: {
+    color: '#526174',
   },
   lateText: {
     color: '#b91c1c',
@@ -647,17 +676,17 @@ const styles: Record<string, React.CSSProperties> = {
   primaryButton: {
     border: 'none',
     borderRadius: 12,
-    background: '#0f766e',
+    background: '#047857',
     color: '#fff',
     padding: '12px 14px',
     fontWeight: 700,
     cursor: 'pointer',
   },
   secondaryButton: {
-    border: '1px solid #cbd5e1',
+    border: '1px solid #dbe6e0',
     borderRadius: 12,
     background: '#fff',
-    color: '#0f172a',
+    color: '#10251f',
     padding: '12px 14px',
     fontWeight: 700,
     cursor: 'pointer',

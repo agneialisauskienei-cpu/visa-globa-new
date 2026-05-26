@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { getCurrentOrganizationId } from "@/lib/current-organization";
 import { getReadableError } from "@/lib/errors";
+import { logAudit } from "@/lib/audit";
 import type { Permission } from "@/lib/app-access";
 
 type Employee = {
@@ -175,6 +176,53 @@ function roleLabel(value?: string | null) {
 function permissionLabel(permission: Permission) {
   return PERMISSION_OPTIONS.find((item) => item.value === permission)?.label || permission;
 }
+function permissionListLabel(permissions: Permission[]) {
+  const labels = uniquePermissions(permissions).map(permissionLabel);
+  return labels.length ? labels.join(", ") : "—";
+}
+
+function permissionsChanged(previous: Permission[], next: Permission[]) {
+  const a = uniquePermissions(previous).sort().join("|");
+  const b = uniquePermissions(next).sort().join("|");
+  return a !== b;
+}
+
+function addAuditChange(
+  changes: Record<string, unknown>,
+  label: string,
+  oldValue: unknown,
+  newValue: unknown,
+) {
+  const oldText = oldValue === null || oldValue === undefined || oldValue === "" ? "—" : String(oldValue);
+  const newText = newValue === null || newValue === undefined || newValue === "" ? "—" : String(newValue);
+
+  if (oldText === newText) return;
+
+  changes[label] = { old: oldText, new: newText };
+}
+
+async function safeAuditLog(input: {
+  organizationId?: string | null;
+  tableName: string;
+  recordId?: string | null;
+  action: string;
+  changes: Record<string, unknown>;
+}) {
+  if (!input.organizationId) return;
+
+  try {
+    await logAudit({
+      organizationId: input.organizationId,
+      tableName: input.tableName,
+      recordId: input.recordId || undefined,
+      action: input.action,
+      changes: input.changes,
+    });
+  } catch (error) {
+    console.warn("[StaffTypesModule] audit log failed", error);
+  }
+}
+
 
 function normalizeText(value?: string | null) {
   return String(value || "")
@@ -379,6 +427,61 @@ export default function StaffTypesModulePage() {
         throw new Error("Pakeitimai neįrašyti. Patikrink RLS teises organization_members lentelei.");
       }
 
+      const savedPermissions = normalizeExtraPermissions(data.extra_permissions);
+      const previousBasePermissions = getBasePermissions(previousEmployee);
+      const nextBasePermissions = getBasePermissions({
+        ...previousEmployee,
+        position: data.position ?? nextPosition,
+        department: data.department ?? nextDepartment,
+        extra_permissions: savedPermissions,
+        employment_rate: Number(data.employment_rate ?? nextEmploymentRate),
+        weekly_hours: Number(data.weekly_hours ?? nextWeeklyHours),
+      });
+      const previousExtraPermissions = normalizeExtraPermissions(previousEmployee.extra_permissions);
+      const auditChanges: Record<string, unknown> = {
+        Darbuotojas: employeeName(previousEmployee),
+        Veiksmas: "Atnaujintos pareigos ir prieigos",
+      };
+
+      addAuditChange(auditChanges, "Konkrečios pareigos", previousEmployee.position, data.position ?? nextPosition);
+      addAuditChange(auditChanges, "Pareigų grupė", previousEmployee.department, data.department ?? nextDepartment);
+      addAuditChange(
+        auditChanges,
+        "Etato dydis",
+        Number(previousEmployee.employment_rate ?? 1).toFixed(2),
+        Number(data.employment_rate ?? nextEmploymentRate).toFixed(2),
+      );
+      addAuditChange(
+        auditChanges,
+        "Savaitės valandos",
+        Number(previousEmployee.weekly_hours ?? 40),
+        Number(data.weekly_hours ?? nextWeeklyHours),
+      );
+
+      if (permissionsChanged(previousExtraPermissions, savedPermissions)) {
+        auditChanges["Papildomos teisės"] = {
+          old: permissionListLabel(previousExtraPermissions),
+          new: permissionListLabel(savedPermissions),
+        };
+      }
+
+      if (permissionsChanged(previousBasePermissions, nextBasePermissions)) {
+        auditChanges["Bazinės teisės pagal pareigybę"] = {
+          old: permissionListLabel(previousBasePermissions),
+          new: permissionListLabel(nextBasePermissions),
+        };
+      }
+
+      if (Object.keys(auditChanges).length > 2) {
+        await safeAuditLog({
+          organizationId,
+          tableName: "organization_members",
+          recordId: currentEmployee.user_id,
+          action: "Atnaujintos darbuotojo teisės",
+          changes: auditChanges,
+        });
+      }
+
       setEmployees((previous) =>
         previous.map((item) =>
           item.user_id === currentEmployee.user_id
@@ -386,7 +489,7 @@ export default function StaffTypesModulePage() {
                 ...item,
                 position: data.position ?? nextPosition,
                 department: data.department ?? nextDepartment,
-                extra_permissions: normalizeExtraPermissions(data.extra_permissions),
+                extra_permissions: savedPermissions,
                 employment_rate: Number(data.employment_rate ?? nextEmploymentRate),
                 weekly_hours: Number(data.weekly_hours ?? nextWeeklyHours),
               }

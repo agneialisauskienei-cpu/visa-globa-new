@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ElementType, type ReactNode } from "react";
 import {
+  Activity,
   AlertTriangle,
   ArrowRight,
+  BriefcaseBusiness,
   BarChart3,
   Building2,
   CalendarCheck,
   CheckCircle2,
   ClipboardList,
+  FileText,
   Home,
   Info,
   RefreshCw,
   ShieldAlert,
+  ShieldCheck,
   Stethoscope,
   Users,
   UserPlus,
@@ -122,11 +126,7 @@ export default function AdminDashboardPage() {
         () => safeCountResult("employee_tasks", (q) => q.in("status", ["pending", "open", "todo", "new"])),
         () => safeCountResult("requests", (q) => q.in("status", ["pending", "submitted", "new"])),
       ]),
-      firstWorkingCount([
-        () => safeCountResult("vacation_requests", (q) => q.in("status", ["pending", "submitted", "new"])),
-        () => safeCountResult("leave_requests", (q) => q.in("status", ["pending", "submitted", "new"])),
-        () => safeCountResult("absence_requests", (q) => q.in("status", ["pending", "submitted", "new"])),
-      ]),
+      countPendingLeaveRequests(),
       countExpiringCertificates(),
       countTrainingProgress(),
       getOrganizationCapacity(),
@@ -266,28 +266,30 @@ export default function AdminDashboardPage() {
     },
   ];
 
-  return (
-    <main className="min-h-screen bg-[#f3f6f4] p-4 text-[#10251f] sm:p-6">
-      <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
-          <div className="bg-[#486b5d] px-5 py-4 text-white">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/12 text-white ring-1 ring-white/15">
-                  <Home className="h-7 w-7" />
-                </div>
+  const dashboardTabs: Array<{ key: DashboardTab; label: string; icon: ElementType }> = [
+    { key: "overview", label: "Rodiklių apžvalga", icon: ShieldCheck },
+    { key: "capacity", label: "Pajėgumas", icon: BriefcaseBusiness },
+    { key: "risks", label: "Rizikos", icon: ShieldAlert },
+    { key: "activity", label: "Veikla", icon: Activity },
+    { key: "documents", label: "Dokumentai", icon: FileText },
+  ];
 
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
-                    Pagrindinis skydelis
-                  </p>
-                  <h1 className="mt-1 text-2xl font-black tracking-tight">
-                    Dienos apžvalga
-                  </h1>
-                  <p className="mt-1 max-w-3xl text-sm font-semibold text-white/80">
-                    Svarbiausi įstaigos rodikliai ir šiandienos prioritetai.
-                  </p>
-                </div>
+  return (
+    <main className="min-h-screen bg-[#f4f7f5] p-4 text-[#10251f] sm:p-6">
+      <div className="mx-auto max-w-[1540px] space-y-4">
+        <section className="overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-white shadow-[0_1px_6px_rgba(16,37,31,0.08)]">
+          <div className="bg-[#486b5d] px-5 py-4 text-white sm:px-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/70">
+                  Pagrindinis skydelis
+                </p>
+                <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+                  Dienos apžvalga
+                </h1>
+                <p className="mt-2 max-w-4xl text-sm font-bold leading-6 text-white/82">
+                  Vienas langas svarbiausiems įstaigos rodikliams: gyventojams, personalo pajėgumui, rizikoms, mokymams, dokumentams ir veiksmams.
+                </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -295,7 +297,7 @@ export default function AdminDashboardPage() {
                   type="button"
                   onClick={loadStats}
                   disabled={loading}
-                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                   Atnaujinti
@@ -304,7 +306,7 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => router.push("/reports")}
-                  className="inline-flex items-center gap-2 rounded-lg bg-white/12 px-3 py-2 text-sm font-black text-white/90 ring-1 ring-white/20 transition hover:bg-white/18"
+                  className="inline-flex items-center gap-2 rounded-lg bg-white/12 px-4 py-2 text-sm font-black text-white ring-1 ring-white/18 transition hover:bg-white/18 active:scale-[0.98]"
                 >
                   <BarChart3 className="h-4 w-4" />
                   Ataskaitos
@@ -313,41 +315,54 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 border-b border-[#dbe6e0] bg-[#f8faf8] p-4 lg:grid-cols-4 xl:grid-cols-7">
-            <TopMetric title="Gyventojai" value={loading ? "…" : String(stats.activeResidents)} meta="aktyvūs" onClick={() => router.push("/residents")} />
-            <TopMetric title="Užimtumas" value={loading ? "…" : `${computed.occupancy}%`} meta="vietos" accent="emerald" onClick={() => router.push("/rooms")} />
-            <TopMetric title="Darbuotojai" value={loading ? "…" : String(stats.activeEmployees)} meta="aktyvūs" onClick={() => router.push("/team?module=employees")} />
-            <TopMetric title="Etatai" value={loading ? "…" : formatFte(stats.freeFte)} meta={`laisva iš ${formatFte(stats.plannedFte)} et.`} accent={stats.freeFte > 0 ? "red" : "emerald"} onClick={() => router.push("/team?module=fte")} />
-            <TopMetric title="Užduotys" value={loading ? "…" : String(stats.pendingTasks)} meta={stats.pendingTasks ? "laukia" : "nėra"} accent={stats.pendingTasks ? "amber" : "emerald"} onClick={() => router.push("/tasks")} />
-            <TopMetric title="Mokymai" value={loading ? "…" : `${computed.trainingCompletion}%`} meta="sutvarkyta" accent={computed.trainingCompletion < 70 ? "amber" : "emerald"} onClick={() => router.push("/team?module=trainings")} />
-            <TopMetric title="Dokumentai" value={loading ? "…" : String(stats.expiringCertificates)} meta="baigiasi" accent={stats.expiringCertificates ? "red" : "emerald"} onClick={() => router.push("/team?module=docs")} />
-          </div>
+          <div className="border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-3 sm:px-5">
+            <nav className="flex flex-wrap items-center gap-2 text-sm font-black text-[#486b5d]">
+              {dashboardTabs.map((item) => {
+                const Icon = item.icon;
 
-          <div className="sticky top-0 z-20 border-b border-[#dbe6e0] bg-white/95 px-4 py-3 backdrop-blur">
-            <nav className="flex gap-2 overflow-x-auto text-sm font-black text-[#486b5d]">
-              <DashboardTabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>
-                Rodiklių apžvalga
-              </DashboardTabButton>
-              <DashboardTabButton active={activeTab === "capacity"} onClick={() => setActiveTab("capacity")}>
-                Pajėgumas
-              </DashboardTabButton>
-              <DashboardTabButton active={activeTab === "risks"} onClick={() => setActiveTab("risks")}>
-                Rizikos
-              </DashboardTabButton>
-              <DashboardTabButton active={activeTab === "activity"} onClick={() => setActiveTab("activity")}>
-                Veikla
-              </DashboardTabButton>
-              <DashboardTabButton active={activeTab === "documents"} onClick={() => setActiveTab("documents")}>
-                Dokumentai
-              </DashboardTabButton>
+                return (
+                  <DashboardTabButton
+                    key={item.key}
+                    active={activeTab === item.key}
+                    onClick={() => setActiveTab(item.key)}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </DashboardTabButton>
+                );
+              })}
+
               <button
                 type="button"
                 onClick={() => setShowHelp(true)}
-                className="ml-auto shrink-0 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-2 transition hover:bg-white"
+                className="ml-auto inline-flex items-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 py-2 text-xs font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8]"
               >
+                <Info className="h-4 w-4" />
                 Instrukcija
               </button>
             </nav>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
+          <TopMetric title="Gyventojai" value={loading ? "…" : String(stats.activeResidents)} meta="aktyvūs" onClick={() => router.push("/residents")} />
+          <TopMetric title="Užimtumas" value={loading ? "…" : `${computed.occupancy}%`} meta="vietos" accent="emerald" onClick={() => router.push("/rooms")} />
+          <TopMetric title="Darbuotojai" value={loading ? "…" : String(stats.activeEmployees)} meta="aktyvūs" onClick={() => router.push("/team?module=employees")} />
+          <TopMetric title="Etatai" value={loading ? "…" : formatFte(stats.freeFte)} meta={`laisva iš ${formatFte(stats.plannedFte)} et.`} accent={stats.freeFte > 0 ? "red" : "emerald"} onClick={() => router.push("/team?module=fte")} />
+          <TopMetric title="Užduotys" value={loading ? "…" : String(stats.pendingTasks)} meta={stats.pendingTasks ? "laukia" : "nėra"} accent={stats.pendingTasks ? "amber" : "emerald"} onClick={() => router.push("/tasks")} />
+          <TopMetric title="Mokymai" value={loading ? "…" : `${computed.trainingCompletion}%`} meta="sutvarkyta" accent={computed.trainingCompletion < 70 ? "amber" : "emerald"} onClick={() => router.push("/team?module=trainings")} />
+          <TopMetric title="Dokumentai" value={loading ? "…" : String(stats.expiringCertificates)} meta="baigiasi" accent={stats.expiringCertificates ? "red" : "emerald"} onClick={() => router.push("/team?module=docs")} />
+        </section>
+
+        <section className="flex flex-col gap-3 border-y border-[#dbe6e0] bg-white/80 px-4 py-3 shadow-[0_1px_5px_rgba(16,37,31,0.06)] sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-2 text-[11px] font-black uppercase tracking-[0.22em] text-[#6a7e75]">Veiksmai</span>
+            <button type="button" onClick={() => router.push("/team?module=vacations")} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Užklausos</button>
+            <button type="button" onClick={() => router.push("/tasks")} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Užduotys</button>
+            <button type="button" onClick={loadStats} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Atnaujinti</button>
+          </div>
+          <div className="inline-flex w-fit rounded-lg border border-[#ead8a7] bg-[#fff9e8] px-4 py-2 text-sm font-black text-[#8a5a13]">
+            Rizikos: {computed.totalRisks + stats.pendingLeaves + stats.expiringCertificates}
           </div>
         </section>
 
@@ -502,8 +517,8 @@ export default function AdminDashboardPage() {
               <CompactFteRows rows={stats.fteRows || []} />
             </section>
 
-            <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">
+            <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
                 Pamainų rizikos
               </p>
               <h2 className="mt-1 text-2xl font-black">Pavadavimas ir grafikas</h2>
@@ -539,8 +554,8 @@ export default function AdminDashboardPage() {
 
         {activeTab === "risks" ? (
           <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-            <section className="rounded-2xl border border-red-100 bg-red-50 p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-red-700">
+            <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
                 Rizikos
               </p>
               <h2 className="mt-1 text-2xl font-black">Reikia dėmesio</h2>
@@ -695,6 +710,34 @@ async function firstWorkingCount(loaders: Array<() => Promise<{ ok: boolean; cou
     if (result.ok) return result.count;
   }
   return 0;
+}
+
+async function countPendingLeaveRequests(): Promise<number> {
+  const pendingStatuses = [
+    "pending",
+    "submitted",
+    "new",
+    "laukiama",
+    "laukia",
+  ];
+
+  const rows = await firstWorkingRows([
+    () => safeSelectRows("vacation_requests", "id, status"),
+    () => safeSelectRows("leave_requests", "id, status"),
+    () => safeSelectRows("absence_requests", "id, status"),
+  ]);
+
+  if (rows.length) {
+    return rows.filter((row: any) =>
+      pendingStatuses.includes(String(row?.status || "submitted").toLowerCase()),
+    ).length;
+  }
+
+  return firstWorkingCount([
+    () => safeCountResult("vacation_requests", (q) => q.in("status", pendingStatuses)),
+    () => safeCountResult("leave_requests", (q) => q.in("status", pendingStatuses)),
+    () => safeCountResult("absence_requests", (q) => q.in("status", pendingStatuses)),
+  ]);
 }
 
 
@@ -1124,10 +1167,10 @@ function DashboardTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`shrink-0 rounded-xl px-4 py-2 transition ${
+      className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 transition ${
         active
-          ? "bg-[#486b5d] text-white shadow-sm"
-          : "border border-[#dbe6e0] bg-[#f8faf8] hover:bg-white"
+          ? "bg-white text-[#486b5d] shadow-sm ring-1 ring-[#c9d8d0]"
+          : "text-[#486b5d] hover:bg-white/80"
       }`}
     >
       {children}
@@ -1156,8 +1199,8 @@ function DashboardSidePanel({
 }) {
   return (
     <aside className="grid content-start gap-4">
-      <section className="rounded-2xl border border-red-100 bg-red-50 p-5 shadow-sm">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-red-700">
+      <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
           Pranešimai
         </p>
         <h2 className="mt-1 text-2xl font-black">Reikia dėmesio</h2>
@@ -1260,7 +1303,7 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
                     row.color === "emerald"
                       ? "bg-[#047857]"
                       : row.color === "red"
-                        ? "bg-red-700"
+                        ? "bg-[#8a5a13]"
                         : "bg-[#ca8a04]"
                   }`}
                   style={{ width: `${clamp(row.percent, 0, 100)}%` }}
@@ -1269,7 +1312,7 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
             </div>
 
             <div className="font-black">{formatFte(row.filled)} / {formatFte(row.planned)}</div>
-            <div className={row.free > 0 ? "font-black text-red-700" : "font-black text-emerald-700"}>
+            <div className={row.free > 0 ? "font-black text-[#047857]" : "font-black text-emerald-700"}>
               {formatFte(row.free)} et.
             </div>
             <div>
@@ -1278,7 +1321,7 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
                   row.color === "emerald"
                     ? "bg-emerald-50 text-emerald-700"
                     : row.color === "red"
-                      ? "bg-red-50 text-red-700"
+                      ? "bg-red-50 text-[#047857]"
                       : "bg-[#fff9e8] text-[#8a5a13]"
                 }`}
               >
@@ -1349,11 +1392,11 @@ function RiskAttentionCard({
 }) {
   const classes =
     tone === "red"
-      ? "border-red-100 bg-red-50 text-red-700"
+      ? "border-[#ead8a7] bg-[#fff9e8] text-[#047857]"
       : tone === "amber"
         ? "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]"
         : tone === "blue"
-          ? "border-blue-100 bg-blue-50 text-blue-700"
+          ? "border-[#c9d8d0] bg-[#eef4f1] text-[#047857]"
           : "border-emerald-100 bg-emerald-50 text-emerald-700";
 
   return (
@@ -1476,7 +1519,7 @@ function FtePlanningSection({
                       row.color === "emerald"
                         ? "bg-[#047857]"
                         : row.color === "red"
-                          ? "bg-red-700"
+                          ? "bg-[#8a5a13]"
                           : "bg-[#ca8a04]"
                     }`}
                     style={{ width: `${clamp(row.percent, 0, 100)}%` }}
@@ -1492,7 +1535,7 @@ function FtePlanningSection({
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-black ${
                     row.free > 0
-                      ? "bg-red-50 text-red-700"
+                      ? "bg-red-50 text-[#047857]"
                       : "bg-emerald-50 text-emerald-700"
                   }`}
                 >
@@ -1508,7 +1551,7 @@ function FtePlanningSection({
                     row.color === "emerald"
                       ? "bg-emerald-50 text-emerald-700"
                       : row.color === "red"
-                        ? "bg-red-50 text-red-700"
+                        ? "bg-red-50 text-[#047857]"
                         : "bg-[#fff9e8] text-[#8a5a13]"
                   }`}
                 >
@@ -1520,8 +1563,8 @@ function FtePlanningSection({
         </div>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-5">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">
+      <div className="mt-5 rounded-2xl border border-[#c9d8d0] bg-[#eef4f1] p-5">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
           Pamainų rizikos
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -1531,7 +1574,7 @@ function FtePlanningSection({
                 ? `Reikia pavaduoti ${formatFte(replacementNeededFte)} et.`
                 : "Pavadavimo poreikio nerasta"}
             </div>
-            <div className="mt-1 text-sm font-bold text-blue-700/70">
+            <div className="mt-1 text-sm font-bold text-[#047857]/70">
               Skaičiuojama pagal patvirtintus neatvykimus.
             </div>
           </div>
@@ -1540,7 +1583,7 @@ function FtePlanningSection({
             <div className="font-black text-[#10251f]">
               Tikrinti minimalų pamainos komplektą
             </div>
-            <div className="mt-1 text-sm font-bold text-blue-700/70">
+            <div className="mt-1 text-sm font-bold text-[#047857]/70">
               Kitas etapas — lyginti grafiką su minimaliu pareigybių poreikiu.
             </div>
           </div>
@@ -1561,7 +1604,7 @@ function FteSummaryCard({
 }) {
   const classes =
     tone === "red"
-      ? "border-red-100 bg-red-50 text-red-700"
+      ? "border-[#ead8a7] bg-[#fff9e8] text-[#047857]"
       : tone === "amber"
         ? "border-[#fff0c2] bg-[#fff9e8] text-[#8a5a13]"
         : "border-[#dbe6e0] bg-[#f8faf8] text-[#10251f]";
@@ -1625,9 +1668,9 @@ function CriticalStrip({
   onClick: () => void;
 }) {
   const styles = {
-    red: "border-red-100 bg-red-50 text-red-700",
+    red: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
     amber: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
-    blue: "border-blue-100 bg-blue-50 text-blue-700",
+    blue: "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]",
   }[color];
 
   return (
@@ -1662,15 +1705,15 @@ function PriorityActionCard({
 }) {
   const styles = {
     amber: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
-    red: "border-red-100 bg-red-50 text-red-700",
-    blue: "border-blue-100 bg-blue-50 text-blue-700",
+    red: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
+    blue: "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]",
     emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
   }[color];
 
   const buttonStyles = {
     amber: "bg-[#8a5a13]",
-    red: "bg-red-700",
-    blue: "bg-blue-700",
+    red: "bg-[#8a5a13]",
+    blue: "bg-[#486b5d]",
     emerald: "bg-[#047857]",
   }[color];
 
@@ -1754,7 +1797,7 @@ function MiniCircularCard({
   return (
     <article className={`rounded-2xl border p-4 ${
       danger
-        ? "border-red-100 bg-red-50"
+        ? "border-[#ead8a7] bg-[#fff9e8]"
         : warm
           ? "border-[#ead8a7] bg-[#fff9e8]"
           : "border-[#dbe6e0] bg-[#f8faf8]"
@@ -1762,13 +1805,13 @@ function MiniCircularCard({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className={`text-xs font-black uppercase tracking-[0.14em] ${
-            danger ? "text-red-700" : warm ? "text-[#8a5a13]" : "text-[#6a7e75]"
+            danger ? "text-[#047857]" : warm ? "text-[#8a5a13]" : "text-[#6a7e75]"
           }`}>
             {eyebrow}
           </p>
           <h3 className="mt-1 text-lg font-black">{title}</h3>
           <p className={`mt-1 text-sm font-bold ${
-            danger ? "text-red-700/75" : warm ? "text-[#7a6a4f]" : "text-[#6a7e75]"
+            danger ? "text-[#047857]/75" : warm ? "text-[#7a6a4f]" : "text-[#6a7e75]"
           }`}>
             {meta}
           </p>
@@ -1825,9 +1868,9 @@ function RiskRow({
   onClick: () => void;
 }) {
   const styles = {
-    red: "border-red-100 bg-red-50 text-red-700",
+    red: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
     amber: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
-    blue: "border-blue-100 bg-blue-50 text-blue-700",
+    blue: "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]",
   }[color];
 
   return (
@@ -1863,17 +1906,17 @@ function TimelineItem({
   return (
     <div className={`flex gap-3 rounded-xl border p-3 ${
       danger
-        ? "border-red-100 bg-red-50"
+        ? "border-[#ead8a7] bg-[#fff9e8]"
         : warm
           ? "border-[#ead8a7] bg-[#fff9e8]"
           : blue
-            ? "border-blue-100 bg-blue-50"
+            ? "border-[#c9d8d0] bg-[#eef4f1]"
             : "border-[#dbe6e0] bg-[#f8faf8]"
     }`}>
       <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
       <div>
         <b>{title}</b>
-        <p className={`text-sm font-bold ${danger ? "text-red-700/75" : warm ? "text-[#7a6a4f]" : blue ? "text-blue-700/75" : "text-[#6a7e75]"}`}>
+        <p className={`text-sm font-bold ${danger ? "text-[#047857]/75" : warm ? "text-[#7a6a4f]" : blue ? "text-[#047857]/75" : "text-[#6a7e75]"}`}>
           {meta}
         </p>
       </div>
@@ -1884,8 +1927,8 @@ function TimelineItem({
 function HelpModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
+      <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-[#c9d8d0] bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] bg-[#eef4f1] px-5 py-4">
           <div>
             <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#6a7e75]">
               Trumpa instrukcija
@@ -1930,7 +1973,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
+        <div className="flex justify-end border-t border-[#dbe6e0] bg-[#eef4f1] px-5 py-4">
           <button
             type="button"
             onClick={onClose}

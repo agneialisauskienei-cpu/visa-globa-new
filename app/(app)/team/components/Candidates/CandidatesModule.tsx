@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Copy, Mail, Plus, Trash2, UserPlus } from "lucide-react";
+import { CheckCircle2, Copy, ExternalLink, Link2, Mail, Plus, Trash2, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getChangedFields, logAudit } from "@/lib/audit";
 
 type Candidate = {
   id: string;
@@ -149,31 +150,33 @@ function hasForbiddenData(text: string) {
   return FORBIDDEN_HINTS.some((hint) => lower.includes(hint));
 }
 
-function buildEmailBody(candidateName: string, questions: CandidateQuestion[]) {
-  const required = questions.filter((q) => q.required);
-  const optional = questions.filter((q) => !q.required);
+function getAppOrigin() {
+  if (typeof window === "undefined") return "";
+  return window.location.origin;
+}
 
+function buildQuestionnaireLink(candidateId?: string | null) {
+  const origin = getAppOrigin();
+  const token = candidateId || "sukurta-issaugojus-kandidata";
+  return `${origin}/candidate-questionnaire/${token}`;
+}
+
+function buildShortEmailBody(candidateName: string, questionnaireLink: string) {
   return [
     `Sveiki, ${candidateName || ""},`,
     "",
     "Dėkojame už susidomėjimą darbu mūsų organizacijoje.",
-    "Kad galėtume įvertinti tinkamumą pareigoms ir paruošti būtiną informaciją tolimesniam atrankos etapui, prašome atsakyti į žemiau pateiktus klausimus.",
+    "Kad galėtume įvertinti tinkamumą pareigoms, kviečiame užpildyti trumpą kandidatavimo anketą:",
+    "",
+    questionnaireLink,
+    "",
+    "Anketos pildymas užtruks apie 5–10 min.",
     "",
     "Svarbu dėl asmens duomenų:",
-    "- Neprašome ir neprašome siųsti asmens kodo.",
+    "- Neprašome asmens kodo.",
     "- Neprašome dokumentų kopijų, paso, ID kortelės ar kitų perteklinių dokumentų.",
     "- Neprašome sveikatos diagnozių, politinių, religinių ar kitų specialių kategorijų duomenų.",
     "- Pateikite tik informaciją, kuri būtina atrankai ir būsimos darbo sutarties paruošimui.",
-    "",
-    "Privalomi klausimai:",
-    ...required.map((q, index) => `${index + 1}. ${q.label}`),
-    "",
-    "Papildomi klausimai:",
-    ...(optional.length
-      ? optional.map((q, index) => `${index + 1}. ${q.label}`)
-      : ["Papildomų klausimų nėra."]),
-    "",
-    "Atsakydami į šį laišką patvirtinate, kad pateikta informacija yra teisinga ir ją galima naudoti atrankos tikslu.",
     "",
     "Pagarbiai",
   ].join("\n");
@@ -230,16 +233,12 @@ export default function CandidatesModule({
     [questions],
   );
 
-  const emailBody = useMemo(
-    () => buildEmailBody(candidateName || "kandidate", selectedQuestions),
-    [candidateName, selectedQuestions],
-  );
+  const questionnairePreviewLink = useMemo(() => buildQuestionnaireLink(), []);
 
-  const mailtoHref = useMemo(() => {
-    const subject = encodeURIComponent("Klausimai dėl darbo atrankos");
-    const body = encodeURIComponent(emailBody);
-    return `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`;
-  }, [email, emailBody]);
+  const emailBody = useMemo(
+    () => buildShortEmailBody(candidateName || "kandidate", questionnairePreviewLink),
+    [candidateName, questionnairePreviewLink],
+  );
 
   function addQuestion() {
     const trimmed = newQuestion.trim();
@@ -280,22 +279,29 @@ export default function CandidatesModule({
     setQuestions((prev) => prev.filter((question) => question.id !== id));
   }
 
-  async function copyEmailText() {
-    await navigator.clipboard.writeText(emailBody);
-    setMessage({ type: "success", text: "Laiško tekstas nukopijuotas." });
+  async function copyEmailText(candidateId?: string | null) {
+    const questionnaireLink = buildQuestionnaireLink(candidateId);
+    const body = buildShortEmailBody(candidateName || "kandidate", questionnaireLink);
+    await navigator.clipboard.writeText(body);
+    setMessage({ type: "success", text: "Trumpo laiško tekstas su anketos nuoroda nukopijuotas." });
   }
 
-  async function saveCandidate(status: "new" | "questionnaire_sent" = "new") {
+  async function copyQuestionnaireLink(candidateId?: string | null) {
+    await navigator.clipboard.writeText(buildQuestionnaireLink(candidateId));
+    setMessage({ type: "success", text: "Anketos nuoroda nukopijuota." });
+  }
+
+  async function saveCandidate(status: "new" | "questionnaire_sent" = "new", resetAfterSave = true) {
     setMessage(null);
 
     if (!organizationId) {
       setMessage({ type: "error", text: "Nenustatyta organizacija." });
-      return;
+      return null;
     }
 
     if (!firstName.trim() || !lastName.trim()) {
       setMessage({ type: "error", text: "Įvesk kandidato vardą ir pavardę." });
-      return;
+      return null;
     }
 
     if (!email.trim()) {
@@ -303,7 +309,7 @@ export default function CandidatesModule({
         type: "error",
         text: "Įvesk kandidato el. paštą, nes klausimynas siunčiamas paštu.",
       });
-      return;
+      return null;
     }
 
     if (!consent) {
@@ -311,7 +317,7 @@ export default function CandidatesModule({
         type: "error",
         text: "Būtinas kandidato sutikimas dėl duomenų tvarkymo atrankos tikslu.",
       });
-      return;
+      return null;
     }
 
     if (selectedQuestions.some((q) => hasForbiddenData(q.label))) {
@@ -321,7 +327,7 @@ export default function CandidatesModule({
         details:
           "Pašalink klausimus apie asmens kodą, dokumentų kopijas, diagnozes ar specialių kategorijų duomenis.",
       });
-      return;
+      return null;
     }
 
     setSaving(true);
@@ -351,7 +357,7 @@ export default function CandidatesModule({
           text: "Nepavyko išsaugoti kandidato į `candidates`.",
           details: errorText(candidateError),
         });
-        return;
+        return null;
       }
 
       const questionnairePayload = {
@@ -359,7 +365,7 @@ export default function CandidatesModule({
         candidate_id: candidate.id,
         status: status === "questionnaire_sent" ? "sent" : "draft",
         questions: selectedQuestions,
-        email_body: emailBody,
+        email_body: buildShortEmailBody(candidateName || "kandidate", buildQuestionnaireLink(candidate.id)),
         sent_to: email.trim(),
       };
 
@@ -374,8 +380,34 @@ export default function CandidatesModule({
           details: errorText(questionnaireError),
         });
         await onRefresh?.();
-        return;
+        return null;
       }
+
+      await logAudit({
+        organizationId,
+        tableName: "candidates",
+        recordId: candidate.id,
+        action: status === "questionnaire_sent" ? "candidate.questionnaire_sent" : "candidate.created",
+        changes: getChangedFields({}, {
+          ...candidatePayload,
+          candidate_id: candidate.id,
+          questionnaire_status: questionnairePayload.status,
+          questions_count: selectedQuestions.length,
+        }),
+      });
+
+      await logAudit({
+        organizationId,
+        tableName: "candidate_questionnaires",
+        recordId: candidate.id,
+        action: "candidate.questionnaire_created",
+        changes: getChangedFields({}, {
+          candidate_id: candidate.id,
+          status: questionnairePayload.status,
+          sent_to: questionnairePayload.sent_to,
+          questions_count: selectedQuestions.length,
+        }),
+      });
 
       setMessage({
         type: "success",
@@ -385,27 +417,53 @@ export default function CandidatesModule({
             : "Kandidatas išsaugotas.",
       });
 
-      setFirstName("");
-      setLastName("");
-      setEmail("");
-      setPhone("");
-      setDesiredRole("");
-      setExperience("");
-      setConsent(false);
-      setQuestions(DEFAULT_QUESTIONS);
+      if (resetAfterSave) {
+        setFirstName("");
+        setLastName("");
+        setEmail("");
+        setPhone("");
+        setDesiredRole("");
+        setExperience("");
+        setConsent(false);
+        setQuestions(DEFAULT_QUESTIONS);
+      }
 
       await onRefresh?.();
+      return candidate.id;
     } catch (error) {
       setMessage({
         type: "error",
         text: "Klaida saugant kandidatą.",
         details: errorText(error),
       });
+      return null;
     } finally {
       setSaving(false);
     }
   }
 
+
+
+  async function saveAndOpenQuestionnaireEmail() {
+    const savedCandidateId = await saveCandidate("questionnaire_sent", false);
+    if (!savedCandidateId) return;
+
+    const questionnaireLink = buildQuestionnaireLink(savedCandidateId);
+    const body = buildShortEmailBody(candidateName || "kandidate", questionnaireLink);
+    const subject = encodeURIComponent("Kandidatavimo anketa");
+    const encodedBody = encodeURIComponent(body);
+
+    window.location.href = `mailto:${encodeURIComponent(email)}?subject=${subject}&body=${encodedBody}`;
+
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setPhone("");
+    setDesiredRole("");
+    setExperience("");
+    setConsent(false);
+    setQuestions(DEFAULT_QUESTIONS);
+  }
 
   async function acceptCandidateToTeam(candidate: Candidate) {
     setMessage(null);
@@ -474,6 +532,30 @@ export default function CandidatesModule({
         await onRefresh?.();
         return;
       }
+
+      await logAudit({
+        organizationId,
+        tableName: "organization_invites",
+        recordId: candidate.id,
+        action: "candidate.invite_created",
+        changes: getChangedFields({}, {
+          email: candidateEmail,
+          role: "employee",
+          status: "pending",
+          candidate_id: candidate.id,
+        }),
+      });
+
+      await logAudit({
+        organizationId,
+        tableName: "candidates",
+        recordId: candidate.id,
+        action: "candidate.hired",
+        changes: getChangedFields(
+          { status: candidate.status || "new" },
+          { status: "invited", email: candidateEmail, desired_role: candidate.desired_role || null },
+        ),
+      });
 
       setMessage({
         type: "success",
@@ -628,24 +710,15 @@ export default function CandidatesModule({
               {saving ? "Saugoma..." : "Išsaugoti kandidatą"}
             </button>
 
-            <a
-              href={email ? mailtoHref : undefined}
-              onClick={(event) => {
-                if (!email) {
-                  event.preventDefault();
-                  setMessage({
-                    type: "error",
-                    text: "Įvesk kandidato el. paštą prieš siunčiant klausimyną.",
-                  });
-                  return;
-                }
-                void saveCandidate("questionnaire_sent");
-              }}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#486b5d] px-4 text-sm font-black text-white transition hover:bg-[#39594c]"
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void saveAndOpenQuestionnaireEmail()}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#486b5d] px-4 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
             >
               <Mail size={16} />
-              Siųsti klausimyną el. paštu
-            </a>
+              {saving ? "Ruošiama..." : "Siųsti anketos nuorodą"}
+            </button>
 
             <button
               type="button"
@@ -653,7 +726,7 @@ export default function CandidatesModule({
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
             >
               <Copy size={16} />
-              Kopijuoti laišką
+              Kopijuoti trumpą laišką
             </button>
           </div>
 
@@ -764,12 +837,61 @@ export default function CandidatesModule({
           </div>
 
           <div className="mt-5 rounded-lg border border-[#dbe6e0] bg-white p-4">
-            <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#6a7e75]">
-              Laiško peržiūra
-            </h4>
-            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950 p-4 text-xs font-semibold leading-5 text-slate-100">
-              {emailBody}
-            </pre>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#6a7e75]">
+                  Kandidato anketos peržiūra
+                </h4>
+                <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
+                  Kandidatui siunčiamas trumpas laiškas su nuoroda, o klausimai pildomi atskiroje anketoje.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void copyQuestionnaireLink()}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f8faf8]"
+              >
+                <Link2 size={14} />
+                Kopijuoti nuorodą
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+              <div className="flex items-center gap-2 text-sm font-black text-[#10251f]">
+                <ExternalLink size={16} className="text-[#486b5d]" />
+                Vieša kandidato anketa
+              </div>
+              <p className="mt-2 break-all rounded-lg bg-white px-3 py-2 text-sm font-bold text-[#486b5d]">
+                {questionnairePreviewLink}
+              </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-lg bg-white p-3">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[#6a7e75]">Privalomi</p>
+                  <p className="mt-1 text-2xl font-black text-[#10251f]">
+                    {selectedQuestions.filter((q) => q.required).length}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-white p-3">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[#6a7e75]">Papildomi</p>
+                  <p className="mt-1 text-2xl font-black text-[#10251f]">
+                    {selectedQuestions.filter((q) => !q.required).length}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-white p-3">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[#6a7e75]">Formatas</p>
+                  <p className="mt-1 text-sm font-black text-[#10251f]">Nuoroda į anketą</p>
+                </div>
+              </div>
+            </div>
+
+            <details className="mt-4 rounded-xl border border-[#dbe6e0] bg-white p-4">
+              <summary className="cursor-pointer text-sm font-black text-[#486b5d]">
+                Rodyti siunčiamo laiško tekstą
+              </summary>
+              <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950 p-4 text-xs font-semibold leading-5 text-slate-100">
+                {emailBody}
+              </pre>
+            </details>
           </div>
         </div>
       </div>

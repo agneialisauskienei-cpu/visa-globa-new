@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import type { ElementType, ReactNode } from "react";
 import {
   AlertTriangle,
   ArrowDownCircle,
@@ -10,6 +10,8 @@ import {
   ArrowUpCircle,
   BedDouble,
   Boxes,
+  CheckCircle2,
+  Download,
   PackageOpen,
   Pill,
   Plus,
@@ -19,1834 +21,2163 @@ import {
   ShieldCheck,
   Shirt,
   Sparkles,
+  Trash2,
+  WashingMachine,
   X,
-} from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentOrganizationId } from '@/lib/current-organization'
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { getCurrentOrganizationId } from "@/lib/current-organization";
 
+type TabKey =
+  | "overview"
+  | "stock"
+  | "assigned"
+  | "uniforms"
+  | "laundry"
+  | "movements"
+  | "writeoffs";
 type InventoryCategory =
-  | 'diapers'
-  | 'bedding'
-  | 'cleaning'
-  | 'medication'
-  | 'uniforms'
-  | 'other'
-
-type StockFilter = '' | 'ok' | 'low' | 'empty'
-type LogTypeFilter = '' | 'in' | 'out' | 'adjustment'
+  | "diapers"
+  | "bedding"
+  | "cleaning"
+  | "medication"
+  | "uniforms"
+  | "other";
+type StockStatus = "ok" | "low" | "empty";
+type MovementType = "in" | "out" | "adjustment";
 
 type InventoryItem = {
-  id: string
-  organization_id: string
-  name: string
-  unit: string | null
-  quantity: number | null
-  category: string | null
-  subcategory: string | null
-  size: string | null
-  min_quantity: number | null
-  is_active: boolean | null
-  created_at: string | null
-  updated_at: string | null
-}
+  id: string;
+  organization_id: string;
+  name: string | null;
+  unit: string | null;
+  quantity: number | null;
+  category: string | null;
+  subcategory: string | null;
+  size: string | null;
+  min_quantity: number | null;
+  is_active?: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
 
 type InventoryLog = {
-  id: string
-  organization_id: string
-  item_id: string | null
-  item_name: string | null
-  category: string | null
-  subcategory: string | null
-  size: string | null
-  unit: string | null
-  resident_id: string | null
-  resident_code: string | null
-  employee_user_id: string | null
-  employee_full_name: string | null
-  quantity: number | null
-  type: string | null
-  notes: string | null
-  created_at: string | null
-}
+  id: string;
+  organization_id: string;
+  item_id: string | null;
+  item_name: string | null;
+  category: string | null;
+  subcategory: string | null;
+  size: string | null;
+  unit: string | null;
+  resident_id: string | null;
+  resident_code: string | null;
+  employee_user_id: string | null;
+  employee_full_name: string | null;
+  quantity: number | null;
+  type: string | null;
+  notes: string | null;
+  created_at: string | null;
+};
 
 type PersonOption = {
-  id: string
-  label: string
-  isActive?: boolean
-}
-
-type CategoryMeta = {
-  code: InventoryCategory
-  title: string
-  description: string
-  href: string
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>
-}
-
-type Option = {
-  value: string
-  label: string
-}
+  id: string;
+  label: string;
+  isActive?: boolean;
+};
 
 type AddForm = {
-  name: string
-  category: InventoryCategory
-  subcategory: string
-  size: string
-  unit: string
-  quantity: string
-  minQuantity: string
-}
+  name: string;
+  category: InventoryCategory;
+  subcategory: string;
+  size: string;
+  unit: string;
+  quantity: string;
+  minQuantity: string;
+};
 
-type IssueLine = {
-  itemId: string
-  targetId: string
-  quantity: string
-  notes: string
-}
+type SingleMovementForm = {
+  itemId: string;
+  targetId: string;
+  quantity: string;
+  notes: string;
+};
 
-type RefillLine = {
-  itemId: string
-  quantity: string
-  notes: string
-}
+type LaundryForm = {
+  itemId: string;
+  quantity: string;
+  unitMode: string;
+  notes: string;
+};
 
-type UniformReturnLine = {
-  itemId: string
-  targetId: string
-  quantity: string
-  notes: string
-}
+type CategoryMeta = {
+  code: InventoryCategory;
+  title: string;
+  short: string;
+  description: string;
+  icon: ElementType;
+  mode: "consumable" | "asset" | "uniform";
+};
 
 const CATEGORIES: CategoryMeta[] = [
   {
-    code: 'diapers',
-    title: 'Sauskelnės',
-    description: 'Dydžiai, likučiai ir išdavimai gyventojams.',
-    href: '/inventory/diapers',
+    code: "diapers",
+    title: "Sauskelnės",
+    short: "Sunaudojamos",
+    description: "Išduodamos gyventojams ir laikomos sunaudotomis.",
     icon: PackageOpen,
+    mode: "consumable",
   },
   {
-    code: 'bedding',
-    title: 'Patalynė',
-    description: 'Komplektai, paklodės, užvalkalai ir judėjimas.',
-    href: '/inventory/bedding',
+    code: "bedding",
+    title: "Patalynė / tekstilė",
+    short: "Ciklinės",
+    description: "Priskiriama, keliauja į skalbyklą, grįžta arba nurašoma.",
     icon: BedDouble,
+    mode: "asset",
   },
   {
-    code: 'cleaning',
-    title: 'Valymo priemonės',
-    description: 'Valymo priemonių atsargos ir sunaudojimas.',
-    href: '/inventory/cleaning',
+    code: "cleaning",
+    title: "Valymo priemonės",
+    short: "Sunaudojamos",
+    description: "Papildymas ir sunaudojimas įstaigos reikmėms.",
     icon: Sparkles,
+    mode: "consumable",
   },
   {
-    code: 'medication',
-    title: 'Vaistai',
-    description: 'Vaistų likučiai, papildymai ir išdavimai.',
-    href: '/inventory/medication',
+    code: "medication",
+    title: "Vaistai",
+    short: "Sunaudojamos",
+    description: "Likučiai, papildymai ir išdavimai per medicinos procesą.",
     icon: Pill,
+    mode: "consumable",
   },
   {
-    code: 'uniforms',
-    title: 'Darbuotojų uniformos',
-    description: 'Darbuotojų apranga, dydžiai ir išdavimai.',
-    href: '/inventory/uniforms',
+    code: "uniforms",
+    title: "Uniformos",
+    short: "Darbuotojams",
+    description: "Išduodamos darbuotojams, grąžinamos arba nurašomos.",
     icon: Shirt,
+    mode: "uniform",
   },
   {
-    code: 'other',
-    title: 'Kita',
-    description: 'Kitos sandėlio prekės ir priemonės.',
-    href: '/inventory/other',
+    code: "other",
+    title: "Kita",
+    short: "Mišru",
+    description: "Kitos prekės, kurias galima išduoti, priskirti ar nurašyti.",
     icon: Boxes,
+    mode: "consumable",
   },
-]
+];
 
-const SUBCATEGORY_OPTIONS: Record<InventoryCategory, Option[]> = {
+const SUBCATEGORY_OPTIONS: Record<
+  InventoryCategory,
+  Array<{ value: string; label: string }>
+> = {
   diapers: [
-    { value: 'pants', label: 'Kelnaitės' },
-    { value: 'tape', label: 'Juostinės sauskelnės' },
-    { value: 'night', label: 'Naktinės sauskelnės' },
-    { value: 'insert', label: 'Įklotai' },
-    { value: 'underpad', label: 'Paklotai' },
+    { value: "pants", label: "Kelnaitės" },
+    { value: "tape", label: "Juostinės sauskelnės" },
+    { value: "night", label: "Naktinės sauskelnės" },
+    { value: "insert", label: "Įklotai" },
+    { value: "underpad", label: "Paklotai" },
   ],
   bedding: [
-    { value: 'set', label: 'Patalynės komplektas' },
-    { value: 'sheet', label: 'Paklodė' },
-    { value: 'duvet_cover', label: 'Antklodės užvalkalas' },
-    { value: 'pillowcase', label: 'Pagalvės užvalkalas' },
-    { value: 'blanket', label: 'Antklodė' },
-    { value: 'pillow', label: 'Pagalvė' },
-    { value: 'towel', label: 'Rankšluostis' },
+    { value: "set", label: "Patalynės komplektas" },
+    { value: "sheet", label: "Paklodė" },
+    { value: "duvet_cover", label: "Antklodės užvalkalas" },
+    { value: "pillowcase", label: "Pagalvės užvalkalas" },
+    { value: "blanket", label: "Antklodė" },
+    { value: "pillow", label: "Pagalvė" },
+    { value: "towel", label: "Rankšluostis" },
   ],
   cleaning: [
-    { value: 'spray', label: 'Purškiklis' },
-    { value: 'liquid', label: 'Skystis' },
-    { value: 'powder', label: 'Milteliai' },
-    { value: 'gel', label: 'Gelis' },
-    { value: 'wipes', label: 'Servetėlės' },
-    { value: 'disinfectant', label: 'Dezinfekantas' },
-    { value: 'bags', label: 'Maišeliai' },
-    { value: 'gloves', label: 'Pirštinės' },
+    { value: "liquid", label: "Skystis" },
+    { value: "spray", label: "Purškiklis" },
+    { value: "powder", label: "Milteliai" },
+    { value: "gel", label: "Gelis" },
+    { value: "wipes", label: "Servetėlės" },
+    { value: "disinfectant", label: "Dezinfekantas" },
+    { value: "bags", label: "Maišeliai" },
+    { value: "gloves", label: "Pirštinės" },
   ],
   medication: [
-    { value: 'tablet', label: 'Tabletės' },
-    { value: 'capsule', label: 'Kapsulės' },
-    { value: 'liquid', label: 'Skystis' },
-    { value: 'drops', label: 'Lašai' },
-    { value: 'ointment', label: 'Tepalas' },
-    { value: 'injection', label: 'Injekcija' },
-    { value: 'bandage', label: 'Tvarstis' },
+    { value: "tablet", label: "Tabletės" },
+    { value: "capsule", label: "Kapsulės" },
+    { value: "liquid", label: "Skystis" },
+    { value: "drops", label: "Lašai" },
+    { value: "ointment", label: "Tepalas" },
+    { value: "injection", label: "Injekcija" },
+    { value: "bandage", label: "Tvarstis" },
   ],
   uniforms: [
-    { value: 'shirt', label: 'Marškinėliai' },
-    { value: 'pants', label: 'Kelnės' },
-    { value: 'jacket', label: 'Švarkas / džemperis' },
-    { value: 'robe', label: 'Chalatas' },
-    { value: 'shoes', label: 'Avalynė' },
-    { value: 'apron', label: 'Prijuostė' },
+    { value: "shirt", label: "Marškinėliai" },
+    { value: "pants", label: "Kelnės" },
+    { value: "jacket", label: "Švarkas / džemperis" },
+    { value: "robe", label: "Chalatas" },
+    { value: "shoes", label: "Avalynė" },
+    { value: "apron", label: "Prijuostė" },
   ],
   other: [
-    { value: 'general', label: 'Bendra prekė' },
-    { value: 'equipment', label: 'Įranga' },
-    { value: 'office', label: 'Kanceliarinės prekės' },
-    { value: 'hygiene', label: 'Higienos priemonės' },
+    { value: "general", label: "Bendra prekė" },
+    { value: "equipment", label: "Įranga" },
+    { value: "office", label: "Kanceliarinės prekės" },
+    { value: "hygiene", label: "Higienos priemonės" },
   ],
-}
+};
 
 const SIZE_OPTIONS: Partial<Record<InventoryCategory, string[]>> = {
-  diapers: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
-  bedding: ['60x120', '80x160', '90x200', '140x200', '160x200', '200x220'],
-  uniforms: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '36', '38', '40', '42', '44', '46'],
-}
+  diapers: ["XS", "S", "M", "L", "XL", "XXL"],
+  bedding: [
+    "kg",
+    "vnt.",
+    "maišai",
+    "komplektai",
+    "60x120",
+    "80x160",
+    "90x200",
+    "140x200",
+    "160x200",
+    "200x220",
+  ],
+  uniforms: [
+    "XS",
+    "S",
+    "M",
+    "L",
+    "XL",
+    "XXL",
+    "36",
+    "38",
+    "40",
+    "42",
+    "44",
+    "46",
+  ],
+};
 
 const DEFAULT_ADD_FORM: AddForm = {
-  name: '',
-  category: 'diapers',
-  subcategory: 'pants',
-  size: 'M',
-  unit: 'vnt.',
-  quantity: '0',
-  minQuantity: '0',
-}
+  name: "",
+  category: "diapers",
+  subcategory: "pants",
+  size: "M",
+  unit: "vnt.",
+  quantity: "0",
+  minQuantity: "0",
+};
 
-const DEFAULT_ISSUE_LINE: IssueLine = {
-  itemId: '',
-  targetId: '',
-  quantity: '1',
-  notes: '',
-}
+const DEFAULT_MOVEMENT: SingleMovementForm = {
+  itemId: "",
+  targetId: "",
+  quantity: "1",
+  notes: "",
+};
 
-const DEFAULT_REFILL_LINE: RefillLine = {
-  itemId: '',
-  quantity: '1',
-  notes: '',
-}
-
-const DEFAULT_UNIFORM_RETURN_LINE: UniformReturnLine = {
-  itemId: '',
-  targetId: '',
-  quantity: '1',
-  notes: '',
-}
+const DEFAULT_LAUNDRY: LaundryForm = {
+  itemId: "",
+  quantity: "1",
+  unitMode: "kg",
+  notes: "",
+};
 
 function getReadableError(error: unknown) {
-  if (!error) return 'Nepavyko įvykdyti veiksmo.'
-  if (error instanceof Error) return error.message
-
-  if (typeof error === 'object') {
-    const e = error as { message?: string; details?: string; hint?: string; code?: string }
-    if (e.message) return e.message
-    if (e.details) return e.details
-    if (e.hint) return e.hint
-    if (e.code) return `Klaidos kodas: ${e.code}`
+  if (!error) return "Nepavyko įvykdyti veiksmo.";
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object") {
+    const e = error as {
+      message?: string;
+      details?: string;
+      hint?: string;
+      code?: string;
+    };
+    return (
+      [e.message, e.details, e.hint, e.code].filter(Boolean).join(" · ") ||
+      "Nepavyko įvykdyti veiksmo."
+    );
   }
-
-  return 'Nepavyko įvykdyti veiksmo.'
+  return String(error);
 }
 
-function shouldShowSize(category: InventoryCategory) {
-  return category === 'diapers' || category === 'bedding' || category === 'uniforms'
+function normalizeText(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
 }
 
-function getSizeLabel(category: InventoryCategory) {
-  if (category === 'bedding') return 'Matmuo'
-  return 'Dydis'
+function categoryMeta(category?: string | null) {
+  return (
+    CATEGORIES.find((item) => item.code === category) ||
+    CATEGORIES.find((item) => item.code === "other")!
+  );
 }
 
-function getSizePlaceholder(category: InventoryCategory) {
-  if (category === 'bedding') return 'Pvz. 90x200'
-  if (category === 'uniforms') return 'Pvz. M arba 42'
-  return 'Pvz. M'
+function getCategoryTitle(category?: string | null) {
+  return categoryMeta(category).title;
+}
+
+function getSubcategoryLabel(
+  category?: string | null,
+  subcategory?: string | null,
+) {
+  if (!subcategory) return "—";
+  const options =
+    SUBCATEGORY_OPTIONS[(category || "other") as InventoryCategory] || [];
+  return (
+    options.find((item) => item.value === subcategory)?.label || subcategory
+  );
 }
 
 function getDefaultSubcategory(category: InventoryCategory) {
-  return SUBCATEGORY_OPTIONS[category]?.[0]?.value || ''
+  return SUBCATEGORY_OPTIONS[category]?.[0]?.value || "general";
 }
 
 function getDefaultSize(category: InventoryCategory) {
-  return SIZE_OPTIONS[category]?.[0] || ''
+  return SIZE_OPTIONS[category]?.[0] || "";
 }
 
-function getStockStatus(quantity: number | null, minQuantity: number | null): StockFilter {
-  const q = Number(quantity || 0)
-  if (q <= 0) return 'empty'
-  if (minQuantity !== null && minQuantity !== undefined && q <= Number(minQuantity)) return 'low'
-  return 'ok'
+function shouldShowSize(category: InventoryCategory) {
+  return (
+    category === "diapers" || category === "bedding" || category === "uniforms"
+  );
 }
 
-function getStockLabel(status: string) {
-  if (status === 'empty') return 'Pasibaigė'
-  if (status === 'low') return 'Baigiasi'
-  return 'Tvarkoje'
+function getStockStatus(
+  quantity?: number | null,
+  minQuantity?: number | null,
+): StockStatus {
+  const q = Number(quantity || 0);
+  if (q <= 0) return "empty";
+  if (
+    minQuantity !== null &&
+    minQuantity !== undefined &&
+    q <= Number(minQuantity || 0)
+  )
+    return "low";
+  return "ok";
 }
 
-function getCategoryTitle(category: string | null) {
-  return CATEGORIES.find((item) => item.code === category)?.title || 'Kita'
+function getStockLabel(status: StockStatus) {
+  if (status === "empty") return "Pasibaigė";
+  if (status === "low") return "Baigiasi";
+  return "Tvarkoje";
 }
 
-function getSubcategoryLabel(category: string | null, subcategory: string | null) {
-  if (!subcategory) return '—'
-  const options = SUBCATEGORY_OPTIONS[(category || 'other') as InventoryCategory] || []
-  return options.find((option) => option.value === subcategory)?.label || subcategory
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("lt-LT");
 }
 
-function formatDate(value: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString('lt-LT')
+function formatQuantity(
+  quantity?: number | string | null,
+  unit?: string | null,
+) {
+  const q = Number(quantity || 0);
+  return `${Number.isInteger(q) ? q : q.toFixed(2)} ${unit || "vnt."}`;
 }
 
-function formatQuantity(quantity: number | null, unit: string | null) {
-  return `${Number(quantity || 0)} ${unit || 'vnt.'}`
+function isUniformItem(item?: InventoryItem | null) {
+  if (!item) return false;
+  const text = normalizeText(
+    [item.category, item.subcategory, item.name, item.size]
+      .filter(Boolean)
+      .join(" "),
+  );
+  return (
+    item.category === "uniforms" ||
+    /uniform|chalatas|chalat|marskin|marškin|kelnes|kelnės|dzemper|džemper|svark|švark|avalyn|batai|apron|prijuost/.test(
+      text,
+    )
+  );
 }
 
-function isUniformItem(item: InventoryItem | null | undefined) {
-  return item?.category === 'uniforms'
+function isTextileItem(item?: InventoryItem | null) {
+  if (!item) return false;
+  const text = normalizeText(
+    [item.category, item.subcategory, item.name].filter(Boolean).join(" "),
+  );
+  return (
+    item.category === "bedding" ||
+    /patalyn|paklod|uzvalk|užvalk|antklod|pagalv|ranksluost|rankšluost|tekstil/.test(
+      text,
+    )
+  );
 }
 
-function isUniformReturnLog(log: InventoryLog) {
-  return log.category === 'uniforms' && log.type === 'in' && (log.resident_code || '').startsWith('Grąžino darbuotojas:')
+function isConsumableItem(item?: InventoryItem | null) {
+  if (!item) return false;
+  if (isUniformItem(item) || isTextileItem(item)) return false;
+  return true;
 }
 
-function getLogOperationLabel(log: InventoryLog) {
-  if (isUniformReturnLog(log)) return 'Grąžinimas'
-  if (log.type === 'in') return 'Papildymas'
-  if (log.type === 'out') return 'Išdavimas'
-  return 'Koregavimas'
+function isLaundryOut(log: InventoryLog) {
+  return String(log.resident_code || "")
+    .toLowerCase()
+    .includes("skalbykla: išvežta");
+}
+
+function isLaundryReturn(log: InventoryLog) {
+  return String(log.resident_code || "")
+    .toLowerCase()
+    .includes("skalbykla: grįžo");
+}
+
+function isWriteOff(log: InventoryLog) {
+  return (
+    String(log.resident_code || "")
+      .toLowerCase()
+      .includes("nurašyta") ||
+    String(log.notes || "")
+      .toLowerCase()
+      .includes("nurašyta")
+  );
+}
+
+function movementLabel(log: InventoryLog) {
+  if (isLaundryOut(log)) return "Į skalbyklą";
+  if (isLaundryReturn(log)) return "Grįžo iš skalbyklos";
+  if (isWriteOff(log)) return "Nurašymas";
+  if (log.type === "in") return "Papildymas";
+  if (log.type === "out") return "Išdavimas";
+  return "Koregavimas";
+}
+
+async function getActor() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user?.id)
+    return { userId: null as string | null, name: null as string | null };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("first_name, last_name, full_name, email")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const record = (profile || {}) as Record<string, unknown>;
+  const fullName = String(record.full_name || "").trim();
+  const firstName = String(record.first_name || "").trim();
+  const lastName = String(record.last_name || "").trim();
+  const email = String(record.email || user.email || "").trim();
+
+  return {
+    userId: user.id,
+    name:
+      fullName ||
+      [firstName, lastName].filter(Boolean).join(" ").trim() ||
+      email ||
+      null,
+  };
+}
+
+async function writeAuditLog(input: {
+  organizationId: string;
+  action: string;
+  entityId: string;
+  entityType?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  try {
+    const actor = await getActor();
+    const now = new Date().toISOString();
+    const base = {
+      organization_id: input.organizationId,
+      user_id: actor.userId,
+      changed_by: actor.userId,
+      actor: actor.userId,
+      action: input.action,
+      created_at: now,
+      changed_at: now,
+    };
+
+    const attempts = [
+      {
+        table: "audit_logs",
+        payload: {
+          ...base,
+          entity_type: input.entityType || "inventory",
+          entity_id: input.entityId,
+          module: "inventory",
+          metadata: input.metadata || {},
+        },
+      },
+      {
+        table: "audit_log",
+        payload: {
+          ...base,
+          table_name: input.entityType || "inventory_items",
+          record_id: input.entityId,
+          changes: input.metadata || {},
+        },
+      },
+    ];
+
+    for (const attempt of attempts) {
+      const { error } = await supabase
+        .from(attempt.table)
+        .insert(attempt.payload as any);
+      if (!error) return;
+    }
+  } catch {
+    // Auditas neturi nulaužti pagrindinio veiksmo.
+  }
 }
 
 export default function InventoryPage() {
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
-  const [organizationId, setOrganizationId] = useState<string | null>(null)
+  const [tab, setTab] = useState<TabKey>("overview");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
 
-  const [items, setItems] = useState<InventoryItem[]>([])
-  const [logs, setLogs] = useState<InventoryLog[]>([])
-  const [residents, setResidents] = useState<PersonOption[]>([])
-  const [employees, setEmployees] = useState<PersonOption[]>([])
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [logs, setLogs] = useState<InventoryLog[]>([]);
+  const [residents, setResidents] = useState<PersonOption[]>([]);
+  const [employees, setEmployees] = useState<PersonOption[]>([]);
 
-  const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [stockFilter, setStockFilter] = useState<StockFilter>('')
-  const [logTypeFilter, setLogTypeFilter] = useState<LogTypeFilter>('')
-  const [residentHistoryFilter, setResidentHistoryFilter] = useState('')
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [stockFilter, setStockFilter] = useState<"" | StockStatus>("");
 
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showIssueModal, setShowIssueModal] = useState(false)
-  const [showUniformIssueModal, setShowUniformIssueModal] = useState(false)
-  const [showRefillModal, setShowRefillModal] = useState(false)
-  const [showUniformReturnModal, setShowUniformReturnModal] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showRefillModal, setShowRefillModal] = useState(false);
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showUniformModal, setShowUniformModal] = useState(false);
+  const [showLaundryOutModal, setShowLaundryOutModal] = useState(false);
+  const [showLaundryReturnModal, setShowLaundryReturnModal] = useState(false);
+  const [showWriteOffModal, setShowWriteOffModal] = useState(false);
 
-  const [addForms, setAddForms] = useState<AddForm[]>([DEFAULT_ADD_FORM])
-  const [issueLines, setIssueLines] = useState<IssueLine[]>([DEFAULT_ISSUE_LINE])
-  const [refillLines, setRefillLines] = useState<RefillLine[]>([DEFAULT_REFILL_LINE])
-  const [uniformReturnLines, setUniformReturnLines] = useState<UniformReturnLine[]>([DEFAULT_UNIFORM_RETURN_LINE])
+  const [addForms, setAddForms] = useState<AddForm[]>([DEFAULT_ADD_FORM]);
+  const [movementForm, setMovementForm] =
+    useState<SingleMovementForm>(DEFAULT_MOVEMENT);
+  const [laundryForm, setLaundryForm] = useState<LaundryForm>(DEFAULT_LAUNDRY);
 
   useEffect(() => {
-    void loadInventory()
-  }, [])
+    void loadInventory();
+  }, []);
 
   async function loadInventory(options: { clearMessage?: boolean } = {}) {
     try {
-      const { clearMessage = true } = options
-      setLoading(true)
-      if (clearMessage) setMessage('')
+      setLoading(true);
+      if (options.clearMessage !== false) setMessage("");
 
-      const orgId = await getCurrentOrganizationId()
-
+      const orgId = await getCurrentOrganizationId();
       if (!orgId) {
-        setOrganizationId(null)
-        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
-        setItems([])
-        setLogs([])
-        setResidents([])
-        setEmployees([])
-        return
+        setOrganizationId(null);
+        setMessage("Nepavyko nustatyti aktyvios įstaigos.");
+        return;
       }
+      setOrganizationId(orgId);
 
-      setOrganizationId(orgId)
+      const [itemsResult, logsResult, residentsResult, membersResult] =
+        await Promise.all([
+          supabase
+            .from("inventory_items")
+            .select(
+              "id, organization_id, name, unit, quantity, category, subcategory, size, min_quantity, is_active, created_at, updated_at",
+            )
+            .eq("organization_id", orgId)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("inventory_issue_history_view")
+            .select(
+              "id, organization_id, item_id, item_name, category, subcategory, size, unit, resident_id, resident_code, employee_user_id, employee_full_name, quantity, type, notes, created_at",
+            )
+            .eq("organization_id", orgId)
+            .order("created_at", { ascending: false })
+            .limit(300),
+          supabase
+            .from("residents")
+            .select("id, first_name, last_name, full_name, resident_code")
+            .eq("organization_id", orgId)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("organization_members")
+            .select("user_id, is_active")
+            .eq("organization_id", orgId),
+        ]);
 
-      const [itemsResult, logsResult, residentsResult, membersResult] = await Promise.all([
-        supabase
-          .from('inventory_items')
-          .select(
-            'id, organization_id, name, unit, quantity, category, subcategory, size, min_quantity, is_active, created_at, updated_at'
-          )
-          .eq('organization_id', orgId)
-          .order('created_at', { ascending: false }),
+      if (itemsResult.error) throw itemsResult.error;
+      if (logsResult.error) throw logsResult.error;
+      if (residentsResult.error) throw residentsResult.error;
+      if (membersResult.error) throw membersResult.error;
 
-        supabase
-          .from('inventory_issue_history_view')
-          .select(
-            'id, organization_id, item_id, item_name, category, subcategory, size, unit, resident_id, resident_code, employee_user_id, employee_full_name, quantity, type, notes, created_at'
-          )
-          .eq('organization_id', orgId)
-          .order('created_at', { ascending: false })
-          .limit(200),
+      const itemRows = ((itemsResult.data || []) as InventoryItem[]).map(
+        (item) => {
+          if (isUniformItem(item) && item.category !== "uniforms")
+            return { ...item, category: "uniforms" };
+          if (isTextileItem(item) && item.category !== "bedding")
+            return { ...item, category: "bedding" };
+          return item;
+        },
+      );
 
-        supabase
-          .from('residents')
-          .select('id, first_name, last_name, full_name')
-          .eq('organization_id', orgId)
-          .order('created_at', { ascending: false }),
-
-        supabase
-          .from('organization_members')
-          .select('user_id, is_active')
-          .eq('organization_id', orgId),
-      ])
-
-      if (itemsResult.error) throw itemsResult.error
-      if (logsResult.error) throw logsResult.error
-      if (residentsResult.error) throw residentsResult.error
-      if (membersResult.error) throw membersResult.error
-
-      setItems((itemsResult.data || []) as InventoryItem[])
-      setLogs((logsResult.data || []) as InventoryLog[])
-
+      setItems(itemRows);
+      setLogs((logsResult.data || []) as InventoryLog[]);
       setResidents(
-        ((residentsResult.data || []) as Record<string, unknown>[]).map((resident) => {
-          const firstName = String(resident.first_name || '').trim()
-          const lastName = String(resident.last_name || '').trim()
-          const fullName = String(resident.full_name || '').trim()
-
-          return {
-            id: String(resident.id),
-            label: fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || String(resident.id),
-          }
-        })
-      )
-
-      const memberUserIds = ((membersResult.data || []) as Record<string, unknown>[])
-        .map((member) => String(member.user_id || '').trim())
-        .filter(Boolean)
-      const memberActivityByUserId = new Map(
-        ((membersResult.data || []) as Record<string, unknown>[]).map((member) => [
-          String(member.user_id || '').trim(),
-          member.is_active !== false,
-        ])
-      )
-
-      if (memberUserIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, email, first_name, last_name, full_name')
-          .in('id', memberUserIds)
-
-        if (profilesError) throw profilesError
-
-        setEmployees(
-          ((profilesData || []) as Record<string, unknown>[]).map((profile) => {
-            const firstName = String(profile.first_name || '').trim()
-            const lastName = String(profile.last_name || '').trim()
-            const fullName = String(profile.full_name || '').trim()
-            const email = String(profile.email || '').trim()
-
+        ((residentsResult.data || []) as Record<string, unknown>[]).map(
+          (resident) => {
+            const full = String(resident.full_name || "").trim();
+            const first = String(resident.first_name || "").trim();
+            const last = String(resident.last_name || "").trim();
+            const code = String(resident.resident_code || "").trim();
             return {
-              id: String(profile.id),
-              label: `${fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || email || String(profile.id)}${memberActivityByUserId.get(String(profile.id)) === false ? ' (neaktyvus)' : ''}`,
-              isActive: memberActivityByUserId.get(String(profile.id)) !== false,
-            }
-          })
-        )
-      } else {
-        setEmployees([])
+              id: String(resident.id),
+              label: [
+                full ||
+                  [first, last].filter(Boolean).join(" ").trim() ||
+                  String(resident.id),
+                code ? `(${code})` : "",
+              ]
+                .filter(Boolean)
+                .join(" "),
+            };
+          },
+        ),
+      );
+
+      const memberRows = (membersResult.data || []) as Record<
+        string,
+        unknown
+      >[];
+      const userIds = memberRows
+        .map((member) => String(member.user_id || "").trim())
+        .filter(Boolean);
+      const activeMap = new Map(
+        memberRows.map((member) => [
+          String(member.user_id || "").trim(),
+          member.is_active !== false,
+        ]),
+      );
+
+      if (!userIds.length) {
+        setEmployees([]);
+        return;
       }
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, email, first_name, last_name, full_name")
+        .in("id", userIds);
+
+      if (profilesError) throw profilesError;
+
+      setEmployees(
+        ((profilesData || []) as Record<string, unknown>[]).map((profile) => {
+          const first = String(profile.first_name || "").trim();
+          const last = String(profile.last_name || "").trim();
+          const full = String(profile.full_name || "").trim();
+          const email = String(profile.email || "").trim();
+          const id = String(profile.id);
+          const active = activeMap.get(id) !== false;
+          return {
+            id,
+            label: `${full || [first, last].filter(Boolean).join(" ").trim() || email || id}${active ? "" : " (neaktyvus)"}`,
+            isActive: active,
+          };
+        }),
+      );
     } catch (error) {
-      setMessage(getReadableError(error))
-      setItems([])
-      setLogs([])
-      setResidents([])
-      setEmployees([])
+      setMessage(getReadableError(error));
+      setItems([]);
+      setLogs([]);
+      setResidents([]);
+      setEmployees([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  function openAddModal(category?: InventoryCategory) {
-    const selectedCategory = category || 'diapers'
+  function openAddModal(category: InventoryCategory = "diapers") {
     setAddForms([
       {
         ...DEFAULT_ADD_FORM,
-        category: selectedCategory,
-        subcategory: getDefaultSubcategory(selectedCategory),
-        size: getDefaultSize(selectedCategory),
+        category,
+        subcategory: getDefaultSubcategory(category),
+        size: getDefaultSize(category),
+        unit: category === "bedding" ? "vnt." : "vnt.",
       },
-    ])
-    setShowAddModal(true)
-    setMessage('')
+    ]);
+    setShowAddModal(true);
   }
 
-  function openIssueModal(itemId?: string) {
-    setIssueLines([{ ...DEFAULT_ISSUE_LINE, itemId: itemId || '' }])
-    setShowIssueModal(true)
-    setMessage('')
-  }
-
-  function openUniformIssueModal(itemId?: string) {
-    setIssueLines([{ ...DEFAULT_ISSUE_LINE, itemId: itemId || '' }])
-    setShowUniformIssueModal(true)
-    setMessage('')
-  }
-
-  function openRefillModal(itemId?: string) {
-    setRefillLines([{ ...DEFAULT_REFILL_LINE, itemId: itemId || '' }])
-    setShowRefillModal(true)
-    setMessage('')
-  }
-
-  function openUniformReturnModal(itemId?: string) {
-    setUniformReturnLines([{ ...DEFAULT_UNIFORM_RETURN_LINE, itemId: itemId || '' }])
-    setShowUniformReturnModal(true)
-    setMessage('')
+  function openMovementModal(
+    kind:
+      | "refill"
+      | "issue"
+      | "assign"
+      | "uniform"
+      | "laundryOut"
+      | "laundryReturn"
+      | "writeOff",
+    itemId = "",
+  ) {
+    setMovementForm({ ...DEFAULT_MOVEMENT, itemId });
+    setLaundryForm({ ...DEFAULT_LAUNDRY, itemId });
+    setMessage("");
+    if (kind === "refill") setShowRefillModal(true);
+    if (kind === "issue") setShowIssueModal(true);
+    if (kind === "assign") setShowAssignModal(true);
+    if (kind === "uniform") setShowUniformModal(true);
+    if (kind === "laundryOut") setShowLaundryOutModal(true);
+    if (kind === "laundryReturn") setShowLaundryReturnModal(true);
+    if (kind === "writeOff") setShowWriteOffModal(true);
   }
 
   function updateAddForm(index: number, patch: Partial<AddForm>) {
-    setAddForms((prev) =>
-      prev.map((form, currentIndex) => {
-        if (currentIndex !== index) return form
-
+    setAddForms((previous) =>
+      previous.map((form, currentIndex) => {
+        if (currentIndex !== index) return form;
         if (patch.category) {
           return {
             ...form,
             ...patch,
             subcategory: getDefaultSubcategory(patch.category),
             size: getDefaultSize(patch.category),
-          }
+            unit: form.unit || "vnt.",
+          };
         }
-
-        return { ...form, ...patch }
-      })
-    )
-  }
-
-  function updateIssueLine(index: number, patch: Partial<IssueLine>) {
-    setIssueLines((prev) =>
-      prev.map((line, currentIndex) => (currentIndex === index ? { ...line, ...patch } : line))
-    )
-  }
-
-  function updateRefillLine(index: number, patch: Partial<RefillLine>) {
-    setRefillLines((prev) =>
-      prev.map((line, currentIndex) => (currentIndex === index ? { ...line, ...patch } : line))
-    )
-  }
-
-  function updateUniformReturnLine(index: number, patch: Partial<UniformReturnLine>) {
-    setUniformReturnLines((prev) =>
-      prev.map((line, currentIndex) => (currentIndex === index ? { ...line, ...patch } : line))
-    )
-  }
-
-  async function getActorName() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user?.id) return { userId: null, name: null }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('first_name, last_name, full_name, email')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    const profileRecord = (profile || {}) as Record<string, unknown>
-    const fullName = String(profileRecord.full_name || '').trim()
-    const firstName = String(profileRecord.first_name || '').trim()
-    const lastName = String(profileRecord.last_name || '').trim()
-    const email = String(profileRecord.email || user.email || '').trim()
-
-    return {
-      userId: user.id,
-      name: fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || email || null,
-    }
+        return { ...form, ...patch };
+      }),
+    );
   }
 
   async function createItems() {
     try {
-      const activeOrganizationId = organizationId || (await getCurrentOrganizationId())
-
-      if (!activeOrganizationId) {
-        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
-        return
+      const orgId = organizationId || (await getCurrentOrganizationId());
+      if (!orgId) {
+        setMessage("Nepavyko nustatyti aktyvios įstaigos.");
+        return;
       }
 
-      if (!organizationId) setOrganizationId(activeOrganizationId)
-
       const rows = addForms.map((form) => {
-        const cleanName = form.name.trim()
-        const cleanUnit = form.unit.trim() || 'vnt.'
-        const cleanSubcategory = form.subcategory.trim()
-        const cleanSize = shouldShowSize(form.category) ? form.size.trim() : ''
-        const quantity = Number(form.quantity || 0)
-        const minQuantity = Number(form.minQuantity || 0)
-
-        if (!cleanName) throw new Error('Visų prekių pavadinimai yra privalomi.')
-        if (Number.isNaN(quantity) || quantity < 0) throw new Error('Kiekis turi būti teigiamas skaičius.')
-        if (Number.isNaN(minQuantity) || minQuantity < 0) {
-          throw new Error('Minimalus kiekis turi būti teigiamas skaičius.')
-        }
-
+        const name = form.name.trim();
+        const quantity = Number(form.quantity || 0);
+        const minQuantity = Number(form.minQuantity || 0);
+        if (!name) throw new Error("Įrašyk prekės pavadinimą.");
+        if (!Number.isFinite(quantity) || quantity < 0)
+          throw new Error("Kiekis turi būti 0 arba didesnis.");
+        if (!Number.isFinite(minQuantity) || minQuantity < 0)
+          throw new Error("Minimalus kiekis turi būti 0 arba didesnis.");
         return {
-          organization_id: activeOrganizationId,
-          name: cleanName,
+          organization_id: orgId,
+          name,
           category: form.category,
-          subcategory: cleanSubcategory || null,
-          size: cleanSize || null,
-          unit: cleanUnit,
+          subcategory: form.subcategory || null,
+          size: shouldShowSize(form.category) ? form.size || null : null,
+          unit: form.unit.trim() || "vnt.",
           quantity,
           min_quantity: minQuantity,
           is_active: true,
-        }
-      })
+        };
+      });
 
-      setSaving(true)
-      setMessage('')
+      setSaving(true);
+      const { data, error } = await supabase
+        .from("inventory_items")
+        .insert(rows)
+        .select("id");
+      if (error) throw error;
 
-      const { error } = await supabase.from('inventory_items').insert(rows)
-      if (error) throw error
+      await writeAuditLog({
+        organizationId: orgId,
+        action:
+          rows.length === 1
+            ? "inventory.item_created"
+            : "inventory.items_created",
+        entityType: "inventory_items",
+        entityId: data?.[0]?.id || "inventory_items",
+        metadata: {
+          Prekės: rows.map((row) => row.name).join(", "),
+          Kiekis: rows.length,
+        },
+      });
 
-      setShowAddModal(false)
-      setAddForms([DEFAULT_ADD_FORM])
-      setMessage(rows.length === 1 ? 'Prekė sėkmingai pridėta.' : 'Prekės sėkmingai pridėtos.')
-      await loadInventory({ clearMessage: false })
+      setShowAddModal(false);
+      setAddForms([DEFAULT_ADD_FORM]);
+      setMessage(rows.length === 1 ? "Prekė pridėta." : "Prekės pridėtos.");
+      await loadInventory({ clearMessage: false });
     } catch (error) {
-      setMessage(getReadableError(error))
+      setMessage(getReadableError(error));
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
-  async function issueItems() {
+  async function updateItemQuantityAndLog(input: {
+    mode: "increase" | "decrease" | "nochange";
+    item: InventoryItem;
+    quantity: number;
+    type: MovementType;
+    targetId?: string | null;
+    targetLabel?: string | null;
+    notes?: string | null;
+    action: string;
+    auditLabel: string;
+  }) {
+    if (!organizationId) throw new Error("Nepavyko nustatyti įstaigos.");
+
+    const currentQuantity = Number(input.item.quantity || 0);
+    const nextQuantity =
+      input.mode === "increase"
+        ? currentQuantity + input.quantity
+        : input.mode === "decrease"
+          ? currentQuantity - input.quantity
+          : currentQuantity;
+
+    if (input.mode === "decrease" && input.quantity > currentQuantity) {
+      throw new Error(
+        `Prekei „${input.item.name}“ sandėlyje yra tik ${formatQuantity(currentQuantity, input.item.unit)}.`,
+      );
+    }
+
+    const actor = await getActor();
+
+    if (input.mode !== "nochange") {
+      const { error } = await supabase
+        .from("inventory_items")
+        .update({
+          quantity: nextQuantity,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.item.id);
+      if (error) throw error;
+    }
+
+    const { error: historyError } = await supabase
+      .from("inventory_issue_history")
+      .insert({
+        organization_id: organizationId,
+        item_id: input.item.id,
+        item_name: input.item.name,
+        category: input.item.category,
+        subcategory: input.item.subcategory,
+        size: input.item.size,
+        unit: input.item.unit,
+        resident_id: input.targetId || null,
+        resident_code: input.targetLabel || null,
+        employee_user_id: actor.userId,
+        employee_full_name: actor.name,
+        quantity: input.quantity,
+        type: input.type,
+        notes: input.notes || null,
+      });
+    if (historyError) throw historyError;
+
+    await writeAuditLog({
+      organizationId,
+      action: input.action,
+      entityType: "inventory_items",
+      entityId: input.item.id,
+      metadata: {
+        Veiksmas: input.auditLabel,
+        Prekė: input.item.name,
+        Kiekis: formatQuantity(input.quantity, input.item.unit),
+        Gavėjas: input.targetLabel || null,
+        "Likutis prieš": formatQuantity(currentQuantity, input.item.unit),
+        "Likutis po": formatQuantity(nextQuantity, input.item.unit),
+        Pastabos: input.notes || null,
+      },
+    });
+  }
+
+  async function submitSingleMovement(
+    kind: "refill" | "issue" | "assign" | "uniform" | "writeOff",
+  ) {
     try {
-      if (!organizationId) {
-        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
-        return
-      }
+      if (!organizationId) return;
+      const item = items.find((current) => current.id === movementForm.itemId);
+      const quantity = Number(movementForm.quantity || 0);
+      if (!item) throw new Error("Pasirink prekę.");
+      if (!Number.isFinite(quantity) || quantity <= 0)
+        throw new Error("Kiekis turi būti didesnis nei 0.");
 
-      const uniformIssue = showUniformIssueModal
-      const actor = await getActorName()
-      const updates: Array<{ item: InventoryItem; newQuantity: number }> = []
-      const historyRows: Array<Record<string, unknown>> = []
+      setSaving(true);
+      setMessage("");
 
-      for (const line of issueLines) {
-        const item = items.find((currentItem) => currentItem.id === line.itemId)
-        const quantity = Number(line.quantity || 0)
-
-        if (!item) throw new Error('Kiekvienoje eilutėje pasirink prekę.')
-        if (uniformIssue && !isUniformItem(item)) throw new Error('Uniformų išdavime galima rinktis tik uniformas.')
-        if (!uniformIssue && isUniformItem(item)) throw new Error('Uniformoms naudok atskirą mygtuką „Išduoti uniformą“.')
-        if (Number.isNaN(quantity) || quantity <= 0) throw new Error('Išduodamas kiekis turi būti didesnis už 0.')
-
-        const currentQuantity = Number(item.quantity || 0)
-        if (quantity > currentQuantity) {
-          throw new Error(`Prekei "${item.name}" sandėlyje yra tik ${formatQuantity(currentQuantity, item.unit)}.`)
-        }
-
-        const targetOptions = isUniformItem(item) ? employees : residents
-        const target = targetOptions.find((option) => option.id === line.targetId)
-
-        if (!target) {
-          throw new Error(isUniformItem(item) ? 'Uniformoms pasirink darbuotoją.' : 'Pasirink gyventoją.')
-        }
-
-        updates.push({
+      if (kind === "refill") {
+        await updateItemQuantityAndLog({
+          mode: "increase",
           item,
-          newQuantity: currentQuantity - quantity,
-        })
-
-        historyRows.push({
-          organization_id: organizationId,
-          item_id: item.id,
-          item_name: item.name,
-          category: item.category,
-          subcategory: item.subcategory,
-          size: item.size,
-          unit: item.unit,
-          resident_id: isUniformItem(item) ? null : target.id,
-          resident_code: isUniformItem(item) ? `Darbuotojas: ${target.label}` : target.label,
-          employee_user_id: actor.userId,
-          employee_full_name: actor.name,
           quantity,
-          type: 'out',
-          notes: line.notes.trim() || null,
-        })
+          type: "in",
+          notes: movementForm.notes.trim() || null,
+          action: "inventory.refilled",
+          auditLabel: "Papildytas sandėlis",
+        });
+        setShowRefillModal(false);
+        setMessage("Sandėlis papildytas.");
       }
 
-      setSaving(true)
-      setMessage('')
-
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('inventory_items')
-          .update({
-            quantity: update.newQuantity,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', update.item.id)
-
-        if (error) throw error
+      if (kind === "issue") {
+        const resident = residents.find(
+          (row) => row.id === movementForm.targetId,
+        );
+        if (!resident) throw new Error("Pasirink gyventoją.");
+        if (!isConsumableItem(item))
+          throw new Error(
+            "Šiam veiksmui rinkis sunaudojamas prekes. Tekstilei naudok „Priskirti naudojimui“, uniformoms – „Išduoti darbuotojui“.",
+          );
+        await updateItemQuantityAndLog({
+          mode: "decrease",
+          item,
+          quantity,
+          type: "out",
+          targetId: resident.id,
+          targetLabel: resident.label,
+          notes: movementForm.notes.trim() || null,
+          action: "inventory.consumable_issued",
+          auditLabel: "Išduotos sunaudojamos prekės",
+        });
+        setShowIssueModal(false);
+        setMessage("Prekės išduotos gyventojui.");
       }
 
-      const { error: historyError } = await supabase.from('inventory_issue_history').insert(historyRows)
-      if (historyError) throw historyError
+      if (kind === "assign") {
+        const resident = residents.find(
+          (row) => row.id === movementForm.targetId,
+        );
+        if (!resident) throw new Error("Pasirink gyventoją / kambarį.");
+        if (!isTextileItem(item))
+          throw new Error(
+            "Priskyrimui naudok tekstilę / patalynę. Sunaudojamoms prekėms naudok išdavimą.",
+          );
+        await updateItemQuantityAndLog({
+          mode: "decrease",
+          item,
+          quantity,
+          type: "out",
+          targetId: resident.id,
+          targetLabel: `Naudojama: ${resident.label}`,
+          notes: movementForm.notes.trim() || "Priskirta naudojimui",
+          action: "inventory.asset_assigned",
+          auditLabel: "Priskirta naudojimui",
+        });
+        setShowAssignModal(false);
+        setMessage("Tekstilė priskirta naudojimui.");
+      }
 
-      setShowIssueModal(false)
-      setShowUniformIssueModal(false)
-      setIssueLines([DEFAULT_ISSUE_LINE])
-      setMessage('Prekės sėkmingai išduotos.')
-      await loadInventory({ clearMessage: false })
+      if (kind === "uniform") {
+        const employee = employees.find(
+          (row) => row.id === movementForm.targetId,
+        );
+        if (!employee) throw new Error("Pasirink darbuotoją.");
+        if (!isUniformItem(item))
+          throw new Error("Uniformų išdavime galima rinktis tik uniformas.");
+        await updateItemQuantityAndLog({
+          mode: "decrease",
+          item,
+          quantity,
+          type: "out",
+          targetId: null,
+          targetLabel: `Darbuotojas: ${employee.label}`,
+          notes: movementForm.notes.trim() || "Uniforma išduota darbuotojui",
+          action: "inventory.uniform_issued",
+          auditLabel: "Išduota uniforma darbuotojui",
+        });
+        setShowUniformModal(false);
+        setMessage("Uniforma išduota darbuotojui.");
+      }
+
+      if (kind === "writeOff") {
+        await updateItemQuantityAndLog({
+          mode: "decrease",
+          item,
+          quantity,
+          type: "adjustment",
+          targetId: null,
+          targetLabel: "Nurašyta / išmesta",
+          notes: movementForm.notes.trim() || "Nurašyta / išmesta",
+          action: "inventory.written_off",
+          auditLabel: "Nurašyta / išmesta",
+        });
+        setShowWriteOffModal(false);
+        setMessage("Prekė nurašyta.");
+      }
+
+      setMovementForm(DEFAULT_MOVEMENT);
+      await loadInventory({ clearMessage: false });
     } catch (error) {
-      setMessage(getReadableError(error))
+      setMessage(getReadableError(error));
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
-  async function refillItems() {
+  async function submitLaundry(kind: "out" | "return") {
     try {
-      if (!organizationId) {
-        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
-        return
-      }
+      if (!organizationId) return;
+      const item = items.find((current) => current.id === laundryForm.itemId);
+      const quantity = Number(laundryForm.quantity || 0);
+      if (!item) throw new Error("Pasirink tekstilę / uniformą.");
+      if (!Number.isFinite(quantity) || quantity <= 0)
+        throw new Error("Kiekis turi būti didesnis nei 0.");
+      if (!isTextileItem(item) && !isUniformItem(item))
+        throw new Error("Į skalbyklą siųsk tik tekstilę arba uniformas.");
 
-      const actor = await getActorName()
-      const updates: Array<{ item: InventoryItem; newQuantity: number }> = []
-      const historyRows: Array<Record<string, unknown>> = []
+      setSaving(true);
+      setMessage("");
 
-      for (const line of refillLines) {
-        const item = items.find((currentItem) => currentItem.id === line.itemId)
-        const quantity = Number(line.quantity || 0)
+      const unit = laundryForm.unitMode || item.unit || "kg";
+      const itemWithUnit = { ...item, unit };
 
-        if (!item) throw new Error('Kiekvienoje eilutėje pasirink prekę.')
-        if (Number.isNaN(quantity) || quantity <= 0) throw new Error('Papildomas kiekis turi būti didesnis už 0.')
+      await updateItemQuantityAndLog({
+        mode: kind === "out" ? "decrease" : "increase",
+        item: itemWithUnit,
+        quantity,
+        type: kind === "out" ? "adjustment" : "in",
+        targetId: null,
+        targetLabel: kind === "out" ? "Skalbykla: išvežta" : "Skalbykla: grįžo",
+        notes:
+          laundryForm.notes.trim() ||
+          (kind === "out" ? "Išvežta į skalbyklą" : "Grįžo iš skalbyklos"),
+        action:
+          kind === "out"
+            ? "inventory.laundry_sent"
+            : "inventory.laundry_returned",
+        auditLabel:
+          kind === "out" ? "Išvežta į skalbyklą" : "Grįžo iš skalbyklos",
+      });
 
-        const currentQuantity = Number(item.quantity || 0)
-
-        updates.push({
-          item,
-          newQuantity: currentQuantity + quantity,
-        })
-
-        historyRows.push({
-          organization_id: organizationId,
-          item_id: item.id,
-          item_name: item.name,
-          category: item.category,
-          subcategory: item.subcategory,
-          size: item.size,
-          unit: item.unit,
-          resident_id: null,
-          resident_code: null,
-          employee_user_id: actor.userId,
-          employee_full_name: actor.name,
-          quantity,
-          type: 'in',
-          notes: line.notes.trim() || null,
-        })
-      }
-
-      setSaving(true)
-      setMessage('')
-
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('inventory_items')
-          .update({
-            quantity: update.newQuantity,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', update.item.id)
-
-        if (error) throw error
-      }
-
-      const { error: historyError } = await supabase.from('inventory_issue_history').insert(historyRows)
-      if (historyError) throw historyError
-
-      setShowRefillModal(false)
-      setRefillLines([DEFAULT_REFILL_LINE])
-      setMessage('Sandėlis sėkmingai papildytas.')
-      await loadInventory({ clearMessage: false })
+      setShowLaundryOutModal(false);
+      setShowLaundryReturnModal(false);
+      setLaundryForm(DEFAULT_LAUNDRY);
+      setMessage(
+        kind === "out"
+          ? "Užregistruota, kad tekstilė išvežta į skalbyklą."
+          : "Užregistruotas grįžimas iš skalbyklos.",
+      );
+      await loadInventory({ clearMessage: false });
     } catch (error) {
-      setMessage(getReadableError(error))
+      setMessage(getReadableError(error));
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
-  async function returnUniforms() {
-    try {
-      if (!organizationId) {
-        setMessage('Nepavyko nustatyti aktyvios įstaigos.')
-        return
-      }
-
-      const actor = await getActorName()
-      const updates: Array<{ item: InventoryItem; newQuantity: number }> = []
-      const historyRows: Array<Record<string, unknown>> = []
-
-      for (const line of uniformReturnLines) {
-        const item = items.find((currentItem) => currentItem.id === line.itemId)
-        const quantity = Number(line.quantity || 0)
-        const employee = employees.find((option) => option.id === line.targetId)
-
-        if (!item) throw new Error('Kiekvienoje eilutėje pasirink uniformą.')
-        if (!isUniformItem(item)) throw new Error('Grąžinimui galima rinktis tik uniformas.')
-        if (!employee) throw new Error('Pasirink darbuotoją, kuris grąžino uniformą.')
-        if (Number.isNaN(quantity) || quantity <= 0) throw new Error('Grąžinamas kiekis turi būti didesnis už 0.')
-
-        const currentQuantity = Number(item.quantity || 0)
-        updates.push({
-          item,
-          newQuantity: currentQuantity + quantity,
-        })
-
-        historyRows.push({
-          organization_id: organizationId,
-          item_id: item.id,
-          item_name: item.name,
-          category: item.category,
-          subcategory: item.subcategory,
-          size: item.size,
-          unit: item.unit,
-          resident_id: null,
-          resident_code: `Grąžino darbuotojas: ${employee.label}`,
-          employee_user_id: actor.userId,
-          employee_full_name: actor.name,
-          quantity,
-          type: 'in',
-          notes: line.notes.trim() || 'Uniforma grąžinta darbuotojui išėjus iš darbo / pasibaigus naudojimui.',
-        })
-      }
-
-      setSaving(true)
-      setMessage('')
-
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('inventory_items')
-          .update({
-            quantity: update.newQuantity,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', update.item.id)
-
-        if (error) throw error
-      }
-
-      const { error: historyError } = await supabase.from('inventory_issue_history').insert(historyRows)
-      if (historyError) throw historyError
-
-      setShowUniformReturnModal(false)
-      setUniformReturnLines([DEFAULT_UNIFORM_RETURN_LINE])
-      setMessage('Uniformos sėkmingai grąžintos į sandėlį.')
-      await loadInventory({ clearMessage: false })
-    } catch (error) {
-      setMessage(getReadableError(error))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const filteredCategories = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return CATEGORIES
-
-    return CATEGORIES.filter((category) =>
-      [category.title, category.description, category.code].join(' ').toLowerCase().includes(q)
-    )
-  }, [search])
+  const q = search.trim().toLowerCase();
 
   const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase()
-
     return items.filter((item) => {
       const matchesSearch = q
         ? [
-            item.name || '',
+            item.name,
             getCategoryTitle(item.category),
             getSubcategoryLabel(item.category, item.subcategory),
-            item.size || '',
-            item.unit || '',
+            item.size,
+            item.unit,
           ]
-            .join(' ')
+            .join(" ")
             .toLowerCase()
             .includes(q)
-        : true
+        : true;
+      const matchesCategory = categoryFilter
+        ? item.category === categoryFilter
+        : true;
+      const matchesStock = stockFilter
+        ? getStockStatus(item.quantity, item.min_quantity) === stockFilter
+        : true;
+      return matchesSearch && matchesCategory && matchesStock;
+    });
+  }, [items, q, categoryFilter, stockFilter]);
 
-      const matchesCategory = categoryFilter ? item.category === categoryFilter : true
-      const matchesStock = stockFilter ? getStockStatus(item.quantity, item.min_quantity) === stockFilter : true
-
-      return matchesSearch && matchesCategory && matchesStock
-    })
-  }, [items, search, categoryFilter, stockFilter])
+  const consumableItems = useMemo(
+    () => filteredItems.filter(isConsumableItem),
+    [filteredItems],
+  );
+  const textileItems = useMemo(
+    () => filteredItems.filter(isTextileItem),
+    [filteredItems],
+  );
+  const uniformItems = useMemo(
+    () => filteredItems.filter(isUniformItem),
+    [filteredItems],
+  );
+  const laundryItems = useMemo(
+    () => items.filter((item) => isTextileItem(item) || isUniformItem(item)),
+    [items],
+  );
 
   const filteredLogs = useMemo(() => {
-    const q = search.trim().toLowerCase()
-
     return logs.filter((log) => {
-      const matchesSearch = q
-        ? [
-            log.item_name || '',
-            getCategoryTitle(log.category),
-            getSubcategoryLabel(log.category, log.subcategory),
-            log.size || '',
-            log.resident_code || '',
-            log.employee_full_name || '',
-            log.notes || '',
-          ]
-            .join(' ')
-            .toLowerCase()
-            .includes(q)
-        : true
+      if (!q) return true;
+      return [
+        log.item_name,
+        getCategoryTitle(log.category),
+        getSubcategoryLabel(log.category, log.subcategory),
+        log.size,
+        log.resident_code,
+        log.employee_full_name,
+        log.notes,
+        movementLabel(log),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [logs, q]);
 
-      const matchesCategory = categoryFilter ? log.category === categoryFilter : true
-      const matchesType = logTypeFilter ? log.type === logTypeFilter : true
-      const matchesResident = residentHistoryFilter ? log.resident_id === residentHistoryFilter : true
-
-      return matchesSearch && matchesCategory && matchesType && matchesResident
-    })
-  }, [logs, search, categoryFilter, logTypeFilter, residentHistoryFilter])
+  const laundryLogs = useMemo(
+    () =>
+      filteredLogs.filter((log) => isLaundryOut(log) || isLaundryReturn(log)),
+    [filteredLogs],
+  );
+  const writeOffLogs = useMemo(
+    () => filteredLogs.filter(isWriteOff),
+    [filteredLogs],
+  );
 
   const categoryStats = useMemo(() => {
     return CATEGORIES.reduce(
       (acc, category) => {
-        const categoryItems = items.filter((item) => item.category === category.code)
-        const totalQuantity = categoryItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
-        const low = categoryItems.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'low').length
-        const empty = categoryItems.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'empty').length
-
+        const rows = items.filter((item) => item.category === category.code);
         acc[category.code] = {
-          items: categoryItems.length,
-          quantity: totalQuantity,
-          low,
-          empty,
-        }
-
-        return acc
+          items: rows.length,
+          quantity: rows.reduce(
+            (sum, item) => sum + Number(item.quantity || 0),
+            0,
+          ),
+          low: rows.filter(
+            (item) =>
+              getStockStatus(item.quantity, item.min_quantity) === "low",
+          ).length,
+          empty: rows.filter(
+            (item) =>
+              getStockStatus(item.quantity, item.min_quantity) === "empty",
+          ).length,
+        };
+        return acc;
       },
-      {} as Record<InventoryCategory, { items: number; quantity: number; low: number; empty: number }>
-    )
-  }, [items])
+      {} as Record<
+        InventoryCategory,
+        { items: number; quantity: number; low: number; empty: number }
+      >,
+    );
+  }, [items]);
 
   const globalStats = useMemo(() => {
-    const totalItems = items.length
-    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
-    const low = items.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'low').length
-    const empty = items.filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'empty').length
-    const movements = logs.length
-    const out = logs.filter((log) => log.type === 'out').length
-    const incoming = logs.filter((log) => log.type === 'in').length
-
+    const totalItems = items.length;
+    const totalQuantity = items.reduce(
+      (sum, item) => sum + Number(item.quantity || 0),
+      0,
+    );
+    const low = items.filter(
+      (item) => getStockStatus(item.quantity, item.min_quantity) === "low",
+    ).length;
+    const empty = items.filter(
+      (item) => getStockStatus(item.quantity, item.min_quantity) === "empty",
+    ).length;
+    const laundryOut = laundryLogs
+      .filter(isLaundryOut)
+      .reduce((sum, log) => sum + Number(log.quantity || 0), 0);
+    const laundryReturned = laundryLogs
+      .filter(isLaundryReturn)
+      .reduce((sum, log) => sum + Number(log.quantity || 0), 0);
     return {
       totalItems,
       totalQuantity,
       low,
       empty,
-      movements,
-      out,
-      incoming,
-    }
-  }, [items, logs])
+      movements: logs.length,
+      consumables: items.filter(isConsumableItem).length,
+      textiles: items.filter(isTextileItem).length,
+      uniforms: items.filter(isUniformItem).length,
+      laundryBalance: Math.max(0, laundryOut - laundryReturned),
+      writeOffs: writeOffLogs.length,
+    };
+  }, [items, logs, laundryLogs, writeOffLogs]);
 
-  const riskRows = useMemo(() => {
-    const criticalItems = items
-      .filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'empty')
-      .slice(0, 3)
-    const lowItems = items
-      .filter((item) => getStockStatus(item.quantity, item.min_quantity) === 'low')
-      .slice(0, 3)
+  function exportHistory() {
+    const rows = filteredLogs.map((row) => ({
+      data: formatDate(row.created_at),
+      preke: row.item_name || "",
+      kategorija: getCategoryTitle(row.category),
+      tipas: getSubcategoryLabel(row.category, row.subcategory),
+      dydis: row.size || "",
+      kiekis: formatQuantity(row.quantity, row.unit),
+      operacija: movementLabel(row),
+      kam: row.resident_code || "",
+      darbuotojas: row.employee_full_name || "",
+      pastaba: row.notes || "",
+    }));
+    const headers = Object.keys(rows[0] || {}) as Array<
+      keyof (typeof rows)[number]
+    >;
+    if (!headers.length) return;
+    const csv = [
+      headers.join(","),
+      ...rows.map((row) =>
+        headers
+          .map((header) => `"${String(row[header] || "").replace(/"/g, '""')}"`)
+          .join(","),
+      ),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sandelio_judejimai.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
-    return [
-      {
-        title: 'Pasibaigusios prekės',
-        value: globalStats.empty,
-        desc: criticalItems.length
-          ? criticalItems.map((item) => item.name).join(', ')
-          : 'Kritinių likučių nėra.',
-        tone: 'danger' as const,
-      },
-      {
-        title: 'Baigiasi likučiai',
-        value: globalStats.low,
-        desc: lowItems.length ? lowItems.map((item) => item.name).join(', ') : 'Minimalūs kiekiai nepasiekti.',
-        tone: 'warning' as const,
-      },
-      {
-        title: 'Šiandienos veiksmas',
-        value: globalStats.empty + globalStats.low,
-        desc: globalStats.empty + globalStats.low > 0 ? 'Peržiūrėti rizikas ir papildyti sandėlį.' : 'Sandėlio rizikos suvaldytos.',
-        tone: globalStats.empty > 0 ? 'danger' as const : globalStats.low > 0 ? 'warning' as const : 'green' as const,
-      },
-    ]
-  }, [items, globalStats])
+  const tabs: Array<{ key: TabKey; label: string; icon: ElementType }> = [
+    { key: "overview", label: "Apžvalga", icon: ShieldCheck },
+    { key: "stock", label: "Likučiai", icon: Boxes },
+    { key: "assigned", label: "Tekstilė", icon: BedDouble },
+    { key: "uniforms", label: "Uniformos", icon: Shirt },
+    { key: "laundry", label: "Skalbykla", icon: WashingMachine },
+    { key: "movements", label: "Judėjimai", icon: RefreshCw },
+    { key: "writeoffs", label: "Nurašymai", icon: Trash2 },
+  ];
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f3f6f4] p-6 text-[#10251f]">
+        <div className="rounded-3xl border border-[#c9d8d0] bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-[#047857]" />
+          <p className="mt-4 text-lg font-black text-[#486b5d]">
+            Kraunamas sandėlis...
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main style={styles.page}>
-      <section style={styles.hero}>
-        <div style={styles.heroContent}>
-          <div style={styles.heroIcon}>
-            <Boxes size={29} strokeWidth={2.2} />
-          </div>
-
-          <div>
-            <div style={styles.eyebrow}>Sandėlių valdymas</div>
-            <h1 style={styles.title}>Sandėlis</h1>
-            <p style={styles.subtitle}>
-              Valdyk prekių likučius, stebėk judėjimą ir greitai pasiek kiekvieną kategoriją.
-            </p>
-          </div>
-        </div>
-
-        <div style={styles.heroActions}>
-          <div style={styles.actionGroup}>
-            <button type="button" onClick={() => openAddModal()} style={styles.secondaryButton}>
-              <Plus size={16} /> Pridėti prekes
-            </button>
-
-            <button type="button" onClick={() => openRefillModal()} style={styles.secondaryButton}>
-              <ArrowUpCircle size={16} /> Papildyti prekes
-            </button>
-
-            <button type="button" onClick={() => openIssueModal()} style={styles.primaryButton}>
-              <Send size={16} /> Išduoti prekes gyventojui
-            </button>
-          </div>
-
-          <div style={styles.uniformActionGroup}>
-            <button type="button" onClick={() => openUniformIssueModal()} style={styles.secondaryButton}>
-              <Shirt size={16} /> Išduoti uniformą
-            </button>
-
-            <button type="button" onClick={() => openUniformReturnModal()} style={styles.secondaryButton}>
-              <ArrowDownCircle size={16} /> Grąžinti uniformą
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {message ? <div style={styles.message}>{message}</div> : null}
-
-      <section style={styles.statsGrid}>
-        <StatCard label="Skirtingų prekių" value={globalStats.totalItems} onClick={() => setStockFilter('')} active={!stockFilter} />
-        <StatCard label="Bendras kiekis" value={globalStats.totalQuantity} onClick={() => setStockFilter('')} active={!stockFilter} />
-        <StatCard label="Baigiasi" value={globalStats.low} tone="warning" onClick={() => setStockFilter((prev) => (prev === 'low' ? '' : 'low'))} active={stockFilter === 'low'} />
-        <StatCard label="Pasibaigė" value={globalStats.empty} tone="danger" onClick={() => setStockFilter((prev) => (prev === 'empty' ? '' : 'empty'))} active={stockFilter === 'empty'} />
-        <StatCard label="Judėjimų" value={globalStats.movements} onClick={() => setLogTypeFilter('')} active={!logTypeFilter} />
-        <StatCard label="Išdavimų" value={globalStats.out} tone="green" onClick={() => setLogTypeFilter((prev) => (prev === 'out' ? '' : 'out'))} active={logTypeFilter === 'out'} />
-        <StatCard label="Papildymų" value={globalStats.incoming} onClick={() => setLogTypeFilter((prev) => (prev === 'in' ? '' : 'in'))} active={logTypeFilter === 'in'} />
-      </section>
-
-      <section style={styles.riskPanel}>
-        <div style={styles.riskHeader}>
-          <div>
-            <div style={styles.warningEyebrow}>Prioritetai</div>
-            <h2 style={styles.cardTitle}>Reikia dėmesio</h2>
-            <p style={styles.cardSubtitle}>Svarbiausi sandėlio signalai darbuotojui prieš išduodant prekes.</p>
-          </div>
-
-          <div style={styles.warningIcon}>
-            <AlertTriangle size={23} />
-          </div>
-        </div>
-
-        <div style={styles.riskGrid}>
-          {riskRows.map((row) => (
-            <button
-              key={row.title}
-              type="button"
-              onClick={() => {
-                if (row.tone === 'danger') setStockFilter((prev) => (prev === 'empty' ? '' : 'empty'))
-                if (row.tone === 'warning') setStockFilter((prev) => (prev === 'low' ? '' : 'low'))
-              }}
-              style={{ ...styles.riskCard, ...getRiskCardStyle(row.tone) }}
-            >
+    <main className="min-h-screen bg-[#f3f6f4] p-5 text-[#10251f]">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+          <div className="bg-[#486b5d] px-5 py-4 text-white">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p style={styles.riskTitle}>{row.title}</p>
-                <p style={styles.riskDesc}>{row.desc}</p>
-              </div>
-              <strong style={styles.riskValue}>{row.value}</strong>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section style={styles.toolbar}>
-        <Field label="Paieška">
-          <div style={styles.searchBox}>
-            <Search size={17} />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Prekė, kategorija, gyventojas..."
-              style={styles.searchInput}
-            />
-          </div>
-        </Field>
-
-        <Field label="Kategorija">
-          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} style={styles.input}>
-            <option value="">Visos</option>
-            {CATEGORIES.map((category) => (
-              <option key={category.code} value={category.code}>
-                {category.title}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Likutis">
-          <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value as StockFilter)} style={styles.input}>
-            <option value="">Visi</option>
-            <option value="ok">Tvarkoje</option>
-            <option value="low">Baigiasi</option>
-            <option value="empty">Pasibaigė</option>
-          </select>
-        </Field>
-
-        <Field label="Gyventojas istorijoje">
-          <select
-            value={residentHistoryFilter}
-            onChange={(event) => setResidentHistoryFilter(event.target.value)}
-            style={styles.input}
-          >
-            <option value="">Visi</option>
-            {residents.map((resident) => (
-              <option key={resident.id} value={resident.id}>
-                {resident.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Operacija istorijoje">
-          <select value={logTypeFilter} onChange={(event) => setLogTypeFilter(event.target.value as LogTypeFilter)} style={styles.input}>
-            <option value="">Visos</option>
-            <option value="out">Išdavimai</option>
-            <option value="in">Papildymai</option>
-            <option value="adjustment">Koregavimai</option>
-          </select>
-        </Field>
-
-        <button type="button" onClick={() => void loadInventory()} style={styles.refreshButton}>
-          <RefreshCw size={16} /> Atnaujinti
-        </button>
-      </section>
-
-      <section style={styles.categoryGrid}>
-        {filteredCategories.map((category) => {
-          const Icon = category.icon
-          const stats = categoryStats[category.code]
-          const status = stats.empty > 0 ? 'empty' : stats.low > 0 ? 'low' : stats.items > 0 ? 'ok' : 'none'
-          const riskCount = stats.low + stats.empty
-          const fillPercent = stats.items > 0 ? Math.max(8, Math.round(((stats.items - riskCount) / stats.items) * 100)) : 0
-
-          return (
-            <article key={category.code} style={styles.categoryCard}>
-              <div style={styles.categoryTop}>
-                <div style={styles.categoryIcon}>
-                  <Icon size={23} strokeWidth={2.2} />
-                </div>
-
-                <span style={{ ...styles.categoryStatus, ...getCategoryStatusStyle(status) }}>
-                  {status === 'none' ? 'Nėra prekių' : getStockLabel(status)}
-                </span>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
+                  Sandėlio valdymas
+                </p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight">
+                  Sandėlis, tekstilė ir uniformos
+                </h1>
+                <p className="mt-1 max-w-3xl text-sm font-semibold text-white/80">
+                  Vienas darbo langas atsargoms, sunaudojamoms prekėms,
+                  tekstilės ciklui, uniformoms, skalbyklai ir nurašymams.
+                </p>
               </div>
 
-              <div>
-                <h2 style={styles.categoryTitle}>{category.title}</h2>
-                <p style={styles.categoryDescription}>{category.description}</p>
-              </div>
-
-              <div style={styles.categoryStats}>
-                <div style={styles.categoryStatItem}>
-                  <strong style={styles.categoryStatNumber}>{stats.items}</strong>
-                  <span style={styles.categoryStatLabel}>Prekių</span>
-                </div>
-
-                <div style={styles.categoryStatItem}>
-                  <strong style={styles.categoryStatNumber}>{stats.quantity}</strong>
-                  <span style={styles.categoryStatLabel}>Kiekis</span>
-                </div>
-
-                <div style={styles.categoryStatItem}>
-                  <strong style={styles.categoryStatNumber}>{stats.low + stats.empty}</strong>
-                  <span style={styles.categoryStatLabel}>Rizika</span>
-                </div>
-              </div>
-
-              <div>
-                <div style={styles.progressMeta}>
-                  <span>Stabilumas</span>
-                  <strong>{stats.items ? `${fillPercent}%` : '—'}</strong>
-                </div>
-                <div style={styles.progressTrack}>
-                  <span style={{ ...styles.progressBar, width: `${fillPercent}%`, background: status === 'empty' ? '#e11d48' : status === 'low' ? '#f59e0b' : '#10b981' }} />
-                </div>
-              </div>
-
-              <div style={styles.categoryActions}>
-                <button type="button" onClick={() => openAddModal(category.code)} style={styles.categoryAddButton}>
-                  <Plus size={15} /> Pridėti
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void loadInventory()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] active:scale-[0.98]"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Atnaujinti
                 </button>
-
-                <Link href={category.href} style={styles.cardFooter}>
-                  Atidaryti <ArrowRight size={16} />
-                </Link>
+                <button
+                  type="button"
+                  onClick={() => openAddModal()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white/12 px-3 py-2 text-sm font-black text-white/90 ring-1 ring-white/20 transition hover:bg-white/18 active:scale-[0.98]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nauja prekė
+                </button>
               </div>
-            </article>
-          )
-        })}
-      </section>
-
-      <section style={styles.bottomGrid}>
-        <DataCard title="Likučiai" meta={`Rodoma prekių: ${filteredItems.length}`}>
-          {loading ? (
-            <EmptyState text="Kraunama..." />
-          ) : filteredItems.length === 0 ? (
-            <EmptyState text="Sandėlis dar tuščias pagal pasirinktus filtrus. Pridėkite pirmą prekę arba išvalykite filtrus." />
-          ) : (
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Prekė</th>
-                    <th style={styles.th}>Kategorija</th>
-                    <th style={styles.th}>Tipas</th>
-                    <th style={styles.th}>Dydis / matmuo</th>
-                    <th style={styles.th}>Kiekis</th>
-                    <th style={styles.th}>Min.</th>
-                    <th style={styles.th}>Būsena</th>
-                    <th style={styles.th}>Veiksmai</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredItems.map((item) => (
-                    <tr key={item.id} style={styles.tr}>
-                      <td style={styles.tdBold}>{item.name}</td>
-                      <td style={styles.td}>{getCategoryTitle(item.category)}</td>
-                      <td style={styles.td}>{getSubcategoryLabel(item.category, item.subcategory)}</td>
-                      <td style={styles.td}>{item.size || '—'}</td>
-                      <td style={styles.td}>{formatQuantity(item.quantity, item.unit)}</td>
-                      <td style={styles.td}>
-                        {item.min_quantity !== null && item.min_quantity !== undefined
-                          ? formatQuantity(item.min_quantity, item.unit)
-                          : '—'}
-                      </td>
-                      <td style={styles.td}>
-                        <span style={{ ...styles.statusBadge, ...getCategoryStatusStyle(getStockStatus(item.quantity, item.min_quantity)) }}>
-                          {getStockLabel(getStockStatus(item.quantity, item.min_quantity))}
-                        </span>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.inlineActions}>
-                          <button type="button" onClick={() => openRefillModal(item.id)} style={styles.inlineGreenButton}>
-                            Papildyti
-                          </button>
-                          {isUniformItem(item) ? (
-                            <>
-                              <button type="button" onClick={() => openUniformIssueModal(item.id)} style={styles.inlineDangerButton}>
-                                Išduoti darbuotojui
-                              </button>
-                              <button type="button" onClick={() => openUniformReturnModal(item.id)} style={styles.inlineGreenButton}>
-                                Grąžinti
-                              </button>
-                            </>
-                          ) : (
-                            <button type="button" onClick={() => openIssueModal(item.id)} style={styles.inlineDangerButton}>
-                              Išduoti gyventojui
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
-          )}
-        </DataCard>
+          </div>
 
-        <DataCard title="Paskutiniai judėjimai" meta={`Rodoma įrašų: ${filteredLogs.length}`}>
-          {loading ? (
-            <EmptyState text="Kraunama..." />
-          ) : filteredLogs.length === 0 ? (
-            <EmptyState text="Judėjimų dar nėra pagal pasirinktus filtrus. Papildymai, išdavimai ir grąžinimai atsiras čia." />
-          ) : (
-            <div style={styles.tableWrap}>
-              <table style={styles.historyTable}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Data</th>
-                    <th style={styles.th}>Prekė</th>
-                    <th style={styles.th}>Operacija</th>
-                    <th style={styles.th}>Kiekis</th>
-                    <th style={styles.th}>Kam</th>
-                    <th style={styles.th}>Darbuotojas</th>
-                  </tr>
-                </thead>
+          <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d]">
+            {tabs.map((item) => {
+              const Icon = item.icon;
+              const active = tab === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setTab(item.key)}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 transition ${
+                    active
+                      ? "bg-white text-[#486b5d] shadow-sm ring-1 ring-[#c9d8d0]"
+                      : "text-[#486b5d] hover:bg-white/80"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+            <Link
+              href="/inventory/uniforms"
+              className="ml-auto rounded-lg border border-[#c2d3ca] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
+            >
+              Senas kategorijos vaizdas
+            </Link>
+          </nav>
+        </section>
 
-                <tbody>
-                  {filteredLogs.map((log) => (
-                    <tr key={log.id} style={styles.tr}>
-                      <td style={styles.td}>{formatDate(log.created_at)}</td>
-                      <td style={styles.tdBold}>{log.item_name || '—'}</td>
-                      <td style={styles.td}>
-                        <span style={{ ...styles.logBadge, ...(log.type === 'in' ? styles.inBadge : styles.outBadge) }}>
-                          {log.type === 'in' ? <ArrowUpCircle size={14} /> : <ArrowDownCircle size={14} />}
-                          {getLogOperationLabel(log)}
-                        </span>
-                      </td>
-                      <td style={styles.td}>{formatQuantity(log.quantity, log.unit)}</td>
-                      <td style={styles.td}>{log.resident_code || '—'}</td>
-                      <td style={styles.td}>{log.employee_full_name || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {message ? (
+          <div className="rounded-2xl border border-[#c9d8d0] bg-[#eef4f1] p-4 text-sm font-black text-[#486b5d]">
+            {message}
+          </div>
+        ) : null}
+
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
+          <StatButton
+            label="Skirtingų prekių"
+            value={globalStats.totalItems}
+            onClick={() => setTab("stock")}
+          />
+          <StatButton
+            label="Sunaudojamos"
+            value={globalStats.consumables}
+            onClick={() => setTab("stock")}
+          />
+          <StatButton
+            label="Tekstilė"
+            value={globalStats.textiles}
+            tone="green"
+            onClick={() => setTab("assigned")}
+          />
+          <StatButton
+            label="Uniformos"
+            value={globalStats.uniforms}
+            tone="green"
+            onClick={() => setTab("uniforms")}
+          />
+          <StatButton
+            label="Skalbykloje"
+            value={`${globalStats.laundryBalance}`}
+            tone="amber"
+            onClick={() => setTab("laundry")}
+          />
+          <StatButton
+            label="Rizikos"
+            value={globalStats.low + globalStats.empty}
+            tone={globalStats.empty > 0 ? "red" : "amber"}
+            onClick={() => setStockFilter(stockFilter ? "" : "low")}
+          />
+          <StatButton
+            label="Nurašymai"
+            value={globalStats.writeOffs}
+            tone="red"
+            onClick={() => setTab("writeoffs")}
+          />
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="self-start rounded-2xl border border-[#c9d8d0] bg-white p-4 shadow-sm xl:sticky xl:top-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#6a7e75]">
+                  Greiti veiksmai
+                </p>
+                <h2 className="text-xl font-black tracking-tight text-[#10251f]">
+                  Darbo eiga
+                </h2>
+              </div>
+              <PackageOpen className="h-5 w-5 text-[#047857]" />
             </div>
-          )}
-        </DataCard>
-      </section>
 
-      <section style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h2 style={styles.cardTitle}>Sistemos būsena</h2>
-            <p style={styles.cardSubtitle}>Greita sandėlio modulio patikra.</p>
-          </div>
+            <div className="grid gap-2">
+              <QuickAction
+                onClick={() => setShowRefillModal(true)}
+                icon={<ArrowUpCircle className="h-4 w-4" />}
+                title="Papildyti sandėlį"
+                desc="Gauta iš tiekėjo / atsargų"
+              />
+              <QuickAction
+                onClick={() => setShowIssueModal(true)}
+                icon={<Send className="h-4 w-4" />}
+                title="Išduoti sunaudojamas"
+                desc="Sauskelnės, valymas, vaistai"
+              />
+              <QuickAction
+                onClick={() => setShowAssignModal(true)}
+                icon={<BedDouble className="h-4 w-4" />}
+                title="Priskirti naudojimui"
+                desc="Patalynė / tekstilė"
+              />
+              <QuickAction
+                onClick={() => setShowUniformModal(true)}
+                icon={<Shirt className="h-4 w-4" />}
+                title="Išduoti uniformą"
+                desc="Darbuotojui"
+              />
+              <QuickAction
+                onClick={() => setShowLaundryOutModal(true)}
+                icon={<WashingMachine className="h-4 w-4" />}
+                title="Išvežti į skalbyklą"
+                desc="Kg, vnt., maišai"
+              />
+              <QuickAction
+                onClick={() => setShowLaundryReturnModal(true)}
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                title="Grąžinti iš skalbyklos"
+                desc="Fiksuoti grįžusį kiekį"
+              />
+              <QuickAction
+                onClick={() => setShowWriteOffModal(true)}
+                icon={<Trash2 className="h-4 w-4" />}
+                title="Nurašyti / išmesti"
+                desc="Sugadinta, prarasta, sunaikinta"
+                danger
+              />
+            </div>
 
-          <ShieldCheck size={22} color="#047857" />
-        </div>
+            <div className="mt-4 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
+              <label className="text-[11px] font-black uppercase tracking-[0.12em] text-[#6a7e75]">
+                Paieška
+              </label>
+              <div className="mt-2 flex h-11 items-center gap-2 rounded-xl border border-[#dbe6e0] bg-white px-3 text-[#486b5d]">
+                <Search className="h-4 w-4" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Prekė, darbuotojas, gyventojas..."
+                  className="h-full min-w-0 flex-1 bg-transparent text-sm font-bold text-[#10251f] outline-none placeholder:text-[#8ea0b5]"
+                />
+              </div>
 
-        <div style={styles.statusList}>
-          <div style={styles.statusItem}>
-            <span style={styles.statusDot} />
-            Likučių apskaita aktyvi
-          </div>
-          <div style={styles.statusItem}>
-            <span style={styles.statusDot} />
-            Judėjimo istorija įjungta
-          </div>
-          <div style={styles.statusItem}>
-            <span style={styles.statusDot} />
-            Multi išdavimas, grąžinimas ir papildymas aktyvus
-          </div>
-        </div>
-      </section>
+              <div className="mt-3 grid gap-2">
+                <select
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  className="h-11 rounded-xl border border-[#dbe6e0] bg-white px-3 text-sm font-black text-[#486b5d]"
+                >
+                  <option value="">Visos kategorijos</option>
+                  {CATEGORIES.map((category) => (
+                    <option key={category.code} value={category.code}>
+                      {category.title}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={stockFilter}
+                  onChange={(event) =>
+                    setStockFilter(event.target.value as "" | StockStatus)
+                  }
+                  className="h-11 rounded-xl border border-[#dbe6e0] bg-white px-3 text-sm font-black text-[#486b5d]"
+                >
+                  <option value="">Visi likučiai</option>
+                  <option value="ok">Tvarkoje</option>
+                  <option value="low">Baigiasi</option>
+                  <option value="empty">Pasibaigė</option>
+                </select>
+              </div>
+            </div>
+          </aside>
+
+          <main className="min-w-0 space-y-4">
+            {tab === "overview" ? (
+              <OverviewPanel
+                categoryStats={categoryStats}
+                onCategory={(category) => {
+                  setCategoryFilter(category);
+                  setTab(
+                    category === "uniforms"
+                      ? "uniforms"
+                      : category === "bedding"
+                        ? "assigned"
+                        : "stock",
+                  );
+                }}
+              />
+            ) : null}
+
+            {tab === "stock" ? (
+              <InventoryTable
+                title="Sandėlio likučiai"
+                meta={`Rodoma prekių: ${filteredItems.length}`}
+                rows={filteredItems}
+                onRefill={(item) => openMovementModal("refill", item.id)}
+                onIssue={(item) =>
+                  openMovementModal(
+                    isUniformItem(item)
+                      ? "uniform"
+                      : isTextileItem(item)
+                        ? "assign"
+                        : "issue",
+                    item.id,
+                  )
+                }
+                onWriteOff={(item) => openMovementModal("writeOff", item.id)}
+              />
+            ) : null}
+
+            {tab === "assigned" ? (
+              <InventoryTable
+                title="Tekstilė / priskiriamos prekės"
+                meta={`Rodoma tekstilės prekių: ${textileItems.length}`}
+                rows={textileItems}
+                onRefill={(item) => openMovementModal("refill", item.id)}
+                onIssue={(item) => openMovementModal("assign", item.id)}
+                onLaundry={(item) => openMovementModal("laundryOut", item.id)}
+                onWriteOff={(item) => openMovementModal("writeOff", item.id)}
+              />
+            ) : null}
+
+            {tab === "uniforms" ? (
+              <InventoryTable
+                title="Darbuotojų uniformos"
+                meta={`Rodoma uniformų: ${uniformItems.length}`}
+                rows={uniformItems}
+                onRefill={(item) => openMovementModal("refill", item.id)}
+                onIssue={(item) => openMovementModal("uniform", item.id)}
+                onLaundry={(item) => openMovementModal("laundryOut", item.id)}
+                onWriteOff={(item) => openMovementModal("writeOff", item.id)}
+              />
+            ) : null}
+
+            {tab === "laundry" ? (
+              <LaundryPanel
+                logs={laundryLogs}
+                balance={globalStats.laundryBalance}
+                onOut={() => setShowLaundryOutModal(true)}
+                onReturn={() => setShowLaundryReturnModal(true)}
+              />
+            ) : null}
+
+            {tab === "movements" ? (
+              <MovementsPanel
+                title="Judėjimo istorija"
+                logs={filteredLogs}
+                onExport={exportHistory}
+              />
+            ) : null}
+            {tab === "writeoffs" ? (
+              <MovementsPanel
+                title="Nurašymai / išmetimai"
+                logs={writeOffLogs}
+                onExport={exportHistory}
+              />
+            ) : null}
+          </main>
+        </section>
+      </div>
 
       {showAddModal ? (
-        <MultiAddModal
+        <AddItemsModal
           forms={addForms}
           saving={saving}
-          message={message}
-          onClose={() => {
-            if (!saving) setShowAddModal(false)
-          }}
+          onClose={() => !saving && setShowAddModal(false)}
           onChange={updateAddForm}
           onAddLine={() =>
-            setAddForms((prev) => [
-              ...prev,
-              {
-                ...DEFAULT_ADD_FORM,
-                subcategory: getDefaultSubcategory(DEFAULT_ADD_FORM.category),
-                size: getDefaultSize(DEFAULT_ADD_FORM.category),
-              },
-            ])
+            setAddForms((previous) => [...previous, { ...DEFAULT_ADD_FORM }])
           }
-          onRemoveLine={(index) => setAddForms((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
+          onRemoveLine={(index) =>
+            setAddForms((previous) =>
+              previous.filter((_, current) => current !== index),
+            )
+          }
           onSubmit={() => void createItems()}
         />
       ) : null}
 
-      {showIssueModal ? (
-        <MultiIssueModal
-          title="Išduoti gyventojui"
-          subtitle="Gali išduoti kelias prekes vienu kartu. Šis veiksmas skirtas gyventojų prekėms."
-          targetType="resident"
-          lines={issueLines}
-          items={items.filter((item) => !isUniformItem(item))}
-          residents={residents}
-          employees={employees}
-          saving={saving}
-          message={message}
-          onClose={() => {
-            if (!saving) setShowIssueModal(false)
-          }}
-          onChange={updateIssueLine}
-          onAddLine={() => setIssueLines((prev) => [...prev, DEFAULT_ISSUE_LINE])}
-          onRemoveLine={(index) => setIssueLines((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-          onSubmit={() => void issueItems()}
-        />
-      ) : null}
-
-      {showUniformIssueModal ? (
-        <MultiIssueModal
-          title="Išduoti uniformą"
-          subtitle="Uniformos išduodamos tik darbuotojams ir vėliau gali būti grąžintos į sandėlį."
-          targetType="employee"
-          lines={issueLines}
-          items={items.filter(isUniformItem)}
-          residents={residents}
-          employees={employees}
-          saving={saving}
-          message={message}
-          onClose={() => {
-            if (!saving) setShowUniformIssueModal(false)
-          }}
-          onChange={updateIssueLine}
-          onAddLine={() => setIssueLines((prev) => [...prev, DEFAULT_ISSUE_LINE])}
-          onRemoveLine={(index) => setIssueLines((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-          onSubmit={() => void issueItems()}
-        />
-      ) : null}
-
       {showRefillModal ? (
-        <MultiRefillModal
-          lines={refillLines}
+        <MovementModal
+          title="Papildyti sandėlį"
+          subtitle="Padidina laisvą sandėlio likutį."
           items={items}
+          form={movementForm}
+          setForm={setMovementForm}
           saving={saving}
-          message={message}
-          onClose={() => {
-            if (!saving) setShowRefillModal(false)
-          }}
-          onChange={updateRefillLine}
-          onAddLine={() => setRefillLines((prev) => [...prev, DEFAULT_REFILL_LINE])}
-          onRemoveLine={(index) => setRefillLines((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-          onSubmit={() => void refillItems()}
+          submitText="Papildyti"
+          notePlaceholder="Pvz. gauta iš tiekėjo, sąskaitos nr., papildymo priežastis"
+          onClose={() => !saving && setShowRefillModal(false)}
+          onSubmit={() => void submitSingleMovement("refill")}
         />
       ) : null}
 
-      {showUniformReturnModal ? (
-        <MultiUniformReturnModal
-          lines={uniformReturnLines}
-          items={items.filter(isUniformItem)}
-          employees={employees}
+      {showIssueModal ? (
+        <MovementModal
+          title="Išduoti sunaudojamas prekes"
+          subtitle="Sauskelnės, valymo priemonės, vaistai ar kitos sunaudojamos prekės."
+          items={items.filter(isConsumableItem)}
+          targets={residents}
+          targetLabel="Gyventojas"
+          form={movementForm}
+          setForm={setMovementForm}
           saving={saving}
-          message={message}
-          onClose={() => {
-            if (!saving) setShowUniformReturnModal(false)
-          }}
-          onChange={updateUniformReturnLine}
-          onAddLine={() => setUniformReturnLines((prev) => [...prev, DEFAULT_UNIFORM_RETURN_LINE])}
-          onRemoveLine={(index) => setUniformReturnLines((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-          onSubmit={() => void returnUniforms()}
+          submitText="Išduoti"
+          notePlaceholder="Pvz. išduota savaitės poreikiui, higienai ar konkrečiam gyventojo poreikiui"
+          danger
+          onClose={() => !saving && setShowIssueModal(false)}
+          onSubmit={() => void submitSingleMovement("issue")}
+        />
+      ) : null}
+
+      {showAssignModal ? (
+        <MovementModal
+          title="Priskirti naudojimui"
+          subtitle="Tekstilė lieka apskaitoje, bet iš sandėlio pereina į naudojimą pas gyventoją / kambaryje."
+          items={items.filter(isTextileItem)}
+          targets={residents}
+          targetLabel="Gyventojas / kambarys"
+          form={movementForm}
+          setForm={setMovementForm}
+          saving={saving}
+          submitText="Priskirti"
+          notePlaceholder="Pvz. priskirta kambariui A101, gyventojo lovai ar konkrečiam komplektui"
+          onClose={() => !saving && setShowAssignModal(false)}
+          onSubmit={() => void submitSingleMovement("assign")}
+        />
+      ) : null}
+
+      {showUniformModal ? (
+        <MovementModal
+          title="Išduoti uniformą"
+          subtitle="Uniformos išduodamos darbuotojams ir vėliau gali būti grąžintos / nurašytos."
+          items={items.filter(isUniformItem)}
+          targets={employees.filter((employee) => employee.isActive !== false)}
+          targetLabel="Darbuotojas"
+          form={movementForm}
+          setForm={setMovementForm}
+          saving={saving}
+          submitText="Išduoti darbuotojui"
+          notePlaceholder="Pvz. išduota naujam darbuotojui, dydžio pakeitimas ar darbo apranga pamainai"
+          onClose={() => !saving && setShowUniformModal(false)}
+          onSubmit={() => void submitSingleMovement("uniform")}
+        />
+      ) : null}
+
+      {showLaundryOutModal ? (
+        <LaundryModal
+          title="Išvežti į skalbyklą"
+          subtitle="Fiksuok kg, vnt., maišus ar komplektus."
+          items={laundryItems}
+          form={laundryForm}
+          setForm={setLaundryForm}
+          saving={saving}
+          submitText="Užregistruoti išvežimą"
+          onClose={() => !saving && setShowLaundryOutModal(false)}
+          onSubmit={() => void submitLaundry("out")}
+        />
+      ) : null}
+
+      {showLaundryReturnModal ? (
+        <LaundryModal
+          title="Grąžinti iš skalbyklos"
+          subtitle="Fiksuok grįžusį kiekį ir neatitikimus pastaboje."
+          items={laundryItems}
+          form={laundryForm}
+          setForm={setLaundryForm}
+          saving={saving}
+          submitText="Patvirtinti grįžimą"
+          onClose={() => !saving && setShowLaundryReturnModal(false)}
+          onSubmit={() => void submitLaundry("return")}
+        />
+      ) : null}
+
+      {showWriteOffModal ? (
+        <MovementModal
+          title="Nurašyti / išmesti"
+          subtitle="Naudok sugadintoms, prarastoms ar netinkamoms naudoti prekėms."
+          items={items}
+          form={movementForm}
+          setForm={setMovementForm}
+          saving={saving}
+          submitText="Nurašyti"
+          notePlaceholder="Pvz. sugadinta, susidėvėjo, išmesta arba trūkumas po skalbimo"
+          danger
+          onClose={() => !saving && setShowWriteOffModal(false)}
+          onSubmit={() => void submitSingleMovement("writeOff")}
         />
       ) : null}
     </main>
-  )
+  );
 }
 
-function MultiAddModal({
-  forms,
-  saving,
-  message,
-  onClose,
-  onChange,
-  onAddLine,
-  onRemoveLine,
-  onSubmit,
+function StatButton({
+  label,
+  value,
+  tone = "default",
+  onClick,
 }: {
-  forms: AddForm[]
-  saving: boolean
-  message: string
-  onClose: () => void
-  onChange: (index: number, patch: Partial<AddForm>) => void
-  onAddLine: () => void
-  onRemoveLine: (index: number) => void
-  onSubmit: () => void
+  label: string;
+  value: ReactNode;
+  tone?: "default" | "green" | "amber" | "red";
+  onClick: () => void;
 }) {
+  const toneClass =
+    tone === "green"
+      ? "text-[#047857]"
+      : tone === "amber"
+        ? "text-[#8a5a13]"
+        : tone === "red"
+          ? "text-red-700"
+          : "text-[#10251f]";
   return (
-    <Modal title="Pridėti prekes" subtitle="Gali pridėti kelias skirtingas prekes vienu kartu." onClose={onClose}>
-      {message ? <div style={styles.modalMessage}>{message}</div> : null}
-
-      <div style={styles.multiLines}>
-        {forms.map((form, index) => (
-          <div key={index} style={styles.multiLine}>
-            <Field label="Pavadinimas *">
-              <input
-                value={form.name}
-                onChange={(event) => onChange(index, { name: event.target.value })}
-                placeholder="Pvz. Pampers M"
-                style={styles.input}
-              />
-            </Field>
-
-            <Field label="Kategorija">
-              <select value={form.category} onChange={(event) => onChange(index, { category: event.target.value as InventoryCategory })} style={styles.input}>
-                {CATEGORIES.map((category) => (
-                  <option key={category.code} value={category.code}>
-                    {category.title}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Tipas">
-              <select value={form.subcategory} onChange={(event) => onChange(index, { subcategory: event.target.value })} style={styles.input}>
-                {SUBCATEGORY_OPTIONS[form.category].map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            {shouldShowSize(form.category) ? (
-              <Field label={getSizeLabel(form.category)}>
-                <input
-                  value={form.size}
-                  onChange={(event) => onChange(index, { size: event.target.value })}
-                  placeholder={getSizePlaceholder(form.category)}
-                  list={`size-options-${form.category}-${index}`}
-                  style={styles.input}
-                />
-                <datalist id={`size-options-${form.category}-${index}`}>
-                  {(SIZE_OPTIONS[form.category] || []).map((size) => (
-                    <option key={size} value={size} />
-                  ))}
-                </datalist>
-              </Field>
-            ) : null}
-
-            <Field label="Vienetas">
-              <input value={form.unit} onChange={(event) => onChange(index, { unit: event.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="Kiekis">
-              <input type="number" min="0" value={form.quantity} onChange={(event) => onChange(index, { quantity: event.target.value })} style={styles.input} />
-            </Field>
-
-            <Field label="Min. kiekis">
-              <input type="number" min="0" value={form.minQuantity} onChange={(event) => onChange(index, { minQuantity: event.target.value })} style={styles.input} />
-            </Field>
-
-            {forms.length > 1 ? (
-              <button type="button" onClick={() => onRemoveLine(index)} style={styles.removeLineButton}>
-                Pašalinti
-              </button>
-            ) : null}
-          </div>
-        ))}
-      </div>
-
-      <div style={styles.modalActions}>
-        <button type="button" onClick={onAddLine} style={styles.secondaryButton}>
-          <Plus size={16} /> Pridėti eilutę
-        </button>
-        <button type="button" onClick={onClose} style={styles.cancelButton}>
-          Atšaukti
-        </button>
-        <button type="button" onClick={onSubmit} disabled={saving} style={styles.saveButton}>
-          {saving ? 'Saugoma...' : 'Išsaugoti'}
-        </button>
-      </div>
-    </Modal>
-  )
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+    >
+      <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
+        {label}
+      </p>
+      <p className={`mt-1 text-2xl font-black ${toneClass}`}>{value}</p>
+      <p className="mt-1 text-xs font-bold text-slate-500">spausk filtruoti</p>
+    </button>
+  );
 }
 
-function MultiIssueModal({
+function QuickAction({
+  icon,
   title,
-  subtitle,
-  targetType,
-  lines,
-  items,
-  residents,
-  employees,
-  saving,
-  message,
-  onClose,
-  onChange,
-  onAddLine,
-  onRemoveLine,
-  onSubmit,
+  desc,
+  onClick,
+  danger = false,
 }: {
-  title: string
-  subtitle: string
-  targetType: 'resident' | 'employee'
-  lines: IssueLine[]
-  items: InventoryItem[]
-  residents: PersonOption[]
-  employees: PersonOption[]
-  saving: boolean
-  message: string
-  onClose: () => void
-  onChange: (index: number, patch: Partial<IssueLine>) => void
-  onAddLine: () => void
-  onRemoveLine: (index: number) => void
-  onSubmit: () => void
+  icon: ReactNode;
+  title: string;
+  desc: string;
+  onClick: () => void;
+  danger?: boolean;
 }) {
   return (
-    <Modal title={title} subtitle={subtitle} onClose={onClose}>
-      {message ? <div style={styles.modalMessage}>{message}</div> : null}
-
-      <div style={styles.multiLines}>
-        {lines.map((line, index) => {
-          const selectedItem = items.find((item) => item.id === line.itemId) || null
-          const targetOptions = targetType === 'employee'
-            ? employees.filter((employee) => employee.isActive !== false)
-            : residents
-
-          return (
-            <div key={index} style={styles.multiLine}>
-              <Field label="Prekė *">
-                <select value={line.itemId} onChange={(event) => onChange(index, { itemId: event.target.value, targetId: '' })} style={styles.input}>
-                  <option value="">Pasirink prekę</option>
-                  {items
-                    .filter((item) => Number(item.quantity || 0) > 0)
-                    .map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} — {formatQuantity(item.quantity, item.unit)}
-                      </option>
-                    ))}
-                </select>
-              </Field>
-
-              <Field label={targetType === 'employee' ? 'Darbuotojas *' : 'Gyventojas *'}>
-                <select value={line.targetId} onChange={(event) => onChange(index, { targetId: event.target.value })} style={styles.input}>
-                  <option value="">{targetType === 'employee' ? 'Pasirink darbuotoją' : 'Pasirink gyventoją'}</option>
-                  {targetOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Kiekis *">
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedItem ? Number(selectedItem.quantity || 0) : undefined}
-                  value={line.quantity}
-                  onChange={(event) => onChange(index, { quantity: event.target.value })}
-                  style={styles.input}
-                />
-              </Field>
-
-              <Field label="Pastaba">
-                <input value={line.notes} onChange={(event) => onChange(index, { notes: event.target.value })} style={styles.input} />
-              </Field>
-
-              {selectedItem ? <div style={styles.issueInfo}>Sandėlyje: <strong>{formatQuantity(selectedItem.quantity, selectedItem.unit)}</strong></div> : null}
-
-              {lines.length > 1 ? (
-                <button type="button" onClick={() => onRemoveLine(index)} style={styles.removeLineButton}>
-                  Pašalinti
-                </button>
-              ) : null}
-            </div>
-          )
-        })}
-      </div>
-
-      <div style={styles.modalActions}>
-        <button type="button" onClick={onAddLine} style={styles.secondaryButton}>
-          <Plus size={16} /> Pridėti eilutę
-        </button>
-        <button type="button" onClick={onClose} style={styles.cancelButton}>
-          Atšaukti
-        </button>
-        <button type="button" onClick={onSubmit} disabled={saving} style={styles.dangerSaveButton}>
-          {saving ? 'Saugoma...' : 'Išduoti'}
-        </button>
-      </div>
-    </Modal>
-  )
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition active:scale-[0.99] ${
+        danger
+          ? "border-red-100 bg-red-50 hover:bg-red-100"
+          : "border-[#dbe6e0] bg-[#f8faf8] hover:bg-[#eef4f1]"
+      }`}
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${danger ? "bg-white text-red-700" : "bg-white text-[#047857]"}`}
+        >
+          {icon}
+        </span>
+        <span className="min-w-0">
+          <b className="block truncate text-sm font-black text-[#10251f]">
+            {title}
+          </b>
+          <small className="block truncate text-xs font-bold text-[#66756c]">
+            {desc}
+          </small>
+        </span>
+      </span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-[#8ea0b5] transition group-hover:translate-x-0.5" />
+    </button>
+  );
 }
 
-function MultiRefillModal({
-  lines,
-  items,
-  saving,
-  message,
-  onClose,
-  onChange,
-  onAddLine,
-  onRemoveLine,
-  onSubmit,
+function OverviewPanel({
+  categoryStats,
+  onCategory,
 }: {
-  lines: RefillLine[]
-  items: InventoryItem[]
-  saving: boolean
-  message: string
-  onClose: () => void
-  onChange: (index: number, patch: Partial<RefillLine>) => void
-  onAddLine: () => void
-  onRemoveLine: (index: number) => void
-  onSubmit: () => void
+  categoryStats: Record<
+    InventoryCategory,
+    { items: number; quantity: number; low: number; empty: number }
+  >;
+  onCategory: (category: InventoryCategory) => void;
 }) {
   return (
-    <Modal title="Papildyti sandėlį" subtitle="Gali papildyti kelias prekes vienu kartu." onClose={onClose}>
-      {message ? <div style={styles.modalMessage}>{message}</div> : null}
-
-      <div style={styles.multiLines}>
-        {lines.map((line, index) => {
-          const selectedItem = items.find((item) => item.id === line.itemId) || null
-
+    <section className="rounded-2xl border border-[#c9d8d0] bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#047857]">
+            Apžvalga
+          </p>
+          <h2 className="text-2xl font-black tracking-tight text-[#10251f]">
+            Sandėlio kategorijos
+          </h2>
+        </div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {CATEGORIES.map((category) => {
+          const Icon = category.icon;
+          const stats = categoryStats[category.code];
+          const risk = stats.low + stats.empty;
           return (
-            <div key={index} style={styles.multiLine}>
-              <Field label="Prekė *">
-                <select value={line.itemId} onChange={(event) => onChange(index, { itemId: event.target.value })} style={styles.input}>
-                  <option value="">Pasirink prekę</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} — {formatQuantity(item.quantity, item.unit)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Kiekis *">
-                <input type="number" min="1" value={line.quantity} onChange={(event) => onChange(index, { quantity: event.target.value })} style={styles.input} />
-              </Field>
-
-              <Field label="Pastaba">
-                <input value={line.notes} onChange={(event) => onChange(index, { notes: event.target.value })} placeholder="Pvz. gauta iš tiekėjo" style={styles.input} />
-              </Field>
-
-              {selectedItem ? <div style={styles.issueInfo}>Dabar: <strong>{formatQuantity(selectedItem.quantity, selectedItem.unit)}</strong></div> : null}
-
-              {lines.length > 1 ? (
-                <button type="button" onClick={() => onRemoveLine(index)} style={styles.removeLineButton}>
-                  Pašalinti
-                </button>
-              ) : null}
-            </div>
-          )
+            <button
+              key={category.code}
+              type="button"
+              onClick={() => onCategory(category.code)}
+              className="rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left transition hover:border-[#c9d8d0] hover:bg-white"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-[#486b5d] shadow-sm">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-black ${risk ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}
+                >
+                  {risk ? `${risk} riz.` : "Tvarkoje"}
+                </span>
+              </div>
+              <h3 className="mt-3 text-lg font-black text-[#10251f]">
+                {category.title}
+              </h3>
+              <p className="mt-1 text-sm font-bold leading-5 text-[#66756c]">
+                {category.description}
+              </p>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <MiniStat label="Prekių" value={stats.items} />
+                <MiniStat label="Kiekis" value={stats.quantity} />
+                <MiniStat label="Rizika" value={risk} />
+              </div>
+            </button>
+          );
         })}
       </div>
-
-      <div style={styles.modalActions}>
-        <button type="button" onClick={onAddLine} style={styles.secondaryButton}>
-          <Plus size={16} /> Pridėti eilutę
-        </button>
-        <button type="button" onClick={onClose} style={styles.cancelButton}>
-          Atšaukti
-        </button>
-        <button type="button" onClick={onSubmit} disabled={saving} style={styles.saveButton}>
-          {saving ? 'Saugoma...' : 'Papildyti'}
-        </button>
-      </div>
-    </Modal>
-  )
+    </section>
+  );
 }
 
-function MultiUniformReturnModal({
-  lines,
-  items,
-  employees,
-  saving,
-  message,
-  onClose,
-  onChange,
-  onAddLine,
-  onRemoveLine,
-  onSubmit,
+function MiniStat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <span className="rounded-xl bg-white p-2">
+      <b className="block text-base font-black text-[#10251f]">{value}</b>
+      <small className="text-[11px] font-black uppercase text-[#6a7e75]">
+        {label}
+      </small>
+    </span>
+  );
+}
+
+function InventoryTable({
+  title,
+  meta,
+  rows,
+  onRefill,
+  onIssue,
+  onLaundry,
+  onWriteOff,
 }: {
-  lines: UniformReturnLine[]
-  items: InventoryItem[]
-  employees: PersonOption[]
-  saving: boolean
-  message: string
-  onClose: () => void
-  onChange: (index: number, patch: Partial<UniformReturnLine>) => void
-  onAddLine: () => void
-  onRemoveLine: (index: number) => void
-  onSubmit: () => void
+  title: string;
+  meta: string;
+  rows: InventoryItem[];
+  onRefill: (item: InventoryItem) => void;
+  onIssue: (item: InventoryItem) => void;
+  onLaundry?: (item: InventoryItem) => void;
+  onWriteOff: (item: InventoryItem) => void;
 }) {
   return (
-    <Modal title="Grąžinti uniformą" subtitle="Uniformos grąžinamos į sandėlį ir istorijoje susiejamos su darbuotoju." onClose={onClose}>
-      {message ? <div style={styles.modalMessage}>{message}</div> : null}
-
-      <div style={styles.multiLines}>
-        {lines.map((line, index) => {
-          const selectedItem = items.find((item) => item.id === line.itemId) || null
-
-          return (
-            <div key={index} style={styles.multiLine}>
-              <Field label="Uniforma *">
-                <select value={line.itemId} onChange={(event) => onChange(index, { itemId: event.target.value })} style={styles.input}>
-                  <option value="">Pasirink uniformą</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} — {formatQuantity(item.quantity, item.unit)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Darbuotojas *">
-                <select value={line.targetId} onChange={(event) => onChange(index, { targetId: event.target.value })} style={styles.input}>
-                  <option value="">Pasirink darbuotoją</option>
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Kiekis *">
-                <input type="number" min="1" value={line.quantity} onChange={(event) => onChange(index, { quantity: event.target.value })} style={styles.input} />
-              </Field>
-
-              <Field label="Pastaba">
-                <input value={line.notes} onChange={(event) => onChange(index, { notes: event.target.value })} placeholder="Pvz. grąžinta išėjus iš darbo" style={styles.input} />
-              </Field>
-
-              {selectedItem ? <div style={styles.issueInfo}>Sandėlyje dabar: <strong>{formatQuantity(selectedItem.quantity, selectedItem.unit)}</strong></div> : null}
-
-              {lines.length > 1 ? (
-                <button type="button" onClick={() => onRemoveLine(index)} style={styles.removeLineButton}>
-                  Pašalinti
-                </button>
-              ) : null}
-            </div>
-          )
-        })}
+    <section className="overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#dbe6e0] p-4">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight text-[#10251f]">
+            {title}
+          </h2>
+          <p className="mt-1 text-sm font-bold text-[#66756c]">{meta}</p>
+        </div>
       </div>
+      {rows.length === 0 ? (
+        <EmptyState text="Pagal pasirinktus filtrus įrašų nėra." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse text-left">
+            <thead className="bg-[#f8faf8] text-[11px] uppercase tracking-[0.12em] text-[#6a7e75]">
+              <tr>
+                <th className="px-4 py-3 font-black">Prekė</th>
+                <th className="px-4 py-3 font-black">Kategorija</th>
+                <th className="px-4 py-3 font-black">Tipas</th>
+                <th className="px-4 py-3 font-black">Dydis / matmuo</th>
+                <th className="px-4 py-3 font-black">Likutis</th>
+                <th className="px-4 py-3 font-black">Būsena</th>
+                <th className="px-4 py-3 font-black">Veiksmai</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#edf2ef] text-sm">
+              {rows.map((item) => {
+                const status = getStockStatus(item.quantity, item.min_quantity);
+                return (
+                  <tr key={item.id} className="align-top hover:bg-[#f8faf8]">
+                    <td className="px-4 py-4 font-black text-[#10251f]">
+                      {item.name || "—"}
+                    </td>
+                    <td className="px-4 py-4 font-bold text-[#486b5d]">
+                      {getCategoryTitle(item.category)}
+                    </td>
+                    <td className="px-4 py-4 font-bold text-[#66756c]">
+                      {getSubcategoryLabel(item.category, item.subcategory)}
+                    </td>
+                    <td className="px-4 py-4 font-bold text-[#66756c]">
+                      {item.size || "—"}
+                    </td>
+                    <td className="px-4 py-4 font-black text-[#10251f]">
+                      {formatQuantity(item.quantity, item.unit)}
+                    </td>
+                    <td className="px-4 py-4">
+                      <StockBadge status={status} />
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        <SmallButton onClick={() => onRefill(item)}>
+                          Papildyti
+                        </SmallButton>
+                        <SmallButton onClick={() => onIssue(item)} tone="green">
+                          {isUniformItem(item)
+                            ? "Išduoti darbuotojui"
+                            : isTextileItem(item)
+                              ? "Priskirti"
+                              : "Išduoti"}
+                        </SmallButton>
+                        {onLaundry ? (
+                          <SmallButton onClick={() => onLaundry(item)}>
+                            Į skalbyklą
+                          </SmallButton>
+                        ) : null}
+                        <SmallButton
+                          onClick={() => onWriteOff(item)}
+                          tone="red"
+                        >
+                          Nurašyti
+                        </SmallButton>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
-      <div style={styles.modalActions}>
-        <button type="button" onClick={onAddLine} style={styles.secondaryButton}>
-          <Plus size={16} /> Pridėti eilutę
-        </button>
-        <button type="button" onClick={onClose} style={styles.cancelButton}>
-          Atšaukti
-        </button>
-        <button type="button" onClick={onSubmit} disabled={saving} style={styles.saveButton}>
-          {saving ? 'Saugoma...' : 'Grąžinti'}
-        </button>
+function LaundryPanel({
+  logs,
+  balance,
+  onOut,
+  onReturn,
+}: {
+  logs: InventoryLog[];
+  balance: number;
+  onOut: () => void;
+  onReturn: () => void;
+}) {
+  const sent = logs
+    .filter(isLaundryOut)
+    .reduce((sum, log) => sum + Number(log.quantity || 0), 0);
+  const returned = logs
+    .filter(isLaundryReturn)
+    .reduce((sum, log) => sum + Number(log.quantity || 0), 0);
+  const mismatch = Math.max(0, sent - returned);
+  return (
+    <section className="space-y-4">
+      <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#047857]">
+              Skalbyklos apskaita
+            </p>
+            <h2 className="text-2xl font-black tracking-tight text-[#10251f]">
+              Tekstilės judėjimas
+            </h2>
+            <p className="mt-1 text-sm font-bold text-[#66756c]">
+              Fiksuok, kiek išvežta į skalbyklą, kiek grįžo ir ar yra
+              neatitikimų.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onOut}
+              className="rounded-xl bg-[#047857] px-4 py-2 text-sm font-black text-white"
+            >
+              Išvežti
+            </button>
+            <button
+              type="button"
+              onClick={onReturn}
+              className="rounded-xl border border-[#c9d8d0] bg-white px-4 py-2 text-sm font-black text-[#486b5d]"
+            >
+              Grąžinti
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <LaundryStat label="Išvežta" value={formatQuantity(sent, "")} />
+          <LaundryStat label="Grįžo" value={formatQuantity(returned, "")} />
+          <LaundryStat
+            label="Balansas"
+            value={formatQuantity(balance || mismatch, "")}
+            warning={mismatch > 0}
+          />
+        </div>
       </div>
-    </Modal>
-  )
+      <MovementsPanel title="Skalbyklos istorija" logs={logs} />
+    </section>
+  );
+}
+
+function LaundryStat({
+  label,
+  value,
+  warning = false,
+}: {
+  label: string;
+  value: string;
+  warning?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border p-4 ${warning ? "border-amber-100 bg-amber-50" : "border-[#dbe6e0] bg-[#f8faf8]"}`}
+    >
+      <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[#6a7e75]">
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-black text-[#10251f]">{value}</p>
+    </div>
+  );
+}
+
+function MovementsPanel({
+  title,
+  logs,
+  onExport,
+}: {
+  title: string;
+  logs: InventoryLog[];
+  onExport?: () => void;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#dbe6e0] p-4">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight text-[#10251f]">
+            {title}
+          </h2>
+          <p className="mt-1 text-sm font-bold text-[#66756c]">
+            Rodoma įrašų: {logs.length}
+          </p>
+        </div>
+        {onExport ? (
+          <button
+            type="button"
+            onClick={onExport}
+            className="inline-flex items-center gap-2 rounded-xl border border-[#c9d8d0] bg-white px-4 py-2 text-sm font-black text-[#486b5d]"
+          >
+            <Download className="h-4 w-4" /> Eksportuoti
+          </button>
+        ) : null}
+      </div>
+      {logs.length === 0 ? (
+        <EmptyState text="Įrašų nėra." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] border-collapse text-left">
+            <thead className="bg-[#f8faf8] text-[11px] uppercase tracking-[0.12em] text-[#6a7e75]">
+              <tr>
+                <th className="px-4 py-3 font-black">Data</th>
+                <th className="px-4 py-3 font-black">Prekė</th>
+                <th className="px-4 py-3 font-black">Operacija</th>
+                <th className="px-4 py-3 font-black">Kiekis</th>
+                <th className="px-4 py-3 font-black">Kam / būsena</th>
+                <th className="px-4 py-3 font-black">Darbuotojas</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#edf2ef] text-sm">
+              {logs.map((log) => (
+                <tr key={log.id} className="hover:bg-[#f8faf8]">
+                  <td className="px-4 py-4 font-bold text-[#66756c]">
+                    {formatDate(log.created_at)}
+                  </td>
+                  <td className="px-4 py-4 font-black text-[#10251f]">
+                    {log.item_name || "—"}
+                    <div className="mt-1 text-xs font-bold text-[#8ea0b5]">
+                      {getSubcategoryLabel(log.category, log.subcategory)}
+                      {log.size ? ` · ${log.size}` : ""}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <MovementBadge log={log} />
+                  </td>
+                  <td className="px-4 py-4 font-black text-[#10251f]">
+                    {formatQuantity(log.quantity, log.unit)}
+                  </td>
+                  <td className="px-4 py-4 font-bold text-[#486b5d]">
+                    {log.resident_code || "—"}
+                  </td>
+                  <td className="px-4 py-4 font-bold text-[#66756c]">
+                    {log.employee_full_name || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StockBadge({ status }: { status: StockStatus }) {
+  const cls =
+    status === "empty"
+      ? "bg-red-50 text-red-700"
+      : status === "low"
+        ? "bg-amber-50 text-amber-700"
+        : "bg-emerald-50 text-emerald-700";
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-black ${cls}`}>
+      {getStockLabel(status)}
+    </span>
+  );
+}
+
+function MovementBadge({ log }: { log: InventoryLog }) {
+  const label = movementLabel(log);
+  const isOut = log.type === "out" || isLaundryOut(log) || isWriteOff(log);
+  const cls = isWriteOff(log)
+    ? "bg-red-50 text-red-700"
+    : isOut
+      ? "bg-amber-50 text-amber-700"
+      : "bg-emerald-50 text-emerald-700";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-black ${cls}`}
+    >
+      {isOut ? (
+        <ArrowDownCircle className="h-3.5 w-3.5" />
+      ) : (
+        <ArrowUpCircle className="h-3.5 w-3.5" />
+      )}
+      {label}
+    </span>
+  );
+}
+
+function SmallButton({
+  children,
+  onClick,
+  tone = "default",
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  tone?: "default" | "green" | "red";
+}) {
+  const cls =
+    tone === "red"
+      ? "border-red-100 bg-red-50 text-red-700"
+      : tone === "green"
+        ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+        : "border-[#dbe6e0] bg-white text-[#486b5d]";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg border px-3 py-1.5 text-xs font-black ${cls}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="m-4 rounded-2xl border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-8 text-center text-sm font-black text-[#66756c]">
+      {text}
+    </div>
+  );
 }
 
 function Modal({
@@ -1855,874 +2186,491 @@ function Modal({
   children,
   onClose,
 }: {
-  title: string
-  subtitle: string
-  children: ReactNode
-  onClose: () => void
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+  onClose: () => void;
 }) {
   return (
-    <div style={styles.modalBackdrop} onClick={onClose}>
-      <div style={styles.modalCard} onClick={(event) => event.stopPropagation()}>
-        <div style={styles.modalHeader}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <section
+        className="max-h-[calc(100vh-40px)] w-full max-w-4xl overflow-hidden rounded-3xl border border-[#dbe6e0] bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
           <div>
-            <h2 style={styles.modalTitle}>{title}</h2>
-            <p style={styles.modalSubtitle}>{subtitle}</p>
+            <h2 className="text-2xl font-black tracking-tight">{title}</h2>
+            <p className="mt-1 text-sm font-semibold text-white/80">
+              {subtitle}
+            </p>
           </div>
-
-          <button type="button" onClick={onClose} style={styles.iconButton}>
-            <X size={18} />
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10 text-white hover:bg-white/20"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
-
-        {children}
-      </div>
+        <div className="max-h-[calc(100vh-140px)] overflow-y-auto bg-[#f3f6f4] p-5">
+          {children}
+        </div>
+      </section>
     </div>
-  )
+  );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label style={styles.field}>
-      <span style={styles.label}>{label}</span>
-      {children}
-    </label>
-  )
-}
-
-function StatCard({
+function FormField({
   label,
-  value,
-  tone = 'default',
-  active = false,
-  onClick,
-}: {
-  label: string
-  value: number
-  tone?: 'default' | 'warning' | 'danger' | 'green'
-  active?: boolean
-  onClick?: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        ...styles.statCard,
-        ...(tone === 'warning' ? styles.warningStat : {}),
-        ...(tone === 'danger' ? styles.dangerStat : {}),
-        ...(tone === 'green' ? styles.greenStat : {}),
-        ...(active ? styles.activeStat : {}),
-      }}
-    >
-      <div style={styles.statValue}>{value}</div>
-      <div style={styles.statLabel}>{label}</div>
-    </button>
-  )
-}
-
-function DataCard({
-  title,
-  meta,
   children,
 }: {
-  title: string
-  meta?: string
-  children: ReactNode
+  label: string;
+  children: ReactNode;
 }) {
   return (
-    <section style={styles.card}>
-      <div style={styles.cardHeader}>
-        <div>
-          <h2 style={styles.cardTitle}>{title}</h2>
-          {meta ? <p style={styles.cardSubtitle}>{meta}</p> : null}
-        </div>
-      </div>
-
+    <label className="grid gap-2">
+      <span className="text-sm font-black text-[#486b5d]">{label}</span>
       {children}
-    </section>
-  )
+    </label>
+  );
 }
 
-function EmptyState({ text }: { text: string }) {
-  return <div style={styles.emptyState}>{text}</div>
+const inputClass =
+  "h-12 w-full rounded-2xl border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10";
+const textareaClass =
+  "min-h-24 w-full rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10";
+
+function AddItemsModal({
+  forms,
+  saving,
+  onClose,
+  onChange,
+  onAddLine,
+  onRemoveLine,
+  onSubmit,
+}: {
+  forms: AddForm[];
+  saving: boolean;
+  onClose: () => void;
+  onChange: (index: number, patch: Partial<AddForm>) => void;
+  onAddLine: () => void;
+  onRemoveLine: (index: number) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <Modal
+      title="Pridėti prekes"
+      subtitle="Gali pridėti kelias prekes vienu kartu."
+      onClose={onClose}
+    >
+      <div className="grid gap-3">
+        {forms.map((form, index) => (
+          <div
+            key={index}
+            className="grid gap-3 rounded-2xl border border-[#dbe6e0] bg-white p-4 md:grid-cols-3"
+          >
+            <FormField label="Pavadinimas *">
+              <input
+                value={form.name}
+                onChange={(event) =>
+                  onChange(index, { name: event.target.value })
+                }
+                className={inputClass}
+                placeholder="Pvz. Chalatas L"
+              />
+            </FormField>
+            <FormField label="Kategorija">
+              <select
+                value={form.category}
+                onChange={(event) =>
+                  onChange(index, {
+                    category: event.target.value as InventoryCategory,
+                  })
+                }
+                className={inputClass}
+              >
+                {CATEGORIES.map((category) => (
+                  <option key={category.code} value={category.code}>
+                    {category.title}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Tipas">
+              <select
+                value={form.subcategory}
+                onChange={(event) =>
+                  onChange(index, { subcategory: event.target.value })
+                }
+                className={inputClass}
+              >
+                {SUBCATEGORY_OPTIONS[form.category].map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            {shouldShowSize(form.category) ? (
+              <FormField
+                label={form.category === "bedding" ? "Matmuo / vnt." : "Dydis"}
+              >
+                {SIZE_OPTIONS[form.category]?.length ? (
+                  <select
+                    value={form.size}
+                    onChange={(event) =>
+                      onChange(index, { size: event.target.value })
+                    }
+                    className={inputClass}
+                  >
+                    {SIZE_OPTIONS[form.category]?.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={form.size}
+                    onChange={(event) =>
+                      onChange(index, { size: event.target.value })
+                    }
+                    className={inputClass}
+                  />
+                )}
+              </FormField>
+            ) : null}
+            <FormField label="Vienetas">
+              <input
+                value={form.unit}
+                onChange={(event) =>
+                  onChange(index, { unit: event.target.value })
+                }
+                className={inputClass}
+              />
+            </FormField>
+            <FormField label="Kiekis">
+              <input
+                type="number"
+                min="0"
+                value={form.quantity}
+                onChange={(event) =>
+                  onChange(index, { quantity: event.target.value })
+                }
+                className={inputClass}
+              />
+            </FormField>
+            <FormField label="Min. kiekis">
+              <input
+                type="number"
+                min="0"
+                value={form.minQuantity}
+                onChange={(event) =>
+                  onChange(index, { minQuantity: event.target.value })
+                }
+                className={inputClass}
+              />
+            </FormField>
+            {forms.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => onRemoveLine(index)}
+                className="self-end rounded-2xl bg-red-50 px-4 py-3 text-sm font-black text-red-700"
+              >
+                Pašalinti
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <ModalActions
+        saving={saving}
+        onClose={onClose}
+        onSubmit={onSubmit}
+        submitText="Išsaugoti"
+        extra={
+          <button
+            type="button"
+            onClick={onAddLine}
+            className="rounded-2xl border border-[#c9d8d0] bg-white px-4 py-3 text-sm font-black text-[#486b5d]"
+          >
+            Pridėti eilutę
+          </button>
+        }
+      />
+    </Modal>
+  );
 }
 
-function getCategoryStatusStyle(status: string): CSSProperties {
-  if (status === 'empty') {
-    return {
-      background: '#fff1f2',
-      color: '#be123c',
-      border: '1px solid #fecdd3',
-    }
-  }
+function MovementModal({
+  title,
+  subtitle,
+  items,
+  targets = [],
+  targetLabel,
+  form,
+  setForm,
+  saving,
+  submitText,
+  notePlaceholder = "Įrašyk papildomą informaciją apie veiksmą",
+  danger = false,
+  onClose,
+  onSubmit,
+}: {
+  title: string;
+  subtitle: string;
+  items: InventoryItem[];
+  targets?: PersonOption[];
+  targetLabel?: string;
+  form: SingleMovementForm;
+  setForm: (form: SingleMovementForm) => void;
+  saving: boolean;
+  submitText: string;
+  notePlaceholder?: string;
+  danger?: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const selected = items.find((item) => item.id === form.itemId) || null;
+  const [categoryFilter, setCategoryFilter] = useState<string>(
+    selected?.category || "",
+  );
 
-  if (status === 'low') {
-    return {
-      background: '#fffbeb',
-      color: '#b45309',
-      border: '1px solid #fde68a',
-    }
-  }
+  const categoryOptions = useMemo(() => {
+    const codes = Array.from(
+      new Set(items.map((item) => item.category).filter(Boolean) as string[]),
+    );
+    return codes
+      .map((code) => ({ code, label: getCategoryTitle(code) }))
+      .sort((a, b) => a.label.localeCompare(b.label, "lt"));
+  }, [items]);
 
-  if (status === 'none') {
-    return {
-      background: '#f8fafc',
-      color: '#64748b',
-      border: '1px solid #e2e8f0',
-    }
-  }
+  const visibleItems = useMemo(() => {
+    const rows = categoryFilter
+      ? items.filter((item) => item.category === categoryFilter)
+      : items;
+    return [...rows].sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "lt"),
+    );
+  }, [items, categoryFilter]);
 
-  return {
-    background: '#ecfdf5',
-    color: '#047857',
-    border: '1px solid #a7f3d0',
-  }
+  return (
+    <Modal title={title} subtitle={subtitle} onClose={onClose}>
+      <div className="grid gap-4 rounded-2xl border border-[#dbe6e0] bg-white p-4 md:grid-cols-2">
+        <FormField label="Kategorija">
+          <select
+            value={categoryFilter}
+            onChange={(event) => {
+              setCategoryFilter(event.target.value);
+              setForm({ ...form, itemId: "" });
+            }}
+            className={inputClass}
+          >
+            <option value="">Visos kategorijos</option>
+            {categoryOptions.map((category) => (
+              <option key={category.code} value={category.code}>
+                {category.label}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField label="Prekė *">
+          <select
+            value={form.itemId}
+            onChange={(event) =>
+              setForm({ ...form, itemId: event.target.value, targetId: "" })
+            }
+            className={inputClass}
+          >
+            <option value="">Pasirink prekę</option>
+            {visibleItems.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name} · {getCategoryTitle(item.category)}
+                {item.size ? ` · ${item.size}` : ""} —{" "}
+                {formatQuantity(item.quantity, item.unit)}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        {targetLabel ? (
+          <FormField label={`${targetLabel} *`}>
+            <select
+              value={form.targetId}
+              onChange={(event) =>
+                setForm({ ...form, targetId: event.target.value })
+              }
+              className={inputClass}
+            >
+              <option value="">
+                Pasirink {targetLabel?.toLowerCase() || "gavėją"}
+              </option>
+              {targets.map((target) => (
+                <option key={target.id} value={target.id}>
+                  {target.label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        ) : null}
+        <FormField label="Kiekis *">
+          <input
+            type="number"
+            min="1"
+            max={selected ? Number(selected.quantity || 0) : undefined}
+            value={form.quantity}
+            onChange={(event) =>
+              setForm({ ...form, quantity: event.target.value })
+            }
+            className={inputClass}
+          />
+        </FormField>
+        <FormField label="Pastaba">
+          <textarea
+            value={form.notes}
+            onChange={(event) =>
+              setForm({ ...form, notes: event.target.value })
+            }
+            className={textareaClass}
+            placeholder={notePlaceholder}
+          />
+        </FormField>
+      </div>
+      <ModalActions
+        saving={saving}
+        onClose={onClose}
+        onSubmit={onSubmit}
+        submitText={submitText}
+        danger={danger}
+      />
+    </Modal>
+  );
 }
 
-function getRiskCardStyle(tone: 'danger' | 'warning' | 'green'): CSSProperties {
-  if (tone === 'danger') {
-    return {
-      background: '#fff1f2',
-      border: '1px solid #fecdd3',
-      color: '#be123c',
-    }
-  }
-
-  if (tone === 'warning') {
-    return {
-      background: '#fffbeb',
-      border: '1px solid #fde68a',
-      color: '#b45309',
-    }
-  }
-
-  return {
-    background: '#ecfdf5',
-    border: '1px solid #a7f3d0',
-    color: '#047857',
-  }
+function LaundryModal({
+  title,
+  subtitle,
+  items,
+  form,
+  setForm,
+  saving,
+  submitText,
+  onClose,
+  onSubmit,
+}: {
+  title: string;
+  subtitle: string;
+  items: InventoryItem[];
+  form: LaundryForm;
+  setForm: (form: LaundryForm) => void;
+  saving: boolean;
+  submitText: string;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <Modal title={title} subtitle={subtitle} onClose={onClose}>
+      <div className="grid gap-4 rounded-2xl border border-[#dbe6e0] bg-white p-4 md:grid-cols-2">
+        <FormField label="Tekstilė / uniforma *">
+          <select
+            value={form.itemId}
+            onChange={(event) =>
+              setForm({ ...form, itemId: event.target.value })
+            }
+            className={inputClass}
+          >
+            <option value="">Pasirink prekę</option>
+            {items.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name} — {formatQuantity(item.quantity, item.unit)}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Mato vienetas">
+          <select
+            value={form.unitMode}
+            onChange={(event) =>
+              setForm({ ...form, unitMode: event.target.value })
+            }
+            className={inputClass}
+          >
+            <option value="kg">kg</option>
+            <option value="vnt.">vnt.</option>
+            <option value="maišai">maišai</option>
+            <option value="komplektai">komplektai</option>
+          </select>
+        </FormField>
+        <FormField label="Kiekis *">
+          <input
+            type="number"
+            min="0.1"
+            step="0.1"
+            value={form.quantity}
+            onChange={(event) =>
+              setForm({ ...form, quantity: event.target.value })
+            }
+            className={inputClass}
+          />
+        </FormField>
+        <FormField label="Pastaba">
+          <textarea
+            value={form.notes}
+            onChange={(event) =>
+              setForm({ ...form, notes: event.target.value })
+            }
+            className={textareaClass}
+            placeholder="Pvz. 3 maišai iš 1 aukšto, trūksta 1 paklodės"
+          />
+        </FormField>
+      </div>
+      <ModalActions
+        saving={saving}
+        onClose={onClose}
+        onSubmit={onSubmit}
+        submitText={submitText}
+      />
+    </Modal>
+  );
 }
 
-const styles: Record<string, CSSProperties> = {
-  page: {
-    minHeight: '100vh',
-    background: '#f8fafc',
-    padding: 24,
-    display: 'grid',
-    gap: 24,
-    color: '#020617',
-  },
-  hero: {
-    width: '100%',
-    maxWidth: 1280,
-    margin: '0 auto',
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: 28,
-    padding: 28,
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 24,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-  },
-  heroContent: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 20,
-    minWidth: 0,
-  },
-  heroIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 24,
-    background: '#ecfdf5',
-    color: '#047857',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: '0 0 auto',
-  },
-  eyebrow: {
-    color: '#047857',
-    fontSize: 12,
-    fontWeight: 900,
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-  },
-  title: {
-    margin: '8px 0 0',
-    color: '#0f172a',
-    fontSize: 40,
-    lineHeight: 1.05,
-    fontWeight: 950,
-    letterSpacing: '-0.03em',
-  },
-  subtitle: {
-    margin: '8px 0 0',
-    color: '#64748b',
-    fontSize: 17,
-    fontWeight: 650,
-    lineHeight: 1.5,
-    maxWidth: 680,
-  },
-  heroActions: {
-    display: 'flex',
-    gap: 16,
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  actionGroup: {
-    display: 'flex',
-    gap: 10,
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  uniformActionGroup: {
-    display: 'flex',
-    gap: 10,
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    borderLeft: '1px solid #e2e8f0',
-    paddingLeft: 16,
-  },
-  primaryButton: {
-    border: '1px solid #34d399',
-    borderRadius: 16,
-    padding: '12px 18px',
-    background: '#047857',
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 900,
-    textDecoration: 'none',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 8,
-    boxShadow: '0 10px 22px rgba(4,120,87,0.18)',
-    cursor: 'pointer',
-  },
-  secondaryButton: {
-    border: '1px solid #bbf7d0',
-    borderRadius: 16,
-    padding: '12px 18px',
-    background: '#ecfdf5',
-    color: '#047857',
-    fontSize: 14,
-    fontWeight: 900,
-    textDecoration: 'none',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 8,
-    cursor: 'pointer',
-  },
-  message: {
-    width: '100%',
-    maxWidth: 1280,
-    margin: '0 auto',
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
-    borderRadius: 16,
-    padding: 13,
-    fontSize: 14,
-    fontWeight: 800,
-  },
-  statsGrid: {
-    width: '100%',
-    maxWidth: 1280,
-    margin: '0 auto',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-    gap: 16,
-  },
-  statCard: {
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: 24,
-    padding: 20,
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-    textAlign: 'left',
-    cursor: 'pointer',
-  },
-  activeStat: {
-    outline: '2px solid #10b981',
-    boxShadow: '0 0 0 4px rgba(16,185,129,0.12)',
-  },
-  warningStat: {
-    background: '#fffbeb',
-    border: '1px solid #fde68a',
-  },
-  dangerStat: {
-    background: '#fff1f2',
-    border: '1px solid #fecdd3',
-  },
-  greenStat: {
-    background: '#ecfdf5',
-    border: '1px solid #a7f3d0',
-  },
-  statValue: {
-    color: '#0f172a',
-    fontSize: 34,
-    fontWeight: 950,
-    lineHeight: 1,
-  },
-  statLabel: {
-    marginTop: 8,
-    color: '#64748b',
-    fontSize: 12,
-    fontWeight: 850,
-  },
-  riskPanel: {
-    width: '100%',
-    maxWidth: 1280,
-    margin: '0 auto',
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: 28,
-    padding: 24,
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-  },
-  riskHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 16,
-    alignItems: 'flex-start',
-  },
-  warningEyebrow: {
-    color: '#d97706',
-    fontSize: 12,
-    fontWeight: 900,
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-  },
-  warningIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 18,
-    background: '#fffbeb',
-    color: '#d97706',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: '0 0 auto',
-  },
-  riskGrid: {
-    marginTop: 20,
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: 12,
-  },
-  riskCard: {
-    borderRadius: 20,
-    padding: 16,
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 14,
-    alignItems: 'flex-start',
-    textAlign: 'left',
-    cursor: 'pointer',
-  },
-  riskTitle: {
-    margin: 0,
-    color: '#0f172a',
-    fontSize: 15,
-    fontWeight: 950,
-  },
-  riskDesc: {
-    margin: '6px 0 0',
-    color: '#475569',
-    fontSize: 13,
-    fontWeight: 700,
-    lineHeight: 1.45,
-  },
-  riskValue: {
-    color: 'currentColor',
-    fontSize: 32,
-    fontWeight: 950,
-    lineHeight: 1,
-  },
-  toolbar: {
-    width: '100%',
-    maxWidth: 1280,
-    margin: '0 auto',
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: 24,
-    padding: 18,
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 12,
-    alignItems: 'end',
-  },
-  searchBox: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 9,
-    border: '1px solid #cbd5e1',
-    borderRadius: 14,
-    padding: '0 12px',
-    color: '#64748b',
-  },
-  searchInput: {
-    width: '100%',
-    border: 'none',
-    outline: 'none',
-    padding: '11px 0',
-    fontSize: 14,
-    background: 'transparent',
-  },
-  refreshButton: {
-    border: '1px solid #cbd5e1',
-    borderRadius: 14,
-    background: '#ffffff',
-    color: '#0f172a',
-    padding: '11px 14px',
-    fontSize: 14,
-    fontWeight: 900,
-    cursor: 'pointer',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  categoryGrid: {
-    width: '100%',
-    maxWidth: 1280,
-    margin: '0 auto',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: 14,
-  },
-  categoryCard: {
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: 24,
-    padding: 18,
-    minHeight: 225,
-    display: 'grid',
-    gap: 16,
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-  },
-  categoryTop: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    alignItems: 'center',
-  },
-  categoryIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    background: '#ecfdf5',
-    color: '#047857',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryStatus: {
-    padding: '5px 9px',
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 900,
-    whiteSpace: 'nowrap',
-  },
-  categoryTitle: {
-    margin: 0,
-    color: '#0f172a',
-    fontSize: 19,
-    fontWeight: 950,
-    letterSpacing: '-0.03em',
-  },
-  categoryDescription: {
-    margin: '7px 0 0',
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: 650,
-    lineHeight: 1.45,
-  },
-  categoryStats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    gap: 10,
-  },
-  progressMeta: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    color: '#64748b',
-    fontSize: 12,
-    fontWeight: 900,
-  },
-  progressTrack: {
-    marginTop: 8,
-    height: 8,
-    overflow: 'hidden',
-    borderRadius: 999,
-    background: '#e2e8f0',
-  },
-  progressBar: {
-    display: 'block',
-    height: '100%',
-    borderRadius: 999,
-  },
-  categoryStatItem: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: 4,
-    minWidth: 0,
-  },
-  categoryStatNumber: {
-    color: '#0f172a',
-    fontSize: 18,
-    fontWeight: 950,
-    lineHeight: 1,
-  },
-  categoryStatLabel: {
-    color: '#0f172a',
-    fontSize: 13,
-    fontWeight: 750,
-    whiteSpace: 'nowrap',
-  },
-  categoryActions: {
-    borderTop: '1px solid #f1f5f9',
-    paddingTop: 12,
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 10,
-    alignItems: 'center',
-  },
-  categoryAddButton: {
-    border: '1px solid #a7f3d0',
-    background: '#ecfdf5',
-    color: '#047857',
-    borderRadius: 12,
-    padding: '8px 10px',
-    fontSize: 12,
-    fontWeight: 900,
-    cursor: 'pointer',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-  },
-  cardFooter: {
-    color: '#047857',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    fontSize: 13,
-    fontWeight: 900,
-    textDecoration: 'none',
-  },
-  bottomGrid: {
-    width: '100%',
-    maxWidth: 1280,
-    margin: '0 auto',
-    display: 'grid',
-    gridTemplateColumns: '1fr',
-    gap: 20,
-    alignItems: 'start',
-  },
-  card: {
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: 24,
-    padding: 24,
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-    minWidth: 0,
-  },
-  cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  cardTitle: {
-    margin: 0,
-    color: '#0f172a',
-    fontSize: 20,
-    fontWeight: 950,
-    letterSpacing: '-0.03em',
-  },
-  cardSubtitle: {
-    margin: '6px 0 0',
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: 650,
-  },
-  emptyState: {
-    marginTop: 16,
-    padding: 28,
-    border: '1px dashed #cbd5e1',
-    borderRadius: 20,
-    color: '#64748b',
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: 750,
-  },
-  tableWrap: {
-    marginTop: 14,
-    overflowX: 'auto',
-  },
-  table: {
-    width: '100%',
-    minWidth: 900,
-    borderCollapse: 'collapse',
-  },
-  historyTable: {
-    width: '100%',
-    minWidth: 900,
-    borderCollapse: 'collapse',
-  },
-  th: {
-    textAlign: 'left',
-    padding: '12px 10px',
-    borderBottom: '1px solid #e2e8f0',
-    color: '#64748b',
-    fontSize: 12,
-    fontWeight: 900,
-    whiteSpace: 'nowrap',
-  },
-  tr: {
-    borderBottom: '1px solid #f1f5f9',
-  },
-  td: {
-    padding: '14px 10px',
-    color: '#334155',
-    fontSize: 13,
-    fontWeight: 650,
-    verticalAlign: 'middle',
-  },
-  tdBold: {
-    padding: '14px 10px',
-    color: '#0f172a',
-    fontSize: 13,
-    fontWeight: 900,
-    verticalAlign: 'middle',
-  },
-  statusBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '5px 9px',
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 900,
-    whiteSpace: 'nowrap',
-  },
-  inlineActions: {
-    display: 'flex',
-    gap: 7,
-    flexWrap: 'wrap',
-  },
-  inlineGreenButton: {
-    border: '1px solid #a7f3d0',
-    background: '#ecfdf5',
-    color: '#047857',
-    borderRadius: 11,
-    padding: '7px 9px',
-    fontSize: 12,
-    fontWeight: 900,
-    cursor: 'pointer',
-  },
-  inlineDangerButton: {
-    border: '1px solid #fecdd3',
-    background: '#fff1f2',
-    color: '#be123c',
-    borderRadius: 11,
-    padding: '7px 9px',
-    fontSize: 12,
-    fontWeight: 900,
-    cursor: 'pointer',
-  },
-  logBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 5,
-    padding: '5px 9px',
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 900,
-    whiteSpace: 'nowrap',
-  },
-  inBadge: {
-    background: '#ecfdf5',
-    color: '#047857',
-    border: '1px solid #a7f3d0',
-  },
-  outBadge: {
-    background: '#fff1f2',
-    color: '#be123c',
-    border: '1px solid #fecdd3',
-  },
-  statusList: {
-    marginTop: 18,
-    display: 'grid',
-    gap: 13,
-  },
-  statusItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    color: '#334155',
-    fontSize: 14,
-    fontWeight: 750,
-  },
-  statusDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 999,
-    background: '#22c55e',
-  },
-  modalBackdrop: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(15, 23, 42, 0.45)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    zIndex: 100,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 1060,
-    maxHeight: '92vh',
-    overflow: 'auto',
-    background: '#ffffff',
-    borderRadius: 24,
-    padding: 22,
-    display: 'grid',
-    gap: 18,
-    boxShadow: '0 24px 70px rgba(15, 23, 42, 0.25)',
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 16,
-    alignItems: 'flex-start',
-  },
-  modalTitle: {
-    margin: 0,
-    color: '#0f172a',
-    fontSize: 24,
-    fontWeight: 950,
-    letterSpacing: '-0.04em',
-  },
-  modalSubtitle: {
-    margin: '6px 0 0',
-    color: '#64748b',
-    fontSize: 14,
-    fontWeight: 650,
-  },
-  iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    border: '1px solid #d1d5db',
-    background: '#ffffff',
-    color: '#0f172a',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  multiLines: {
-    display: 'grid',
-    gap: 12,
-  },
-  multiLine: {
-    background: '#f8fafc',
-    border: '1px solid #e5e7eb',
-    borderRadius: 18,
-    padding: 14,
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 12,
-    alignItems: 'end',
-  },
-  field: {
-    display: 'grid',
-    gap: 6,
-    minWidth: 0,
-  },
-  label: {
-    color: '#334155',
-    fontSize: 12,
-    fontWeight: 850,
-  },
-  input: {
-    width: '100%',
-    border: '1px solid #d1d5db',
-    borderRadius: 13,
-    padding: '11px 12px',
-    fontSize: 14,
-    outline: 'none',
-    background: '#ffffff',
-    boxSizing: 'border-box',
-  },
-  issueInfo: {
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    color: '#334155',
-    padding: 12,
-    borderRadius: 14,
-    fontSize: 14,
-    fontWeight: 750,
-  },
-  modalMessage: {
-    background: '#fff1f2',
-    border: '1px solid #fecdd3',
-    color: '#be123c',
-    borderRadius: 16,
-    padding: 13,
-    fontSize: 14,
-    fontWeight: 850,
-    lineHeight: 1.45,
-  },
-  removeLineButton: {
-    border: '1px solid #fecdd3',
-    background: '#fff1f2',
-    color: '#be123c',
-    borderRadius: 13,
-    padding: '11px 12px',
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: 'pointer',
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: 10,
-    flexWrap: 'wrap',
-  },
-  cancelButton: {
-    border: '1px solid #d1d5db',
-    borderRadius: 14,
-    padding: '11px 14px',
-    background: '#ffffff',
-    color: '#0f172a',
-    fontSize: 14,
-    fontWeight: 850,
-    cursor: 'pointer',
-  },
-  saveButton: {
-    border: 'none',
-    borderRadius: 14,
-    padding: '11px 14px',
-    background: '#047857',
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 850,
-    cursor: 'pointer',
-  },
-  dangerSaveButton: {
-    border: 'none',
-    borderRadius: 14,
-    padding: '11px 14px',
-    background: '#dc2626',
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 850,
-    cursor: 'pointer',
-  },
+function ModalActions({
+  saving,
+  onClose,
+  onSubmit,
+  submitText,
+  danger = false,
+  extra,
+}: {
+  saving: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+  submitText: string;
+  notePlaceholder?: string;
+  danger?: boolean;
+  extra?: ReactNode;
+}) {
+  return (
+    <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      {extra}
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-2xl border border-[#c9d8d0] bg-white px-4 py-3 text-sm font-black text-[#486b5d]"
+      >
+        Atšaukti
+      </button>
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={saving}
+        className={`rounded-2xl px-4 py-3 text-sm font-black text-white disabled:opacity-60 ${danger ? "bg-red-700 hover:bg-red-800" : "bg-[#047857] hover:bg-[#036747]"}`}
+      >
+        {saving ? "Saugoma..." : submitText}
+      </button>
+    </div>
+  );
 }

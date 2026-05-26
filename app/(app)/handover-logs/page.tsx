@@ -5,6 +5,7 @@ import {
   Archive,
   CheckCircle2,
   ClipboardList,
+  CalendarDays,
   HelpCircle,
   MessageSquare,
   Plus,
@@ -12,6 +13,7 @@ import {
   Search,
   ShieldAlert,
   Sparkles,
+  Users,
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -210,39 +212,51 @@ async function writeAuditLog(input: {
     } = await supabase.auth.getUser();
 
     const now = new Date().toISOString();
-    const base = {
-      organization_id: input.organizationId,
-      user_id: user?.id || null,
-      action: input.action,
-      created_at: now,
+    const tableName = input.entityType || "handover_logs";
+    const changes = {
+      ...(input.metadata || {}),
+      module: "handover_logs",
     };
 
     const attempts = [
       {
-        table: "audit_logs",
-        payload: {
-          ...base,
-          entity_type: input.entityType || "handover_log",
-          entity_id: input.entityId,
-          metadata: input.metadata || {},
-        },
-      },
-      {
-        table: "audit_logs",
-        payload: {
-          ...base,
-          table_name: input.entityType || "handover_logs",
-          record_id: input.entityId,
-          changes: input.metadata || {},
-        },
-      },
-      {
         table: "audit_log",
         payload: {
-          ...base,
-          table_name: input.entityType || "handover_logs",
+          organization_id: input.organizationId,
+          table_name: tableName,
           record_id: input.entityId,
-          changes: input.metadata || {},
+          action: input.action,
+          changed_by: user?.id || null,
+          actor: user?.id || null,
+          changed_at: now,
+          created_at: now,
+          changes,
+        },
+      },
+      {
+        table: "audit_logs",
+        payload: {
+          organization_id: input.organizationId,
+          table_name: tableName,
+          record_id: input.entityId,
+          action: input.action,
+          changed_by: user?.id || null,
+          user_id: user?.id || null,
+          changed_at: now,
+          created_at: now,
+          changes,
+        },
+      },
+      {
+        table: "audit_logs",
+        payload: {
+          organization_id: input.organizationId,
+          entity_type: tableName,
+          entity_id: input.entityId,
+          action: input.action,
+          user_id: user?.id || null,
+          created_at: now,
+          metadata: changes,
         },
       },
     ];
@@ -590,8 +604,8 @@ export default function HandoverLogsPage() {
 
   if (isMobile) {
     return (
-      <main className="min-h-screen bg-slate-50 pb-32 text-slate-950">
-        <section className="overflow-hidden rounded-b-[34px] bg-gradient-to-br from-emerald-800 via-emerald-700 to-slate-950 px-5 pb-7 pt-7 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+      <main className="min-h-screen bg-[#f8faf8] pb-32 text-[#10251f]">
+        <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-emerald-900/10 bg-[#486b5d] px-5 pb-7 pt-7 text-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.32em] text-emerald-100">
@@ -611,7 +625,7 @@ export default function HandoverLogsPage() {
           </div>
 
           <div className="mt-6 grid grid-cols-3 gap-3">
-            <MobileHeroStat label="Visi" value={stats.total} />
+            <MobileHeroStat label="Visi" value={stats.all} />
             <MobileHeroStat label="Nauji" value={stats.unread} />
             <MobileHeroStat label="Svarbūs" value={stats.important} />
           </div>
@@ -625,12 +639,12 @@ export default function HandoverLogsPage() {
           ) : null}
 
           <label className="relative block">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8ea0b5]" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Ieškoti gyventojo, teksto..."
-              className="h-14 w-full rounded-[22px] border border-slate-200/70 bg-white pl-12 pr-4 text-[15px] font-black text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.05)] outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+              className="h-14 w-full rounded-[22px] border border-[#dbe6e0] bg-white pl-12 pr-4 text-[15px] font-black text-[#10251f] shadow-[0_8px_24px_rgba(15,23,42,0.05)] outline-none placeholder:text-[#8ea0b5] focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
             />
           </label>
 
@@ -674,11 +688,11 @@ export default function HandoverLogsPage() {
           </div>
 
           {hotResidents.length > 0 ? (
-            <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[28px] border border-[#dbe6e0] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">Dažniausiai minimi</p>
-                  <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">Gyventojai</h2>
+                  <h2 className="mt-1 text-xl font-black tracking-tight text-[#10251f]">Gyventojai</h2>
                 </div>
                 <Sparkles className="h-5 w-5 text-emerald-700" />
               </div>
@@ -688,10 +702,10 @@ export default function HandoverLogsPage() {
                     key={item.resident.id}
                     type="button"
                     onClick={() => setResidentFilter(item.resident.id)}
-                    className="min-w-[190px] rounded-[22px] border border-slate-200 bg-slate-50 p-3 text-left transition active:scale-[0.98]"
+                    className="min-w-[190px] rounded-[22px] border border-[#dbe6e0] bg-[#f8faf8] p-3 text-left transition active:scale-[0.98]"
                   >
-                    <p className="line-clamp-1 text-sm font-black text-slate-950">{residentName(item.resident, roomsById)}</p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">{item.count} įrašai · {item.critical} krit.</p>
+                    <p className="line-clamp-1 text-sm font-black text-[#10251f]">{residentName(item.resident, roomsById)}</p>
+                    <p className="mt-1 text-xs font-bold text-[#526174]">{item.count} įrašai · {item.critical} krit.</p>
                   </button>
                 ))}
               </div>
@@ -707,7 +721,7 @@ export default function HandoverLogsPage() {
               <button
                 type="button"
                 onClick={() => void loadAll()}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200/70 bg-white text-emerald-700 shadow-sm"
+                className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#dbe6e0] bg-white text-emerald-700 shadow-sm"
                 aria-label="Atnaujinti"
               >
                 <RefreshCw className="h-5 w-5" />
@@ -715,7 +729,7 @@ export default function HandoverLogsPage() {
             </div>
 
             {filteredLogs.length === 0 ? (
-              <div className="rounded-[28px] border border-slate-200/70 bg-white p-8 text-center text-sm font-black text-slate-500">
+              <div className="rounded-[28px] border border-[#dbe6e0] bg-white p-8 text-center text-sm font-black text-[#526174]">
                 Perdavimo įrašų pagal filtrus nėra.
               </div>
             ) : (
@@ -732,30 +746,30 @@ export default function HandoverLogsPage() {
                         ? "border-rose-200"
                         : log.priority === "high"
                           ? "border-amber-200"
-                          : "border-slate-200"
+                          : "border-[#dbe6e0]"
                     } ${log.archived ? "opacity-60" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-700">
+                          <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-[11px] font-black text-[#486b5d]">
                             {shiftLabel(log.shift_type)}
                           </span>
                           <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700">
                             {priorityLabel(log.priority)}
                           </span>
                           {!read ? (
-                            <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-black text-white">Nauja</span>
+                            <span className="rounded-full bg-[#047857] px-3 py-1 text-[11px] font-black text-white">Nauja</span>
                           ) : null}
                           {log.is_important ? (
                             <span className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-black text-rose-700">Svarbu</span>
                           ) : null}
                         </div>
 
-                        <h3 className="mt-3 text-xl font-black leading-tight tracking-[-0.02em] text-slate-950">
+                        <h3 className="mt-3 text-xl font-black leading-tight tracking-[-0.02em] text-[#10251f]">
                           {log.title}
                         </h3>
-                        <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-600">
+                        <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#526174]">
                           {log.note}
                         </p>
                       </div>
@@ -770,15 +784,15 @@ export default function HandoverLogsPage() {
                           <CheckCircle2 className="h-6 w-6" />
                         </button>
                       ) : (
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-slate-50 text-slate-400">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#f8faf8] text-[#8ea0b5]">
                           <CheckCircle2 className="h-6 w-6" />
                         </div>
                       )}
                     </div>
 
-                    <div className="mt-4 rounded-[22px] bg-slate-50 p-3">
-                      <p className="line-clamp-1 text-sm font-black text-slate-700">{residentName(resident, roomsById)}</p>
-                      <p className="mt-1 text-xs font-bold text-slate-500">
+                    <div className="mt-4 rounded-[22px] bg-[#f8faf8] p-3">
+                      <p className="line-clamp-1 text-sm font-black text-[#486b5d]">{residentName(resident, roomsById)}</p>
+                      <p className="mt-1 text-xs font-bold text-[#526174]">
                         {formatShortDate(log.shift_date)} · {profileName(author)}
                       </p>
                     </div>
@@ -787,7 +801,7 @@ export default function HandoverLogsPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedLog(log)}
-                        className="flex-1 rounded-[18px] bg-slate-950 px-4 py-3 text-sm font-black text-white"
+                        className="flex-1 rounded-[18px] bg-[#047857] px-4 py-3 text-sm font-black text-white"
                       >
                         Atidaryti
                       </button>
@@ -795,7 +809,7 @@ export default function HandoverLogsPage() {
                         <button
                           type="button"
                           onClick={() => void archiveLog(log)}
-                          className="rounded-[18px] border border-slate-200/70 bg-white px-4 py-3 text-sm font-black text-slate-700"
+                          className="rounded-[18px] border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d]"
                         >
                           Arch.
                         </button>
@@ -811,31 +825,31 @@ export default function HandoverLogsPage() {
         <button
           type="button"
           onClick={() => setMobileCreateOpen(true)}
-          className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-white shadow-2xl active:scale-95"
+          className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-[#047857] text-white shadow-2xl active:scale-95"
           aria-label="Naujas perdavimo įrašas"
         >
           <Plus className="h-7 w-7" />
         </button>
 
         {mobileCreateOpen ? (
-          <div className="fixed inset-0 z-40 flex items-end bg-slate-950/40 backdrop-blur-sm">
-            <section className="max-h-[88vh] w-full overflow-y-auto rounded-t-[32px] bg-white p-5 shadow-2xl">
-              <div className="flex items-start justify-between gap-4">
+          <div className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-[#047857]/50 p-4 backdrop-blur-sm md:p-6">
+            <section className="max-h-[calc(100vh-48px)] w-full max-w-[980px] overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+              <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700">Naujas įrašas</p>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight">Perduoti informaciją</h2>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100/80">Naujas įrašas</p>
+                  <h2 className="mt-1 text-3xl font-black tracking-[-0.04em] text-white">Perduoti informaciją</h2>
                 </div>
                 <button
                   type="button"
                   onClick={() => setMobileCreateOpen(false)}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"
+                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
                   aria-label="Uždaryti"
                 >
-                  <X className="h-5 w-5" />
+                  <X size={28} strokeWidth={2.1} />
                 </button>
               </div>
 
-              <div className="mt-5 space-y-4">
+              <div className="max-h-[calc(100vh-178px)] space-y-4 overflow-y-auto bg-[#f3f6f4] p-6">
                 <Field label="Gyventojas">
                   <select value={form.resident_id} onChange={(event) => setForm((prev) => ({ ...prev, resident_id: event.target.value }))} className="input">
                     <option value="">Bendra įstaigos informacija</option>
@@ -867,11 +881,11 @@ export default function HandoverLogsPage() {
                 </Field>
 
                 <div className="grid gap-2">
-                  <label className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-700">
+                  <label className="flex items-center gap-3 rounded-[20px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-black text-[#486b5d]">
                     <input type="checkbox" checked={form.is_important} onChange={(event) => setForm((prev) => ({ ...prev, is_important: event.target.checked }))} />
                     Pažymėti kaip svarbų
                   </label>
-                  <label className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-700">
+                  <label className="flex items-center gap-3 rounded-[20px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-black text-[#486b5d]">
                     <input type="checkbox" checked={form.needs_follow_up} onChange={(event) => setForm((prev) => ({ ...prev, needs_follow_up: event.target.checked }))} />
                     Reikia sekti kitai pamainai
                   </label>
@@ -931,8 +945,8 @@ export default function HandoverLogsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
-        <div className="mx-auto w-full max-w-[1700px] rounded-3xl border border-slate-200/70 bg-white p-8 text-center font-black shadow-sm">
+      <main className="min-h-screen bg-[#f8faf8] p-6 text-[#10251f]">
+        <div className="mx-auto w-full max-w-[1700px] rounded-[22px] border border-[#dbe6e0] bg-white p-8 text-center font-black shadow-sm">
           Kraunama perdavimo žurnalus...
         </div>
       </main>
@@ -940,34 +954,43 @@ export default function HandoverLogsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
+    <main className="min-h-screen bg-[#f8faf8] p-6 text-[#10251f]">
       <div className="mx-auto w-full max-w-[1700px] space-y-6">
-        <section className="rounded-3xl border border-slate-200/70 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-5">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
+        <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]">
+          <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-5">
+              <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#e8f7ef] text-[#486b5d] shadow-sm">
                 <ClipboardList className="h-7 w-7" />
               </div>
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Perdavimo žurnalai</p>
-                <h1 className="mt-2 text-4xl font-black tracking-tight">Pamainų perdavimas</h1>
-                <p className="mt-2 text-lg font-semibold text-slate-500">
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-100/80">Perdavimo žurnalai</p>
+                <h1 className="mt-2 text-4xl font-black tracking-[-0.04em] text-white">Pamainų perdavimas</h1>
+                <p className="mt-2 max-w-4xl text-lg font-semibold text-white/85">
                   Svarbi informacija tarp pamainų, susieta su gyventojais ir atsakomybės tęstinumu.
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={() => setHelpOpen(true)} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white px-5 py-3 font-extrabold text-slate-700 hover:bg-slate-50">
+              <button type="button" onClick={() => setHelpOpen(true)} className="inline-flex items-center gap-2 rounded-[14px] bg-white/10 px-5 py-3 font-extrabold text-white ring-1 ring-white/15 transition hover:bg-white/20">
                 <HelpCircle className="h-4 w-4" /> Pagalba
               </button>
-              <button type="button" onClick={() => void loadAll()} className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 font-extrabold text-emerald-700 hover:bg-emerald-100">
+              <button type="button" onClick={() => void loadAll()} className="inline-flex items-center gap-2 rounded-[14px] bg-[#e8f7ef] px-5 py-3 font-extrabold text-[#486b5d] transition hover:bg-white">
                 <RefreshCw className="h-4 w-4" /> Atnaujinti
               </button>
             </div>
           </div>
+
+          <div className="border-t border-emerald-900/10 bg-[#eef4f1] p-3">
+            <div className="flex flex-wrap gap-2">
+              <HandoverTab active={!includeArchived && !unreadOnly && !importantOnly} icon={<ClipboardList className="h-4 w-4" />} label="Visi aktyvūs" count={stats.all} onClick={() => { setIncludeArchived(false); setUnreadOnly(false); setImportantOnly(false); }} />
+              <HandoverTab active={unreadOnly} icon={<CheckCircle2 className="h-4 w-4" />} label="Nepatvirtinti" count={stats.unread} onClick={() => { setIncludeArchived(false); setUnreadOnly((v) => !v); }} />
+              <HandoverTab active={importantOnly} icon={<ShieldAlert className="h-4 w-4" />} label="Svarbūs" count={stats.important} onClick={() => setImportantOnly((v) => !v)} />
+              <HandoverTab active={includeArchived} icon={<Archive className="h-4 w-4" />} label="Archyvas" onClick={() => { setUnreadOnly(false); setIncludeArchived((v) => !v); }} />
+            </div>
+          </div>
         </section>
 
-        {message ? <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5 font-extrabold text-amber-800">{message}</div> : null}
+        {message ? <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-5 font-extrabold text-amber-900">{message}</div> : null}
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <Stat title="Visi" value={stats.all} />
@@ -979,10 +1002,10 @@ export default function HandoverLogsPage() {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[560px_minmax(0,1fr)]">
-          <article className="xl:sticky xl:top-6 self-start rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Naujas įrašas</p>
+          <article className="xl:sticky xl:top-6 self-start rounded-[24px] border border-[#c9d8d0] bg-white p-6 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-100/80">Naujas įrašas</p>
             <h2 className="mt-1 text-2xl font-black tracking-tight">Perduoti informaciją</h2>
-            <p className="mt-1 font-semibold text-slate-500">Pirmiausia pasirink temą, tada, jei reikia, priskirk gyventoją.</p>
+            <p className="mt-1 font-semibold text-[#526174]">Pirmiausia pasirink temą, tada, jei reikia, priskirk gyventoją.</p>
 
             <div className="mt-5 space-y-4">
               <Field label="Tema">
@@ -1003,10 +1026,10 @@ export default function HandoverLogsPage() {
                           }))
                         }
                         className={[
-                          "min-h-12 rounded-2xl border px-3 py-2 text-sm font-black transition",
+                          "min-h-12 rounded-[14px] border px-3 py-2 text-sm font-black transition",
                           isActive
                             ? "border-emerald-300 bg-emerald-700 text-white shadow-sm"
-                            : "border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800",
+                            : "border-[#dbe6e0] bg-[#f8faf8] text-[#486b5d] hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800",
                         ].join(" ")}
                       >
                         {topic.label}
@@ -1052,38 +1075,38 @@ export default function HandoverLogsPage() {
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {QUICK_TEMPLATES.map((template) => (
-                  <button key={template} type="button" onClick={() => setForm((prev) => ({ ...prev, title: prev.title || template, note: prev.note ? `${prev.note}\n${template}` : template }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-black text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700">
+                  <button key={template} type="button" onClick={() => setForm((prev) => ({ ...prev, title: prev.title || template, note: prev.note ? `${prev.note}\n${template}` : template }))} className="rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-3 py-2 text-left text-xs font-black text-[#526174] hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700">
                     + {template}
                   </button>
                 ))}
               </div>
 
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-700">
+              <label className="flex items-center gap-3 rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-black text-[#486b5d]">
                 <input type="checkbox" checked={form.is_important} onChange={(event) => setForm((prev) => ({ ...prev, is_important: event.target.checked }))} />
                 Pažymėti kaip svarbų
               </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-black text-slate-700">
+              <label className="flex items-center gap-3 rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-black text-[#486b5d]">
                 <input type="checkbox" checked={form.needs_follow_up} onChange={(event) => setForm((prev) => ({ ...prev, needs_follow_up: event.target.checked }))} />
                 Reikia sekti / perduoti kitai pamainai
               </label>
 
-              <button type="button" onClick={() => void createLog()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-5 py-3 font-extrabold text-white hover:bg-emerald-900 disabled:opacity-60">
+              <button type="button" onClick={() => void createLog()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#047857] px-5 py-3 font-extrabold text-white transition hover:bg-[#036747] disabled:opacity-60">
                 <Plus className="h-4 w-4" /> {saving ? "Saugoma..." : "Sukurti įrašą"}
               </button>
             </div>
           </article>
 
           <div className="min-w-0 space-y-6">
-            <article className="rounded-[28px] border border-slate-200/70 bg-white p-5 shadow-sm">
+            <article className="rounded-[24px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Filtrai</p>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Pamainos informacija</h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">Atrinkite įrašus pagal gyventoją, prioritetą, pamainą ir būseną.</p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight text-[#10251f]">Pamainos informacija</h2>
+                  <p className="mt-1 text-sm font-semibold text-[#526174]">Atrinkite įrašus pagal gyventoją, prioritetą, pamainą ir būseną.</p>
                 </div>
                 <label className="relative block w-full xl:max-w-md">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ieškoti pagal tekstą, gyventoją..." className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 font-bold text-slate-900 outline-none focus:border-emerald-300 focus:bg-white" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8ea0b5]" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ieškoti pagal tekstą, gyventoją..." className="h-12 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] py-3 pl-12 pr-4 font-bold text-[#10251f] outline-none focus:border-emerald-300 focus:bg-white" />
                 </label>
               </div>
 
@@ -1092,7 +1115,7 @@ export default function HandoverLogsPage() {
                   <select
                     value={residentFilter}
                     onChange={(event) => setResidentFilter(event.target.value)}
-                    className="h-14 w-full min-w-0 rounded-2xl border border-slate-200/70 bg-white px-5 text-sm font-black text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+                    className="h-14 w-full min-w-0 rounded-[14px] border border-[#dbe6e0] bg-white px-5 text-sm font-black text-[#10251f] outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
                   >
                     <option value="all">Visi gyventojai</option>
                     {residents.map((resident) => (
@@ -1105,7 +1128,7 @@ export default function HandoverLogsPage() {
                   <select
                     value={priorityFilter}
                     onChange={(event) => setPriorityFilter(event.target.value)}
-                    className="h-14 w-full min-w-0 rounded-2xl border border-slate-200/70 bg-white px-5 text-sm font-black text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+                    className="h-14 w-full min-w-0 rounded-[14px] border border-[#dbe6e0] bg-white px-5 text-sm font-black text-[#10251f] outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
                   >
                     <option value="all">Visi prioritetai</option>
                     {PRIORITIES.map((p) => (
@@ -1118,7 +1141,7 @@ export default function HandoverLogsPage() {
                   <select
                     value={shiftFilter}
                     onChange={(event) => setShiftFilter(event.target.value)}
-                    className="h-14 w-full min-w-0 rounded-2xl border border-slate-200/70 bg-white px-5 text-sm font-black text-slate-900 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+                    className="h-14 w-full min-w-0 rounded-[14px] border border-[#dbe6e0] bg-white px-5 text-sm font-black text-[#10251f] outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
                   >
                     <option value="all">Visos pamainos</option>
                     {SHIFTS.map((s) => (
@@ -1139,13 +1162,13 @@ export default function HandoverLogsPage() {
             </article>
 
             {hotResidents.length > 0 ? (
-              <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
+              <article className="rounded-[24px] border border-[#c9d8d0] bg-white p-6 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Dažniausiai minimi</p>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {hotResidents.map((item) => (
-                    <button key={item.resident.id} type="button" onClick={() => setResidentFilter(item.resident.id)} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left hover:border-emerald-200 hover:bg-emerald-50">
-                      <p className="font-black text-slate-950">{residentName(item.resident, roomsById)}</p>
-                      <p className="mt-1 text-sm font-bold text-slate-500">{item.count} įrašai · {item.critical} krit.</p>
+                    <button key={item.resident.id} type="button" onClick={() => setResidentFilter(item.resident.id)} className="rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left hover:border-emerald-200 hover:bg-emerald-50">
+                      <p className="font-black text-[#10251f]">{residentName(item.resident, roomsById)}</p>
+                      <p className="mt-1 text-sm font-bold text-[#526174]">{item.count} įrašai · {item.critical} krit.</p>
                     </button>
                   ))}
                 </div>
@@ -1154,7 +1177,7 @@ export default function HandoverLogsPage() {
 
             <section className="grid gap-4">
               {filteredLogs.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center font-bold text-slate-500">Perdavimo įrašų pagal filtrus nėra.</div>
+                <div className="rounded-[24px] border border-dashed border-[#c9d8d0] bg-white p-10 text-center font-bold text-[#526174]">Perdavimo įrašų pagal filtrus nėra.</div>
               ) : (
                 filteredLogs.map((log) => {
                   const resident = residents.find((item) => item.id === log.resident_id);
@@ -1162,24 +1185,24 @@ export default function HandoverLogsPage() {
                   const read = isRead(log.id);
 
                   return (
-                    <article key={log.id} className={`rounded-3xl border p-5 shadow-sm ${priorityClasses(log.priority)} ${log.archived ? "opacity-60" : ""}`}>
+                    <article key={log.id} className={`rounded-[22px] border p-5 shadow-sm ${priorityClasses(log.priority)} ${log.archived ? "opacity-60" : ""}`}>
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <div className="flex flex-wrap gap-2">
                             <span className={`rounded-full px-3 py-1 text-xs font-black ${priorityPillClasses(log.priority)}`}>{priorityLabel(log.priority)}</span>
-                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700">{shiftLabel(log.shift_type)}</span>
-                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700">{log.category}</span>
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d]">{shiftLabel(log.shift_type)}</span>
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d]">{log.category}</span>
                             {log.is_important ? <span className="rounded-full bg-red-900 px-3 py-1 text-xs font-black text-white">Svarbu</span> : null}
-                            {log.needs_follow_up ? <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">Sekti</span> : null}
+                            {log.needs_follow_up ? <span className="rounded-full bg-[#047857] px-3 py-1 text-xs font-black text-white">Sekti</span> : null}
                           </div>
-                          <h3 className="mt-3 text-2xl font-black text-slate-950">{log.title}</h3>
-                          <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700">{log.note}</p>
-                          <p className="mt-3 text-sm font-bold text-slate-500">{residentName(resident, roomsById)} · {formatShortDate(log.shift_date)} · Sukūrė: {profileName(author)} · {formatDate(log.created_at)}</p>
+                          <h3 className="mt-3 text-2xl font-black text-[#10251f]">{log.title}</h3>
+                          <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#486b5d]">{log.note}</p>
+                          <p className="mt-3 text-sm font-bold text-[#526174]">{residentName(resident, roomsById)} · {formatShortDate(log.shift_date)} · Sukūrė: {profileName(author)} · {formatDate(log.created_at)}</p>
                         </div>
                         <div className="flex flex-wrap gap-2 lg:justify-end">
-                          <button type="button" onClick={() => setSelectedLog(log)} className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"><MessageSquare className="h-4 w-4" /> Komentarai</button>
-                          {!read ? <button type="button" onClick={() => void markRead(log)} className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black text-emerald-700 shadow-sm hover:bg-emerald-50"><CheckCircle2 className="h-4 w-4" /> Patvirtinti, kad mačiau</button> : null}
-                          {!log.archived ? <button type="button" onClick={() => void archiveLog(log)} className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50"><Archive className="h-4 w-4" /> Archyvas</button> : null}
+                          <button type="button" onClick={() => setSelectedLog(log)} className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm hover:bg-[#f8faf8]"><MessageSquare className="h-4 w-4" /> Komentarai</button>
+                          {!read ? <button type="button" onClick={() => void markRead(log)} className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-2 text-sm font-black text-emerald-700 shadow-sm hover:bg-emerald-50"><CheckCircle2 className="h-4 w-4" /> Patvirtinti, kad mačiau</button> : null}
+                          {!log.archived ? <button type="button" onClick={() => void archiveLog(log)} className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm hover:bg-[#f8faf8]"><Archive className="h-4 w-4" /> Archyvas</button> : null}
                         </div>
                       </div>
                     </article>
@@ -1208,17 +1231,17 @@ export default function HandoverLogsPage() {
       ) : null}
 
       {helpOpen ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <section className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-5">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#047857]/45 p-4 backdrop-blur-sm">
+          <section className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-6 bg-[#486b5d] p-5 text-white">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
                   Kaip naudoti
                 </p>
-                <h2 className="mt-1 text-4xl font-black tracking-tight">
+                <h2 className="mt-1 text-4xl font-black tracking-tight text-white">
                   Perdavimo žurnalų taisyklės
                 </h2>
-                <p className="mt-2 max-w-3xl text-base font-semibold leading-7 text-slate-500">
+                <p className="mt-2 max-w-3xl text-base font-semibold leading-7 text-[#526174]">
                   Perdavimo žurnalas skirtas informacijai tarp pamainų perduoti, atsakomybei tęsti ir rizikoms mažinti.
                 </p>
               </div>
@@ -1226,10 +1249,10 @@ export default function HandoverLogsPage() {
               <button
                 type="button"
                 onClick={() => setHelpOpen(false)}
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-[#eef4f1] text-[#526174] transition hover:bg-[#dbe6e0]"
                 aria-label="Uždaryti"
               >
-                <X className="h-7 w-7" />
+                <X size={28} strokeWidth={2.1} />
               </button>
             </div>
 
@@ -1266,26 +1289,60 @@ export default function HandoverLogsPage() {
       <style jsx global>{`
         .input {
           width: 100%;
-          border-radius: 1rem;
-          border: 1px solid #dbe3ef;
+          border-radius: 0.875rem;
+          border: 1px solid #dbe6e0;
           background: white;
           padding: 0.9rem 1rem;
           font-weight: 800;
-          color: #0f172a;
+          color: #10251f;
           outline: none;
         }
         .input:focus {
-          border-color: #10b981;
-          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+          border-color: #047857;
+          box-shadow: 0 0 0 4px rgba(4, 120, 87, 0.12);
         }
       `}</style>
     </main>
   );
 }
 
+function HandoverTab({
+  active,
+  icon,
+  label,
+  count,
+  onClick,
+}: {
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  count?: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+        active
+          ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+          : "text-[#486b5d] hover:bg-white/70"
+      }`}
+    >
+      {icon}
+      {label}
+      {typeof count === "number" ? (
+        <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+          {count}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 function MobileHeroStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[24px] bg-white/15 p-4 backdrop-blur">
+    <div className="rounded-[18px] bg-white/15 p-4 backdrop-blur">
       <div className="text-2xl font-black text-white">{value}</div>
       <div className="mt-1 text-[11px] font-black uppercase tracking-wide text-emerald-50">{label}</div>
     </div>
@@ -1294,9 +1351,9 @@ function MobileHeroStat({ label, value }: { label: string; value: number }) {
 
 function MobileMiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-      <div className="text-2xl font-black text-slate-950">{value}</div>
-      <div className="mt-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</div>
+    <div className="rounded-[24px] border border-[#dbe6e0] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+      <div className="text-2xl font-black text-[#10251f]">{value}</div>
+      <div className="mt-1 text-[11px] font-black uppercase tracking-[0.18em] text-[#526174]">{label}</div>
     </div>
   );
 }
@@ -1308,8 +1365,8 @@ function MobileFilterChip({ active, onClick, children }: { active: boolean; onCl
       onClick={onClick}
       className={`whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-black transition active:scale-[0.98] ${
         active
-          ? "bg-slate-950 text-white shadow-sm"
-          : "border border-slate-200/70 bg-white text-slate-600"
+          ? "bg-[#047857] text-white shadow-sm"
+          : "border border-[#dbe6e0] bg-white text-[#526174]"
       }`}
     >
       {children}
@@ -1319,17 +1376,17 @@ function MobileFilterChip({ active, onClick, children }: { active: boolean; onCl
 
 function Stat({ title, value, tone = "slate" }: { title: string; value: number; tone?: "slate" | "blue" | "amber" | "rose" | "emerald" }) {
   const toneClass = {
-    slate: "bg-white text-slate-700",
-    blue: "bg-blue-50 text-blue-700",
-    amber: "bg-amber-50 text-amber-700",
-    rose: "bg-rose-50 text-rose-700",
-    emerald: "bg-emerald-50 text-emerald-700",
+    slate: "bg-white text-[#486b5d]",
+    blue: "bg-[#eef4f1] text-[#047857]",
+    amber: "bg-amber-50 text-amber-800",
+    rose: "bg-rose-50 text-rose-800",
+    emerald: "bg-emerald-50 text-[#047857]",
   }[tone];
 
   return (
-    <article className={`rounded-3xl border border-slate-200 p-5 shadow-sm ${toneClass}`}>
-      <p className="text-sm font-black uppercase tracking-widest opacity-80">{title}</p>
-      <p className="mt-2 text-4xl font-black">{value}</p>
+    <article className={`rounded-[22px] border border-[#dbe6e0] p-5 shadow-[0_1px_3px_rgba(16,37,31,0.08)] ${toneClass}`}>
+      <p className="text-xs font-black uppercase tracking-[0.18em] opacity-80">{title}</p>
+      <p className="mt-2 text-4xl font-black tracking-[-0.03em]">{value}</p>
     </article>
   );
 }
@@ -1337,9 +1394,9 @@ function Stat({ title, value, tone = "slate" }: { title: string; value: number; 
 
 function HelpRuleCard({ title, text }: { title: string; text: string }) {
   return (
-    <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-      <h3 className="text-lg font-black text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{text}</p>
+    <article className="rounded-[22px] border border-[#dbe6e0] bg-[#f8faf8] p-5">
+      <h3 className="text-lg font-black text-[#10251f]">{title}</h3>
+      <p className="mt-2 text-sm font-semibold leading-6 text-[#526174]">{text}</p>
     </article>
   );
 }
@@ -1347,7 +1404,7 @@ function HelpRuleCard({ title, text }: { title: string; text: string }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">{label}</span>
+      <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-[#526174]">{label}</span>
       {children}
     </label>
   );
@@ -1355,7 +1412,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function FilterToggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className={`inline-flex h-12 items-center justify-center rounded-2xl border px-4 text-sm font-black transition ${active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}>
+    <button type="button" onClick={onClick} className={`inline-flex h-12 items-center justify-center rounded-[14px] border px-4 text-sm font-black transition ${active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-[#dbe6e0] bg-white text-[#526174] hover:border-slate-300 hover:bg-[#f8faf8]"}`}>
       {children}
     </button>
   );
@@ -1387,44 +1444,44 @@ function LogModal({
   saving: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#047857]/45 p-4 backdrop-blur-sm">
       <section className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-6 border-b border-slate-100 p-5">
+        <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] p-5">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Perdavimo įrašas</p>
             <h2 className="mt-1 text-4xl font-black tracking-tight">{log.title}</h2>
-            <p className="mt-2 font-semibold text-slate-500">{residentName(resident, roomsById)} · {profileName(author)} · {formatDate(log.created_at)}</p>
+            <p className="mt-2 font-semibold text-[#526174]">{residentName(resident, roomsById)} · {profileName(author)} · {formatDate(log.created_at)}</p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"><X className="h-7 w-7" /></button>
+          <button type="button" onClick={onClose} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-[#eef4f1] text-[#526174]"><X size={28} strokeWidth={2.1} /></button>
         </div>
 
         <div className="space-y-5 p-5">
-          <div className={`rounded-3xl border p-5 ${priorityClasses(log.priority)}`}>
+          <div className={`rounded-[22px] border p-5 ${priorityClasses(log.priority)}`}>
             <div className="flex flex-wrap gap-2">
               <span className={`rounded-full px-3 py-1 text-xs font-black ${priorityPillClasses(log.priority)}`}>{priorityLabel(log.priority)}</span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700">{shiftLabel(log.shift_type)}</span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700">{log.category}</span>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d]">{shiftLabel(log.shift_type)}</span>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d]">{log.category}</span>
             </div>
-            <p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700">{log.note}</p>
+            <p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#486b5d]">{log.note}</p>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+          <div className="rounded-[22px] border border-[#dbe6e0] bg-[#f8faf8] p-5">
             <h3 className="text-xl font-black">Komentarai</h3>
             <div className="mt-4 space-y-3">
               {comments.length ? comments.map((comment) => {
                 const author = profiles.find((profile) => profile.id === comment.created_by);
                 return (
-                  <div key={comment.id} className="rounded-2xl bg-white p-4">
-                    <p className="font-black text-slate-900">{profileName(author)}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">{formatDate(comment.created_at)}</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-slate-700">{comment.comment}</p>
+                  <div key={comment.id} className="rounded-[14px] bg-white p-4">
+                    <p className="font-black text-[#10251f]">{profileName(author)}</p>
+                    <p className="mt-1 text-sm font-semibold text-[#526174]">{formatDate(comment.created_at)}</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-[#486b5d]">{comment.comment}</p>
                   </div>
                 );
-              }) : <p className="text-sm font-bold text-slate-500">Komentarų nėra.</p>}
+              }) : <p className="text-sm font-bold text-[#526174]">Komentarų nėra.</p>}
             </div>
             <div className="mt-4 flex gap-3">
               <textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} className="input min-h-20 flex-1 resize-none" placeholder="Parašyti komentarą..." />
-              <button type="button" onClick={onAddComment} disabled={saving || !commentText.trim()} className="rounded-2xl bg-emerald-800 px-5 py-3 font-black text-white hover:bg-emerald-900 disabled:opacity-60">Pridėti</button>
+              <button type="button" onClick={onAddComment} disabled={saving || !commentText.trim()} className="rounded-[14px] bg-emerald-800 px-5 py-3 font-black text-white hover:bg-emerald-900 disabled:opacity-60">Pridėti</button>
             </div>
           </div>
         </div>

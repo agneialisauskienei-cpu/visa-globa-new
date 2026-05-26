@@ -273,48 +273,77 @@ export default function MySchedulePage() {
   const nextShift = upcoming[0] || null;
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 pb-24 pt-4 text-slate-950 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
+    <main className="min-h-screen bg-[#f3f6f4] px-4 pb-24 pt-4 text-[#10251f] sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
       <div className="mx-auto max-w-7xl space-y-5 lg:space-y-7">
-        <section className="overflow-hidden rounded-[34px] bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-950 p-6 text-white shadow-[0_24px_70px_rgba(2,6,23,0.22)] sm:p-8 lg:p-10">
-          <div className="flex items-start justify-between gap-4">
-            <button
-              type="button"
-              onClick={() => router.push("/employee-dashboard")}
-              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/12 text-white transition hover:bg-white/18"
-              aria-label="Grįžti"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
+        <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]">
+          <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-5">
+              <button
+                type="button"
+                onClick={() => router.push("/employee-dashboard")}
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-[#e8f7ef] text-[#486b5d] transition hover:bg-white"
+                aria-label="Grįžti"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-100/80">
+                  Mano grafikas
+                </p>
+                <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-white sm:text-4xl lg:text-5xl">
+                  Artimiausios pamainos
+                </h1>
+                <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-white/85">
+                  Čia rodomas tik administratoriaus paskelbtas grafikas. Juodraščiai darbuotojams nerodomi.
+                </p>
+              </div>
+            </div>
 
             <button
               type="button"
               onClick={() => void loadSchedule(true)}
-              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/12 text-white transition hover:bg-white/18"
+              className="inline-flex h-14 items-center justify-center gap-2 rounded-[18px] bg-[#e8f7ef] px-5 text-sm font-black text-[#486b5d] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
               aria-label="Atnaujinti grafiką"
+              disabled={refreshing}
             >
-              {refreshing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Atnaujinti
             </button>
           </div>
 
-          <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_420px] lg:items-end">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-100">Mano grafikas</p>
-              <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">Artimiausios pamainos</h1>
-              <p className="mt-4 max-w-2xl text-base font-bold leading-7 text-emerald-50 sm:text-lg">
-                Čia rodomas tik administratoriaus paskelbtas grafikas. Juodraščiai darbuotojams nerodomi.
-              </p>
-            </div>
+          <div className="grid gap-3 bg-[#eef4f1] p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <ScheduleSummaryCard title="Būsimų" value={upcoming.length} desc="pamainų" tone="emerald" />
+            <ScheduleSummaryCard title="Istorija" value={past.length} desc="įrašų" tone="slate" />
+            <ScheduleSummaryCard
+              title="Kita pamaina"
+              value={nextShift ? shortDate(getScheduleDate(nextShift)) : "—"}
+              desc={nextShift ? timeText(nextShift) : "nesuplanuota"}
+              tone="amber"
+            />
+            <ScheduleSummaryCard
+              title="Pareigos"
+              value={membership?.position || "Darbuotojas"}
+              desc={membership?.department || "paskelbtas grafikas"}
+              tone="slate"
+            />
+          </div>
 
-            <div className="rounded-[28px] border border-white/15 bg-white/10 p-5 backdrop-blur">
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-100">Kita pamaina</p>
-              <div className="mt-3 flex flex-col gap-3">
+          <div className="border-t border-emerald-900/10 bg-white p-5">
+            <div className="rounded-[22px] border border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">Kita pamaina</p>
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-2xl font-black">{nextShift ? formatDate(getScheduleDate(nextShift)) : "Nėra suplanuota"}</p>
-                  <p className="mt-1 text-lg font-extrabold text-emerald-50">{nextShift ? timeText(nextShift) : "—"}</p>
+                  <p className="text-xl font-black text-[#10251f]">
+                    {nextShift ? formatDate(getScheduleDate(nextShift)) : "Nėra suplanuota"}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-[#526174]">
+                    {nextShift ? `${timeText(nextShift)} · ${shiftLabel(nextShift)}` : "Kai administratorius paskelbs grafiką, pamaina atsiras čia."}
+                  </p>
                 </div>
-                <div className="w-max rounded-full bg-white px-4 py-2 text-sm font-black text-emerald-800">
+                <span className="w-fit rounded-full bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-800">
                   {nextShift ? shiftLabel(nextShift) : "—"}
-                </div>
+                </span>
               </div>
             </div>
           </div>
@@ -378,14 +407,41 @@ export default function MySchedulePage() {
 
         {!loading && past.length ? (
           <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-7">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Istorija</p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight">Praėjusios pamainos</h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Istorija</p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight">Praėjusios pamainos</h2>
+                <p className="mt-1 font-semibold text-slate-500">Rodoma tuo pačiu formatu kaip būsimos pamainos.</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-600">{past.length} įrašų</div>
             </div>
-            <div className="mt-5 grid gap-3 lg:grid-cols-2">
-              {past.map((shift) => (
-                <ShiftCard key={shift.id} shift={shift} muted />
-              ))}
+
+            <div className="mt-6">
+              <div className="hidden overflow-hidden rounded-3xl border border-slate-200 lg:block">
+                <table className="w-full border-collapse bg-white text-left">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Data</th>
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Diena</th>
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Laikas</th>
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Tipas</th>
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Valandos</th>
+                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">Pastaba</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {past.map((shift) => (
+                      <DesktopShiftRow key={shift.id} shift={shift} muted />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="space-y-3 lg:hidden">
+                {past.map((shift) => (
+                  <ShiftCard key={shift.id} shift={shift} muted />
+                ))}
+              </div>
             </div>
           </section>
         ) : null}
@@ -394,13 +450,45 @@ export default function MySchedulePage() {
   );
 }
 
-function DesktopShiftRow({ shift }: { shift: ScheduleRow }) {
+
+function ScheduleSummaryCard({
+  title,
+  value,
+  desc,
+  tone,
+}: {
+  title: string;
+  value: string | number;
+  desc: string;
+  tone: "emerald" | "amber" | "slate";
+}) {
+  const toneClass = {
+    emerald: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    slate: "bg-slate-50 text-slate-700",
+  }[tone];
+
+  return (
+    <article className="flex min-h-[112px] items-center gap-4 rounded-[22px] border border-[#dbe6e0] bg-white p-5 shadow-sm">
+      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] ${toneClass}`}>
+        <CalendarDays className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-[#526174]">{title}</p>
+        <p className="mt-1 truncate text-2xl font-black tracking-[-0.04em] text-[#10251f]">{value}</p>
+        <p className="mt-0.5 truncate text-sm font-bold text-[#526174]">{desc}</p>
+      </div>
+    </article>
+  );
+}
+
+function DesktopShiftRow({ shift, muted = false }: { shift: ScheduleRow; muted?: boolean }) {
   const date = getScheduleDate(shift);
   const hours = durationHours(shift);
   const cleanNote = technicalNoteHidden(shift.notes || shift.note || "");
 
   return (
-    <tr className="border-t border-slate-100">
+    <tr className={muted ? "border-t border-slate-100 bg-slate-50/60" : "border-t border-slate-100"}>
       <td className="px-5 py-4 text-base font-black text-slate-950">{shortDate(date)}</td>
       <td className="px-5 py-4 text-sm font-extrabold capitalize text-slate-600">{weekday(date)}</td>
       <td className="px-5 py-4">

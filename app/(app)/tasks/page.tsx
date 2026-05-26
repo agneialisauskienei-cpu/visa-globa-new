@@ -20,6 +20,7 @@ import {
   Timer,
   UserCheck,
   UserRound,
+  ShieldCheck,
   Wrench,
   X,
 } from "lucide-react"
@@ -49,6 +50,17 @@ type TaskRow = {
   completed_at?: string | null
   interval_days: number | null
   last_done_at: string | null
+}
+
+type TaskAttachmentRow = {
+  id: string
+  task_id: string
+  file_path: string
+  file_name: string | null
+  content_type: string | null
+  size_bytes: number | null
+  created_at: string | null
+  signed_url?: string | null
 }
 
 type ResidentRow = {
@@ -87,6 +99,12 @@ type NewTaskForm = {
   draft_note: string
 }
 
+type TaskImageDraft = {
+  id: string
+  file: File
+  previewUrl: string
+}
+
 const TASK_TYPES = [
   { value: "maintenance", label: "Ūkis / techninė problema" },
   { value: "higiena", label: "Higiena" },
@@ -100,7 +118,7 @@ const TASK_TYPES = [
 
 
 const PRIORITY_OPTIONS = [
-  { value: "low", label: "Žemas", className: "border-slate-200 bg-slate-50 text-slate-600" },
+  { value: "low", label: "Žemas", className: "border-[#dbe6e0] bg-[#f8faf8] text-[#526174]" },
   { value: "medium", label: "Vidutinis", className: "border-blue-200 bg-blue-50 text-blue-700" },
   { value: "high", label: "Aukštas", className: "border-orange-200 bg-orange-50 text-orange-700" },
   { value: "urgent", label: "Kritinis", className: "border-rose-200 bg-rose-50 text-rose-700" },
@@ -121,10 +139,47 @@ const REPEAT_OPTIONS = [
   { value: "30", label: "Kas mėnesį", helper: "Pvz., patikra / papildymas" },
 ]
 
+const TASK_IMAGE_BUCKET = "task-images"
+const MAX_TASK_IMAGE_COUNT = 5
+const MAX_TASK_IMAGE_SIZE_MB = 5
+const ALLOWED_TASK_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
+
+function sanitizeFileName(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 90)
+}
+
+
+async function createSignedTaskAttachment(row: TaskAttachmentRow) {
+  if (!row.file_path) return row
+
+  const { data: signedData, error } = await supabase.storage
+    .from(TASK_IMAGE_BUCKET)
+    .createSignedUrl(row.file_path, 60 * 60)
+
+  if (error) {
+    console.warn("Could not create signed URL for task attachment:", error)
+  }
+
+  return {
+    ...row,
+    signed_url: signedData?.signedUrl || null,
+  }
+}
+
+function revokeTaskImagePreview(image: TaskImageDraft) {
+  URL.revokeObjectURL(image.previewUrl)
+}
+
+
 const TASK_PRESETS = [
   {
     label: "Lova",
-    icon: "🛏",
+    icon: "bed",
     title: "Sulūžo lova",
     type: "maintenance",
     subtype: "Baldai",
@@ -133,7 +188,7 @@ const TASK_PRESETS = [
   },
   {
     label: "Elektra",
-    icon: "💡",
+    icon: "electricity",
     title: "Reikia pakeisti lemputę",
     type: "maintenance",
     subtype: "Elektra",
@@ -142,7 +197,7 @@ const TASK_PRESETS = [
   },
   {
     label: "Santechnika",
-    icon: "🚿",
+    icon: "plumbing",
     title: "Neveikia dušas",
     type: "maintenance",
     subtype: "Santechnika",
@@ -151,7 +206,7 @@ const TASK_PRESETS = [
   },
   {
     label: "Tvarkymas",
-    icon: "🧹",
+    icon: "cleaning",
     title: "Reikia sutvarkyti / išvalyti",
     type: "higiena",
     subtype: "Tvarkymas",
@@ -160,7 +215,7 @@ const TASK_PRESETS = [
   },
   {
     label: "Maudymas",
-    icon: "🧼",
+    icon: "bath",
     title: "Maudymas",
     type: "higiena",
     subtype: "Asmens higiena",
@@ -170,7 +225,7 @@ const TASK_PRESETS = [
   },
   {
     label: "Vaistai",
-    icon: "💊",
+    icon: "medicine",
     title: "Medikamentų papildymas",
     type: "slauga",
     subtype: "Medikamentai",
@@ -178,6 +233,26 @@ const TASK_PRESETS = [
     description: "Kokių medikamentų trūksta? Iki kada reikia papildyti?",
   },
 ]
+
+
+function presetIcon(label: string) {
+  switch (label) {
+    case "Lova":
+      return <Hammer className="h-4 w-4" />
+    case "Elektra":
+      return <Sparkles className="h-4 w-4" />
+    case "Santechnika":
+      return <Wrench className="h-4 w-4" />
+    case "Tvarkymas":
+      return <CheckCircle2 className="h-4 w-4" />
+    case "Maudymas":
+      return <Repeat className="h-4 w-4" />
+    case "Vaistai":
+      return <ClipboardList className="h-4 w-4" />
+    default:
+      return <ClipboardList className="h-4 w-4" />
+  }
+}
 
 function getPriorityOption(priority: string | null) {
   return PRIORITY_OPTIONS.find((item) => item.value === priority) || PRIORITY_OPTIONS[1]
@@ -232,6 +307,40 @@ function isMaintenanceStaff(staffType?: string | null) {
   const value = String(staffType || "").trim().toLowerCase()
 
   return ["maintenance", "ukis", "ūkis", "technician", "techninis"].includes(value)
+}
+
+function relevantTaskTypesForStaff(staffType?: string | null) {
+  const value = String(staffType || "").trim().toLowerCase()
+
+  if (!value) return ["kita", "administration"]
+
+  if (["maintenance", "ukis", "ūkis", "technician", "techninis"].includes(value)) {
+    return ["maintenance"]
+  }
+
+  if (
+    value.includes("slaug") ||
+    value.includes("med") ||
+    value.includes("nurse") ||
+    value.includes("care")
+  ) {
+    return ["slauga", "higiena", "mobilumas", "maitinimas"]
+  }
+
+  if (value.includes("social")) {
+    return ["socialinis", "mobilumas", "maitinimas"]
+  }
+
+  if (value.includes("admin") || value.includes("vadov")) {
+    return ["administration", "kita"]
+  }
+
+  return ["kita", "administration"]
+}
+
+function isTaskRelevantForStaff(task: TaskRow, staffType?: string | null) {
+  const relevant = relevantTaskTypesForStaff(staffType)
+  return relevant.includes(task.type || "kita")
 }
 
 function canManageAllTasks(access: CurrentAccess | null) {
@@ -354,6 +463,7 @@ export default function TasksPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const [tasks, setTasks] = useState<TaskRow[]>([])
+  const [taskAttachmentsMap, setTaskAttachmentsMap] = useState<Record<string, TaskAttachmentRow[]>>({})
   const [residentsMap, setResidentsMap] = useState<Record<string, ResidentRow>>({})
   const [allResidents, setAllResidents] = useState<ResidentRow[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
@@ -363,6 +473,7 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState("")
   const [typeFilter, setTypeFilter] = useState("")
   const [viewFilter, setViewFilter] = useState<"my" | "maintenance" | "all">("my")
+  const [activePageTab, setActivePageTab] = useState<"overview" | "tasks" | "maintenance" | "recurring" | "late">("tasks")
   const [isMobile, setIsMobile] = useState(false)
 
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -370,6 +481,8 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState<TaskRow | null>(null)
   const [form, setForm] = useState<NewTaskForm>(initialForm)
   const [editForm, setEditForm] = useState<NewTaskForm>(initialForm)
+  const [taskImages, setTaskImages] = useState<TaskImageDraft[]>([])
+  const [editTaskImages, setEditTaskImages] = useState<TaskImageDraft[]>([])
 
   useEffect(() => {
     void loadData()
@@ -382,6 +495,25 @@ export default function TasksPage() {
     window.addEventListener("resize", update)
 
     return () => window.removeEventListener("resize", update)
+  }, [])
+
+  useEffect(() => {
+    const canUseMaintenanceView =
+      canManageAllTasks(access) || isMaintenanceStaff(access?.staffType)
+
+    if (activePageTab === "maintenance" && !canUseMaintenanceView) {
+      setActivePageTab("tasks")
+      setViewFilter("all")
+      setTypeFilter("")
+    }
+  }, [activePageTab, access])
+
+  useEffect(() => {
+    return () => {
+      taskImages.forEach(revokeTaskImagePreview)
+      editTaskImages.forEach(revokeTaskImagePreview)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function loadData() {
@@ -469,6 +601,17 @@ export default function TasksPage() {
 
       const typedTasks = (tasksData as TaskRow[]) || []
       setTasks(typedTasks)
+
+      const taskIds = typedTasks.map((task) => task.id)
+      const attachmentsByTask: Record<string, TaskAttachmentRow[]> = {}
+
+      if (taskIds.length > 0) {
+        for (const taskId of taskIds) {
+          attachmentsByTask[taskId] = await loadTaskAttachments(taskId)
+        }
+      }
+
+      setTaskAttachmentsMap(attachmentsByTask)
 
       let residents: ResidentRow[] = []
 
@@ -563,6 +706,235 @@ export default function TasksPage() {
     }
   }
 
+
+  function handleTaskImageFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+
+    const incoming = Array.from(files)
+    const valid: TaskImageDraft[] = []
+    const rejected: string[] = []
+
+    for (const file of incoming) {
+      if (!ALLOWED_TASK_IMAGE_TYPES.includes(file.type)) {
+        rejected.push(`${file.name}: leidžiami tik JPG, PNG arba WEBP.`)
+        continue
+      }
+
+      if (file.size > MAX_TASK_IMAGE_SIZE_MB * 1024 * 1024) {
+        rejected.push(`${file.name}: failas didesnis nei ${MAX_TASK_IMAGE_SIZE_MB} MB.`)
+        continue
+      }
+
+      valid.push({
+        id: crypto.randomUUID(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+      })
+    }
+
+    setTaskImages((previous) => {
+      const availableSlots = Math.max(0, MAX_TASK_IMAGE_COUNT - previous.length)
+      const accepted = valid.slice(0, availableSlots)
+      const notAccepted = valid.slice(availableSlots)
+
+      notAccepted.forEach(revokeTaskImagePreview)
+
+      if (notAccepted.length > 0) {
+        setMessage(`Galima pridėti iki ${MAX_TASK_IMAGE_COUNT} nuotraukų.`)
+      }
+
+      return [...previous, ...accepted]
+    })
+
+    if (rejected.length > 0) {
+      setMessage(rejected.join(" "))
+    }
+  }
+
+  function clearTaskImages() {
+    setTaskImages((previous) => {
+      previous.forEach(revokeTaskImagePreview)
+      return []
+    })
+  }
+
+  function removeTaskImage(imageId: string) {
+    setTaskImages((previous) => {
+      const image = previous.find((item) => item.id === imageId)
+      if (image) revokeTaskImagePreview(image)
+
+      return previous.filter((item) => item.id !== imageId)
+    })
+  }
+
+
+  async function loadTaskAttachments(taskId: string) {
+    if (!access?.organizationId) return []
+
+    const collected: TaskAttachmentRow[] = []
+
+    const { data: attachmentRows, error: attachmentError } = await supabase
+      .from("task_attachments")
+      .select("id, task_id, file_path, file_name, content_type, size_bytes, created_at")
+      .eq("task_id", taskId)
+
+    if (!attachmentError && attachmentRows?.length) {
+      for (const row of attachmentRows as TaskAttachmentRow[]) {
+        collected.push(await createSignedTaskAttachment(row))
+      }
+    } else if (attachmentError) {
+      console.warn("Could not load task attachment metadata:", attachmentError)
+    }
+
+    const folder = `${access.organizationId}/${taskId}`
+    const { data: storageFiles, error: listError } = await supabase.storage
+      .from(TASK_IMAGE_BUCKET)
+      .list(folder, {
+        limit: 20,
+        sortBy: { column: "created_at", order: "desc" },
+      })
+
+    if (!listError && storageFiles?.length) {
+      const knownPaths = new Set(collected.map((item) => item.file_path))
+
+      for (const file of storageFiles) {
+        if (!file.name) continue
+
+        const filePath = `${folder}/${file.name}`
+        if (knownPaths.has(filePath)) continue
+
+        const fallbackRow: TaskAttachmentRow = {
+          id: file.id || filePath,
+          task_id: taskId,
+          file_path: filePath,
+          file_name: file.name,
+          content_type: file.metadata?.mimetype || file.metadata?.contentType || null,
+          size_bytes: typeof file.metadata?.size === "number" ? file.metadata.size : null,
+          created_at: file.created_at || null,
+        }
+
+        collected.push(await createSignedTaskAttachment(fallbackRow))
+      }
+    } else if (listError) {
+      console.warn(`Could not list task image folder ${folder}:`, listError)
+    }
+
+    return collected
+  }
+
+  async function refreshTaskAttachments(taskId: string) {
+    const attachments = await loadTaskAttachments(taskId)
+
+    setTaskAttachmentsMap((previous) => ({
+      ...previous,
+      [taskId]: attachments,
+    }))
+
+    return attachments
+  }
+
+  function handleEditTaskImageFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+
+    const incoming = Array.from(files)
+    const valid: TaskImageDraft[] = []
+    const rejected: string[] = []
+
+    for (const file of incoming) {
+      if (!ALLOWED_TASK_IMAGE_TYPES.includes(file.type)) {
+        rejected.push(`${file.name}: leidžiami tik JPG, PNG arba WEBP.`)
+        continue
+      }
+
+      if (file.size > MAX_TASK_IMAGE_SIZE_MB * 1024 * 1024) {
+        rejected.push(`${file.name}: failas didesnis nei ${MAX_TASK_IMAGE_SIZE_MB} MB.`)
+        continue
+      }
+
+      valid.push({
+        id: crypto.randomUUID(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+      })
+    }
+
+    setEditTaskImages((previous) => {
+      const availableSlots = Math.max(0, MAX_TASK_IMAGE_COUNT - previous.length)
+      const accepted = valid.slice(0, availableSlots)
+      const notAccepted = valid.slice(availableSlots)
+
+      notAccepted.forEach(revokeTaskImagePreview)
+
+      if (notAccepted.length > 0) {
+        setMessage(`Galima pridėti iki ${MAX_TASK_IMAGE_COUNT} nuotraukų.`)
+      }
+
+      return [...previous, ...accepted]
+    })
+
+    if (rejected.length > 0) {
+      setMessage(rejected.join(" "))
+    }
+  }
+
+  function clearEditTaskImages() {
+    setEditTaskImages((previous) => {
+      previous.forEach(revokeTaskImagePreview)
+      return []
+    })
+  }
+
+  function removeEditTaskImage(imageId: string) {
+    setEditTaskImages((previous) => {
+      const image = previous.find((item) => item.id === imageId)
+      if (image) revokeTaskImagePreview(image)
+
+      return previous.filter((item) => item.id !== imageId)
+    })
+  }
+
+  async function uploadTaskImages(taskId: string, images: TaskImageDraft[] = taskImages) {
+    if (!access?.organizationId || !currentUserId || images.length === 0) return
+
+    const uploadedRows = []
+
+    for (const image of images) {
+      const file = image.file
+      const safeName = sanitizeFileName(file.name || "task-image")
+      const filePath = `${access.organizationId}/${taskId}/${crypto.randomUUID()}-${safeName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from(TASK_IMAGE_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          contentType: file.type,
+          upsert: false,
+        })
+
+      if (uploadError) throw uploadError
+
+      uploadedRows.push({
+        organization_id: access.organizationId,
+        task_id: taskId,
+        file_path: filePath,
+        file_name: file.name,
+        content_type: file.type,
+        size_bytes: file.size,
+        uploaded_by: currentUserId,
+        created_at: new Date().toISOString(),
+      })
+    }
+
+    if (uploadedRows.length > 0) {
+      const { error: metaError } = await supabase.from("task_attachments").insert(uploadedRows as any)
+
+      if (metaError) {
+        console.warn("Task images uploaded, but attachment metadata was not saved:", metaError)
+        // Do not block task creation: images can still be shown by Storage folder fallback.
+      }
+    }
+  }
+
   async function createTask() {
     if (!access?.organizationId || !currentUserId) {
       setMessage("Nepavyko nustatyti naudotojo arba įstaigos.")
@@ -580,7 +952,10 @@ export default function TasksPage() {
     setMessage("")
 
     try {
+      const taskId = crypto.randomUUID()
+
       const payload = {
+        id: taskId,
         organization_id: access.organizationId,
         assigned_user_id: form.assigned_user_id || null,
         created_by_user_id: currentUserId,
@@ -602,16 +977,20 @@ export default function TasksPage() {
 
       if (error) throw error
 
+      await uploadTaskImages(taskId)
+
       if (form.keep_open) {
         setForm((previous) => ({
           ...initialForm,
           keep_open: previous.keep_open,
         }))
-        setMessage("Užduotis sukurta. Forma palikta atidaryta kitai užduočiai.")
+        clearTaskImages()
+        setMessage(taskImages.length > 0 ? "Užduotis sukurta su nuotraukomis. Forma palikta atidaryta kitai užduočiai." : "Užduotis sukurta. Forma palikta atidaryta kitai užduočiai.")
       } else {
         setShowCreateModal(false)
         setForm(initialForm)
-        setMessage("Užduotis sukurta.")
+        clearTaskImages()
+        setMessage(taskImages.length > 0 ? "Užduotis sukurta su nuotraukomis." : "Užduotis sukurta.")
       }
 
       await loadData()
@@ -633,6 +1012,8 @@ export default function TasksPage() {
   function openEditTask(task: TaskRow) {
     setSelectedTask(null)
     setEditingTask(task)
+    clearEditTaskImages()
+    void refreshTaskAttachments(task.id)
     setEditForm({
       title: task.title || "",
       description: task.description || "",
@@ -683,8 +1064,14 @@ export default function TasksPage() {
 
       if (error) throw error
 
+      if (editTaskImages.length > 0) {
+        await uploadTaskImages(editingTask.id, editTaskImages)
+        await refreshTaskAttachments(editingTask.id)
+        clearEditTaskImages()
+      }
+
       setEditingTask(null)
-      setMessage("Užduotis atnaujinta.")
+      setMessage(editTaskImages.length > 0 ? "Užduotis atnaujinta su nuotraukomis." : "Užduotis atnaujinta.")
       await loadData()
     } catch (error) {
       setMessage(getReadableError(error))
@@ -758,6 +1145,7 @@ export default function TasksPage() {
 
   async function openTaskDetails(task: TaskRow) {
     setSelectedTask(task)
+    void refreshTaskAttachments(task.id)
 
     if (task.viewed_at) return
 
@@ -801,6 +1189,18 @@ export default function TasksPage() {
     const maintenance = isMaintenanceStaff(access?.staffType)
 
     let rows = [...tasks]
+
+    if (!canManage) {
+      rows = rows.filter((task) => {
+        const ownTask =
+          task.assigned_user_id === currentUserId ||
+          task.created_by_user_id === currentUserId
+
+        if (ownTask) return true
+
+        return isTaskRelevantForStaff(task, access?.staffType)
+      })
+    }
 
     if (viewFilter === "my" && currentUserId) {
       rows = rows.filter(
@@ -864,6 +1264,28 @@ export default function TasksPage() {
     residentsMap,
   ])
 
+  const visibleTasks = useMemo(() => {
+    if (activePageTab === "maintenance") {
+      return filteredTasks.filter((task) => task.type === "maintenance")
+    }
+
+    if (activePageTab === "recurring") {
+      return filteredTasks.filter((task) => task.interval_days && task.interval_days > 0)
+    }
+
+    if (activePageTab === "late") {
+      return filteredTasks.filter(isTaskLate)
+    }
+
+    return filteredTasks
+  }, [activePageTab, filteredTasks])
+
+  const statusNavTasks = filteredTasks
+  const newStatusTasks = statusNavTasks.filter((task) => task.status === "new")
+  const inProgressStatusTasks = statusNavTasks.filter((task) => task.status === "in_progress")
+  const waitingPartsStatusTasks = statusNavTasks.filter((task) => task.status === "waiting_parts")
+  const doneStatusTasks = statusNavTasks.filter((task) => task.status === "done")
+
   const openTasks = tasks.filter(isOpenTask)
   const lateTasks = tasks.filter(isTaskLate)
   const maintenanceTasks = tasks.filter((task) => task.type === "maintenance")
@@ -901,6 +1323,14 @@ export default function TasksPage() {
 
     return map
   }, [employees])
+
+  const visibleTaskTypes = useMemo(() => {
+    if (canManageAllTasks(access)) return TASK_TYPES
+
+    const allowed = new Set(relevantTaskTypesForStaff(access?.staffType))
+
+    return TASK_TYPES.filter((type) => allowed.has(type.value))
+  }, [access])
   const operationalTotal = Math.max(1, tasks.length)
   const completionRate = Math.round((completedTasks.length / operationalTotal) * 100)
   const viewedRate = Math.round((viewedTasks.length / operationalTotal) * 100)
@@ -909,11 +1339,11 @@ export default function TasksPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-slate-950">
-        <div className="rounded-3xl border border-slate-200/70 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" />
-          <p className="mt-4 text-lg font-black text-slate-700">Kraunama...</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
+      <main className="flex min-h-screen items-center justify-center bg-[#f8faf8] p-6 text-[#10251f]">
+        <div className="rounded-[22px] border border-[#dbe6e0] bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-emerald-600" />
+          <p className="mt-4 text-lg font-black text-[#486b5d]">Kraunama...</p>
+          <p className="mt-1 text-sm font-semibold text-[#526174]">
             Ruošiame užduočių sąrašą.
           </p>
         </div>
@@ -926,7 +1356,7 @@ export default function TasksPage() {
 
   if (isMobile) {
     return (
-      <main className="min-h-screen bg-[#f7faf8] pb-28 text-slate-950">
+      <main className="min-h-screen bg-[#f7faf8] pb-28 text-[#10251f]">
         <section className="overflow-hidden rounded-b-[34px] bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-600 px-5 pb-8 pt-7 text-white shadow-lg">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -966,7 +1396,7 @@ export default function TasksPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Ieškoti užduoties, gyventojo..."
-              className="h-14 w-full rounded-[22px] border border-slate-200/70 bg-white py-3 pl-12 pr-4 text-sm font-bold text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
+              className="h-14 w-full rounded-[22px] border border-[#dbe6e0] bg-white py-3 pl-12 pr-4 text-sm font-bold text-[#10251f] shadow-sm outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
             />
           </label>
 
@@ -996,8 +1426,8 @@ export default function TasksPage() {
           {filteredTasks.length === 0 ? (
             <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
               <ClipboardList className="mx-auto h-10 w-10 text-slate-400" />
-              <p className="mt-4 text-lg font-black text-slate-700">Užduočių nėra</p>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
+              <p className="mt-4 text-lg font-black text-[#486b5d]">Užduočių nėra</p>
+              <p className="mt-1 text-sm font-semibold text-[#526174]">
                 Sukurk naują užduotį arba pakeisk filtrus.
               </p>
             </div>
@@ -1037,7 +1467,7 @@ export default function TasksPage() {
             allResidents={allResidents}
             employees={employees}
             saving={saving}
-            onClose={() => setShowCreateModal(false)}
+            onClose={() => { setShowCreateModal(false); clearTaskImages() }}
             onSubmit={() => void createTask()}
           />
         ) : null}
@@ -1059,17 +1489,17 @@ export default function TasksPage() {
         <Modal
           title="Redaguoti užduotį"
           desc="Pakeisk užduoties detales, gyventoją, kambarį per gyventojo priskyrimą, atsakingą darbuotoją ir terminą."
-          onClose={() => setEditingTask(null)}
+          onClose={() => { setEditingTask(null); clearEditTaskImages() }}
         >
           <form
-            className="space-y-6"
+            className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault()
               void updateTask()
             }}
           >
-            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="grid gap-5 md:grid-cols-2">
+            <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
+              <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Pavadinimas" full>
                   <input
                     value={editForm.title}
@@ -1214,13 +1644,99 @@ export default function TasksPage() {
               />
             </Field>
 
+            {editingTask && taskAttachmentsMap[editingTask.id]?.length ? (
+              <TaskAttachmentGallery
+                title="Esamos nuotraukos"
+                attachments={taskAttachmentsMap[editingTask.id]}
+              />
+            ) : null}
+
+            <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Camera className="h-5 w-5 text-[#047857]" />
+                    <h3 className="text-base font-black">Pridėti foto / screenshot</h3>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[#526174]">
+                    Galima pridėti naujų nuotraukų ir redaguojant užduotį. Dokumentų čia nekelk.
+                  </p>
+                </div>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#047857]">
+                  {editTaskImages.length}/{MAX_TASK_IMAGE_COUNT}
+                </span>
+              </div>
+
+              <label
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  handleEditTaskImageFiles(event.dataTransfer.files)
+                }}
+                className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#f8faf8] px-4 py-3 transition hover:bg-emerald-50/60"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#047857]">
+                    <Camera className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-black text-[#10251f]">Pridėti nuotraukas</span>
+                    <span className="block text-xs font-bold text-[#526174]">JPG, PNG, WEBP · iki {MAX_TASK_IMAGE_SIZE_MB} MB</span>
+                  </span>
+                </span>
+                <Plus className="h-5 w-5 text-[#047857]" />
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  capture="environment"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    handleEditTaskImageFiles(event.target.files)
+                    event.currentTarget.value = ""
+                  }}
+                />
+              </label>
+
+              {editTaskImages.length > 0 ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {editTaskImages.map((image) => (
+                    <div key={image.id} className="group overflow-hidden rounded-[14px] border border-[#dbe6e0] bg-white">
+                      <a href={image.previewUrl} target="_blank" rel="noreferrer">
+                        <img
+                          src={image.previewUrl}
+                          alt={image.file.name}
+                          className="h-24 w-full object-cover transition group-hover:scale-[1.02]"
+                        />
+                      </a>
+                      <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-black text-[#10251f]">{image.file.name}</p>
+                          <p className="text-[11px] font-bold text-[#526174]">
+                            {(image.file.size / 1024 / 1024).toFixed(1)} MB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeEditTaskImage(image.id)}
+                          className="rounded-[10px] border border-rose-100 bg-rose-50 px-2.5 py-1.5 text-xs font-black text-rose-700 transition hover:bg-rose-100"
+                        >
+                          Šalinti
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+
             {editForm.resident_id ? (
-              <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5 text-sm font-bold text-emerald-900">
+              <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 p-5 text-sm font-bold text-emerald-900">
                 Pasirinktas gyventojas: {residentName(residentsMap[editForm.resident_id])} · kambarys: {residentRoom(residentsMap[editForm.resident_id])}
               </div>
             ) : null}
 
-            <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
+            <div className="flex flex-wrap justify-end gap-3 border-t border-[#dbe6e0] pt-5">
               <button type="button" onClick={() => setEditingTask(null)} className="btn-secondary">
                 Atšaukti
               </button>
@@ -1238,25 +1754,24 @@ export default function TasksPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 pb-28 text-slate-950 sm:p-6">
+    <main className="min-h-screen bg-[#f3f6f4] p-4 pb-28 text-[#10251f] sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm sm:p-7">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
+          <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-5">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-700">
+              <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-[#e8f7ef] text-[#486b5d]">
                 <ClipboardList className="h-7 w-7" />
               </div>
 
               <div>
-                <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+                <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-100/80">
                   Užduotys
                 </p>
-                <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-white sm:text-4xl">
                   {canManage ? "Visos užduotys" : "Mano užduotys"}
                 </h1>
-                <p className="mt-2 text-base font-semibold text-slate-500 sm:text-lg">
-                  Darbuotojai mato jiems priskirtas ir jų sukurtas užduotis.
-                  Ūkis mato technines užduotis.
+                <p className="mt-2 max-w-4xl text-base font-semibold text-white/85 sm:text-lg">
+                  Darbuotojai mato jiems priskirtas ir jų sukurtas užduotis. Ūkis mato technines užduotis.
                 </p>
               </div>
             </div>
@@ -1265,32 +1780,225 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 font-black text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98]"
+                className="inline-flex items-center justify-center gap-2 rounded-[14px] bg-white px-5 py-3 font-black text-[#486b5d] shadow-sm transition hover:bg-white/90 active:scale-[0.98]"
               >
                 <Plus className="h-5 w-5" />
                 Sukurti užduotį
               </button>
             ) : null}
           </div>
+
+          <div className="border-t border-emerald-900/10 bg-[#eef4f1] p-3">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePageTab("overview")
+                  setViewFilter("all")
+                  setStatusFilter("")
+                  setTypeFilter("")
+                }}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                  activePageTab === "overview"
+                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "text-[#486b5d] hover:bg-white/70"
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Apžvalga
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePageTab("tasks")
+                  setViewFilter("all")
+                  setStatusFilter("")
+                  setTypeFilter("")
+                }}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                  activePageTab === "tasks"
+                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "text-[#486b5d] hover:bg-white/70"
+                }`}
+              >
+                <UserRound className="h-4 w-4" />
+                Užduotys
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                  {filteredTasks.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePageTab("tasks")
+                  setViewFilter("all")
+                  setStatusFilter("new")
+                  setTypeFilter("")
+                }}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                  activePageTab === "tasks" && statusFilter === "new"
+                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "text-[#486b5d] hover:bg-white/70"
+                }`}
+              >
+                <Sparkles className="h-4 w-4" />
+                Naujos
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                  {newStatusTasks.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePageTab("tasks")
+                  setViewFilter("all")
+                  setStatusFilter("in_progress")
+                  setTypeFilter("")
+                }}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                  activePageTab === "tasks" && statusFilter === "in_progress"
+                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "text-[#486b5d] hover:bg-white/70"
+                }`}
+              >
+                <Timer className="h-4 w-4" />
+                Vykdoma
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                  {inProgressStatusTasks.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePageTab("tasks")
+                  setViewFilter("all")
+                  setStatusFilter("waiting_parts")
+                  setTypeFilter("")
+                }}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                  activePageTab === "tasks" && statusFilter === "waiting_parts"
+                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "text-[#486b5d] hover:bg-white/70"
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                Laukia dalių
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                  {waitingPartsStatusTasks.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePageTab("tasks")
+                  setViewFilter("all")
+                  setStatusFilter("done")
+                  setTypeFilter("")
+                }}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                  activePageTab === "tasks" && statusFilter === "done"
+                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "text-[#486b5d] hover:bg-white/70"
+                }`}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Atlikta
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                  {doneStatusTasks.length}
+                </span>
+              </button>
+
+              {(canManage || isMaintenanceStaff(access?.staffType)) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePageTab("maintenance")
+                  setViewFilter("maintenance")
+                  setStatusFilter("")
+                  setTypeFilter("maintenance")
+                }}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                  activePageTab === "maintenance"
+                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "text-[#486b5d] hover:bg-white/70"
+                }`}
+              >
+                <Wrench className="h-4 w-4" />
+                Ūkis
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                  {maintenanceTasks.length}
+                </span>
+              </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePageTab("recurring")
+                  setViewFilter("all")
+                  setStatusFilter("")
+                  setTypeFilter("")
+                }}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                  activePageTab === "recurring"
+                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "text-[#486b5d] hover:bg-white/70"
+                }`}
+              >
+                <Repeat className="h-4 w-4" />
+                Periodinės
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                  {recurringTasks.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePageTab("late")
+                  setViewFilter("all")
+                  setStatusFilter("")
+                  setTypeFilter("")
+                }}
+                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+                  activePageTab === "late"
+                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
+                    : "text-[#486b5d] hover:bg-white/70"
+                }`}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Vėluoja
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-rose-700 ring-1 ring-rose-100">
+                  {lateTasks.length}
+                </span>
+              </button>
+            </div>
+          </div>
         </section>
 
         {message ? (
-          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5 font-extrabold text-amber-800">
+          <div className="rounded-[22px] border border-amber-100 bg-amber-50 p-5 font-extrabold text-amber-800">
             {message}
           </div>
         ) : null}
 
-        <section className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
+        {activePageTab === "overview" ? (
+        <section className="rounded-[24px] border border-[#c9d8d0] bg-white p-6 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                Operacinis dashboardas
+                Operacinė apžvalga
               </p>
               <h2 className="mt-1 text-2xl font-black tracking-tight">
-                Užduočių situacija
+                Užduočių būklė
               </h2>
-              <p className="mt-1 font-semibold text-slate-500">
-                Greitai matosi vėlavimai, neperžiūrėtos užduotys, periodinės procedūros ir atlikimo progresas.
+              <p className="mt-1 font-semibold text-[#526174]">
+                Svarbiausi signalai: šiandienos, skubios, vėluojančios ir periodinės užduotys.
               </p>
             </div>
 
@@ -1337,63 +2045,33 @@ export default function TasksPage() {
           </div>
         </section>
 
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-6">
-          <StatCard
-            icon={<UserRound className="h-6 w-6" />}
-            title="Mano"
-            value={String(canManage ? tasks.length : myTasks.length)}
-            meta="užduočių"
-            tone="emerald"
-          />
-          <StatCard
-            icon={<Clock className="h-6 w-6" />}
-            title="Atviros"
-            value={String(openTasks.length)}
-            meta="vykdomos"
-            tone="blue"
-          />
-          <StatCard
-            icon={<Eye className="h-6 w-6" />}
-            title="Nepamatytos"
-            value={String(unseenTasks.length)}
-            meta="reikia dėmesio"
-            tone="amber"
-          />
-          <StatCard
-            icon={<CheckCircle2 className="h-6 w-6" />}
-            title="Įvykdytos"
-            value={String(completedTasks.length)}
-            meta="atliktos"
-            tone="emerald"
-          />
-          <StatCard
-            icon={<Wrench className="h-6 w-6" />}
-            title="Ūkis"
-            value={String(maintenanceTasks.length)}
-            meta="techninės"
-            tone="slate"
-          />
-          <StatCard
-            icon={<AlertTriangle className="h-6 w-6" />}
-            title="Vėluoja"
-            value={String(lateTasks.length)}
-            meta="užduočių"
-            tone="rose"
-          />
-        </section>
+        ) : null}
 
+        {activePageTab !== "overview" ? (
         <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
+          <article className="rounded-[22px] border border-[#dbe6e0] bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
-                  Sąrašas
+                  {activePageTab === "maintenance" ? "Ūkio darbai" : activePageTab === "recurring" ? "Periodinės" : activePageTab === "late" ? "Vėluoja" : "Sąrašas"}
                 </p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight">
-                  Užduočių kortelės
+                  {activePageTab === "maintenance"
+                    ? "Techninės užduotys"
+                    : activePageTab === "recurring"
+                      ? "Pasikartojančios užduotys"
+                      : activePageTab === "late"
+                        ? "Pavėluotos užduotys"
+                        : "Užduočių kortelės"}
                 </h2>
-                <p className="mt-1 font-semibold text-slate-500">
-                  Paspausk užduotį, kad pamatytum daugiau informacijos.
+                <p className="mt-1 font-semibold text-[#526174]">
+                  {activePageTab === "maintenance"
+                    ? "Čia rodomi ūkiui ir techniniams gedimams aktualūs darbai."
+                    : activePageTab === "recurring"
+                      ? "Čia rodomos periodinės užduotys: maudymas, patikros, priežiūra."
+                      : activePageTab === "late"
+                        ? "Čia rodomos užduotys, kurių terminas jau praėjęs."
+                        : "Paspausk užduotį, kad pamatytum daugiau informacijos."}
                 </p>
               </div>
 
@@ -1403,33 +2081,15 @@ export default function TasksPage() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Ieškoti užduoties..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
+                  className="w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] py-3 pl-12 pr-4 font-bold text-[#10251f] outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
                 />
               </label>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-4">
-              <Select
-                value={viewFilter}
-                onChange={(value) => setViewFilter(value as "my" | "maintenance" | "all")}
-              >
-                <option value="my">Mano vaizdas</option>
-                <option value="maintenance">Ūkio užduotys</option>
-                <option value="all">Visos leidžiamos</option>
-              </Select>
-
-              <Select value={statusFilter} onChange={setStatusFilter}>
-                <option value="">Visi statusai</option>
-                <option value="new">Nauja</option>
-                <option value="in_progress">Vykdoma</option>
-                <option value="waiting_parts">Laukia dalių</option>
-                <option value="done">Atlikta</option>
-                <option value="cancelled">Atšaukta</option>
-              </Select>
-
+            <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
               <Select value={typeFilter} onChange={setTypeFilter}>
-                <option value="">Visi tipai</option>
-                {TASK_TYPES.map((type) => (
+                <option value="">Visi tipai pagal pareigas</option>
+                {visibleTaskTypes.map((type) => (
                   <option key={type.value} value={type.value}>
                     {type.label}
                   </option>
@@ -1439,69 +2099,32 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => void loadData()}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-black text-slate-700 transition hover:bg-slate-100 active:scale-[0.99]"
+                className="rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-5 py-3 font-black text-[#486b5d] transition hover:bg-slate-100 active:scale-[0.99]"
               >
                 Atnaujinti
               </button>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <TaskSegmentCard
-                title="Mano užduotys"
-                value={myTasks.length}
-                helper="Priskirtos arba sukurtos man"
-                tone="emerald"
-                onClick={() => setViewFilter("my")}
-              />
-              <TaskSegmentCard
-                title="Techninės / ūkio"
-                value={maintenanceTasks.length}
-                helper="Ūkio darbai ir gedimai"
-                tone="amber"
-                onClick={() => setViewFilter("maintenance")}
-              />
-              <TaskSegmentCard
-                title="Periodinės"
-                value={recurringTasks.length}
-                helper="Maudymas, patikros, priežiūra"
-                tone="blue"
-                onClick={() => {
-                  setViewFilter("all")
-                  setStatusFilter("")
-                  setTypeFilter("")
-                }}
-              />
-              <TaskSegmentCard
-                title="Pavėluotos"
-                value={lateTasks.length}
-                helper="Praėję terminai"
-                tone="rose"
-                onClick={() => {
-                  setViewFilter("all")
-                  setStatusFilter("")
-                }}
-              />
-            </div>
-
-            {filteredTasks.length === 0 ? (
-              <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+            {visibleTasks.length === 0 ? (
+              <div className="mt-6 rounded-[22px] border border-dashed border-slate-300 bg-[#f8faf8] p-10 text-center">
                 <ClipboardList className="mx-auto h-10 w-10 text-slate-400" />
-                <p className="mt-4 text-lg font-black text-slate-700">
+                <p className="mt-4 text-lg font-black text-[#486b5d]">
                   Užduočių nėra
                 </p>
-                <p className="mt-1 font-semibold text-slate-500">
+                <p className="mt-1 font-semibold text-[#526174]">
                   Sukurk naują užduotį arba pakeisk filtrus.
                 </p>
               </div>
             ) : (
               <div className="mt-6 grid gap-4">
-                {filteredTasks.map((task) => (
+                {visibleTasks.map((task) => (
                   <TaskCard
                     key={task.id}
                     task={task}
                     resident={task.resident_id ? residentsMap[task.resident_id] : undefined}
                     assignedEmployee={task.assigned_user_id ? employeesMap[task.assigned_user_id] : undefined}
                     saving={savingId === task.id}
+                    attachmentCount={taskAttachmentsMap[task.id]?.length || 0}
                     onClick={() => void openTaskDetails(task)}
                     onEdit={() => openEditTask(task)}
                     onStatusChange={(status) => void updateTaskStatus(task, status)}
@@ -1512,18 +2135,18 @@ export default function TasksPage() {
           </article>
 
           <aside className="grid content-start gap-6">
-            <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
+            <article className="rounded-[22px] border border-[#dbe6e0] bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-extrabold uppercase tracking-widest text-amber-700">
-                    Greitas kūrimas
+                    {activePageTab === "maintenance" ? "Ūkio šablonai" : "Šablonai"}
                   </p>
                   <h2 className="mt-1 text-2xl font-black tracking-tight">
-                    Pranešti problemai
+                    Greitas sukūrimas
                   </h2>
                 </div>
 
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-amber-50 text-amber-700">
                   <Hammer className="h-6 w-6" />
                 </div>
               </div>
@@ -1549,12 +2172,12 @@ export default function TasksPage() {
                       })
                       setShowCreateModal(true)
                     }}
-                    className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
+                    className="group flex items-center justify-between rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
                   >
                     <span>
                       <b>{item.title}</b>
                       <br />
-                      <small className="font-semibold text-slate-500">
+                      <small className="font-semibold text-[#526174]">
                         {item.hint}
                       </small>
                     </span>
@@ -1565,16 +2188,9 @@ export default function TasksPage() {
               </div>
             </article>
 
-            <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-black">Matomumo taisyklės</h2>
-              <div className="mt-4 space-y-3 text-sm font-semibold text-slate-600">
-                <p>• Admin / owner mato visas užduotis.</p>
-                <p>• Darbuotojas mato jam priskirtas ir jo sukurtas užduotis.</p>
-                <p>• Ūkio darbuotojas mato technines ūkio užduotis.</p>
-              </div>
-            </article>
           </aside>
         </section>
+        ) : null}
       </div>
 
       {showCreateModal && (
@@ -1590,12 +2206,12 @@ export default function TasksPage() {
               void createTask()
             }}
           >
-            <section className="rounded-3xl border border-emerald-100 bg-emerald-50/50 p-5">
+            <section className="rounded-[18px] border border-emerald-100 bg-emerald-50/80 p-5">
               <div className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-emerald-700">
                 <Sparkles className="h-4 w-4" />
                 Greiti šablonai
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {TASK_PRESETS.map((preset) => (
                   <button
                     key={preset.label}
@@ -1611,16 +2227,18 @@ export default function TasksPage() {
                         interval_days: preset.interval_days || previous.interval_days,
                       }))
                     }
-                    className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100 active:scale-[0.98]"
+                    className="inline-flex items-center gap-2 rounded-[14px] border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-[#047857] shadow-sm transition hover:bg-emerald-50 active:scale-[0.98]"
                   >
-                    <span className="mr-1">{preset.icon}</span>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-[10px] bg-emerald-50 text-[#047857]">
+                      {presetIcon(preset.label)}
+                    </span>
                     {preset.label}
                   </button>
                 ))}
               </div>
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
               <div className="grid gap-5 md:grid-cols-2">
                 <Field label="Pavadinimas" full>
                   <input
@@ -1680,7 +2298,7 @@ export default function TasksPage() {
                             priority: priority.value,
                           }))
                         }
-                        className={`rounded-2xl border px-4 py-3 text-sm font-black transition active:scale-[0.98] ${
+                        className={`rounded-[14px] border px-4 py-3 text-sm font-black transition active:scale-[0.98] ${
                           priority.className
                         } ${form.priority === priority.value ? "ring-4 ring-emerald-100" : ""}`}
                       >
@@ -1689,7 +2307,7 @@ export default function TasksPage() {
                     ))}
                   </div>
                   {getSlaHint(form.priority, form.due_date) ? (
-                    <p className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-black text-amber-800">
+                    <p className="mt-2 rounded-[14px] border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-black text-amber-800">
                       {getSlaHint(form.priority, form.due_date)}
                     </p>
                   ) : null}
@@ -1706,7 +2324,7 @@ export default function TasksPage() {
                     }
                     className="input"
                   >
-                    {TASK_TYPES.map((type) => (
+                    {visibleTaskTypes.map((type) => (
                       <option key={type.value} value={type.value}>
                         {type.label}
                       </option>
@@ -1803,7 +2421,7 @@ export default function TasksPage() {
               </div>
             </section>
 
-            <section className="rounded-3xl border border-slate-200/70 bg-white p-5">
+            <section className="rounded-[22px] border border-[#dbe6e0] bg-white p-5">
               <div className="mb-4 flex items-center gap-2">
                 <Repeat className="h-5 w-5 text-emerald-700" />
                 <h3 className="text-xl font-black">Pasikartojimas</h3>
@@ -1820,14 +2438,14 @@ export default function TasksPage() {
                         interval_days: option.value,
                       }))
                     }
-                    className={`rounded-2xl border p-4 text-left transition active:scale-[0.98] ${
+                    className={`rounded-[14px] border p-4 text-left transition active:scale-[0.98] ${
                       form.interval_days === option.value
-                        ? "border-emerald-300 bg-emerald-50 ring-4 ring-emerald-50"
-                        : "border-slate-200 bg-slate-50 hover:bg-white"
+                        ? "border-emerald-200 bg-emerald-50 ring-4 ring-emerald-50"
+                        : "border-[#dbe6e0] bg-[#f8faf8] hover:bg-white"
                     }`}
                   >
                     <b className="block text-sm">{option.label}</b>
-                    <span className="mt-1 block text-xs font-bold text-slate-500">
+                    <span className="mt-1 block text-xs font-bold text-[#526174]">
                       {option.helper}
                     </span>
                   </button>
@@ -1836,16 +2454,16 @@ export default function TasksPage() {
             </section>
 
             <section className="grid gap-5 lg:grid-cols-2">
-              <div className="rounded-3xl border border-slate-200/70 bg-white p-5">
+              <div className="rounded-[22px] border border-[#dbe6e0] bg-white p-5">
                 <div className="mb-3 flex items-center gap-2">
-                  <Eye className="h-5 w-5 text-slate-600" />
+                  <Eye className="h-5 w-5 text-[#526174]" />
                   <h3 className="text-lg font-black">Kas matys?</h3>
                 </div>
                 <div className="space-y-2">
                   {getVisibilityText(form.type, form.assigned_user_id).map((viewer) => (
                     <div
                       key={viewer}
-                      className="flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-700"
+                      className="flex items-center gap-2 rounded-[14px] bg-[#f8faf8] px-4 py-3 text-sm font-black text-[#486b5d]"
                     >
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       {viewer}
@@ -1854,17 +2472,83 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <Camera className="h-5 w-5 text-slate-600" />
-                  <h3 className="text-lg font-black">Nuotrauka</h3>
+              <div className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Camera className="h-5 w-5 text-[#047857]" />
+                      <h3 className="text-base font-black">Foto / screenshot</h3>
+                    </div>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-[#526174]">
+                      JPG, PNG, WEBP · iki {MAX_TASK_IMAGE_COUNT} vnt. · iki {MAX_TASK_IMAGE_SIZE_MB} MB. Dokumentų čia nekelk.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#047857]">
+                    {taskImages.length}/{MAX_TASK_IMAGE_COUNT}
+                  </span>
                 </div>
-                <p className="text-sm font-semibold text-slate-500">
-                  Vėliau čia galima prijungti foto / screenshot įkėlimą. Dokumentų kelti nereikia.
-                </p>
-                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center text-sm font-black text-slate-400">
-                  📷 Foto zona / preview
-                </div>
+
+                <label
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    handleTaskImageFiles(event.dataTransfer.files)
+                  }}
+                  className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#f8faf8] px-4 py-3 transition hover:bg-emerald-50/60"
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#047857]">
+                      <Camera className="h-5 w-5" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-black text-[#10251f]">Pridėti nuotraukas</span>
+                      <span className="block text-xs font-bold text-[#526174]">Gedimas, inventorius ar screenshot</span>
+                    </span>
+                  </span>
+                  <Plus className="h-5 w-5 text-[#047857]" />
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    capture="environment"
+                    multiple
+                    className="sr-only"
+                    onChange={(event) => {
+                      handleTaskImageFiles(event.target.files)
+                      event.currentTarget.value = ""
+                    }}
+                  />
+                </label>
+
+                {taskImages.length > 0 ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {taskImages.map((image) => (
+                      <div key={image.id} className="group overflow-hidden rounded-[14px] border border-[#dbe6e0] bg-white">
+                        <a href={image.previewUrl} target="_blank" rel="noreferrer">
+                          <img
+                            src={image.previewUrl}
+                            alt={image.file.name}
+                            className="h-24 w-full object-cover transition group-hover:scale-[1.02]"
+                          />
+                        </a>
+                        <div className="flex items-center justify-between gap-2 px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-black text-[#10251f]">{image.file.name}</p>
+                            <p className="text-[11px] font-bold text-[#526174]">
+                              {(image.file.size / 1024 / 1024).toFixed(1)} MB
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeTaskImage(image.id)}
+                            className="rounded-[10px] border border-rose-100 bg-rose-50 px-2.5 py-1.5 text-xs font-black text-rose-700 transition hover:bg-rose-100"
+                          >
+                            Šalinti
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </section>
 
@@ -1880,8 +2564,8 @@ export default function TasksPage() {
                 className="input min-h-36 resize-none"
                 placeholder="Trumpai aprašyk problemą arba užduotį..."
               />
-              <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-500">
-                <b className="text-slate-700">Padeda kokybiškam aprašymui:</b>
+              <div className="mt-3 rounded-[14px] bg-[#f8faf8] p-4 text-sm font-semibold text-[#526174]">
+                <b className="text-[#486b5d]">Padeda kokybiškam aprašymui:</b>
                 <br />
                 • Kas neveikia?
                 <br />
@@ -1893,9 +2577,9 @@ export default function TasksPage() {
               </div>
             </Field>
 
-            <div className="sticky bottom-0 z-10 -mx-7 -mb-7 border-t border-slate-100 bg-white/95 p-5 backdrop-blur">
+            <div className="sticky bottom-0 z-10 -mx-7 -mb-7 border-t border-[#dbe6e0] bg-white/95 p-5 backdrop-blur">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <label className="flex items-center gap-2 text-sm font-black text-slate-600">
+                <label className="flex items-center gap-2 text-sm font-black text-[#526174]">
                   <input
                     type="checkbox"
                     checked={form.keep_open}
@@ -1912,7 +2596,7 @@ export default function TasksPage() {
                 <div className="flex flex-wrap justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => setShowCreateModal(false)}
+                    onClick={() => { setShowCreateModal(false); clearTaskImages() }}
                     className="btn-secondary"
                   >
                     Atšaukti
@@ -1929,7 +2613,7 @@ export default function TasksPage() {
                   >
                     Išsaugoti juodraštį
                   </button>
-                  <button type="submit" disabled={saving} className="btn-primary bg-emerald-700 hover:bg-emerald-800">
+                  <button type="submit" disabled={saving} className="btn-primary bg-[#047857] hover:bg-[#036747]">
                     {saving ? "Kuriama..." : "Sukurti užduotį"}
                   </button>
                 </div>
@@ -1945,31 +2629,40 @@ export default function TasksPage() {
           desc="Užduoties informacija"
           onClose={() => setSelectedTask(null)}
         >
-          <div className="space-y-5">
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <DetailBox label="Statusas" value={getTaskStatusLabel(selectedTask.status)} />
-                <DetailBox label="Tipas" value={getTypeLabel(selectedTask.type)} />
-                <DetailBox label="Prioritetas" value={getPriorityLabel(selectedTask.priority)} />
-                <DetailBox label="Terminas" value={formatDateTime(selectedTask.due_date)} />
-                <DetailBox
+          <div className="space-y-4">
+            <section className="rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className={`rounded-full border px-3 py-1 text-xs font-black ${getPriorityOption(selectedTask.priority).className}`}>
+                  {getPriorityLabel(selectedTask.priority)}
+                </span>
+                <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-xs font-black text-[#486b5d]">
+                  {getTypeLabel(selectedTask.type)}
+                </span>
+                <span className={`rounded-full px-3 py-1 text-xs font-black ${
+                  isTaskLate(selectedTask)
+                    ? "bg-rose-50 text-rose-700"
+                    : "bg-emerald-50 text-[#047857]"
+                }`}>
+                  {isTaskLate(selectedTask) ? "Vėluoja" : getTaskStatusLabel(selectedTask.status)}
+                </span>
+                {taskAttachmentsMap[selectedTask.id]?.length ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-black text-[#047857] ring-1 ring-emerald-100">
+                    <Camera className="h-3.5 w-3.5" />
+                    {taskAttachmentsMap[selectedTask.id].length} foto
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <CompactDetail
                   label="Gyventojas"
-                  value={residentName(
-                    selectedTask.resident_id
-                      ? residentsMap[selectedTask.resident_id]
-                      : undefined
-                  )}
+                  value={residentName(selectedTask.resident_id ? residentsMap[selectedTask.resident_id] : undefined)}
                 />
-                <DetailBox
+                <CompactDetail
                   label="Kambarys"
-                  value={residentRoom(
-                    selectedTask.resident_id
-                      ? residentsMap[selectedTask.resident_id]
-                      : undefined
-                  )}
+                  value={residentRoom(selectedTask.resident_id ? residentsMap[selectedTask.resident_id] : undefined)}
                 />
-                <DetailBox label="Sukurta" value={formatDate(selectedTask.created_at)} />
-                <DetailBox
+                <CompactDetail
                   label="Priskirta"
                   value={
                     selectedTask.assigned_user_id && employeesMap[selectedTask.assigned_user_id]
@@ -1977,24 +2670,43 @@ export default function TasksPage() {
                       : "Nepriskirta"
                   }
                 />
-                <DetailBox label="Pamatė" value={formatDateTime(selectedTask.viewed_at || null)} />
-                <DetailBox label="Įvykdė" value={formatDateTime(selectedTask.completed_at || selectedTask.last_done_at || null)} />
-                <DetailBox label="Kartojimas" value={selectedTask.interval_days ? `Kas ${selectedTask.interval_days} d.` : "Nekartojama"} />
+                <CompactDetail label="Terminas" value={formatDateTime(selectedTask.due_date)} />
+                <CompactDetail label="Pamatė" value={formatDateTime(selectedTask.viewed_at || null)} />
+                <CompactDetail label="Įvykdė" value={formatDateTime(selectedTask.completed_at || selectedTask.last_done_at || null)} />
+                <CompactDetail label="Sukurta" value={formatDate(selectedTask.created_at)} />
+                <CompactDetail label="Kartojimas" value={selectedTask.interval_days ? `Kas ${selectedTask.interval_days} d.` : "Nekartojama"} />
               </div>
-            </div>
+            </section>
 
             {selectedTask.description ? (
-              <div className="rounded-3xl border border-slate-200/70 bg-white p-5">
-                <p className="text-sm font-extrabold uppercase tracking-widest text-slate-400">
+              <section className="rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#8ea0b5]">
                   Aprašymas
                 </p>
-                <p className="mt-2 whitespace-pre-wrap font-semibold text-slate-700">
+                <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#486b5d]">
                   {selectedTask.description}
                 </p>
-              </div>
+              </section>
             ) : null}
 
-            <div className="flex flex-wrap justify-end gap-3">
+            {taskAttachmentsMap[selectedTask.id]?.length ? (
+              <TaskAttachmentGallery
+                title="Nuotraukos"
+                attachments={taskAttachmentsMap[selectedTask.id]}
+              />
+            ) : (
+              <section className="rounded-[20px] border border-dashed border-[#c9d8d0] bg-white p-4">
+                <div className="flex items-center gap-2 text-sm font-black text-[#526174]">
+                  <Camera className="h-5 w-5 text-[#047857]" />
+                  Nuotraukų nėra
+                </div>
+                <p className="mt-1 text-xs font-semibold text-[#526174]">
+                  Nuotraukas galima pridėti kuriant užduotį. Esamoms užduotims redagavime kol kas rodomos jau įkeltos nuotraukos.
+                </p>
+              </section>
+            )}
+
+            <div className="sticky bottom-0 -mx-6 -mb-6 flex flex-wrap justify-end gap-3 border-t border-[#dbe6e0] bg-white/95 p-4 backdrop-blur sm:-mx-7 sm:-mb-7">
               <button
                 type="button"
                 onClick={() => openEditTask(selectedTask)}
@@ -2033,7 +2745,7 @@ export default function TasksPage() {
         <Modal
           title="Redaguoti užduotį"
           desc="Pakeisk užduoties detales, gyventoją, kambarį per gyventojo priskyrimą, atsakingą darbuotoją ir terminą."
-          onClose={() => setEditingTask(null)}
+          onClose={() => { setEditingTask(null); clearEditTaskImages() }}
         >
           <form
             className="space-y-6"
@@ -2042,7 +2754,7 @@ export default function TasksPage() {
               void updateTask()
             }}
           >
-            <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
               <div className="grid gap-5 md:grid-cols-2">
                 <Field label="Pavadinimas" full>
                   <input
@@ -2188,13 +2900,99 @@ export default function TasksPage() {
               />
             </Field>
 
+            {editingTask && taskAttachmentsMap[editingTask.id]?.length ? (
+              <TaskAttachmentGallery
+                title="Esamos nuotraukos"
+                attachments={taskAttachmentsMap[editingTask.id]}
+              />
+            ) : null}
+
+            <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Camera className="h-5 w-5 text-[#047857]" />
+                    <h3 className="text-base font-black">Pridėti foto / screenshot</h3>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[#526174]">
+                    Galima pridėti naujų nuotraukų ir redaguojant užduotį. Dokumentų čia nekelk.
+                  </p>
+                </div>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#047857]">
+                  {editTaskImages.length}/{MAX_TASK_IMAGE_COUNT}
+                </span>
+              </div>
+
+              <label
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  handleEditTaskImageFiles(event.dataTransfer.files)
+                }}
+                className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#f8faf8] px-4 py-3 transition hover:bg-emerald-50/60"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#047857]">
+                    <Camera className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-black text-[#10251f]">Pridėti nuotraukas</span>
+                    <span className="block text-xs font-bold text-[#526174]">JPG, PNG, WEBP · iki {MAX_TASK_IMAGE_SIZE_MB} MB</span>
+                  </span>
+                </span>
+                <Plus className="h-5 w-5 text-[#047857]" />
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  capture="environment"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    handleEditTaskImageFiles(event.target.files)
+                    event.currentTarget.value = ""
+                  }}
+                />
+              </label>
+
+              {editTaskImages.length > 0 ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {editTaskImages.map((image) => (
+                    <div key={image.id} className="group overflow-hidden rounded-[14px] border border-[#dbe6e0] bg-white">
+                      <a href={image.previewUrl} target="_blank" rel="noreferrer">
+                        <img
+                          src={image.previewUrl}
+                          alt={image.file.name}
+                          className="h-24 w-full object-cover transition group-hover:scale-[1.02]"
+                        />
+                      </a>
+                      <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-black text-[#10251f]">{image.file.name}</p>
+                          <p className="text-[11px] font-bold text-[#526174]">
+                            {(image.file.size / 1024 / 1024).toFixed(1)} MB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeEditTaskImage(image.id)}
+                          className="rounded-[10px] border border-rose-100 bg-rose-50 px-2.5 py-1.5 text-xs font-black text-rose-700 transition hover:bg-rose-100"
+                        >
+                          Šalinti
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+
             {editForm.resident_id ? (
-              <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5 text-sm font-bold text-emerald-900">
+              <div className="rounded-[22px] border border-emerald-100 bg-emerald-50 p-5 text-sm font-bold text-emerald-900">
                 Pasirinktas gyventojas: {residentName(residentsMap[editForm.resident_id])} · kambarys: {residentRoom(residentsMap[editForm.resident_id])}
               </div>
             ) : null}
 
-            <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
+            <div className="flex flex-wrap justify-end gap-3 border-t border-[#dbe6e0] pt-5">
               <button type="button" onClick={() => setEditingTask(null)} className="btn-secondary">
                 Atšaukti
               </button>
@@ -2212,18 +3010,18 @@ export default function TasksPage() {
       <style jsx>{`
         .input {
           width: 100%;
-          border-radius: 1rem;
-          border: 1px solid #dbe3ef;
+          border-radius: 0.875rem;
+          border: 1px solid #dbe6e0;
           background: white;
           padding: 0.9rem 1rem;
           font-weight: 800;
-          color: #0f172a;
+          color: #10251f;
           outline: none;
         }
 
         .input:focus {
-          border-color: #10b981;
-          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+          border-color: #047857;
+          box-shadow: 0 0 0 4px rgba(4, 120, 87, 0.12);
         }
 
         .btn-primary {
@@ -2299,7 +3097,7 @@ function MobileTaskChip({
       className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-black transition active:scale-[0.98] ${
         active
           ? "bg-slate-950 text-white"
-          : "border border-slate-200/70 bg-white text-slate-600"
+          : "border border-[#dbe6e0] bg-white text-[#526174]"
       }`}
     >
       {children}
@@ -2368,7 +3166,7 @@ function MobileTaskCard({
           ? "border-emerald-100 bg-emerald-50"
           : late
             ? "border-rose-100 bg-rose-50"
-            : "border-slate-200 bg-white"
+            : "border-[#dbe6e0] bg-white"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -2387,11 +3185,11 @@ function MobileTaskCard({
             ) : null}
           </div>
 
-          <h3 className="mt-3 text-lg font-black leading-tight text-slate-950">
+          <h3 className="mt-3 text-lg font-black leading-tight text-[#10251f]">
             {task.title}
           </h3>
 
-          <p className="mt-1 text-sm font-semibold text-slate-500">
+          <p className="mt-1 text-sm font-semibold text-[#526174]">
             {residentName(resident)} · kamb. {residentRoom(resident)} · {getTypeLabel(task.type)}
           </p>
         </button>
@@ -2400,7 +3198,7 @@ function MobileTaskCard({
           type="button"
           disabled={saving}
           onClick={done ? onProgress : onDone}
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition active:scale-95 disabled:opacity-50 ${
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] transition active:scale-95 disabled:opacity-50 ${
             done ? "bg-white text-emerald-700" : "bg-emerald-50 text-emerald-700"
           }`}
           aria-label={done ? "Grąžinti" : "Atlikta"}
@@ -2410,20 +3208,20 @@ function MobileTaskCard({
       </div>
 
       {task.description ? (
-        <p className="mt-4 line-clamp-2 text-sm font-medium leading-relaxed text-slate-600">
+        <p className="mt-4 line-clamp-2 text-sm font-medium leading-relaxed text-[#526174]">
           {task.description}
         </p>
       ) : null}
 
-      <div className="mt-4 grid gap-2 rounded-[20px] bg-slate-50 p-3">
-        <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-500">
+      <div className="mt-4 grid gap-2 rounded-[20px] bg-[#f8faf8] p-3">
+        <div className="flex items-center justify-between gap-3 text-xs font-black text-[#526174]">
           <span className="inline-flex items-center gap-1">
             <Clock className="h-4 w-4" />
             {task.due_date ? formatDateTime(task.due_date) : "Be termino"}
           </span>
           <span>{getTaskStatusLabel(task.status)}</span>
         </div>
-        <div className="text-xs font-semibold text-slate-500">
+        <div className="text-xs font-semibold text-[#526174]">
           Priskirta: {assignedEmployee ? employeeName(assignedEmployee) : "Nepriskirta"}
         </div>
       </div>
@@ -2431,7 +3229,7 @@ function MobileTaskCard({
       <button
         type="button"
         onClick={onOpen}
-        className="mt-3 h-11 w-full rounded-2xl bg-slate-950 text-sm font-black text-white transition active:scale-[0.99]"
+        className="mt-3 h-11 w-full rounded-[14px] bg-slate-950 text-sm font-black text-white transition active:scale-[0.99]"
       >
         Atidaryti
       </button>
@@ -2457,35 +3255,35 @@ function MobileCreateTaskSheet({
   onSubmit: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end bg-slate-950/45 backdrop-blur-sm">
-      <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-[32px] bg-white p-5 shadow-2xl">
-        <div className="mb-5 flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-slate-950/50 p-4 backdrop-blur-sm md:p-6">
+      <section className="max-h-[calc(100vh-48px)] w-full max-w-[980px] overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+        <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100/80">
               Nauja užduotis
             </p>
-            <h2 className="mt-2 text-2xl font-black tracking-tight">Sukurti greitai</h2>
+            <h2 className="mt-1 text-3xl font-black tracking-[-0.04em] text-white">Sukurti greitai</h2>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
             aria-label="Uždaryti"
           >
-            <X className="h-5 w-5" />
+            <X size={28} strokeWidth={2.1} />
           </button>
         </div>
 
         <form
-          className="space-y-4"
+          className="max-h-[calc(100vh-178px)] space-y-4 overflow-y-auto bg-[#f3f6f4] p-6"
           onSubmit={(event) => {
             event.preventDefault()
             onSubmit()
           }}
         >
           <label className="block">
-            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-[#526174]">
               Pavadinimas
             </span>
             <input
@@ -2493,14 +3291,14 @@ function MobileCreateTaskSheet({
               onChange={(event) =>
                 setForm((previous) => ({ ...previous, title: event.target.value }))
               }
-              className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
+              className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
               placeholder="Pvz., sulūžo lova 203 kambaryje"
             />
           </label>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+              <span className="mb-2 block text-xs font-black uppercase tracking-widest text-[#526174]">
                 Tipas
               </span>
               <select
@@ -2508,7 +3306,7 @@ function MobileCreateTaskSheet({
                 onChange={(event) =>
                   setForm((previous) => ({ ...previous, type: event.target.value }))
                 }
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none"
+                className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-3 text-sm font-bold outline-none"
               >
                 {TASK_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -2519,7 +3317,7 @@ function MobileCreateTaskSheet({
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+              <span className="mb-2 block text-xs font-black uppercase tracking-widest text-[#526174]">
                 Prioritetas
               </span>
               <select
@@ -2527,7 +3325,7 @@ function MobileCreateTaskSheet({
                 onChange={(event) =>
                   setForm((previous) => ({ ...previous, priority: event.target.value }))
                 }
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none"
+                className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-3 text-sm font-bold outline-none"
               >
                 {PRIORITY_OPTIONS.map((priority) => (
                   <option key={priority.value} value={priority.value}>
@@ -2539,7 +3337,7 @@ function MobileCreateTaskSheet({
           </div>
 
           <label className="block">
-            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-[#526174]">
               Gyventojas
             </span>
             <select
@@ -2547,7 +3345,7 @@ function MobileCreateTaskSheet({
               onChange={(event) =>
                 setForm((previous) => ({ ...previous, resident_id: event.target.value }))
               }
-              className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 font-bold outline-none"
+              className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-4 font-bold outline-none"
             >
               <option value="">Nepriskirta gyventojui</option>
               {allResidents.map((resident) => (
@@ -2559,7 +3357,7 @@ function MobileCreateTaskSheet({
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-[#526174]">
               Priskirti darbuotojui
             </span>
             <select
@@ -2570,7 +3368,7 @@ function MobileCreateTaskSheet({
                   assigned_user_id: event.target.value,
                 }))
               }
-              className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 font-bold outline-none"
+              className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-4 font-bold outline-none"
             >
               <option value="">Nepriskirta</option>
               {employees.map((employee) => (
@@ -2582,7 +3380,7 @@ function MobileCreateTaskSheet({
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">
+            <span className="mb-2 block text-xs font-black uppercase tracking-widest text-[#526174]">
               Aprašymas
             </span>
             <textarea
@@ -2593,16 +3391,16 @@ function MobileCreateTaskSheet({
                   description: event.target.value,
                 }))
               }
-              className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
+              className="min-h-28 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
               placeholder="Trumpai aprašyk problemą..."
             />
           </label>
 
-          <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-slate-100 bg-white/95 p-5 backdrop-blur">
+          <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-[#dbe6e0] bg-white/95 p-5 backdrop-blur">
             <button
               type="submit"
               disabled={saving}
-              className="h-14 w-full rounded-2xl bg-emerald-700 text-base font-black text-white disabled:opacity-60"
+              className="h-14 w-full rounded-[14px] bg-[#047857] text-base font-black text-white disabled:opacity-60"
             >
               {saving ? "Kuriama..." : "Sukurti užduotį"}
             </button>
@@ -2631,23 +3429,23 @@ function MobileTaskDetailsSheet({
   onStatusChange: (status: string) => void
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end bg-slate-950/45 backdrop-blur-sm">
-      <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-[32px] bg-white p-5 shadow-2xl">
-        <div className="mb-5 flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-slate-950/50 p-4 backdrop-blur-sm md:p-6">
+      <section className="max-h-[calc(100vh-48px)] w-full max-w-[980px] overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+        <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
           <div>
             <MobilePriorityPill priority={task.priority} />
             <h2 className="mt-3 text-2xl font-black tracking-tight">{task.title}</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
+            <p className="mt-1 text-sm font-semibold text-[#526174]">
               {residentName(resident)} · {getTypeLabel(task.type)}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
             aria-label="Uždaryti"
           >
-            <X className="h-5 w-5" />
+            <X size={28} strokeWidth={2.1} />
           </button>
         </div>
 
@@ -2664,21 +3462,21 @@ function MobileTaskDetailsSheet({
         </div>
 
         {task.description ? (
-          <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+          <div className="mt-4 rounded-[24px] border border-[#dbe6e0] bg-[#f8faf8] p-4">
             <p className="text-xs font-black uppercase tracking-widest text-slate-400">
               Aprašymas
             </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-700">
+            <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-relaxed text-[#486b5d]">
               {task.description}
             </p>
           </div>
         ) : null}
 
-        <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 bg-white/95 p-5 backdrop-blur">
+        <div className="sticky bottom-0 -mx-5 -mb-5 mt-5 grid grid-cols-2 gap-3 border-t border-[#dbe6e0] bg-white/95 p-5 backdrop-blur">
           <button
             type="button"
             onClick={onEdit}
-            className="col-span-2 h-13 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 font-black text-slate-700"
+            className="col-span-2 h-13 rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-3 font-black text-[#486b5d]"
           >
             Redaguoti užduotį
           </button>
@@ -2686,7 +3484,7 @@ function MobileTaskDetailsSheet({
             type="button"
             disabled={saving}
             onClick={() => onStatusChange("in_progress")}
-            className="h-13 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 font-black text-slate-700 disabled:opacity-60"
+            className="h-13 rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-3 font-black text-[#486b5d] disabled:opacity-60"
           >
             Vykdoma
           </button>
@@ -2694,7 +3492,7 @@ function MobileTaskDetailsSheet({
             type="button"
             disabled={saving}
             onClick={() => onStatusChange("done")}
-            className="h-13 rounded-2xl bg-emerald-700 px-4 py-3 font-black text-white disabled:opacity-60"
+            className="h-13 rounded-[14px] bg-[#047857] px-4 py-3 font-black text-white disabled:opacity-60"
           >
             Atlikta
           </button>
@@ -2740,7 +3538,7 @@ function CircleStat({
   const strokeDashoffset = circumference - (safePercent / 100) * circumference
 
   return (
-    <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+    <article className="rounded-[18px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
       <div className="flex items-center gap-5">
         <div className="relative h-28 w-28 shrink-0">
           <svg viewBox="0 0 100 100" className="h-28 w-28 -rotate-90">
@@ -2771,8 +3569,8 @@ function CircleStat({
         </div>
 
         <div className="min-w-0">
-          <p className="text-lg font-black text-slate-950">{title}</p>
-          <p className="mt-1 text-sm font-bold text-slate-500">{helper}</p>
+          <p className="text-lg font-black text-[#10251f]">{title}</p>
+          <p className="mt-2 text-sm font-bold text-white/80">{helper}</p>
           <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-black ${bg}`}>
             {value} įrašai
           </span>
@@ -2798,7 +3596,7 @@ function DashboardPill({
   }[tone]
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 font-black ${toneClass}`}>
+    <div className={`rounded-[14px] border px-4 py-3 font-black ${toneClass}`}>
       {label}: {value}
     </div>
   )
@@ -2828,7 +3626,7 @@ function TaskSegmentCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-3xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClass}`}
+      className={`rounded-[22px] border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClass}`}
     >
       <span className="text-3xl font-black">{value}</span>
       <p className="mt-1 font-black">{title}</p>
@@ -2850,7 +3648,7 @@ function Select({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-black text-slate-700 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
+      className="rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 font-black text-[#486b5d] outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
     >
       {children}
     </select>
@@ -2875,7 +3673,7 @@ function StatCard({
     amber: "bg-amber-50 text-amber-700",
     blue: "bg-blue-50 text-blue-700",
     rose: "bg-rose-50 text-rose-700",
-    slate: "bg-slate-50 text-slate-700",
+    slate: "bg-[#f8faf8] text-[#486b5d]",
   }[tone]
 
   const textClass = {
@@ -2883,20 +3681,20 @@ function StatCard({
     amber: "text-amber-700",
     blue: "text-blue-700",
     rose: "text-rose-700",
-    slate: "text-slate-700",
+    slate: "text-[#486b5d]",
   }[tone]
 
   return (
-    <article className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
+    <article className="rounded-[22px] border border-[#dbe6e0] bg-white p-6 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
       <div className="flex items-center gap-4">
         <div
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl ${toneClass}`}
+          className={`flex h-14 w-14 items-center justify-center rounded-[14px] ${toneClass}`}
         >
           {icon}
         </div>
 
         <div>
-          <p className="font-extrabold text-slate-500">{title}</p>
+          <p className="font-extrabold text-[#526174]">{title}</p>
           <p className="mt-1 text-4xl font-black">
             {value}{" "}
             <span className={`text-sm font-bold ${textClass}`}>{meta}</span>
@@ -2912,6 +3710,7 @@ function TaskCard({
   resident,
   assignedEmployee,
   saving,
+  attachmentCount,
   onClick,
   onEdit,
   onStatusChange,
@@ -2920,67 +3719,101 @@ function TaskCard({
   resident?: ResidentRow
   assignedEmployee?: EmployeeOption
   saving: boolean
+  attachmentCount?: number
   onClick: () => void
   onEdit: () => void
   onStatusChange: (status: string) => void
 }) {
   const late = isTaskLate(task)
+  const done = task.status === "done"
+  const description = task.description?.trim()
 
   return (
     <article
-      className={`rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-        task.status === "done"
-          ? "border-emerald-100 bg-emerald-50"
+      className={`rounded-[22px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        done
+          ? "border-emerald-100 border-l-[8px] border-l-[#047857]"
           : late
-            ? "border-rose-100 bg-rose-50"
-            : "border-slate-200 bg-slate-50"
+            ? "border-rose-100 border-l-[8px] border-l-rose-600"
+            : "border-[#dbe6e0] border-l-[8px] border-l-[#486b5d]"
       }`}
     >
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <button type="button" onClick={onClick} className="flex-1 text-left">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-black text-slate-950">{task.title}</h3>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold text-slate-500">
-                  {getTypeLabel(task.type)}
-                </span>
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <button type="button" onClick={onClick} className="min-w-0 flex-1 text-left">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <h3 className="truncate text-xl font-black tracking-[-0.02em] text-[#10251f]">
+                {task.title}
+              </h3>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm font-black text-[#486b5d]">
+                <span>{getTypeLabel(task.type)}</span>
+                <span className="text-[#8ea0b5]">•</span>
                 <span className={`rounded-full border px-3 py-1 text-xs font-black ${getPriorityOption(task.priority).className}`}>
                   {getPriorityLabel(task.priority)}
                 </span>
+                <span className="text-[#8ea0b5]">•</span>
+                <span className={late ? "text-rose-700" : done ? "text-[#047857]" : "text-[#486b5d]"}>
+                  {late ? "Vėluoja" : getTaskStatusLabel(task.status)}
+                </span>
+                {!task.viewed_at ? (
+                  <>
+                    <span className="text-[#8ea0b5]">•</span>
+                    <span className="text-amber-700">Nepamatyta</span>
+                  </>
+                ) : null}
+                {attachmentCount ? (
+                  <>
+                    <span className="text-[#8ea0b5]">•</span>
+                    <span className="inline-flex items-center gap-1 text-[#047857]">
+                      <Camera className="h-3.5 w-3.5" />
+                      {attachmentCount} foto
+                    </span>
+                  </>
+                ) : null}
               </div>
             </div>
 
             <span
-              className={`rounded-full bg-white px-3 py-1 text-sm font-black ${
-                late ? "text-rose-700" : "text-slate-700"
+              className={`w-fit rounded-full px-4 py-2 text-sm font-black ${
+                late
+                  ? "bg-rose-50 text-rose-700"
+                  : done
+                    ? "bg-emerald-50 text-[#047857]"
+                    : "bg-[#eef4f1] text-[#486b5d]"
               }`}
             >
               {late ? "Vėluoja" : getTaskStatusLabel(task.status)}
             </span>
-            {!task.viewed_at ? (
-              <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-black text-amber-700">
-                Nepamatyta
-              </span>
-            ) : null}
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-            <InfoPill label="Gyventojas" value={residentName(resident)} />
-            <InfoPill label="Kambarys" value={residentRoom(resident)} />
-            <InfoPill label="Priskirta" value={assignedEmployee ? employeeName(assignedEmployee) : "Nepriskirta"} />
-            <InfoPill label="Terminas" value={formatDateTime(task.due_date)} />
-            <InfoPill label="Kartojimas" value={task.interval_days ? `Kas ${task.interval_days} d.` : "—"} />
-            <InfoPill label="Pamatė" value={formatDateTime(task.viewed_at || null)} />
-            <InfoPill label="Įvykdė" value={formatDateTime(task.completed_at || task.last_done_at || null)} />
+          {description ? (
+            <p className="mt-3 line-clamp-2 text-sm font-semibold leading-6 text-[#486b5d]">
+              {description}
+            </p>
+          ) : null}
+
+          <div className="mt-4 space-y-2 text-sm font-semibold text-[#10251f]">
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              <TaskInlineMeta label="Gyventojas" value={residentName(resident)} />
+              <TaskInlineMeta label="Kambarys" value={residentRoom(resident)} />
+              <TaskInlineMeta label="Priskirta" value={assignedEmployee ? employeeName(assignedEmployee) : "Nepriskirta"} />
+            </div>
+
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-[#526174]">
+              <TaskInlineMeta label="Terminas" value={formatDateTime(task.due_date)} />
+              <TaskInlineMeta label="Kartojimas" value={task.interval_days ? `Kas ${task.interval_days} d.` : "—"} />
+              <TaskInlineMeta label="Pamatė" value={formatDateTime(task.viewed_at || null)} />
+              <TaskInlineMeta label="Įvykdė" value={formatDateTime(task.completed_at || task.last_done_at || null)} />
+            </div>
           </div>
         </button>
 
-        <div className="flex shrink-0 flex-wrap gap-2 md:flex-col">
+        <div className="flex shrink-0 flex-wrap gap-2 xl:w-40 xl:flex-col xl:pt-1">
           <button
             type="button"
             onClick={onEdit}
-            className="rounded-2xl border border-slate-200/70 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100"
+            className="rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-slate-100"
           >
             Redaguoti
           </button>
@@ -2990,7 +3823,7 @@ function TaskCard({
                 type="button"
                 disabled={saving}
                 onClick={() => onStatusChange("in_progress")}
-                className="rounded-2xl border border-slate-200/70 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+                className="rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-slate-100 disabled:opacity-60"
               >
                 Vykdoma
               </button>
@@ -2998,7 +3831,7 @@ function TaskCard({
                 type="button"
                 disabled={saving}
                 onClick={() => onStatusChange("done")}
-                className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
+                className="rounded-[14px] bg-slate-950 px-4 py-2 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
               >
                 Atlikta
               </button>
@@ -3008,7 +3841,7 @@ function TaskCard({
               type="button"
               disabled={saving}
               onClick={() => onStatusChange("in_progress")}
-              className="rounded-2xl border border-slate-200/70 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+              className="rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-slate-100 disabled:opacity-60"
             >
               Grąžinti
             </button>
@@ -3019,13 +3852,97 @@ function TaskCard({
   )
 }
 
+function TaskInlineMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="min-w-0">
+      <span className="mr-1 text-[11px] font-black uppercase tracking-[0.1em] text-[#8ea0b5]">
+        {label}:
+      </span>
+      <span className="font-black text-[#10251f]">{value || "—"}</span>
+    </span>
+  )
+}
+
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white px-4 py-3">
+    <div className="rounded-[14px] bg-white px-4 py-3">
       <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
         {label}
       </p>
       <p className="mt-1 font-black text-slate-800">{value || "—"}</p>
+    </div>
+  )
+}
+
+
+function CompactDetail({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string
+  value: string
+  wide?: boolean
+}) {
+  return (
+    <div className={`rounded-[16px] border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 ${wide ? "md:col-span-2" : ""}`}>
+      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#8ea0b5]">{label}</p>
+      <p className="mt-1 break-words text-sm font-black leading-5 text-[#10251f]">{value || "—"}</p>
+    </div>
+  )
+}
+
+function TaskAttachmentGallery({
+  title,
+  attachments,
+}: {
+  title: string
+  attachments: TaskAttachmentRow[]
+}) {
+  return (
+    <div className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Camera className="h-5 w-5 text-[#047857]" />
+          <h3 className="text-lg font-black text-[#10251f]">{title}</h3>
+        </div>
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#047857]">
+          {attachments.length}
+        </span>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {attachments.map((attachment) => (
+          <a
+            key={attachment.id}
+            href={attachment.signed_url || undefined}
+            target={attachment.signed_url ? "_blank" : undefined}
+            rel={attachment.signed_url ? "noreferrer" : undefined}
+            className="group overflow-hidden rounded-[16px] border border-[#dbe6e0] bg-[#f8faf8] transition hover:border-emerald-200 hover:bg-emerald-50/50"
+          >
+            {attachment.signed_url ? (
+              <img
+                src={attachment.signed_url}
+                alt={attachment.file_name || "Užduoties nuotrauka"}
+                className="h-32 w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-32 items-center justify-center text-sm font-black text-[#526174]">
+                Nuotraukos peržiūra nepasiekiama
+              </div>
+            )}
+
+            <div className="p-3">
+              <p className="truncate text-xs font-black text-[#10251f]">
+                {attachment.file_name || "Nuotrauka"}
+              </p>
+              <p className="mt-1 text-[11px] font-bold text-[#526174]">
+                {attachment.size_bytes ? `${(attachment.size_bytes / 1024 / 1024).toFixed(1)} MB` : "Failas"}
+              </p>
+            </div>
+          </a>
+        ))}
+      </div>
     </div>
   )
 }
@@ -3042,27 +3959,30 @@ function Modal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-4">
-      <section className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
-        <div className="sticky top-0 z-20 flex items-start justify-between gap-6 border-b border-slate-100 bg-white/95 p-6 backdrop-blur sm:p-7">
+    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-slate-950/50 p-4 backdrop-blur-sm md:p-6">
+      <section className="max-h-[calc(100vh-48px)] w-full max-w-[1180px] overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+        <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
           <div>
-            <h2 className="text-3xl font-black tracking-tight md:text-5xl">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100/80">
+              Užduotys
+            </p>
+            <h2 className="mt-1 text-3xl font-black tracking-[-0.04em] text-white md:text-4xl">
               {title}
             </h2>
-            <p className="mt-2 font-semibold text-slate-500">{desc}</p>
+            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-white/80">{desc}</p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 active:scale-[0.98]"
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20 active:scale-[0.98]"
             aria-label="Uždaryti"
           >
-            <X className="h-6 w-6" />
+            <X size={28} strokeWidth={2.1} />
           </button>
         </div>
 
-        <div className="p-6 sm:p-7">{children}</div>
+        <div className="max-h-[calc(100vh-178px)] overflow-y-auto bg-[#f3f6f4] p-6 sm:p-7">{children}</div>
       </section>
     </div>
   )
@@ -3079,7 +3999,7 @@ function Field({
 }) {
   return (
     <label className={`block ${full ? "md:col-span-2" : ""}`}>
-      <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">
+      <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-[#526174]">
         {label}
       </span>
       {children}
@@ -3089,11 +4009,11 @@ function Field({
 
 function DetailBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white p-4">
+    <div className="rounded-[14px] bg-white p-4">
       <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <p className="mt-2 break-words font-black text-slate-900">{value || "—"}</p>
+      <p className="mt-2 break-words font-black text-[#10251f]">{value || "—"}</p>
     </div>
   )
 }

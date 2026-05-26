@@ -8,12 +8,14 @@ import {
   BarChart3,
   Bell,
   Box,
+  CalendarDays,
   ClipboardList,
   FileText,
   HeartPulse,
   Home,
   Inbox,
   LogOut,
+  Settings,
   ShieldCheck,
   User,
   UserRound,
@@ -27,7 +29,7 @@ import {
   staffTypeLabel,
   type CurrentAccess,
 } from "@/lib/app-access"
-import { APP_MENU, type AppMenuItem } from "@/lib/app-menu"
+import { ADMIN_MENU, EMPLOYEE_MENU, type AppMenuItem } from "@/lib/app-menu"
 import { supabase } from "@/lib/supabase"
 
 const SUPER_ADMIN_MENU: AppMenuItem[] = [
@@ -45,8 +47,6 @@ const SUPER_ADMIN_MENU: AppMenuItem[] = [
   },
 ]
 
-const ADMIN_HIDDEN_MENU_LABELS = new Set(["Grafikas", "Pranešimai"])
-
 function menuIcon(icon: string) {
   if (icon === "home") return Home
   if (icon === "home2") return Home
@@ -60,6 +60,8 @@ function menuIcon(icon: string) {
   if (icon === "inbox") return Inbox
   if (icon === "chart") return BarChart3
   if (icon === "bell") return Bell
+  if (icon === "calendar") return CalendarDays
+  if (icon === "settings") return Settings
   if (icon === "shield") return ShieldCheck
 
   return Home
@@ -82,22 +84,6 @@ function isActiveItem(
   }
 
   return true
-}
-
-function mapMenuByRole(item: AppMenuItem, access: CurrentAccess): AppMenuItem {
-  if (
-    item.label === "Gyventojai" &&
-    item.href === "/residents" &&
-    access.role === "employee"
-  ) {
-    return {
-      ...item,
-      href: "/my-residents",
-      label: "Mano gyventojai",
-    }
-  }
-
-  return item
 }
 
 function initials(nameOrEmail: string | null | undefined) {
@@ -214,7 +200,7 @@ export default function AppSidebar() {
     access?.role === "super_admin"
       ? "/admin"
       : access?.role === "employee"
-        ? "/dashboard"
+        ? "/employee-dashboard"
         : "/dashboard"
 
   const visibleMenu = useMemo(() => {
@@ -226,14 +212,15 @@ export default function AppSidebar() {
       )
     }
 
-    return APP_MENU
-      .filter((item) => hasPermission(access, item.permission))
-      .filter((item) => {
-        if (access.role === "employee") return true
+    if (access.role === "employee") {
+      return EMPLOYEE_MENU.filter((item) =>
+        hasPermission(access, item.permission),
+      )
+    }
 
-        return !ADMIN_HIDDEN_MENU_LABELS.has(item.label)
-      })
-      .map((item) => mapMenuByRole(item, access))
+    return ADMIN_MENU.filter((item) =>
+      hasPermission(access, item.permission),
+    )
   }, [access])
 
   const userRoleLabel =

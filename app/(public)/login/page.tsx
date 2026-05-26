@@ -74,7 +74,7 @@ export default function LoginPage() {
       }
 
       if (role === 'owner' || role === 'admin') {
-        router.replace('/admin-dashboard')
+        router.replace('/dashboard')
         router.refresh()
         return
       }

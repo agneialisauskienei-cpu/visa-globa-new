@@ -826,7 +826,7 @@ export default function TrainingModule({
       organizationId,
       tableName: "personnel_trainings",
       recordId: (data as TrainingRecord).id,
-      action: "insert",
+      action: "training.created",
       changes: getChangedFields({}, data as Record<string, unknown>),
     });
 
@@ -910,7 +910,7 @@ export default function TrainingModule({
         organizationId: previousTraining.organization_id || organizationId,
         tableName: "personnel_trainings",
         recordId: trainingId,
-        action: "update",
+        action: "training.approved",
         changes: getChangedFields(previousTraining as Record<string, unknown>, {
           ...previousTraining,
           ...actualPayload,
@@ -973,7 +973,7 @@ export default function TrainingModule({
         organizationId: previousTraining.organization_id || organizationId,
         tableName: "personnel_trainings",
         recordId: trainingId,
-        action: "update",
+        action: "training.rejected",
         changes: getChangedFields(previousTraining as Record<string, unknown>, {
           ...previousTraining,
           ...actualPayload,
