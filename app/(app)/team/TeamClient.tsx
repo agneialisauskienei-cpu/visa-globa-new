@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import InvitesModule from "./components/Invites/InvitesModule"
+import InvitesModule from "./components/Invites/InvitesModule";
 import {
   AlertTriangle,
   ArrowRight,
@@ -14,6 +14,7 @@ import {
   Edit3,
   FileText,
   GraduationCap,
+  Mail,
   PackageCheck,
   Plus,
   RefreshCw,
