@@ -1056,7 +1056,7 @@ export default function TeamPage() {
       editForm.full_name.trim() ||
       [firstName, lastName].filter(Boolean).join(" ").trim();
 
-    console.log("[TeamPage] validation", { firstName, lastName, fullName, birth_date: editForm.birth_date });
+    console.log("[TeamPage] validation", { firstName, lastName, fullName, birth_date: "" });
 
     if (!firstName || !lastName) {
       console.error("[TeamPage] saveEmployee aborted: missing firstName or lastName");
@@ -1106,7 +1106,7 @@ export default function TeamPage() {
         full_name: fullName || null,
         email: editForm.email.trim() || null,
         phone: editForm.phone.trim() || null,
-        birth_date: editForm.birth_date || null,
+        birth_date: "" || null,
       });
 
       const previousMemberAudit = compactAuditPayload({
@@ -1167,7 +1167,7 @@ export default function TeamPage() {
         full_name: fullName || null,
         email: editForm.email.trim() || null,
         phone: editForm.phone.trim() || null,
-        birth_date: editForm.birth_date || null,
+        birth_date: "" || null,
       };
 
       const profileResult = await supabase.rpc("admin_update_employee_profile", {
@@ -1178,7 +1178,7 @@ export default function TeamPage() {
         p_full_name: fullName || null,
         p_email: editForm.email.trim() || null,
         p_phone: editForm.phone.trim() || null,
-        p_birth_date: editForm.birth_date || null,
+        p_birth_date: "" || null,
       });
 
       if (profileResult.error) {
@@ -1245,7 +1245,7 @@ export default function TeamPage() {
     const email = newEmployeeForm.email.trim();
     const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
-    console.log("[TeamPage] validation", { firstName, lastName, fullName, birth_date: editForm.birth_date });
+    console.log("[TeamPage] validation", { firstName, lastName, fullName, birth_date: "" });
 
     if (!firstName || !lastName) {
       setCreateModalMessage("Įvesk darbuotojo vardą ir pavardę.");
