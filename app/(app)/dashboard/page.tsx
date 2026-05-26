@@ -32,6 +32,8 @@ type DashboardStats = {
   activeEmployees: number;
   pendingTasks: number;
   pendingLeaves: number;
+  pendingInvites: number;
+  totalInvites: number;
   expiringCertificates: number;
   completedTrainings: number;
   requiredTrainings: number;
@@ -70,6 +72,8 @@ const EMPTY_STATS: DashboardStats = {
   activeEmployees: 0,
   pendingTasks: 0,
   pendingLeaves: 0,
+  pendingInvites: 0,
+  totalInvites: 0,
   expiringCertificates: 0,
   completedTrainings: 0,
   requiredTrainings: 0,
@@ -106,6 +110,7 @@ export default function AdminDashboardPage() {
       activeEmployees,
       pendingTasks,
       pendingLeaves,
+      inviteStats,
       expiringCertificates,
       trainingStats,
       capacity,
@@ -127,6 +132,7 @@ export default function AdminDashboardPage() {
         () => safeCountResult("requests", (q) => q.in("status", ["pending", "submitted", "new"])),
       ]),
       countPendingLeaveRequests(),
+      countInviteStats(),
       countExpiringCertificates(),
       countTrainingProgress(),
       getOrganizationCapacity(),
@@ -147,6 +153,8 @@ export default function AdminDashboardPage() {
       activeEmployees,
       pendingTasks,
       pendingLeaves,
+      pendingInvites: inviteStats.pending,
+      totalInvites: inviteStats.total,
       expiringCertificates,
       completedTrainings: trainingStats.completed,
       requiredTrainings: trainingStats.required,
@@ -212,6 +220,15 @@ export default function AdminDashboardPage() {
   }, [stats]);
 
   const attentionItems = [
+    {
+      title: "Kvietimai",
+      desc: stats.pendingInvites > 0
+        ? `${stats.pendingInvites} kvietimai laukia atsakymo.`
+        : "Laukiančių kvietimų nėra.",
+      badge: stats.pendingInvites ? "Peržiūrėti" : "Gerai",
+      color: stats.pendingInvites ? "blue" as const : "emerald" as const,
+      onClick: () => router.push("/team?module=invites"),
+    },
     {
       title: "Atostogų prašymai",
       desc: `${stats.pendingLeaves} praš. laukia sprendimo.`,
@@ -344,10 +361,11 @@ export default function AdminDashboardPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
           <TopMetric title="Gyventojai" value={loading ? "…" : String(stats.activeResidents)} meta="aktyvūs" onClick={() => router.push("/residents")} />
           <TopMetric title="Užimtumas" value={loading ? "…" : `${computed.occupancy}%`} meta="vietos" accent="emerald" onClick={() => router.push("/rooms")} />
           <TopMetric title="Darbuotojai" value={loading ? "…" : String(stats.activeEmployees)} meta="aktyvūs" onClick={() => router.push("/team?module=employees")} />
+          <TopMetric title="Kvietimai" value={loading ? "…" : String(stats.pendingInvites)} meta={stats.pendingInvites ? "laukia" : `${stats.totalInvites} iš viso`} accent={stats.pendingInvites ? "amber" : "emerald"} onClick={() => router.push("/team?module=invites")} />
           <TopMetric title="Etatai" value={loading ? "…" : formatFte(stats.freeFte)} meta={`laisva iš ${formatFte(stats.plannedFte)} et.`} accent={stats.freeFte > 0 ? "red" : "emerald"} onClick={() => router.push("/team?module=fte")} />
           <TopMetric title="Užduotys" value={loading ? "…" : String(stats.pendingTasks)} meta={stats.pendingTasks ? "laukia" : "nėra"} accent={stats.pendingTasks ? "amber" : "emerald"} onClick={() => router.push("/tasks")} />
           <TopMetric title="Mokymai" value={loading ? "…" : `${computed.trainingCompletion}%`} meta="sutvarkyta" accent={computed.trainingCompletion < 70 ? "amber" : "emerald"} onClick={() => router.push("/team?module=trainings")} />
@@ -359,15 +377,26 @@ export default function AdminDashboardPage() {
             <span className="mr-2 text-[11px] font-black uppercase tracking-[0.22em] text-[#6a7e75]">Veiksmai</span>
             <button type="button" onClick={() => router.push("/team?module=vacations")} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Užklausos</button>
             <button type="button" onClick={() => router.push("/tasks")} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Užduotys</button>
+            <button type="button" onClick={() => router.push("/team?module=invites")} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Kvietimai</button>
             <button type="button" onClick={loadStats} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Atnaujinti</button>
           </div>
           <div className="inline-flex w-fit rounded-lg border border-[#ead8a7] bg-[#fff9e8] px-4 py-2 text-sm font-black text-[#8a5a13]">
-            Rizikos: {computed.totalRisks + stats.pendingLeaves + stats.expiringCertificates}
+            Rizikos: {computed.totalRisks + stats.pendingLeaves + stats.expiringCertificates + stats.pendingInvites}
           </div>
         </section>
 
-        {(stats.pendingLeaves > 0 || stats.todayAbsences > 0 || stats.replacementNeededFte > 0) ? (
-          <section className="grid gap-3 lg:grid-cols-3">
+        {(stats.pendingLeaves > 0 || stats.pendingInvites > 0 || stats.todayAbsences > 0 || stats.replacementNeededFte > 0) ? (
+          <section className="grid gap-3 lg:grid-cols-4">
+            <CriticalStrip
+              icon={<UserPlus />}
+              title="Laukia kvietimai"
+              text={`${stats.pendingInvites} darbuotojų kvietimai dar nepriimti`}
+              color={stats.pendingInvites > 0 ? "blue" : "amber"}
+              onClick={() => {
+                setActiveTab("risks");
+                router.push("/team?module=invites");
+              }}
+            />
             <CriticalStrip
               icon={<CalendarCheck />}
               title="Laukia prašymai"
@@ -476,11 +505,14 @@ export default function AdminDashboardPage() {
 
             <DashboardSidePanel
               pendingLeaves={stats.pendingLeaves}
+              pendingInvites={stats.pendingInvites}
+              totalInvites={stats.totalInvites}
               todayAbsences={stats.todayAbsences}
               expiringCertificates={stats.expiringCertificates}
               trainingCompletion={computed.trainingCompletion}
               lastUpdated={lastUpdated}
               onVacations={() => router.push("/team?module=vacations")}
+              onInvites={() => router.push("/team?module=invites")}
               onSchedule={() => router.push("/team?module=schedule")}
               onDocuments={() => router.push("/team?module=docs")}
             />
@@ -608,6 +640,7 @@ export default function AdminDashboardPage() {
                 <QuickLink title="Atostogų / išvykimų patvirtinimai" onClick={() => router.push("/team?module=vacations")} />
                 <QuickLink title="Darbuotojų dokumentai" onClick={() => router.push("/team?module=docs")} />
                 <QuickLink title="Grafiko patikra" onClick={() => router.push("/team?module=schedule")} />
+                <QuickLink title="Kvietimų valdymas" onClick={() => router.push("/team?module=invites")} />
                 <QuickLink title="Audit žurnalas" onClick={() => router.push("/audit")} />
               </div>
             </section>
@@ -710,6 +743,21 @@ async function firstWorkingCount(loaders: Array<() => Promise<{ ok: boolean; cou
     if (result.ok) return result.count;
   }
   return 0;
+}
+
+async function countInviteStats(): Promise<{ pending: number; total: number }> {
+  const rows = await safeSelectRows("organization_invites", "id, status");
+  if (rows.length) {
+    return {
+      pending: rows.filter((row: any) => String(row?.status || "pending").toLowerCase() === "pending").length,
+      total: rows.length,
+    };
+  }
+
+  const pending = await safeCount("organization_invites", (q) => q.eq("status", "pending"));
+  const total = await safeCount("organization_invites");
+
+  return { pending, total };
 }
 
 async function countPendingLeaveRequests(): Promise<number> {
@@ -1180,20 +1228,26 @@ function DashboardTabButton({
 
 function DashboardSidePanel({
   pendingLeaves,
+  pendingInvites,
+  totalInvites,
   todayAbsences,
   expiringCertificates,
   trainingCompletion,
   lastUpdated,
   onVacations,
+  onInvites,
   onSchedule,
   onDocuments,
 }: {
   pendingLeaves: number;
+  pendingInvites: number;
+  totalInvites: number;
   todayAbsences: number;
   expiringCertificates: number;
   trainingCompletion: number;
   lastUpdated: Date | null;
   onVacations: () => void;
+  onInvites: () => void;
   onSchedule: () => void;
   onDocuments: () => void;
 }) {
@@ -1206,6 +1260,17 @@ function DashboardSidePanel({
         <h2 className="mt-1 text-2xl font-black">Reikia dėmesio</h2>
 
         <div className="mt-4 space-y-3">
+          <RiskAttentionCard
+            title="Darbuotojų kvietimai"
+            text={
+              pendingInvites > 0
+                ? `${pendingInvites} kvietimai laukia atsakymo. Iš viso sukurta: ${totalInvites}.`
+                : "Laukiančių kvietimų nėra."
+            }
+            badge={pendingInvites > 0 ? "Laukia" : "Gerai"}
+            tone={pendingInvites > 0 ? "amber" : "emerald"}
+            onClick={onInvites}
+          />
           <RiskAttentionCard
             title="Atostogų / išvykimo užklausos"
             text={
@@ -1250,6 +1315,7 @@ function DashboardSidePanel({
 
         <div className="mt-4 space-y-3">
           <TimelineItem color="#047857" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
+          <TimelineItem color="#2563eb" title="Darbuotojų kvietimai" meta={`${pendingInvites} laukia atsakymo`} blue />
           <TimelineItem color="#8a5a13" title="Atostogų / išvykimo užklausos" meta={`${pendingLeaves} laukia sprendimo`} warm />
           <TimelineItem color="#b91c1c" title="Dokumentų terminai" meta={`${expiringCertificates} įspėjimai`} danger />
           <TimelineItem color="#2563eb" title="Mokymai" meta={`${trainingCompletion}% užbaigta`} blue />

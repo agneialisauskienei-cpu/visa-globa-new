@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import InvitesModule from "./components/Invites/InvitesModule"
 import {
   AlertTriangle,
   ArrowRight,
@@ -306,6 +307,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
   { key: "schedule", label: "Grafikas", icon: CalendarDays },
   { key: "vacations", label: "Atostogos", icon: Umbrella },
   { key: "candidates", label: "Kandidatai", icon: UserPlus },
+  { key: "invites", label: "Kvietimai", icon: Mail },
   { key: "access", label: "Pareigos ir teisės", icon: UserCog },
   { key: "trainings", label: "Mokymai", icon: GraduationCap },
   { key: "docs", label: "Dokumentai", icon: FileText },
@@ -2337,6 +2339,7 @@ export default function TeamPage() {
             onRefresh={loadAll}
           />
         )}
+
 
         {tab === "trainings" && (
           <TrainingModule
