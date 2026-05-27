@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { Bell, CalendarDays, Home, LogOut, User, Users } from 'lucide-react'
 import { ROUTES } from '@/lib/routes'
 import { supabase } from '@/lib/supabase'
-import { useNotifications } from '@/components/providers/NotificationProvider'
+const { unreadCount } = useNotifications()
 
 function isActive(pathname: string, href: string) {
   return pathname === href
@@ -23,7 +23,7 @@ type NavItem = {
 export default function MobileBottomNav() {
   const pathname = usePathname()
   const router = useRouter()
-  const { unreadCount } = useNotifications()
+  const unreadCount = 0
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
