@@ -4,12 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
-  Copy,
   Mail,
   RefreshCw,
   Search,
   Send,
-  Trash2,
   UserPlus,
   X,
 } from "lucide-react";
@@ -108,6 +106,7 @@ export default function InvitesModule() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"active" | "all" | "pending" | "accepted" | "cancelled">("active");
   const [message, setMessage] = useState("");
@@ -304,12 +303,66 @@ export default function InvitesModule() {
     }
   }
 
-  async function copyEmail(email: string) {
+
+  async function approveInvite(invite: Invite) {
     try {
-      await navigator.clipboard.writeText(email);
-      setMessage("El. paštas nukopijuotas.");
-    } catch {
-      setError("Nepavyko nukopijuoti.");
+      setApprovingId(invite.id);
+      setError("");
+      setMessage("");
+
+      if (!organizationId) {
+        setError("Nepavyko nustatyti įstaigos.");
+        return;
+      }
+
+      const email = normalizeEmail(invite.email);
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .ilike("email", email)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (!profile?.id) {
+        setError("Darbuotojas dar neprisijungė pagal kvietimą. Pirmiausia jis turi paspausti laiške esančią nuorodą ir susikurti paskyrą.");
+        return;
+      }
+
+      const { error: memberError } = await supabase
+        .from("organization_members")
+        .upsert(
+          {
+            organization_id: organizationId,
+            user_id: profile.id,
+            role: invite.role || "employee",
+            is_active: true,
+          },
+          {
+            onConflict: "organization_id,user_id",
+          },
+        );
+
+      if (memberError) throw memberError;
+
+      const { error: inviteError } = await supabase
+        .from("organization_invites")
+        .update({
+          status: "accepted",
+          accepted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", invite.id);
+
+      if (inviteError) throw inviteError;
+
+      setMessage(`Kvietimas patvirtintas: ${invite.email}`);
+      await load();
+    } catch (approveError) {
+      setError(approveError instanceof Error ? approveError.message : "Nepavyko patvirtinti kvietimo.");
+    } finally {
+      setApprovingId(null);
     }
   }
 
@@ -481,15 +534,6 @@ export default function InvitesModule() {
                         </div>
 
                         <div className="flex shrink-0 flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void copyEmail(invite.email)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-[#c9d8d0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
-                          >
-                            <Copy className="h-4 w-4" />
-                            Kopijuoti
-                          </button>
-
                           {isPending(invite.status) ? (
                             <>
                               <button
@@ -500,6 +544,16 @@ export default function InvitesModule() {
                               >
                                 <Send className="h-4 w-4" />
                                 {resendingId === invite.id ? "Siunčiama..." : "Persiųsti"}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => void approveInvite(invite)}
+                                disabled={approvingId === invite.id}
+                                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-700 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-800 disabled:opacity-60"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                                {approvingId === invite.id ? "Tvirtinama..." : "Patvirtinti"}
                               </button>
 
                               <button
@@ -529,7 +583,7 @@ export default function InvitesModule() {
               <div className="flex gap-3">
                 <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                 <p>
-                  Jei laiškas neatėjo, pirmiausia patikrinkite ar el. paštas teisingas, ar nėra Spam/Promotions aplanke, tada spauskite „Persiųsti“.
+                  Jei laiškas neatėjo, pirmiausia patikrinkite ar el. paštas teisingas, ar nėra Spam/Promotions aplanke, tada spauskite „Persiųsti“. Kai darbuotojas paspaus laiško nuorodą ir susikurs paskyrą, administratoriui beliks paspausti „Patvirtinti“.
                 </p>
               </div>
             </div>
