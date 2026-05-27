@@ -315,58 +315,40 @@ export default function InvitesModule() {
         return;
       }
 
-      const email = normalizeEmail(invite.email);
+      const response = await fetch("/api/invitations/approve", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: invite.email,
+          organizationId,
+          role: invite.role || "employee",
+        }),
+      });
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, email")
-        .ilike("email", email)
-        .maybeSingle();
+      const payload = await response.json().catch(() => null);
 
-      if (profileError) throw profileError;
-
-      if (!profile?.id) {
-        setError("Darbuotojas dar neprisijungė pagal kvietimą. Pirmiausia jis turi paspausti laiške esančią nuorodą ir susikurti paskyrą.");
-        return;
-      }
-
-      const { error: memberError } = await supabase
-        .from("organization_members")
-        .upsert(
-          {
-            organization_id: organizationId,
-            user_id: profile.id,
-            role: invite.role || "employee",
-            is_active: true,
-          },
-          {
-            onConflict: "organization_id,user_id",
-          },
+      if (!response.ok) {
+        throw new Error(
+          payload?.error || "Nepavyko patvirtinti kvietimo.",
         );
-
-      if (memberError) throw memberError;
-
-      const { error: inviteError } = await supabase
-        .from("organization_invites")
-        .update({
-          status: "accepted",
-          accepted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", invite.id);
-
-      if (inviteError) throw inviteError;
+      }
 
       setMessage(`Kvietimas patvirtintas: ${invite.email}`);
       await load();
     } catch (approveError) {
-      setError(approveError instanceof Error ? approveError.message : "Nepavyko patvirtinti kvietimo.");
+      setError(
+        approveError instanceof Error
+          ? approveError.message
+          : "Nepavyko patvirtinti kvietimo.",
+      );
     } finally {
       setApprovingId(null);
     }
   }
 
-  return (
+        return (
     <section className="space-y-5">
       <div className="overflow-hidden rounded-[28px] border border-[#c9d8d0] bg-white shadow-sm">
         <div className="bg-[#486b5d] px-6 py-6 text-white">
