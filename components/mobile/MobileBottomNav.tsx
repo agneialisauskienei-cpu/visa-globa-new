@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import { Bell, CalendarDays, Home, LogOut, User, Users } from 'lucide-react'
 import { ROUTES } from '@/lib/routes'
 import { supabase } from '@/lib/supabase'
-const { unreadCount } = useNotifications()
 
 function isActive(pathname: string, href: string) {
   return pathname === href
