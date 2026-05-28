@@ -619,8 +619,8 @@ export default function MyProfilePage() {
   }
 
   async function updateDocumentsInfo() {
-    if (!profile?.id) {
-      setMessage("Nepavyko nustatyti vartotojo.");
+    if (!profile?.id || !membership?.organization_id) {
+      setMessage("Nepavyko nustatyti vartotojo arba įstaigos.");
       return;
     }
 
@@ -646,81 +646,37 @@ export default function MyProfilePage() {
     setMessage("");
 
     const submittedAt = new Date().toISOString();
-    const reviewFields = {
-      documents_review_status: "submitted",
-      documents_verified: false,
-      documents_admin_seen: false,
-      documents_submitted_at: submittedAt,
-    };
 
     try {
-      let saved = false;
-      let lastError: unknown = null;
+      const updatePayload = {
+        professional_license_number:
+          cleanDocuments.professional_license_number,
+        professional_license_valid_until:
+          cleanDocuments.professional_license_valid_until,
+        occupational_health_valid_until:
+          cleanDocuments.occupational_health_valid_until,
+        documents_review_status: "submitted",
+        documents_verified: false,
+        documents_admin_seen: false,
+        documents_submitted_at: submittedAt,
+      };
 
-      // Optimistiškai atnaujiname UI, kad mygtukas aiškiai sureaguotų iš karto.
+      const { error } = await supabase
+        .from("organization_members")
+        .update(updatePayload)
+        .eq("organization_id", membership.organization_id)
+        .eq("user_id", profile.id);
+
+      if (error) throw error;
+
       setMembership((prev: any) =>
         prev
           ? {
               ...prev,
-              ...cleanDocuments,
-              ...reviewFields,
+              ...updatePayload,
             }
           : prev,
       );
-
-      // Bandome dažniausiai naudojamus narystės lentelių pavadinimus.
-      // Kai kuriose bazėse statuso laukų gali nebūti, todėl pirmiausia saugome privalomus dokumentų laukus.
-      const membershipTables = [
-        "organization_members",
-        "organization_memberships",
-        "memberships",
-      ];
-
-      for (const tableName of membershipTables) {
-        const baseUpdate = supabase.from(tableName).update(cleanDocuments);
-
-        const updateAttempts = [];
-        if (membership?.id) updateAttempts.push(baseUpdate.eq("id", membership.id));
-        if (membership?.organization_id) {
-          updateAttempts.push(
-            supabase
-              .from(tableName)
-              .update(cleanDocuments)
-              .eq("organization_id", membership.organization_id)
-              .eq("user_id", profile.id),
-          );
-          updateAttempts.push(
-            supabase
-              .from(tableName)
-              .update(cleanDocuments)
-              .eq("organization_id", membership.organization_id)
-              .eq("employee_id", profile.id),
-          );
-        }
-
-        for (const attempt of updateAttempts) {
-          const { error } = await attempt;
-          if (!error) {
-            saved = true;
-
-            // Statuso laukai neprivalomi — jei jų nėra, klaidą ignoruojame.
-            if (membership?.id) {
-              await supabase
-                .from(tableName)
-                .update(reviewFields)
-                .eq("id", membership.id);
-            }
-            break;
-          }
-          lastError = error;
-        }
-
-        if (saved) break;
-      }
-
-      // Papildomai sukuriame admin peržiūros įrašą, jeigu tokia lentelė projekte yra.
-
-      if (!saved) throw lastError || new Error("Nepavyko išsaugoti dokumentų.");
 
       setShowDocumentsModal(false);
       setMessage(

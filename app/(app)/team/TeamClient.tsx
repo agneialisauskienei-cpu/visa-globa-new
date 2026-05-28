@@ -3249,7 +3249,7 @@ function EmployeeTabbedEditor({
               </p>
               <h3 className="mt-1 text-2xl font-black">{employeeName(employee)}</h3>
               <p className="mt-1 text-sm font-semibold text-white/75">
-                {editForm.position || "Pareigos nenurodytos"} · {editForm.department || "Skyrius nenurodytas"}
+                {editForm.position || "Pareigos dar nepriskirtos"} · {editForm.department || "Skyrius dar nepriskirtas"}
               </p>
             </div>
           </div>
@@ -3523,7 +3523,7 @@ function EmployeeRowCard({
       <div>
         <div className="text-lg font-black text-[#10251f]">{employeeName(employee)}</div>
         <div className="text-sm font-bold text-[#6a7e75]">
-          {employee.position || employeeRole(employee) || "Pareigos nenurodytos"} · {employee.department || "Skyrius nenurodytas"}
+          {employee.position || employeeRole(employee) || "Pareigos dar nepriskirtos"} · {employee.department || "Skyrius dar nepriskirtas"}
         </div>
       </div>
 
@@ -3539,7 +3539,7 @@ function EmployeeRowCard({
       <div className="text-sm font-bold text-[#6a7e75]">
         {employee.contract_number
           ? `${employee.contract_number}${employee.employment_start_date ? ` · nuo ${fmt(employee.employment_start_date)}` : ""}`
-          : "Trūksta sutarties duomenų"}
+          : "Onboarding neužbaigtas"}
       </div>
 
       <span className={selected ? "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-black text-white" : "rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d]"}>
@@ -3567,10 +3567,10 @@ function EmployeeCard({
           <div>
             <h3 className="text-lg font-black text-slate-950">{employeeName(employee)}</h3>
             <p className="mt-1 text-sm font-bold text-slate-500">
-              {employeeRole(employee) || "Pareigos nenurodytos"}
+              {employeeRole(employee) || "Pareigos dar nepriskirtos"}
             </p>
             <p className="mt-1 text-sm font-bold text-slate-500">
-              {employee.department || "Skyrius nenurodytas"}
+              {employee.department || "Skyrius dar nepriskirtas"}
             </p>
             {(employee.contract_number || employee.employment_start_date || employee.termination_date) && (
               <p className="mt-1 text-xs font-bold text-slate-400">
