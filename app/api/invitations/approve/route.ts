@@ -74,13 +74,18 @@ export async function POST(request: Request) {
       )
     }
 
+    const safeRole =
+      role === "owner" || role === "admin"
+        ? "employee"
+        : role
+
     const { error: memberError } = await admin
       .from("organization_members")
       .upsert(
         {
           organization_id: organizationId,
           user_id: user.id,
-          role,
+          role: safeRole,
           is_active: true,
         },
         {
@@ -115,6 +120,10 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
+
+    console.log(
+      `Darbuotojo paskyra patvirtinta: ${email}`,
+    )
 
     return NextResponse.json({
       ok: true,
