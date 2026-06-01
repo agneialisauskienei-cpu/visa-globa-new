@@ -11,8 +11,6 @@ import {
   Umbrella,
   XCircle,
 } from "lucide-react";
-import { getChangedFields, logAudit } from "@/lib/audit";
-import { getCurrentOrganizationId } from "@/lib/current-organization";
 
 type Employee = {
   user_id: string;
@@ -30,6 +28,16 @@ type Employee = {
   employment_rate?: number | string | null;
   fte?: number | string | null;
   employment_fte?: number | string | null;
+  // Prefer these DB-driven fields over text/regex detection.
+  schedule_type?: "five_day" | "six_day" | "variable" | string | null;
+  vacation_entitlement_days?: number | string | null;
+  annual_vacation_days?: number | string | null;
+  vacation_balance_days?: number | string | null;
+  vacation_balance_as_of?: string | null;
+  position_id?: string | null;
+  department_id?: string | null;
+  staffing_group_id?: string | null;
+  staffing_group?: string | null;
 };
 
 type VacationRequest = {
@@ -42,6 +50,7 @@ type VacationRequest = {
   requested_days: number | null;
   note: string | null;
   created_at: string | null;
+  substitute_user_id?: string | null;
 };
 
 type AbsenceType = { value: string; label: string; code: string };
@@ -65,20 +74,77 @@ type FilterKey =
   | "risk"
   | "history";
 
+type ScheduleConflict = {
+  employee_id: string;
+  start_date: string;
+  end_date: string;
+  label?: string | null;
+};
+
+type NegativeBalanceApproval = {
+  allowNegativeBalance: true;
+  reason: string;
+};
+
+type SubmitOptions = {
+  negativeBalance?: NegativeBalanceApproval;
+};
+
+type ApprovalSubstitution = {
+  substituteUserId: string;
+  absentEmployeeId: string;
+  validFrom: string;
+  validUntil: string;
+  sourceRequestId: string;
+  reason: string;
+};
+
+type ApproveOptions = {
+  /**
+   * Server/API must handle approval transactionally:
+   * approve request → create employee_substitutions → create temporary permission grants → audit_log.
+   */
+  substitution?: ApprovalSubstitution;
+};
+
 type Props = {
   employees: Employee[];
   requests: VacationRequest[];
+  /**
+   * Parent/API must pass already calculated schedule conflicts and set this to true.
+   * If false, annual leave submission/approval is blocked because schedule conflict
+   * validation would be incomplete.
+   */
+  scheduleConflicts?: ScheduleConflict[];
+  scheduleConflictsChecked?: boolean;
+  /**
+   * This component shows employee vacation balances, so use it only in HR/admin context.
+   * Parent/API must enforce the real permission before rendering this UI.
+   */
+  canViewSensitiveVacationData?: boolean;
+  /**
+   * Parent/API must pass only employees visible to the signed-in HR/admin user.
+   * This component intentionally does not broaden/narrow organization, department,
+   * or scope permissions on the client because that must be enforced server-side.
+   */
+  employeesFilteredByPermissions?: boolean;
+  /**
+   * UI-only gate for exceptional negative vacation balance flow.
+   * Server/API must still enforce the real permission and require/audit the reason.
+   */
+  canAllowNegativeVacationBalance?: boolean;
   form: VacationForm;
   saving: boolean;
   absenceTypes: AbsenceType[];
   activeFilter?: FilterKey;
   onFilterChange?: (filter: FilterKey) => void;
   onFormChange: (form: VacationForm) => void;
-  onSubmit: (options?: { allowNegativeBalance?: boolean }) => void | Promise<void>;
-  onApprove: (id: string) => void | Promise<void>;
+  // Must return the persisted DB row so optimistic UI can be reconciled with the real DB id.
+  // The API/parent should also create the audit row in the same transaction.
+  onSubmit: (options?: SubmitOptions) => VacationRequest | Promise<VacationRequest>;
+  // The API/parent must approve/reject and write audit in one server-side transaction.
+  onApprove: (id: string, options?: ApproveOptions) => void | Promise<void>;
   onReject: (id: string) => void | Promise<void>;
-  employeeName: (employee?: Employee | null) => string;
-  employeeRole: (employee?: Employee | null) => string;
   daysBetween: (start: string, end: string) => number;
   fmt: (value?: string | null) => string;
   absenceTypeMeta: (type?: string | null) => AbsenceType;
@@ -105,75 +171,29 @@ function datesBetween(start: string, end: string) {
   return rows;
 }
 
-function normalizedText(employee?: Employee | null) {
-  return [
-    employee?.position,
-    employee?.role,
-    employee?.legacy_role,
-    employee?.department,
-    employee?.staff_type,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
-function scheduleType(employee?: Employee | null): "five_day" | "six_day" | "variable" {
-  const text = normalizedText(employee);
-  if (/kintam|slenkan|pamain|grafik|sumine|suminė|variable/.test(text)) return "variable";
-  if (/6\s*d|6\s*dien|šeši|sesi/.test(text)) return "six_day";
-  return "five_day";
-}
-
 function vacationEntitlement(employee?: Employee | null) {
-  const text = normalizedText(employee);
-  const weekType = scheduleType(employee);
+  const explicitDays =
+    parseNumericValue(employee?.vacation_entitlement_days) ??
+    parseNumericValue(employee?.annual_vacation_days);
 
-  const socialServices = /social|soc\s|globos|individualios priežiūros|individuali priežiūra|priežiūros darbuotoj|slaug|užimtumo|psicholog/.test(text);
-  const extraGuarantee = /negal|vienas augina|nepilnamet|iki 18/.test(text);
-
-  if (socialServices) {
-    if (weekType === "variable") {
-      return {
-        days: 30,
-        weeks: 6,
-        basis: "Socialinių paslaugų / priežiūros grupė: 6 savaitės, kai grafikas kintantis.",
-      };
-    }
+  if (explicitDays !== null && explicitDays > 0) {
     return {
-      days: weekType === "six_day" ? 36 : 30,
-      weeks: 6,
-      basis: weekType === "six_day"
-        ? "Socialinių paslaugų / priežiūros grupė: 36 d. d. dirbant 6 d. savaitę."
-        : "Socialinių paslaugų / priežiūros grupė: 30 d. d. dirbant 5 d. savaitę.",
-    };
-  }
-
-  if (extraGuarantee) {
-    return {
-      days: weekType === "six_day" ? 30 : 25,
-      weeks: 5,
-      basis: "Papildoma garantija: padidinta minimali atostogų trukmė.",
-    };
-  }
-
-  if (weekType === "variable") {
-    return {
-      days: 20,
-      weeks: 4,
-      basis: "Kintantis grafikas: skaičiuojama kaip 4 savaitės.",
+      days: explicitDays,
+      weeks: explicitDays >= 30 ? 6 : explicitDays >= 25 ? 5 : 4,
+      source: "db" as const,
+      basis:
+        "Atostogų norma paimta iš darbuotojo / pareigybės DB lauko.",
     };
   }
 
   return {
-    days: weekType === "six_day" ? 24 : 20,
-    weeks: 4,
-    basis: weekType === "six_day"
-      ? "Standartinė norma: 24 d. d. dirbant 6 d. savaitę."
-      : "Standartinė norma: 20 d. d. dirbant 5 d. savaitę.",
+    days: 0,
+    weeks: 0,
+    source: "missing" as const,
+    basis:
+      "Atostogų norma nenustatyta DB. Produkcijoje norma turi būti paduodama iš vacation_entitlements / pareigybės nustatymų, ne skaičiuojama frontende.",
   };
 }
-
 
 function parseNumericValue(value: number | string | null | undefined) {
   if (value === null || value === undefined || value === "") return null;
@@ -203,8 +223,16 @@ function clampDate(date: Date, min: Date, max: Date) {
 }
 
 function daysInclusive(start: Date, end: Date) {
-  const startMs = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
-  const endMs = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+  const startMs = new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate(),
+  ).getTime();
+  const endMs = new Date(
+    end.getFullYear(),
+    end.getMonth(),
+    end.getDate(),
+  ).getTime();
   return Math.max(0, Math.floor((endMs - startMs) / 86400000) + 1);
 }
 
@@ -230,13 +258,18 @@ function accrualInfo(employee?: Employee | null, targetInput?: string) {
   const yearEnd = new Date(year, 11, 31);
   const employmentStart = dateFromInput(employee?.employment_start_date);
   const employmentEnd = dateFromInput(employee?.termination_date);
-  const accrualStart = employmentStart && employmentStart > yearStart ? employmentStart : yearStart;
-  const accrualEndLimit = employmentEnd && employmentEnd < yearEnd ? employmentEnd : yearEnd;
+  const accrualStart =
+    employmentStart && employmentStart > yearStart
+      ? employmentStart
+      : yearStart;
+  const accrualEndLimit =
+    employmentEnd && employmentEnd < yearEnd ? employmentEnd : yearEnd;
   const cappedTarget = clampDate(target, accrualStart, accrualEndLimit);
   const workedDays = daysInclusive(accrualStart, cappedTarget);
   const possibleDays = daysInclusive(yearStart, yearEnd);
   const annualNorm = entitlement.days * fte;
-  const accrued = possibleDays > 0 ? (annualNorm / possibleDays) * workedDays : 0;
+  const accrued =
+    possibleDays > 0 ? (annualNorm / possibleDays) * workedDays : 0;
 
   return {
     annualNorm: roundDays(annualNorm),
@@ -287,6 +320,39 @@ function employeeDisplayName(
   return full || combined || email || fallback;
 }
 
+function staffingGroupKey(employee?: Employee | null) {
+  if (!employee) return "unknown";
+  return (
+    String(employee.staffing_group_id || "").trim() ||
+    String(employee.position_id || "").trim() ||
+    [employee.department_id, employee.position, employee.staff_type, employee.department]
+      .filter(Boolean)
+      .join("|")
+      .toLowerCase() ||
+    employee.user_id
+  );
+}
+
+function staffingGroupLabel(employee?: Employee | null) {
+  if (!employee) return "darbuotojo grupė";
+  return (
+    String(employee.staffing_group || "").trim() ||
+    employeePositionText(employee) ||
+    String(employee.department || "").trim() ||
+    "darbuotojo grupė"
+  );
+}
+
+function dateRangesOverlap(
+  aStart?: string | null,
+  aEnd?: string | null,
+  bStart?: string | null,
+  bEnd?: string | null,
+) {
+  if (!aStart || !aEnd || !bStart || !bEnd) return false;
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
 function employeeInitials(employee?: Employee | null) {
   const name = employeeDisplayName(employee, "D");
   const parts = name.split(/\s+/).filter(Boolean);
@@ -321,30 +387,6 @@ function normalizeTimeInput(value?: string) {
   const m = Number(match[2] || 0);
   if (h < 0 || h > 24 || m < 0 || m > 59 || (h === 24 && m !== 0)) return "";
   return `${String(h % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-
-async function writeVacationAudit(args: {
-  tableName?: string;
-  recordId?: string | null;
-  action: string;
-  before?: Record<string, unknown>;
-  after?: Record<string, unknown>;
-}) {
-  try {
-    const organizationId = await getCurrentOrganizationId();
-    if (!organizationId) return;
-
-    await logAudit({
-      organizationId,
-      tableName: args.tableName || "vacation_requests",
-      recordId: args.recordId || null,
-      action: args.action,
-      changes: getChangedFields(args.before || {}, args.after || {}),
-    });
-  } catch (error) {
-    console.warn("[vacation-requests] audit failed", error);
-  }
 }
 
 function timeRangeHours(start?: string, end?: string) {
@@ -382,9 +424,100 @@ function requestStatusIcon(status: string) {
   return <Clock3 size={16} />;
 }
 
+function hasDbVacationEntitlement(employee?: Employee | null) {
+  return (
+    parseNumericValue(employee?.vacation_entitlement_days) !== null ||
+    parseNumericValue(employee?.annual_vacation_days) !== null
+  );
+}
+
+function hasDbVacationBalance(employee?: Employee | null) {
+  return parseNumericValue(employee?.vacation_balance_days) !== null;
+}
+
+function hasRequiredDbVacationData(employee?: Employee | null) {
+  return hasDbVacationEntitlement(employee) && hasDbVacationBalance(employee);
+}
+
+function requestSignature(
+  request: Pick<
+    VacationRequest,
+    | "employee_id"
+    | "type"
+    | "start_date"
+    | "end_date"
+    | "requested_days"
+    | "note"
+  >,
+) {
+  return [
+    request.employee_id,
+    request.type || "",
+    request.start_date || "",
+    request.end_date || "",
+    request.requested_days ?? "",
+    String(request.note || "").trim(),
+  ].join("|");
+}
+
+function hasSamePersistedRequest(
+  persistedRequests: VacationRequest[],
+  optimisticRequest: VacationRequest,
+) {
+  const optimisticSignature = requestSignature(optimisticRequest);
+
+  return persistedRequests.some((request) => {
+    if (request.id === optimisticRequest.id) return true;
+    return requestSignature(request) === optimisticSignature;
+  });
+}
+
+function isValidDateRange(start: string, end: string) {
+  const startDate = dateFromInput(start);
+  const endDate = dateFromInput(end);
+  if (!startDate || !endDate) return false;
+  return startDate <= endDate;
+}
+
+function buildSubstitutionPayload(
+  request: VacationRequest,
+): ApprovalSubstitution | undefined {
+  const substituteUserId = String(request.substitute_user_id || "").trim();
+  if (!substituteUserId) return undefined;
+
+  return {
+    substituteUserId,
+    absentEmployeeId: request.employee_id,
+    validFrom: request.start_date,
+    validUntil: request.end_date,
+    sourceRequestId: request.id,
+    reason:
+      "Pavadavimas patvirtinto neatvykimo laikotarpiui. Serveris privalo sukurti laikinas teises tik iki validUntil datos.",
+  };
+}
+
+function requireNegativeBalanceReason() {
+  const reason = window.prompt(
+    "Įrašykite priežastį, kodėl leidžiamas minusinis atostogų likutis. Šią teisę serveris privalo patikrinti ir įrašyti į auditą.",
+  );
+
+  const normalized = String(reason || "").trim();
+  if (normalized.length < 8) {
+    window.alert("Minusiniam likučiui būtina aiški priežastis, bent 8 simboliai.");
+    return null;
+  }
+
+  return normalized;
+}
+
 export default function VacationRequests({
   employees,
   requests,
+  scheduleConflicts = [],
+  scheduleConflictsChecked = false,
+  canViewSensitiveVacationData = false,
+  employeesFilteredByPermissions = false,
+  canAllowNegativeVacationBalance = false,
   form,
   saving,
   absenceTypes,
@@ -394,8 +527,6 @@ export default function VacationRequests({
   onSubmit,
   onApprove,
   onReject,
-  employeeName,
-  employeeRole,
   daysBetween,
   fmt,
   absenceTypeMeta,
@@ -405,9 +536,16 @@ export default function VacationRequests({
   const [historyEmployeeId, setHistoryEmployeeId] = useState<string | null>(
     null,
   );
-  const [forecastDate, setForecastDate] = useState(() => toDateInput(new Date()));
+  const [forecastDate, setForecastDate] = useState(() =>
+    toDateInput(new Date()),
+  );
   const filter = activeFilter || localFilter;
-  const [optimisticRequests, setOptimisticRequests] = useState<VacationRequest[]>([]);
+  const [optimisticRequests, setOptimisticRequests] = useState<
+    VacationRequest[]
+  >([]);
+  const [statusOverrides, setStatusOverrides] = useState<
+    Record<string, VacationRequest["status"]>
+  >({});
   const employeeMap = useMemo(
     () => new Map(employees.map((employee) => [employee.user_id, employee])),
     [employees],
@@ -416,12 +554,20 @@ export default function VacationRequests({
   const allRequests = useMemo(() => {
     const map = new Map<string, VacationRequest>();
 
-    optimisticRequests.forEach((request) => {
-      map.set(request.id, request);
+    requests.forEach((request) => {
+      map.set(request.id, {
+        ...request,
+        status: statusOverrides[request.id] || request.status,
+      });
     });
 
-    requests.forEach((request) => {
-      map.set(request.id, request);
+    optimisticRequests.forEach((request) => {
+      if (!hasSamePersistedRequest(requests, request)) {
+        map.set(request.id, {
+          ...request,
+          status: statusOverrides[request.id] || request.status,
+        });
+      }
     });
 
     return Array.from(map.values()).sort((a, b) => {
@@ -439,7 +585,7 @@ export default function VacationRequests({
         String(a.created_at || a.start_date || ""),
       );
     });
-  }, [requests, optimisticRequests]);
+  }, [requests, optimisticRequests, statusOverrides]);
 
   function update<K extends keyof VacationForm>(
     key: K,
@@ -492,29 +638,120 @@ export default function VacationRequests({
 
   function remainingAnnualDays(employee?: Employee | null) {
     const entitlement = vacationEntitlement(employee);
+    const accrual = accrualInfo(employee);
     const used = usedAnnualDays(employee);
     const reserved = reservedAnnualDays(employee);
-    const leftBeforeReservations = entitlement.days - used;
+    const dbBalance = parseNumericValue(employee?.vacation_balance_days);
+    // vacation_balance_days is treated as the current DB-authoritative balance
+    // before pending reservations. Do not subtract already-used days again here,
+    // because that would double-count usage when DB has already calculated it.
+    const availableBeforeReservations =
+      dbBalance !== null ? dbBalance : accrual.accrued - used;
+    const rawLeft = roundDays(availableBeforeReservations - reserved);
+
     return {
-      entitlement: entitlement.days,
+      entitlement: accrual.annualNorm,
+      accrued: accrual.accrued,
       weeks: entitlement.weeks,
       used,
       reserved,
-      leftBeforeReservations,
-      left: Math.max(0, leftBeforeReservations - reserved),
-      rawLeft: leftBeforeReservations - reserved,
-      basis: entitlement.basis,
+      leftBeforeReservations: roundDays(availableBeforeReservations),
+      left: Math.max(0, rawLeft),
+      rawLeft,
+      basis:
+        dbBalance !== null
+          ? `${entitlement.basis} Likutis paimtas iš DB kaip dabartinis likutis prieš laukiančias rezervacijas: ${formatDays(dbBalance)} d.${employee?.vacation_balance_as_of ? ` (${employee.vacation_balance_as_of})` : ""}`
+          : `${entitlement.basis} Likutis skaičiuojamas pagal realiai sukauptą dalį iki šiandienos, ne pagal visą metinę normą.`,
+      entitlementSource: entitlement.source,
     };
   }
 
+  function groupEmployeesFor(request: VacationRequest) {
+    const employee = employeeMap.get(request.employee_id);
+    const key = staffingGroupKey(employee);
+    return employees.filter((item) => staffingGroupKey(item) === key);
+  }
+
+  function overlappingRequestsFor(request: VacationRequest) {
+    return allRequests.filter((item) => {
+      if (item.id === request.id) return false;
+      if (item.employee_id !== request.employee_id) return false;
+      if (normalizedStatus(item.status) === "rejected") return false;
+      return dateRangesOverlap(
+        request.start_date,
+        request.end_date,
+        item.start_date,
+        item.end_date,
+      );
+    });
+  }
+
+  function scheduleConflictsFor(request: VacationRequest) {
+    return scheduleConflicts.filter(
+      (item) =>
+        item.employee_id === request.employee_id &&
+        dateRangesOverlap(
+          request.start_date,
+          request.end_date,
+          item.start_date,
+          item.end_date,
+        ),
+    );
+  }
+
+  function validationMessagesFor(request: VacationRequest) {
+    const messages: string[] = [];
+    const employee = employeeMap.get(request.employee_id);
+
+    if (!employee) messages.push("Darbuotojas nerastas.");
+
+    if (!request.start_date || !request.end_date) {
+      messages.push("Nenurodytos datos.");
+    } else if (!isValidDateRange(request.start_date, request.end_date)) {
+      messages.push("Pabaigos data negali būti ankstesnė už pradžios datą.");
+    }
+
+    const overlaps = overlappingRequestsFor(request);
+    if (overlaps.length) {
+      messages.push("Darbuotojas jau turi persidengiantį prašymą šiame laikotarpyje.");
+    }
+
+    const scheduleMatches = scheduleConflictsFor(request);
+    if (!isTemporaryLeave(request.type) && !scheduleConflictsChecked) {
+      messages.push(
+        "Grafiko konfliktai nepatikrinti. Parent/API turi paduoti scheduleConflicts ir scheduleConflictsChecked=true.",
+      );
+    }
+    if (scheduleMatches.length) {
+      messages.push(
+        `Yra grafiko konfliktas: ${scheduleMatches
+          .map((item) => item.label || `${item.start_date}–${item.end_date}`)
+          .join(", ")}.`,
+      );
+    }
+
+    if (isAnnual(request.type) && employee && !hasRequiredDbVacationData(employee)) {
+      messages.push(
+        "Darbuotojui nėra DB atostogų normos ir/ar DB likučio. Frontend fallback nenaudojamas kaip teisinis pagrindas pateikimui ar patvirtinimui.",
+      );
+    }
+
+    return messages;
+  }
+
   function impactFor(request: VacationRequest) {
+    const group = groupEmployeesFor(request);
+    const employee = employeeMap.get(request.employee_id);
+    const groupIds = new Set(group.map((item) => item.user_id));
+
     if (isTemporaryLeave(request.type)) {
       return {
-        left: employees.length,
-        total: employees.length,
+        left: group.length,
+        total: group.length,
         maxOff: 0,
         worstDay: request.start_date,
         risky: false,
+        groupLabel: staffingGroupLabel(employee),
       };
     }
 
@@ -527,6 +764,7 @@ export default function VacationRequests({
         const status = normalizedStatus(item.status);
         if (status === "rejected") return false;
         if (isTemporaryLeave(item.type)) return false;
+        if (!groupIds.has(item.employee_id)) return false;
         if (item.id === request.id) return true;
         return item.start_date <= day && item.end_date >= day;
       }).length;
@@ -537,9 +775,16 @@ export default function VacationRequests({
       }
     }
 
-    const left = Math.max(0, employees.length - maxOff);
-    const risky = left < Math.max(1, Math.ceil(employees.length * 0.5));
-    return { left, total: employees.length, maxOff, worstDay, risky };
+    const left = Math.max(0, group.length - maxOff);
+    const risky = left < Math.max(1, Math.ceil(group.length * 0.5));
+    return {
+      left,
+      total: group.length,
+      maxOff,
+      worstDay,
+      risky,
+      groupLabel: staffingGroupLabel(employee),
+    };
   }
 
   function isRisk(request: VacationRequest) {
@@ -582,17 +827,25 @@ export default function VacationRequests({
   const selectedBalance = remainingAnnualDays(selectedEmployee);
   const detailEmployee = historyEmployee || selectedEmployee;
   const detailBalance = remainingAnnualDays(detailEmployee);
-  const selectedAccrual = accrualInfo(selectedEmployee, form.start_date || forecastDate);
   const detailAccrual = accrualInfo(detailEmployee, forecastDate);
+  const detailDbBalance = parseNumericValue(detailEmployee?.vacation_balance_days);
   const projectedAvailableAtForecast = detailEmployee
-    ? Math.max(0, detailAccrual.accrued - usedAnnualDays(detailEmployee) - reservedAnnualDays(detailEmployee))
+    ? Math.max(
+        0,
+        roundDays(
+          (detailDbBalance !== null
+            ? detailDbBalance
+            : detailAccrual.accrued - usedAnnualDays(detailEmployee)) -
+            reservedAnnualDays(detailEmployee),
+        ),
+      )
     : 0;
   const previewRequest: VacationRequest = {
     id: "preview",
     employee_id: form.employee_id,
     type: form.type,
     start_date: form.start_date,
-    end_date: form.end_date,
+    end_date: isTemporaryLeave(form.type) ? form.start_date : form.end_date,
     status: "submitted",
     requested_days: isTemporaryLeave(form.type)
       ? 0
@@ -601,50 +854,101 @@ export default function VacationRequests({
       ? `${normalizeTimeInput(form.start_time)}-${normalizeTimeInput(form.end_time)}${form.note ? ` · ${form.note}` : ""}`
       : form.note || null,
     created_at: null,
+    substitute_user_id: form.substitute_user_id || null,
   };
-  const previewImpact =
-    form.employee_id && form.start_date && form.end_date
-      ? impactFor(previewRequest)
-      : null;
+  const canPreview = isTemporaryLeave(form.type)
+    ? Boolean(
+        form.employee_id && form.start_date && form.start_time && form.end_time,
+      )
+    : Boolean(
+        form.employee_id &&
+        form.start_date &&
+        form.end_date &&
+        isValidDateRange(form.start_date, form.end_date),
+      );
+  const previewImpact = canPreview ? impactFor(previewRequest) : null;
   const previewDays = isTemporaryLeave(form.type)
     ? 0
     : daysBetween(form.start_date, form.end_date);
   const selectedProjectedAfterRequest = selectedEmployee
-    ? selectedAccrual.accrued - usedAnnualDays(selectedEmployee) - reservedAnnualDays(selectedEmployee) - (isAnnual(form.type) ? previewDays || 0 : 0)
+    ? selectedBalance.leftBeforeReservations -
+      selectedBalance.reserved -
+      (isAnnual(form.type) ? previewDays || 0 : 0)
     : 0;
   const previewHours = isTemporaryLeave(form.type)
     ? timeRangeHours(form.start_time, form.end_time)
     : 0;
   const previewOverBalance =
     isAnnual(form.type) && previewDays > selectedBalance.left;
+  const previewValidationMessages = canPreview
+    ? validationMessagesFor(previewRequest)
+    : [];
+  const blocksSubmit = previewValidationMessages.length > 0;
 
-  async function submitRequest(allowNegativeBalance = false) {
+  async function submitRequest(options?: SubmitOptions) {
+    const normalizedStartTime = normalizeTimeInput(form.start_time);
+    const normalizedEndTime = normalizeTimeInput(form.end_time);
+    const isTemporary = isTemporaryLeave(form.type);
+    const endDate = isTemporary ? form.start_date : form.end_date;
+
+    if (!form.employee_id || !form.start_date || !endDate) return;
+    if (!isTemporary && !isValidDateRange(form.start_date, endDate)) {
+      window.alert("Pabaigos data negali būti ankstesnė už pradžios datą.");
+      return;
+    }
+    if (isTemporary && (!normalizedStartTime || !normalizedEndTime)) {
+      window.alert("Trumpam išvykimui nurodykite pradžios ir pabaigos laiką.");
+      return;
+    }
+
+    const draftForValidation: VacationRequest = {
+      id: "draft",
+      employee_id: form.employee_id,
+      type: form.type,
+      start_date: form.start_date,
+      end_date: endDate,
+      status: "submitted",
+      requested_days: isTemporary ? 0 : daysBetween(form.start_date, endDate),
+      note: form.note || null,
+      created_at: null,
+      substitute_user_id: form.substitute_user_id || null,
+    };
+    const validationMessages = validationMessagesFor(draftForValidation);
+    if (validationMessages.length) {
+      window.alert(validationMessages.join("\n"));
+      return;
+    }
+
     const optimisticId = `optimistic-${Date.now()}`;
     const optimisticRequest: VacationRequest = {
       id: optimisticId,
       employee_id: form.employee_id,
       type: form.type,
       start_date: form.start_date,
-      end_date: isTemporaryLeave(form.type) ? form.start_date : form.end_date,
+      end_date: endDate,
       status: "submitted",
-      requested_days: isTemporaryLeave(form.type)
-        ? 0
-        : daysBetween(form.start_date, form.end_date),
-      note: isTemporaryLeave(form.type)
-        ? `${normalizeTimeInput(form.start_time)}-${normalizeTimeInput(form.end_time)}${form.note ? ` · ${form.note}` : ""}`
+      requested_days: isTemporary ? 0 : daysBetween(form.start_date, endDate),
+      note: isTemporary
+        ? `${normalizedStartTime}-${normalizedEndTime}${form.note ? ` · ${form.note}` : ""}`
         : form.note || null,
       created_at: new Date().toISOString(),
+      substitute_user_id: form.substitute_user_id || null,
     };
 
     setOptimisticRequests((previous) => [optimisticRequest, ...previous]);
 
     try {
-      await onSubmit(allowNegativeBalance ? { allowNegativeBalance: true } : undefined);
-      await writeVacationAudit({
-        recordId: optimisticId,
-        action: "vacation_request.created",
-        after: optimisticRequest as unknown as Record<string, unknown>,
-      });
+      const savedRequest = await onSubmit(options);
+
+      if (!savedRequest?.id || savedRequest.id.startsWith("optimistic-")) {
+        throw new Error(
+          "Prašymas išsaugotas, bet onSubmit negrąžino tikro DB įrašo ID. Auditas nesukurtas, todėl pataisykite parent/API, kad onSubmit grąžintų sukurtą vacation_requests eilutę.",
+        );
+      }
+
+      setOptimisticRequests((previous) =>
+        previous.filter((request) => request.id !== optimisticId),
+      );
     } catch (error) {
       setOptimisticRequests((previous) =>
         previous.filter((request) => request.id !== optimisticId),
@@ -654,69 +958,70 @@ export default function VacationRequests({
   }
 
   async function approveRequest(id: string) {
-    setOptimisticRequests((previous) => {
-      const existing =
-        previous.find((request) => request.id === id) ||
-        allRequests.find((request) => request.id === id);
+    const existing = allRequests.find((request) => request.id === id);
+    if (!existing) return;
 
-      if (!existing) return previous;
+    const validationMessages = validationMessagesFor(existing);
+    if (validationMessages.length) {
+      window.alert(validationMessages.join("\n"));
+      return;
+    }
 
-      return [
-        { ...existing, status: "approved" },
-        ...previous.filter((request) => request.id !== id),
-      ];
-    });
+    setStatusOverrides((previous) => ({ ...previous, [id]: "approved" }));
+
+    const substitution = buildSubstitutionPayload(existing);
 
     try {
-      await onApprove(id);
-      const existing = allRequests.find((request) => request.id === id);
-      if (existing) {
-        await writeVacationAudit({
-          recordId: id,
-          action: "vacation_request.approved",
-          before: existing as unknown as Record<string, unknown>,
-          after: { ...(existing as unknown as Record<string, unknown>), status: "approved" },
-        });
-      }
+      await onApprove(id, substitution ? { substitution } : undefined);
     } catch (error) {
-      setOptimisticRequests((previous) =>
-        previous.filter((request) => request.id !== id),
-      );
+      setStatusOverrides((previous) => {
+        const next = { ...previous };
+        delete next[id];
+        return next;
+      });
       throw error;
     }
   }
 
   async function rejectRequest(id: string) {
-    setOptimisticRequests((previous) => {
-      const existing =
-        previous.find((request) => request.id === id) ||
-        allRequests.find((request) => request.id === id);
+    const existing = allRequests.find((request) => request.id === id);
+    if (!existing) return;
 
-      if (!existing) return previous;
-
-      return [
-        { ...existing, status: "rejected" },
-        ...previous.filter((request) => request.id !== id),
-      ];
-    });
+    setStatusOverrides((previous) => ({ ...previous, [id]: "rejected" }));
 
     try {
       await onReject(id);
-      const existing = allRequests.find((request) => request.id === id);
-      if (existing) {
-        await writeVacationAudit({
-          recordId: id,
-          action: "vacation_request.rejected",
-          before: existing as unknown as Record<string, unknown>,
-          after: { ...(existing as unknown as Record<string, unknown>), status: "rejected" },
-        });
-      }
     } catch (error) {
-      setOptimisticRequests((previous) =>
-        previous.filter((request) => request.id !== id),
-      );
+      setStatusOverrides((previous) => {
+        const next = { ...previous };
+        delete next[id];
+        return next;
+      });
       throw error;
     }
+  }
+
+  if (!canViewSensitiveVacationData || !employeesFilteredByPermissions) {
+    return (
+      <section className="vr-card">
+        <style>{css}</style>
+        <div className="vr-validation" role="alert">
+          <AlertTriangle size={18} />
+          <div>
+            <b>Prieiga ribojama</b>
+            <span>
+              Atostogų likučiai ir darbuotojų neatvykimų duomenys rodomi tik HR/admin aplinkoje.
+            </span>
+            {!canViewSensitiveVacationData ? (
+              <span>Parent/API turi patvirtinti HR/admin teisę ir perduoti canViewSensitiveVacationData=true.</span>
+            ) : null}
+            {!employeesFilteredByPermissions ? (
+              <span>Parent/API turi perduoti tik pagal organizaciją, skyrių ir vartotojo teises perfiltruotus darbuotojus ir nustatyti employeesFilteredByPermissions=true.</span>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -728,7 +1033,8 @@ export default function VacationRequests({
           <span className="vr-eyebrow">Prašymai</span>
           <h2>Atostogos ir trumpi išvykimai</h2>
           <p>
-            Darbuotojų atostogų, mamadienių, tėvadienių ir trumpų išvykimų valdymas.
+            Atostogų prašymai atskirti nuo trumpų vidinių išvykimų. Teisiniai
+            likučiai remiasi tik DB duomenimis, ne frontend spėjimais.
           </p>
         </div>
         <div className="vr-summary" aria-label="Prašymų filtrai">
@@ -851,29 +1157,53 @@ export default function VacationRequests({
         <select
           value={form.substitute_user_id || ""}
           onChange={(event) => update("substitute_user_id", event.target.value)}
-          title="Pavaduotojas laikinai gaus neatvykstančio darbuotojo teises"
+          title="Pavaduotojo pasirinkimas. Teisių suteikimą ir automatinį galiojimo pabaigos terminą turi įgyvendinti serverio logika."
         >
           <option value="">Be pavadavimo</option>
           {employees
             .filter((employee) => employee.user_id !== form.employee_id)
             .map((employee) => (
               <option key={employee.user_id} value={employee.user_id}>
-                Pavaduoja: {employeeDisplayName(employee)}
+                Pavaduotojas: {employeeDisplayName(employee)}
               </option>
             ))}
         </select>
         <button
           type="button"
-          disabled={saving || !form.employee_id || !form.start_date || !form.end_date}
+          disabled={
+            saving ||
+            !form.employee_id ||
+            !form.start_date ||
+            blocksSubmit ||
+            (isTemporaryLeave(form.type)
+              ? !form.start_time || !form.end_time
+              : !form.end_date ||
+                !isValidDateRange(form.start_date, form.end_date))
+          }
           onClick={() => {
             if (previewOverBalance) {
+              if (!canAllowNegativeVacationBalance) {
+                window.alert(
+                  "Prašymas viršija atostogų likutį. Minusinis likutis leidžiamas tik HR/admin naudotojui su atskira teise, kurią privalo patikrinti serveris.",
+                );
+                return;
+              }
+              const reason = requireNegativeBalanceReason();
+              if (!reason) return;
               const ok = window.confirm(
                 `Darbuotojui trūksta atostogų likučio. Prašoma ${previewDays} d., likutis ${selectedBalance.left} d.
 
-Ar leisti atostogas į minusą?`,
+Priežastis bus perduota serveriui: ${reason}
+
+Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
               );
               if (!ok) return;
-              void submitRequest(true);
+              void submitRequest({
+                negativeBalance: {
+                  allowNegativeBalance: true,
+                  reason,
+                },
+              });
               return;
             }
             void submitRequest();
@@ -882,6 +1212,18 @@ Ar leisti atostogas į minusą?`,
           <Plus size={16} /> Pateikti prašymą
         </button>
       </div>
+
+      {previewValidationMessages.length ? (
+        <div className="vr-validation" role="alert">
+          <AlertTriangle size={18} />
+          <div>
+            <b>Prašymo pateikti negalima</b>
+            {previewValidationMessages.map((message) => (
+              <span key={message}>{message}</span>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="vr-main-list-title">
         <div>
@@ -949,6 +1291,11 @@ Ar leisti atostogas į minusą?`,
                     ) : (
                       <span>{days} d.</span>
                     )}
+                    {request.substitute_user_id ? (
+                      <span className="vr-note">
+                        Pavadavimas: galioja tik {fmt(request.start_date)}–{fmt(request.end_date)}
+                      </span>
+                    ) : null}
                     {request.note ? (
                       <span className="vr-note">{request.note}</span>
                     ) : null}
@@ -960,7 +1307,8 @@ Ar leisti atostogas į minusą?`,
                       <b>Likutis {balance.left} d.</b>
                     )}
                     <small>
-                      Norma {balance.entitlement} d. · panaudota {balance.used} d. · rezervuota {balance.reserved} d.
+                      Norma {balance.entitlement} d. · panaudota {balance.used}{" "}
+                      d. · rezervuota {balance.reserved} d.
                     </small>
                   </div>
                   <div className={requestStatusClass(request.status)}>
@@ -986,8 +1334,8 @@ Ar leisti atostogas į minusą?`,
                       {isTemporaryLeave(request.type)
                         ? "Tabelio nekeičia"
                         : impact.risky
-                          ? "Žmonių trūkumo rizika"
-                          : "Komanda pakankama"}
+                          ? `Rizika grupėje: ${impact.groupLabel}`
+                          : `Pakanka grupėje: ${impact.groupLabel}`}
                     </small>
                   </div>
                   <div className="vr-actions">
@@ -1049,124 +1397,160 @@ Ar leisti atostogas į minusą?`,
           </select>
         </div>
 
-      {detailEmployee ? (
-        <div className="vr-balance">
-          <Umbrella size={18} />
-          <b>{employeeDisplayName(detailEmployee)}</b>
-          <span>Metinė norma: {formatDays(detailAccrual.annualNorm)} d.</span>
-          <span>Kaupiasi: +{formatDays(detailAccrual.monthly)} d./mėn.</span>
-          <span>Per dieną: +{formatDays(detailAccrual.daily)} d.</span>
-          <span>Panaudota: {detailBalance.used} d.</span>
-          <span>Rezervuota: {detailBalance.reserved} d.</span>
-          <span className={projectedAvailableAtForecast <= 0 ? "vr-balance-warning" : ""}>Prognozė: {formatDays(projectedAvailableAtForecast)} d.</span>
-          <small>{detailBalance.basis}</small>
-        </div>
-      ) : null}
-
-      {detailEmployee ? (
-        <section className="vr-forecast" aria-label="Atostogų likučio prognozė">
-          <div className="vr-forecast-main">
-            <div>
-              <span>Prognozė pasirinktai datai</span>
-              <h3>{formatDays(projectedAvailableAtForecast)} d.</h3>
-              <p>Preliminarus likutis įvertinus sukaupimą, panaudotas ir rezervuotas kasmetines atostogas.</p>
-            </div>
-            <label>
-              Data
-              <input
-                type="date"
-                value={forecastDate}
-                onChange={(event) => setForecastDate(event.target.value)}
-              />
-            </label>
-          </div>
-          <div className="vr-forecast-grid">
-            <span><b>Metinė norma</b>{formatDays(detailAccrual.annualNorm)} d.</span>
-            <span><b>Per mėnesį</b>+{formatDays(detailAccrual.monthly)} d.</span>
-            <span><b>Per dieną</b>+{formatDays(detailAccrual.daily)} d.</span>
-            <span><b>Sukaupta iki datos</b>{formatDays(detailAccrual.accrued)} d.</span>
-            <span><b>Po rengiamo prašymo</b>{formatDays(selectedProjectedAfterRequest)} d.</span>
-          </div>
-        </section>
-      ) : null}
-
-      {previewImpact ? (
-        <div
-          className={
-            previewImpact.risky || previewOverBalance
-              ? "vr-impact vr-impact-risk"
-              : "vr-impact"
-          }
-        >
-          <TrendingDown size={18} />
-          <b>Poveikis prieš pateikiant:</b>
-          {isTemporaryLeave(form.type) ? (
-            <span>Trumpas išvykimas: {previewHours || "—"} val.</span>
-          ) : (
-            <span>Prašoma: {previewDays} d.</span>
-          )}
-          {isAnnual(form.type) ? (
-            <span>
-              Likutis po prašymo: {selectedBalance.rawLeft - previewDays} d.
+        {detailEmployee ? (
+          <div className="vr-balance">
+            <Umbrella size={18} />
+            <b>{employeeDisplayName(detailEmployee)}</b>
+            <span>Metinė norma: {formatDays(detailAccrual.annualNorm)} d.</span>
+            <span>Sukaupta: {formatDays(detailBalance.accrued)} d.</span>
+            <span>Kaupiasi: +{formatDays(detailAccrual.monthly)} d./mėn.</span>
+            <span>Per dieną: +{formatDays(detailAccrual.daily)} d.</span>
+            <span>Panaudota: {detailBalance.used} d.</span>
+            <span>Rezervuota: {detailBalance.reserved} d.</span>
+            <span
+              className={
+                projectedAvailableAtForecast <= 0 ? "vr-balance-warning" : ""
+              }
+            >
+              Prognozė: {formatDays(projectedAvailableAtForecast)} d.
             </span>
+            <small>{detailBalance.basis}</small>
+          {detailBalance.entitlementSource !== "db" ? (
+            <small className="vr-balance-warning">Teisinė norma nenustatyta DB / pareigybės nustatymuose.</small>
           ) : null}
-          {!isTemporaryLeave(form.type) ? (
-            <span>
-              Komandoje liks {previewImpact.left} iš {previewImpact.total}
-            </span>
-          ) : (
-            <span>Trumpas išvykimas valandomis</span>
-          )}
-          {!isTemporaryLeave(form.type) ? (
-            <span>Kritinė diena: {fmt(previewImpact.worstDay)}</span>
-          ) : null}
-          {previewOverBalance ? (
-            <strong>
-              <AlertTriangle size={16} /> Viršija atostogų likutį
-            </strong>
-          ) : null}
-          {previewImpact.risky ? (
-            <strong>
-              <AlertTriangle size={16} /> Gali trūkti žmonių
-            </strong>
-          ) : (
-            <strong>
-              <CheckCircle2 size={16} /> Rizikų nerasta
-            </strong>
-          )}
-        </div>
-      ) : null}
+          </div>
+        ) : null}
 
-
-      {detailEmployee ? (
-        <section className="vr-rules" aria-label="Atostogų skaičiavimo taisyklės">
-          <div className="vr-rule-head">
-            <div>
-              <span>Skaičiavimo taisyklės</span>
-              <h3>Norma parenkama pagal darbuotojo pareigybę / grupę</h3>
+        {detailEmployee ? (
+          <section
+            className="vr-forecast"
+            aria-label="Atostogų likučio prognozė"
+          >
+            <div className="vr-forecast-main">
+              <div>
+                <span>Prognozė pasirinktai datai</span>
+                <h3>{formatDays(projectedAvailableAtForecast)} d.</h3>
+                <p>
+                  Preliminarus likutis įvertinus sukaupimą, panaudotas ir
+                  rezervuotas kasmetines atostogas.
+                </p>
+              </div>
+              <label>
+                Data
+                <input
+                  type="date"
+                  value={forecastDate}
+                  onChange={(event) => setForecastDate(event.target.value)}
+                />
+              </label>
             </div>
-            <strong>Automatiškai</strong>
-          </div>
-          <div className="vr-rule-grid">
-            <article className="vr-rule-card">
-              <b>Administracija</b>
-              <strong>20 d. d.</strong>
-              <p>Standartinė 5 d. savaitė. Jei 6 d. savaitė — 24 d. d.</p>
-            </article>
-            <article className="vr-rule-card vr-rule-card-active">
-              <b>Socialinė / slauga / globos darbuotojai</b>
-              <strong>30 d. d.</strong>
-              <p>5 d. savaitė. Jei 6 d. savaitė — 36 d. d.; jei kintantis grafikas — 6 savaitės.</p>
-            </article>
-            <article className="vr-rule-card vr-rule-card-warn">
-              <b>Pradinis likutis ir korekcijos</b>
-              <strong>{detailBalance.left} d.</strong>
-              <p>Pradinis likutis įvedamas pirmą kartą arba metų pradžioje. Visi pakeitimai turi likti audite.</p>
-            </article>
-          </div>
-        </section>
-      ) : null}
+            <div className="vr-forecast-grid">
+              <span>
+                <b>Metinė norma</b>
+                {formatDays(detailAccrual.annualNorm)} d.
+              </span>
+              <span>
+                <b>Per mėnesį</b>+{formatDays(detailAccrual.monthly)} d.
+              </span>
+              <span>
+                <b>Per dieną</b>+{formatDays(detailAccrual.daily)} d.
+              </span>
+              <span>
+                <b>Sukaupta iki datos</b>
+                {formatDays(detailAccrual.accrued)} d.
+              </span>
+              <span>
+                <b>Po rengiamo prašymo</b>
+                {formatDays(selectedProjectedAfterRequest)} d.
+              </span>
+            </div>
+          </section>
+        ) : null}
 
+        {previewImpact ? (
+          <div
+            className={
+              previewImpact.risky || previewOverBalance
+                ? "vr-impact vr-impact-risk"
+                : "vr-impact"
+            }
+          >
+            <TrendingDown size={18} />
+            <b>Poveikis prieš pateikiant:</b>
+            {isTemporaryLeave(form.type) ? (
+              <span>Trumpas išvykimas: {previewHours || "—"} val.</span>
+            ) : (
+              <span>Prašoma: {previewDays} d.</span>
+            )}
+            {isAnnual(form.type) ? (
+              <span>
+                Likutis po prašymo: {selectedBalance.rawLeft - previewDays} d.
+              </span>
+            ) : null}
+            {!isTemporaryLeave(form.type) ? (
+              <span>
+                Grupėje „{previewImpact.groupLabel}“ liks {previewImpact.left} iš {previewImpact.total}
+              </span>
+            ) : (
+              <span>Trumpas išvykimas valandomis</span>
+            )}
+            {!isTemporaryLeave(form.type) ? (
+              <span>Kritinė diena: {fmt(previewImpact.worstDay)}</span>
+            ) : null}
+            {previewOverBalance ? (
+              <strong>
+                <AlertTriangle size={16} /> Viršija atostogų likutį
+              </strong>
+            ) : null}
+            {previewImpact.risky ? (
+              <strong>
+                <AlertTriangle size={16} /> Gali trūkti žmonių
+              </strong>
+            ) : (
+              <strong>
+                <CheckCircle2 size={16} /> Rizikų nerasta
+              </strong>
+            )}
+          </div>
+        ) : null}
+
+        {detailEmployee ? (
+          <section
+            className="vr-rules"
+            aria-label="Atostogų normos valdymas"
+          >
+            <div className="vr-rule-head">
+              <div>
+                <span>Atostogų norma</span>
+                <h3>Norma ir likutis valdomi DB / API, ne statinėmis frontend taisyklėmis</h3>
+              </div>
+              <strong>DB valdoma</strong>
+            </div>
+            <div className="vr-rule-grid">
+              <article className="vr-rule-card vr-rule-card-active">
+                <b>Metinė norma iš DB</b>
+                <strong>{formatDays(detailBalance.entitlement)} d.</strong>
+                <p>
+                  Reikšmė turi ateiti iš darbuotojo pareigybės, sutarties arba vacation_entitlements lentelės.
+                </p>
+              </article>
+              <article className="vr-rule-card">
+                <b>Dabartinis likutis</b>
+                <strong>{formatDays(detailBalance.left)} d.</strong>
+                <p>
+                  Likutis turi būti apskaičiuotas API/DB, įvertinus sukaupimą, korekcijas, rezervacijas ir patvirtintas atostogas.
+                </p>
+              </article>
+              <article className="vr-rule-card vr-rule-card-warn">
+                <b>Serverinė validacija</b>
+                <strong>Privaloma</strong>
+                <p>
+                  API turi tikrinti likutį, minusinio likučio teisę, grafiko konfliktus, pavadavimo galiojimą ir auditą vienoje transakcijoje.
+                </p>
+              </article>
+            </div>
+          </section>
+        ) : null}
       </section>
 
       <div className="vr-history">
@@ -1380,6 +1764,9 @@ const css = `
 }
 .vr-form button:hover { background:#39594c; }
 .vr-form button:disabled,.vr-actions button:disabled { opacity:.55; cursor:not-allowed; box-shadow:none; }
+.vr-validation{ display:flex; gap:10px; align-items:flex-start; margin:14px 22px 0; border:1px solid #fed7aa; background:#fff7ed; color:#8a5a13; border-radius:14px; padding:12px 14px; font-weight:850; }
+.vr-validation b{ display:block; margin-bottom:4px; color:#7c2d12; }
+.vr-validation span{ display:block; margin-top:2px; }
 .vr-main-list-title{ display:flex; justify-content:space-between; align-items:end; gap:16px; padding:16px 22px 0; background:#fff; }
 .vr-main-list-title span{ display:block; text-transform:uppercase; letter-spacing:.13em; font-size:11px; font-weight:950; color:#6a7e75; }
 .vr-main-list-title h3{ margin:3px 0 0; font-size:18px; font-weight:950; color:#10251f; }
