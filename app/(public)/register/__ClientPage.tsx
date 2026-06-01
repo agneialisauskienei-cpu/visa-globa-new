@@ -79,27 +79,23 @@ export default function RegisterPage() {
     return data?.id || null;
   }
 
-  async function createMembership(invite: InviteRow, userId: string) {
-    const { error: membershipError } = await supabase
-      .from("organization_members")
-      .upsert(
-        {
-          organization_id: invite.organization_id,
-          user_id: userId,
-          role: invite.role || "employee",
-          is_active: true,
-        },
-        { onConflict: "organization_id,user_id" },
-      );
+  async function createMembership(invite: InviteRow, userId: string, normalizedEmail: string) {
+    const response = await fetch("/api/invitations/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: normalizedEmail,
+        organizationId: invite.organization_id,
+        role: invite.role || "employee",
+        userId,
+      }),
+    });
 
-    if (membershipError) throw membershipError;
+    const result = await response.json().catch(() => null);
 
-    const { error: inviteError } = await supabase
-      .from("organization_invites")
-      .update({ status: "accepted" })
-      .eq("id", invite.id);
-
-    if (inviteError) throw inviteError;
+    if (!response.ok) {
+      throw new Error(result?.error || "Nepavyko aktyvuoti narystės.");
+    }
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -150,7 +146,7 @@ export default function RegisterPage() {
         throw new Error("Nepavyko nustatyti naudotojo paskyros.");
       }
 
-      await createMembership(invite, userId);
+      await createMembership(invite, userId, normalizedEmail);
 
       setMessage("Paskyra aktyvuota. Gali prisijungti.");
       router.replace("/login");

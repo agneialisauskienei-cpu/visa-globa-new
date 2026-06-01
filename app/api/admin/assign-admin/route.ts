@@ -241,37 +241,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { count: activeAdminCount, error: activeAdminCountError } = await supabase
-      .from('organization_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('organization_id', organizationId)
-      .eq('role', 'admin')
-      .eq('is_active', true)
-
-    if (activeAdminCountError) {
-      return jsonError(activeAdminCountError.message, 500)
-    }
-
     const targetAlreadyActiveAdmin =
       existingMembership?.role === 'admin' && existingMembership?.is_active === true
 
-    if (!planLimits.can_have_multiple_admins && !targetAlreadyActiveAdmin) {
-      const { error: deactivateAdminsError } = await supabase
-        .from('organization_members')
-        .update({ is_active: false })
-        .eq('organization_id', organizationId)
-        .eq('role', 'admin')
-        .neq('user_id', profile.id)
-        .eq('is_active', true)
-
-      if (deactivateAdminsError) {
-        return jsonError(deactivateAdminsError.message, 500)
-      }
-    } else if (
-      planLimits.can_have_multiple_admins &&
-      targetAlreadyActiveAdmin &&
-      (activeAdminCount || 0) > 0
-    ) {
+    if (targetAlreadyActiveAdmin) {
       return NextResponse.json({
         ok: true,
         type: 'already_admin',
@@ -338,9 +311,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       type: 'admin_assigned',
-      message: planLimits.can_have_multiple_admins
-        ? 'Admin sėkmingai pridėtas.'
-        : 'Admin sėkmingai priskirtas.',
+      message: 'Admin sėkmingai pridėtas.',
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Serverio klaida.'

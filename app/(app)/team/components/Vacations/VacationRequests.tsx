@@ -53,6 +53,7 @@ type VacationForm = {
   end_date: string;
   start_time?: string;
   end_time?: string;
+  substitute_user_id?: string;
   note: string;
 };
 
@@ -847,6 +848,20 @@ export default function VacationRequests({
           onChange={(event) => update("note", event.target.value)}
           placeholder="Pastaba"
         />
+        <select
+          value={form.substitute_user_id || ""}
+          onChange={(event) => update("substitute_user_id", event.target.value)}
+          title="Pavaduotojas laikinai gaus neatvykstančio darbuotojo teises"
+        >
+          <option value="">Be pavadavimo</option>
+          {employees
+            .filter((employee) => employee.user_id !== form.employee_id)
+            .map((employee) => (
+              <option key={employee.user_id} value={employee.user_id}>
+                Pavaduoja: {employeeDisplayName(employee)}
+              </option>
+            ))}
+        </select>
         <button
           type="button"
           disabled={saving || !form.employee_id || !form.start_date || !form.end_date}

@@ -10,6 +10,7 @@ export async function POST(request: Request) {
       body.organizationId || body.organization_id || "",
     ).trim()
     const role = String(body.role || "employee").trim()
+    const requestedUserId = String(body.userId || body.user_id || "").trim()
 
     if (!email || !organizationId) {
       return NextResponse.json(
@@ -35,18 +36,23 @@ export async function POST(request: Request) {
       },
     })
 
-    const { data: usersData, error: usersError } =
-      await admin.auth.admin.listUsers()
+    let userId = requestedUserId
 
-    if (usersError) {
-      return NextResponse.json({ error: usersError.message }, { status: 400 })
+    if (!userId) {
+      const { data: usersData, error: usersError } =
+        await admin.auth.admin.listUsers()
+
+      if (usersError) {
+        return NextResponse.json({ error: usersError.message }, { status: 400 })
+      }
+
+      userId =
+        usersData.users.find(
+          (item) => String(item.email || "").trim().toLowerCase() === email,
+        )?.id || ""
     }
 
-    const user = usersData.users.find(
-      (item) => String(item.email || "").trim().toLowerCase() === email,
-    )
-
-    if (!user) {
+    if (!userId) {
       return NextResponse.json(
         { error: "Darbuotojas dar neprisijungė pagal kvietimą." },
         { status: 400 },
@@ -69,7 +75,7 @@ export async function POST(request: Request) {
     if (firstName || lastName || candidate?.phone) {
       const { error: profileError } = await admin.from("profiles").upsert(
         {
-          id: user.id,
+          id: userId,
           email,
           first_name: firstName || null,
           last_name: lastName || null,
@@ -87,15 +93,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const safeRole =
-      role === "owner" || role === "admin" ? "employee" : role
+    const safeRole = role === "admin" ? "admin" : "employee"
 
     const { error: memberError } = await admin
       .from("organization_members")
       .upsert(
         {
           organization_id: organizationId,
-          user_id: user.id,
+          user_id: userId,
           role: safeRole,
           is_active: true,
           position: candidate?.desired_role || null,
@@ -124,7 +129,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      userId: user.id,
+      userId,
     })
   } catch (error) {
     return NextResponse.json(

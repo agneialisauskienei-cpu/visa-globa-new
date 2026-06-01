@@ -173,6 +173,7 @@ type VacationForm = {
   end_date: string;
   start_time?: string;
   end_time?: string;
+  substitute_user_id?: string;
   note: string;
 };
 
@@ -774,6 +775,7 @@ export default function TeamPage() {
     end_date: toDateInput(new Date()),
     start_time: "",
     end_time: "",
+    substitute_user_id: "",
     note: "",
   });
   const [trainings, setTrainings] = useState<Training[]>([]);
@@ -847,7 +849,7 @@ export default function TeamPage() {
         supabase
           .from("organization_members")
           .select(
-            "id, user_id, role, legacy_role, position, department, staff_type, contract_number, employment_rate, weekly_hours, employment_type, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
+            "id, user_id, role, legacy_role, position, department, staff_type, extra_permissions, contract_number, employment_rate, weekly_hours, employment_type, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
           )
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false }),
@@ -1644,6 +1646,11 @@ export default function TeamPage() {
         noteParts.push(`Leista į minusą: prašoma ${requestedDays} d., likutis ${left} d., rezervuota ${reserved} d.`);
       }
 
+      const substituteEmployee = employees.find((employee) => employee.user_id === vacationForm.substitute_user_id);
+      if (substituteEmployee) {
+        noteParts.push(`Pavaduoja: ${employeeName(substituteEmployee)}`);
+      }
+
       const payload = {
         organization_id: organizationId,
         employee_id: vacationForm.employee_id,
@@ -1678,6 +1685,26 @@ export default function TeamPage() {
         changes: getChangedFields({}, created as unknown as Record<string, unknown>),
       });
 
+      if (vacationForm.substitute_user_id && vacationForm.substitute_user_id !== vacationForm.employee_id) {
+        const { error: substitutionError } = await supabase
+          .from("employee_substitutions")
+          .insert({
+            organization_id: organizationId,
+            absent_user_id: vacationForm.employee_id,
+            substitute_user_id: vacationForm.substitute_user_id,
+            starts_on: vacationForm.start_date,
+            ends_on: isTemporaryVacation(vacationForm.type) ? vacationForm.start_date : vacationForm.end_date,
+            status: "pending",
+            reason: "Pavadavimas pagal neatvykimo prašymą",
+            source_vacation_request_id: created.id,
+          });
+
+        if (substitutionError) {
+          console.warn("[TeamPage] substitution create failed", substitutionError);
+          setMessage("Prašymas sukurtas, bet pavadavimo nepavyko įrašyti. Patikrink `employee_substitutions` migraciją.");
+        }
+      }
+
       setVacations((current) => [created, ...current]);
       setVacationForm({
         employee_id: vacationForm.employee_id,
@@ -1686,6 +1713,7 @@ export default function TeamPage() {
         end_date: toDateInput(new Date()),
         start_time: "",
         end_time: "",
+        substitute_user_id: "",
         note: "",
       });
       setVacationFilter("submitted");
@@ -1708,6 +1736,27 @@ export default function TeamPage() {
       const request = vacations.find((item) => item.id === id);
       const { error } = await supabase.from("vacation_requests").update({ status }).eq("id", id);
       if (error) throw error;
+
+      if (status === "rejected") {
+        const { error: substitutionError } = await supabase
+          .from("employee_substitutions")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("source_vacation_request_id", id);
+
+        if (substitutionError) {
+          console.warn("[TeamPage] substitution cancel failed", substitutionError);
+        }
+      } else if (status === "approved") {
+        const { error: substitutionError } = await supabase
+          .from("employee_substitutions")
+          .update({ status: "active", updated_at: new Date().toISOString() })
+          .eq("source_vacation_request_id", id)
+          .eq("status", "pending");
+
+        if (substitutionError) {
+          console.warn("[TeamPage] substitution activate failed", substitutionError);
+        }
+      }
 
       if (request) {
         await safeAuditLog({

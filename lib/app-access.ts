@@ -52,6 +52,8 @@ export type CurrentAccess = {
   extraPermissions?: Permission[]
   organizationId: string | null
   permissions: Permission[]
+  substitutionPermissions?: Permission[]
+  substitutedForUserIds?: string[]
   email?: string | null
 }
 
@@ -259,6 +261,87 @@ function buildPermissions(
   return Array.from(permissions)
 }
 
+function todayDateString() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+async function getActiveSubstitutionPermissions(input: {
+  organizationId?: string | null
+  substituteUserId: string
+}) {
+  if (!input.organizationId) {
+    return {
+      permissions: [] as Permission[],
+      substitutedForUserIds: [] as string[],
+    }
+  }
+
+  const today = todayDateString()
+
+  const { data: substitutions } = await supabase
+    .from("employee_substitutions")
+    .select("absent_user_id")
+    .eq("organization_id", input.organizationId)
+    .eq("substitute_user_id", input.substituteUserId)
+    .eq("status", "active")
+    .lte("starts_on", today)
+    .gte("ends_on", today)
+
+  const absentUserIds = Array.from(
+    new Set(
+      ((substitutions || []) as Array<{ absent_user_id?: string | null }>)
+        .map((row) => row.absent_user_id)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  )
+
+  if (absentUserIds.length === 0) {
+    return {
+      permissions: [] as Permission[],
+      substitutedForUserIds: [] as string[],
+    }
+  }
+
+  const { data: absentMemberships } = await supabase
+    .from("organization_members")
+    .select("user_id, role, staff_type, extra_permissions")
+    .eq("organization_id", input.organizationId)
+    .in("user_id", absentUserIds)
+    .eq("is_active", true)
+
+  const permissions = new Set<Permission>()
+  const substitutedForUserIds: string[] = []
+
+  for (const membership of (absentMemberships || []) as Array<{
+    user_id?: string | null
+    role?: MembershipRole | null
+    staff_type?: StaffType
+    extra_permissions?: unknown
+  }>) {
+    const role = membership.role || "employee"
+    const inheritedPermissions = buildPermissions(
+      role === "super_admin" ? "employee" : role,
+      membership.staff_type,
+      normalizeExtraPermissions(membership.extra_permissions),
+    )
+
+    for (const permission of inheritedPermissions) {
+      if (permission !== "system.super") {
+        permissions.add(permission)
+      }
+    }
+
+    if (membership.user_id) {
+      substitutedForUserIds.push(membership.user_id)
+    }
+  }
+
+  return {
+    permissions: Array.from(permissions),
+    substitutedForUserIds,
+  }
+}
+
 export function hasPermission(
   access: CurrentAccess | null,
   permission: Permission
@@ -304,6 +387,8 @@ export async function getCurrentAccess(): Promise<CurrentAccess> {
       extraPermissions: [],
       organizationId: null,
       permissions: [],
+      substitutionPermissions: [],
+      substitutedForUserIds: [],
     }
   }
 
@@ -318,6 +403,8 @@ export async function getCurrentAccess(): Promise<CurrentAccess> {
       extraPermissions: [],
       organizationId: null,
       permissions: ROLE_PERMISSIONS.super_admin,
+      substitutionPermissions: [],
+      substitutedForUserIds: [],
       email,
     }
   }
@@ -335,6 +422,11 @@ export async function getCurrentAccess(): Promise<CurrentAccess> {
   const extraPermissions = normalizeExtraPermissions(
     (membership as any)?.extra_permissions
   )
+  const basePermissions = buildPermissions(role, staffType, extraPermissions)
+  const substitution = await getActiveSubstitutionPermissions({
+    organizationId: membership?.organization_id ?? null,
+    substituteUserId: user.id,
+  })
 
   return {
     role,
@@ -342,7 +434,11 @@ export async function getCurrentAccess(): Promise<CurrentAccess> {
     position: (membership as any)?.position ?? null,
     extraPermissions,
     organizationId: membership?.organization_id ?? null,
-    permissions: buildPermissions(role, staffType, extraPermissions),
+    permissions: Array.from(
+      new Set([...basePermissions, ...substitution.permissions]),
+    ),
+    substitutionPermissions: substitution.permissions,
+    substitutedForUserIds: substitution.substitutedForUserIds,
     email,
   }
 }

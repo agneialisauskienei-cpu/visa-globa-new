@@ -29,6 +29,16 @@ type Invite = {
   invited_by?: string | null;
 };
 
+type ProfileRow = {
+  id: string;
+  email: string | null;
+};
+
+type MemberRow = {
+  user_id: string;
+  is_active: boolean | null;
+};
+
 type NewInviteForm = {
   email: string;
   role: "employee" | "admin" | "owner";
@@ -79,6 +89,10 @@ function normalizeEmail(value: string) {
 
 function isPending(status: InviteStatus) {
   return String(status || "").toLowerCase() === "pending";
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
 }
 
 function statusClass(status: InviteStatus) {
@@ -133,7 +147,59 @@ export default function InvitesModule() {
 
       if (inviteError) throw inviteError;
 
-      setInvites((data || []) as Invite[]);
+      const inviteRows = ((data || []) as Invite[]).map((invite) => ({
+        ...invite,
+        email: normalizeEmail(invite.email || ""),
+      }));
+
+      const pendingEmails = uniqueValues(
+        inviteRows
+          .filter((invite) => isPending(invite.status))
+          .map((invite) => normalizeEmail(invite.email || "")),
+      );
+      const acceptedEmails = new Set<string>();
+
+      if (pendingEmails.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, email")
+          .in("email", pendingEmails);
+
+        const profileRows = ((profiles || []) as ProfileRow[]).filter((profile) => profile.id);
+        const profileIds = profileRows.map((profile) => profile.id);
+
+        if (profileIds.length > 0) {
+          const { data: members } = await supabase
+            .from("organization_members")
+            .select("user_id, is_active")
+            .eq("organization_id", orgId)
+            .in("user_id", profileIds);
+
+          const activeMemberIds = new Set(
+            ((members || []) as MemberRow[])
+              .filter((member) => member.is_active !== false)
+              .map((member) => member.user_id),
+          );
+
+          for (const profile of profileRows) {
+            if (activeMemberIds.has(profile.id)) {
+              acceptedEmails.add(normalizeEmail(profile.email || ""));
+            }
+          }
+        }
+      }
+
+      setInvites(
+        inviteRows.map((invite) =>
+          isPending(invite.status) && acceptedEmails.has(normalizeEmail(invite.email || ""))
+            ? {
+                ...invite,
+                status: "accepted",
+                accepted_at: invite.accepted_at || invite.updated_at || new Date().toISOString(),
+              }
+            : invite,
+        ),
+      );
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Nepavyko įkelti kvietimų.");
     } finally {
