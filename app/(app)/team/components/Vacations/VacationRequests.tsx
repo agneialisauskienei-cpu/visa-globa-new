@@ -361,11 +361,20 @@ function employeeInitials(employee?: Employee | null) {
 }
 
 function isAnnual(type?: string | null) {
-  return !type || ["annual", "vacation", "A"].includes(String(type));
+  const normalized = String(type || "annual_leave").trim().toLowerCase();
+  return [
+    "annual",
+    "annual_leave",
+    "vacation",
+    "kasmetines",
+    "kasmetinės",
+    "a",
+  ].includes(normalized);
 }
 
 function isTemporaryLeave(type?: string | null) {
-  return String(type || "") === "temporary_leave";
+  const normalized = String(type || "").trim().toLowerCase();
+  return normalized === "temporary_leave" || normalized === "short_leave";
 }
 
 function normalizedStatus(status?: string | null) {
