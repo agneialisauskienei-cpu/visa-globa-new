@@ -922,29 +922,41 @@ export default function TeamPage() {
         }
       }
 
+      const candidateRows = !candidatesResult.error ? ((candidatesResult.data as Candidate[]) || []) : [];
+      const candidatesByEmail = new Map(
+        candidateRows
+          .filter((candidate) => candidate.email)
+          .map((candidate) => [String(candidate.email).trim().toLowerCase(), candidate]),
+      );
+
       setEmployees(
         memberRows.map((employee) => {
           const profile = profileMap.get(employee.user_id) || {};
+          const email = String(profile.email || employee.email || "").trim();
+          const candidate = candidatesByEmail.get(email.toLowerCase());
+          const firstName = String(profile.first_name || employee.first_name || candidate?.first_name || "").trim();
+          const lastName = String(profile.last_name || employee.last_name || candidate?.last_name || "").trim();
+          const fullName =
+            String(profile.full_name || employee.full_name || "").trim() ||
+            [firstName, lastName].filter(Boolean).join(" ").trim() ||
+            employee.full_name ||
+            null;
+          const genericPosition = !employee.position || employee.position === employee.staff_type || employee.position === employee.role;
 
           return {
             ...employee,
-            email: String(profile.email || employee.email || "").trim() || employee.email || null,
-            first_name: String(profile.first_name || employee.first_name || "").trim() || employee.first_name || null,
-            last_name: String(profile.last_name || employee.last_name || "").trim() || employee.last_name || null,
-            full_name:
-              String(profile.full_name || employee.full_name || "").trim() ||
-              [profile.first_name || employee.first_name, profile.last_name || employee.last_name]
-                .filter(Boolean)
-                .join(" ")
-                .trim() ||
-              employee.full_name ||
-              null,
-            phone: String(profile.phone || employee.phone || "").trim() || employee.phone || null,
+            email: email || employee.email || candidate?.email || null,
+            first_name: firstName || employee.first_name || null,
+            last_name: lastName || employee.last_name || null,
+            full_name: fullName,
+            phone: String(profile.phone || employee.phone || candidate?.phone || "").trim() || employee.phone || null,
             birth_date: String(profile.birth_date || employee.birth_date || "").trim() || employee.birth_date || null,
+            position: genericPosition ? candidate?.desired_role || employee.position || null : employee.position,
+            department: employee.department || candidate?.experience || null,
           };
         }),
       );
-      if (!candidatesResult.error) setCandidates((candidatesResult.data as Candidate[]) || []);
+      if (!candidatesResult.error) setCandidates(candidateRows);
       if (!invitesResult.error) setInvites((invitesResult.data as Invite[]) || []);
 
       const vacationResult = await supabase
