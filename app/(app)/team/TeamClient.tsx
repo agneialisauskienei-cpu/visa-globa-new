@@ -651,7 +651,9 @@ function employeeName(employee?: Employee | null) {
 
   const full = String(employee.full_name || "").trim();
 
-  if (full) return full;
+  if (full && full.toLowerCase() !== "administration") {
+    return full;
+  }
 
   const combined = [employee.first_name, employee.last_name]
     .filter(Boolean)
@@ -660,7 +662,9 @@ function employeeName(employee?: Employee | null) {
 
   if (combined) return combined;
 
-  if (employee.position?.trim()) return employee.position.trim();
+  if (employee.email?.trim()) {
+    return employee.email.split("@")[0];
+  }
 
   return "Darbuotojas";
 }
@@ -672,23 +676,19 @@ function employeeKey(employee: Pick<Employee, "member_id" | "user_id">) {
 function employeeRole(employee?: Employee | null) {
   const candidates = [
     employee?.position,
-    employee?.legacy_role,
     employee?.staff_type,
     employee?.department,
-    employee?.role,
   ];
 
   for (const value of candidates) {
     const raw = String(value || "").trim();
-    const normalized = raw.toLowerCase();
 
     if (!raw) continue;
-    if (["admin", "employee", "administratorius", "darbuotojas"].includes(normalized)) continue;
 
     return raw;
   }
 
-  return "";
+  return "Pareigos dar nepriskirtos";
 }
 
 function staffTypeLabel(value?: string | null) {
@@ -1035,10 +1035,14 @@ export default function TeamPage() {
       is_active: employee.is_active !== false,
     });
 
+    const selectedEmployeeKey = employeeKey(employee);
+
     window.requestAnimationFrame(() => {
-      document
-        .getElementById("employee-register-tabs")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.setTimeout(() => {
+        document
+          .getElementById(`employee-editor-${selectedEmployeeKey}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
     });
   }
 
@@ -1075,9 +1079,9 @@ export default function TeamPage() {
 
     console.log("[TeamPage] validation", { firstName, lastName, fullName, birth_date: "" });
 
-    if (!firstName || !lastName) {
-      console.error("[TeamPage] saveEmployee aborted: missing firstName or lastName");
-      setMessage("Įvesk darbuotojo vardą ir pavardę.");
+    if (!firstName && !lastName && !fullName) {
+      console.error("[TeamPage] saveEmployee aborted: missing name");
+      setMessage("Įvesk darbuotojo vardą, pavardę arba bent rodomą vardą.");
       return;
     }
 
@@ -2355,7 +2359,8 @@ export default function TeamPage() {
                       />
 
                       {selected && editForm && employeeEditorTab !== "register" ? (
-                        <EmployeeTabbedEditor
+                        <div id={`employee-editor-${employeeKey(employee)}`}>
+                          <EmployeeTabbedEditor
                           employee={editingEmployee}
                           editForm={editForm}
                           activeTab={employeeEditorTab}
@@ -2367,6 +2372,7 @@ export default function TeamPage() {
                           onTogglePermission={toggleExtraPermission}
                           onSave={() => void saveEmployee()}
                         />
+                        </div>
                       ) : null}
                     </div>
                   );
@@ -3496,14 +3502,19 @@ function EmployeeTabbedEditor({
               })}
             </div>
 
-            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Galutinės aktyvios teisės</p>
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Prieigos santrauka</p>
+              <p className="mt-2 text-sm font-bold text-blue-900">
+                Teisės pritaikomos pagal pasirinktą pareigų tipą ir papildomai pažymėtas prieigas.
+              </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {mergedPermissions(editForm).map((permission) => (
-                  <span key={permission} className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-800">
-                    {permission}
-                  </span>
-                ))}
+                {EXTRA_PERMISSIONS
+                  .filter((permission) => mergedPermissions(editForm).includes(permission.value))
+                  .map((permission) => (
+                    <span key={permission.value} className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-800">
+                      {permission.label}
+                    </span>
+                  ))}
               </div>
             </div>
           </section>
