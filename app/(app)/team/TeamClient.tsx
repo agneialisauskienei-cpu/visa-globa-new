@@ -2343,31 +2343,36 @@ export default function TeamPage() {
               <EmptyState text="Darbuotojų nerasta." />
             ) : (
               <div className="mt-5 grid gap-3">
-                {filteredEmployees.map((employee) => (
-                  <EmployeeRowCard
-                    key={employeeKey(employee)}
-                    employee={employee}
-                    selected={editingEmployee ? employeeKey(editingEmployee) === employeeKey(employee) : false}
-                    onEdit={() => openEmployeeEditor(employee)}
-                  />
-                ))}
+                {filteredEmployees.map((employee) => {
+                  const selected = editingEmployee ? employeeKey(editingEmployee) === employeeKey(employee) : false;
+
+                  return (
+                    <div key={employeeKey(employee)} className="grid gap-3">
+                      <EmployeeRowCard
+                        employee={employee}
+                        selected={selected}
+                        onEdit={() => openEmployeeEditor(employee)}
+                      />
+
+                      {selected && editForm && employeeEditorTab !== "register" ? (
+                        <EmployeeTabbedEditor
+                          employee={editingEmployee}
+                          editForm={editForm}
+                          activeTab={employeeEditorTab}
+                          trainings={trainings.filter((training) => training.employee_id === editingEmployee.user_id)}
+                          credentials={credentials.filter((credential) => credential.employee_id === editingEmployee.user_id)}
+                          saving={saving}
+                          onChange={setEditForm}
+                          onTabChange={setEmployeeEditorTab}
+                          onTogglePermission={toggleExtraPermission}
+                          onSave={() => void saveEmployee()}
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             )}
-
-            {editingEmployee && editForm && employeeEditorTab !== "register" ? (
-              <EmployeeTabbedEditor
-                employee={editingEmployee}
-                editForm={editForm}
-                activeTab={employeeEditorTab}
-                trainings={trainings.filter((training) => training.employee_id === editingEmployee.user_id)}
-                credentials={credentials.filter((credential) => credential.employee_id === editingEmployee.user_id)}
-                saving={saving}
-                onChange={setEditForm}
-                onTabChange={setEmployeeEditorTab}
-                onTogglePermission={toggleExtraPermission}
-                onSave={() => void saveEmployee()}
-              />
-            ) : null}
           </Card>
         )}
 
