@@ -112,11 +112,6 @@ type VacationRequest = {
   requested_days: number | null;
   note: string | null;
   created_at: string | null;
-  substitute_user_id?: string | null;
-  approved_at?: string | null;
-  approved_by?: string | null;
-  rejected_at?: string | null;
-  rejected_by?: string | null;
 };
 
 type ScheduleEntry = {
@@ -1143,8 +1138,6 @@ export default function TeamPage() {
   }
 
   async function loadDocumentAcknowledgements(orgId: string) {
-    // Šioje DB reali lentelė yra personnel_document_acknowledgements.
-    // Nebebandom document_acknowledgements, nes jos nėra ir tai teršia Console 404 klaidomis.
     const result = await supabase
       .from("personnel_document_acknowledgements")
       .select("*")
@@ -2359,9 +2352,109 @@ export default function TeamPage() {
       );
   }
 
+  function vacationRequestDays(request: VacationRequest) {
+    return Number(
+      request.requested_days || daysBetween(request.start_date, request.end_date),
+    );
+  }
+
+  function updateLocalVacationEntitlement(
+    employeeId: string,
+    year: number,
+    patch: Partial<VacationEntitlement>,
+  ) {
+    setVacationEntitlements((current) => {
+      const index = current.findIndex(
+        (row) => row.employee_id === employeeId && Number(row.year || year) === year,
+      );
+
+      if (index === -1) {
+        return [
+          {
+            employee_id: employeeId,
+            year,
+            annual_days: 30,
+            carried_over_days: 0,
+            used_days: 0,
+            reserved_days: 0,
+            is_active: true,
+            ...patch,
+          },
+          ...current,
+        ];
+      }
+
+      return current.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, ...patch } : row,
+      );
+    });
+  }
+
+  async function syncVacationEntitlementAfterStatusChange(
+    request: VacationRequest,
+    nextStatus: "approved" | "rejected",
+  ) {
+    if (!organizationId || !isAnnualVacation(request.type)) return;
+
+    const year = new Date(`${request.start_date}T00:00:00`).getFullYear();
+    const days = vacationRequestDays(request);
+    const current = vacationEntitlementRecord(request.employee_id);
+
+    const annualDays = Number(
+      current?.annual_days ?? current?.entitlement_days ?? current?.days ?? 30,
+    );
+    const carriedOverDays = Number(current?.carried_over_days || 0);
+    let usedDays = Number(current?.used_days ?? usedAnnualVacationDays(request.employee_id));
+    let reservedDays = Number(
+      current?.reserved_days ?? reservedAnnualVacationDays(request.employee_id),
+    );
+
+    if (nextStatus === "approved") {
+      if (request.status !== "approved") usedDays += days;
+      if (request.status === "submitted" || request.status === "pending") {
+        reservedDays = Math.max(0, reservedDays - days);
+      }
+    }
+
+    if (nextStatus === "rejected") {
+      if (request.status === "approved") usedDays = Math.max(0, usedDays - days);
+      if (request.status === "submitted" || request.status === "pending") {
+        reservedDays = Math.max(0, reservedDays - days);
+      }
+    }
+
+    const patch = {
+      annual_days: annualDays,
+      carried_over_days: carriedOverDays,
+      used_days: roundFte(usedDays),
+      reserved_days: roundFte(reservedDays),
+      is_active: true,
+    };
+
+    const { error } = await supabase
+      .from("vacation_entitlements")
+      .upsert(
+        {
+          organization_id: organizationId,
+          employee_id: request.employee_id,
+          year,
+          ...patch,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "organization_id,employee_id,year" },
+      );
+
+    if (!error) {
+      updateLocalVacationEntitlement(request.employee_id, year, patch);
+    } else {
+      notifyAuditWarning(
+        `Įspėjimas: prašymo statusas pakeistas, bet atostogų likučio atnaujinti nepavyko: ${error.message}`,
+      );
+    }
+  }
+
   async function submitVacationRequest(options?: {
     allowNegativeBalance?: boolean;
-    negativeBalance?: { allowNegativeBalance: true; reason: string };
   }) {
     if (!organizationId) return;
 
@@ -2387,15 +2480,10 @@ export default function TeamPage() {
     const left = balance.left;
     const reserved = balance.reserved;
 
-    const negativeBalanceAllowed =
-      options?.allowNegativeBalance === true ||
-      options?.negativeBalance?.allowNegativeBalance === true;
-    const negativeBalanceReason = options?.negativeBalance?.reason?.trim() || "";
-
     if (
       isAnnualVacation(vacationForm.type) &&
       requestedDays > left &&
-      !negativeBalanceAllowed
+      !options?.allowNegativeBalance
     ) {
       const ok = window.confirm(
         `Darbuotojui trūksta atostogų likučio.\n\nLikutis: ${left} d.\nPrašoma: ${requestedDays} d.\n\nAr leisti atostogas į minusą?`,
@@ -2417,7 +2505,7 @@ export default function TeamPage() {
       }
       if (isAnnualVacation(vacationForm.type) && requestedDays > left) {
         noteParts.push(
-          `Leista į minusą: prašoma ${requestedDays} d., likutis ${left} d., rezervuota ${reserved} d.${negativeBalanceReason ? ` Priežastis: ${negativeBalanceReason}` : ""}`,
+          `Leista į minusą: prašoma ${requestedDays} d., likutis ${left} d., rezervuota ${reserved} d.`,
         );
       }
 
@@ -2532,37 +2620,27 @@ export default function TeamPage() {
   async function updateVacationStatus(
     id: string,
     status: "approved" | "rejected",
-    options?: {
-      substitution?: {
-        substituteUserId: string;
-        absentEmployeeId: string;
-        validFrom: string;
-        validUntil: string;
-        sourceRequestId: string;
-        reason: string;
-      };
-    },
   ) {
     if (!organizationId) {
       setMessage("Nepavyko nustatyti įstaigos.");
       return;
     }
 
+    const request = vacations.find((item) => item.id === id);
+
+    if (!request) {
+      setMessage("Nepavyko rasti prašymo vietiniame sąraše. Perkrauk puslapį.");
+      return;
+    }
+
     setSaving(true);
+    setMessage("");
+
     try {
-      const request = vacations.find((item) => item.id === id);
       const now = new Date().toISOString();
-      const currentUserResult = await supabase.auth.getUser();
-      const currentUserId = currentUserResult.data.user?.id || null;
-
-      const requestPatch =
-        status === "approved"
-          ? { status, approved_at: now, approved_by: currentUserId }
-          : { status, rejected_at: now, rejected_by: currentUserId };
-
-      let vacationUpdate = await supabase
+      const { data: updatedRequest, error } = await supabase
         .from("vacation_requests")
-        .update(requestPatch)
+        .update({ status, updated_at: now })
         .eq("organization_id", organizationId)
         .eq("id", id)
         .select(
@@ -2570,24 +2648,23 @@ export default function TeamPage() {
         )
         .maybeSingle();
 
-      // Senesnėse DB schemose approved_at / approved_by / rejected_at / rejected_by gali dar neegzistuoti.
-      // Tokiu atveju saugiai kartojame tik su status, kad UI neliktų melagingai patvirtintas vien lokaliai.
-      if (vacationUpdate.error) {
-        vacationUpdate = await supabase
-          .from("vacation_requests")
-          .update({ status })
-          .eq("organization_id", organizationId)
-          .eq("id", id)
-          .select(
-            "id, employee_id, type, start_date, end_date, status, requested_days, note, created_at",
-          )
-          .maybeSingle();
+      if (error) throw error;
+
+      if (!updatedRequest) {
+        throw new Error(
+          "Prašymo statusas DB nepasikeitė. Patikrink vacation_requests UPDATE RLS politiką arba ar prašymas priklauso šiai organizacijai.",
+        );
       }
 
-      if (vacationUpdate.error) throw vacationUpdate.error;
+      const savedRequest = {
+        ...(updatedRequest as VacationRequest),
+        status: (updatedRequest as VacationRequest).status || status,
+      };
 
-      const savedRequest =
-        ((vacationUpdate.data as VacationRequest | null) || request || null);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const reviewerId = user?.id || null;
 
       if (status === "rejected") {
         const { error: substitutionError } = await supabase
@@ -2595,98 +2672,49 @@ export default function TeamPage() {
           .update({
             status: "cancelled",
             cancelled_at: now,
-            cancelled_by: currentUserId,
+            cancelled_by: reviewerId,
           })
           .eq("organization_id", organizationId)
           .eq("source_vacation_request_id", id);
 
-        if (substitutionError) throw substitutionError;
+        if (substitutionError) {
+          notifyAuditWarning(
+            `Įspėjimas: prašymas atmestas, bet pavadavimo atšaukti nepavyko: ${substitutionError.message}`,
+          );
+        }
       } else if (status === "approved") {
-        const substitution = options?.substitution;
+        const { error: substitutionError } = await supabase
+          .from("employee_substitutions")
+          .update({
+            status: "active",
+            activated_at: now,
+            activated_by: reviewerId,
+          })
+          .eq("organization_id", organizationId)
+          .eq("source_vacation_request_id", id)
+          .eq("status", "pending");
 
-        if (substitution?.substituteUserId && substitution.substituteUserId !== substitution.absentEmployeeId) {
-          const { data: existingSubstitution, error: existingSubstitutionError } = await supabase
-            .from("employee_substitutions")
-            .select("id")
-            .eq("organization_id", organizationId)
-            .eq("source_vacation_request_id", id)
-            .maybeSingle();
-
-          if (existingSubstitutionError) throw existingSubstitutionError;
-
-          if (existingSubstitution?.id) {
-            const { error: substitutionError } = await supabase
-              .from("employee_substitutions")
-              .update({
-                substitute_user_id: substitution.substituteUserId,
-                absent_user_id: substitution.absentEmployeeId,
-                starts_on: substitution.validFrom,
-                ends_on: substitution.validUntil,
-                reason: substitution.reason,
-                status: "active",
-                activated_at: now,
-                activated_by: currentUserId,
-              })
-              .eq("organization_id", organizationId)
-              .eq("id", existingSubstitution.id);
-
-            if (substitutionError) throw substitutionError;
-          } else {
-            const { error: substitutionError } = await supabase
-              .from("employee_substitutions")
-              .insert({
-                organization_id: organizationId,
-                absent_user_id: substitution.absentEmployeeId,
-                substitute_user_id: substitution.substituteUserId,
-                starts_on: substitution.validFrom,
-                ends_on: substitution.validUntil,
-                source_vacation_request_id: substitution.sourceRequestId || id,
-                reason: substitution.reason,
-                status: "active",
-                activated_at: now,
-                activated_by: currentUserId,
-              });
-
-            if (substitutionError) throw substitutionError;
-          }
-        } else {
-          const { error: substitutionError } = await supabase
-            .from("employee_substitutions")
-            .update({
-              status: "active",
-              activated_at: now,
-              activated_by: currentUserId,
-            })
-            .eq("organization_id", organizationId)
-            .eq("source_vacation_request_id", id)
-            .eq("status", "pending");
-
-          if (substitutionError) throw substitutionError;
+        if (substitutionError) {
+          notifyAuditWarning(
+            `Įspėjimas: prašymas patvirtintas, bet pavadavimo aktyvuoti nepavyko: ${substitutionError.message}`,
+          );
         }
       }
 
-      if (request) {
-        await safeAuditLog({
-          organizationId,
-          tableName: "vacation_requests",
-          recordId: id,
-          action:
-            status === "approved" ? "vacation.approved" : "vacation.rejected",
-          changes: getChangedFields(
-            request as unknown as Record<string, unknown>,
-            {
-              ...(request as unknown as Record<string, unknown>),
-              status,
-            },
-          ),
-        });
-      }
+      await syncVacationEntitlementAfterStatusChange(request, status);
 
-      if (
-        status === "approved" &&
-        savedRequest &&
-        !isTemporaryVacation(savedRequest.type)
-      ) {
+      await safeAuditLog({
+        organizationId,
+        tableName: "vacation_requests",
+        recordId: id,
+        action: status === "approved" ? "vacation.approved" : "vacation.rejected",
+        changes: getChangedFields(
+          request as unknown as Record<string, unknown>,
+          savedRequest as unknown as Record<string, unknown>,
+        ),
+      });
+
+      if (status === "approved" && !isTemporaryVacation(savedRequest.type)) {
         const meta = absenceTypeMeta(savedRequest.type);
         const rows = datesBetween(savedRequest.start_date, savedRequest.end_date).map(
           (date) => ({
@@ -2702,9 +2730,8 @@ export default function TeamPage() {
           const { error: scheduleError } = await supabase
             .from("work_schedule_entries")
             .upsert(rows, { onConflict: "organization_id,employee_id,date" });
-          if (scheduleError) {
-            throw scheduleError;
-          } else {
+
+          if (!scheduleError) {
             setScheduleEntries((current) => {
               const savedKeys = new Set(
                 rows.map((row) => `${row.employee_id}:${row.date}`),
@@ -2723,30 +2750,26 @@ export default function TeamPage() {
                 })),
               ];
             });
+          } else {
+            notifyAuditWarning(
+              `Įspėjimas: prašymas patvirtintas, bet grafiko įrašų sukurti nepavyko: ${scheduleError.message}`,
+            );
           }
         }
       }
 
       setVacations((current) =>
-        current.map((request) =>
-          request.id === id
-            ? {
-                ...request,
-                ...(savedRequest || {}),
-                status,
-              }
-            : request,
-        ),
+        current.map((item) => (item.id === id ? savedRequest : item)),
       );
-      await loadVacationEntitlements(organizationId);
       setMessage((current) =>
         current ||
         (status === "approved"
-          ? "Prašymas patvirtintas ir grafike rodomas kaip neatvykimas."
-          : "Prašymas atmestas."),
+          ? "Prašymas patvirtintas DB ir grafike rodomas kaip neatvykimas."
+          : "Prašymas atmestas DB."),
       );
     } catch (error) {
       setMessage(getReadableError(error));
+      throw error;
     } finally {
       setSaving(false);
     }
@@ -3495,14 +3518,14 @@ export default function TeamPage() {
             activeFilter={vacationFilter}
             onFilterChange={setVacationFilter}
             onFormChange={setVacationForm}
+            onSubmit={submitVacationRequest}
+            onApprove={(id) => updateVacationStatus(id, "approved")}
+            onReject={(id) => updateVacationStatus(id, "rejected")}
             canViewSensitiveVacationData={canViewSensitiveFields}
             employeesFilteredByPermissions={true}
             canAllowNegativeVacationBalance={canViewSensitiveFields}
             scheduleConflicts={[]}
             scheduleConflictsChecked={true}
-            onSubmit={submitVacationRequest}
-            onApprove={(id, options) => updateVacationStatus(id, "approved", options)}
-            onReject={(id) => updateVacationStatus(id, "rejected")}
             employeeName={employeeName}
             employeeRole={employeeRole}
             daysBetween={daysBetween}
