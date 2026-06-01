@@ -79,6 +79,13 @@ type Employee = {
   occupational_health_valid_until?: string | null;
   is_active?: boolean | null;
   created_at?: string | null;
+  // DB-driven vacation fields injected from vacation_entitlements before rendering VacationRequests.
+  vacation_entitlement_days?: number | string | null;
+  annual_vacation_days?: number | string | null;
+  vacation_balance_days?: number | string | null;
+  vacation_balance_as_of?: string | null;
+  vacation_used_days?: number | string | null;
+  vacation_reserved_days?: number | string | null;
 };
 
 type Candidate = {
@@ -225,6 +232,7 @@ type VacationEntitlement = {
   reserved_days?: number | null;
   remaining_days?: number | null;
   is_active?: boolean | null;
+  updated_at?: string | null;
 };
 
 type NewEmployeeForm = {
@@ -1160,8 +1168,15 @@ export default function TeamPage() {
     }
   }
 
-  async function loadVacationEntitlements(orgId: string) {
+  async function loadVacationEntitlements(orgId: string): Promise<VacationEntitlement[]> {
     const currentYear = new Date().getFullYear();
+
+    const normalizeRows = (rows: VacationEntitlement[]) =>
+      rows.filter(
+        (row) =>
+          row.is_active !== false &&
+          (!row.year || Number(row.year) === currentYear),
+      );
 
     const primaryResult = await supabase
       .from("vacation_entitlements")
@@ -1169,11 +1184,9 @@ export default function TeamPage() {
       .eq("organization_id", orgId);
 
     if (!primaryResult.error) {
-      const rows = ((primaryResult.data as VacationEntitlement[]) || []).filter(
-        (row) => row.is_active !== false && (!row.year || Number(row.year) === currentYear),
-      );
+      const rows = normalizeRows((primaryResult.data as VacationEntitlement[]) || []);
       setVacationEntitlements(rows);
-      return;
+      return rows;
     }
 
     const fallbackResult = await supabase
@@ -1182,13 +1195,13 @@ export default function TeamPage() {
       .eq("organization_id", orgId);
 
     if (!fallbackResult.error) {
-      const rows = ((fallbackResult.data as VacationEntitlement[]) || []).filter(
-        (row) => row.is_active !== false && (!row.year || Number(row.year) === currentYear),
-      );
+      const rows = normalizeRows((fallbackResult.data as VacationEntitlement[]) || []);
       setVacationEntitlements(rows);
-    } else {
-      setVacationEntitlements([]);
+      return rows;
     }
+
+    setVacationEntitlements([]);
+    return [];
   }
 
   async function loadAll() {
@@ -1330,6 +1343,23 @@ export default function TeamPage() {
           ]),
       );
 
+      const loadedVacationEntitlements = await loadVacationEntitlements(orgId);
+      const currentVacationYear = new Date().getFullYear();
+      const vacationEntitlementMap = new Map(
+        loadedVacationEntitlements.map((row) => [
+          `${row.employee_id}:${Number(row.year || currentVacationYear)}`,
+          row,
+        ]),
+      );
+
+      function entitlementForEmployee(employeeId: string) {
+        return (
+          vacationEntitlementMap.get(`${employeeId}:${currentVacationYear}`) ||
+          loadedVacationEntitlements.find((row) => row.employee_id === employeeId) ||
+          null
+        );
+      }
+
       setEmployees(
         memberRows.map((employee) => {
           const profile = profileMap.get(employee.user_id) || {};
@@ -1374,6 +1404,47 @@ export default function TeamPage() {
               ? candidate?.desired_role || employee.position || null
               : employee.position,
             department: employee.department || candidate?.experience || null,
+            vacation_entitlement_days: (() => {
+              const entitlement = entitlementForEmployee(employee.user_id);
+              const annualDays = Number(
+                entitlement?.annual_days ??
+                  entitlement?.entitlement_days ??
+                  entitlement?.days ??
+                  0,
+              );
+              const carriedOverDays = Number(entitlement?.carried_over_days || 0);
+              const totalEntitlement = annualDays + carriedOverDays;
+              return totalEntitlement > 0 ? roundFte(totalEntitlement) : null;
+            })(),
+            annual_vacation_days: (() => {
+              const entitlement = entitlementForEmployee(employee.user_id);
+              const annualDays = Number(
+                entitlement?.annual_days ??
+                  entitlement?.entitlement_days ??
+                  entitlement?.days ??
+                  0,
+              );
+              return annualDays > 0 ? roundFte(annualDays) : null;
+            })(),
+            vacation_balance_days: (() => {
+              const entitlement = entitlementForEmployee(employee.user_id);
+              return entitlement?.remaining_days != null
+                ? roundFte(Number(entitlement.remaining_days))
+                : null;
+            })(),
+            vacation_used_days: (() => {
+              const entitlement = entitlementForEmployee(employee.user_id);
+              return entitlement?.used_days != null
+                ? roundFte(Number(entitlement.used_days))
+                : null;
+            })(),
+            vacation_reserved_days: (() => {
+              const entitlement = entitlementForEmployee(employee.user_id);
+              return entitlement?.reserved_days != null
+                ? roundFte(Number(entitlement.reserved_days))
+                : null;
+            })(),
+            vacation_balance_as_of: entitlementForEmployee(employee.user_id)?.updated_at || null,
           };
         }),
       );
@@ -1405,7 +1476,6 @@ export default function TeamPage() {
 
       await loadScheduleForMonth(orgId, scheduleMonth);
       await loadDocumentAcknowledgements(orgId);
-      await loadVacationEntitlements(orgId);
 
       if (!trainingsResult.error)
         setTrainings((trainingsResult.data as Training[]) || []);

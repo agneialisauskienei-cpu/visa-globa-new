@@ -34,6 +34,8 @@ type Employee = {
   annual_vacation_days?: number | string | null;
   vacation_balance_days?: number | string | null;
   vacation_balance_as_of?: string | null;
+  vacation_used_days?: number | string | null;
+  vacation_reserved_days?: number | string | null;
   position_id?: string | null;
   department_id?: string | null;
   staffing_group_id?: string | null;
@@ -623,6 +625,10 @@ export default function VacationRequests({
 
   function usedAnnualDays(employee?: Employee | null) {
     if (!employee) return 0;
+
+    const dbUsed = parseNumericValue(employee.vacation_used_days);
+    if (dbUsed !== null) return dbUsed;
+
     return allRequests
       .filter(
         (request) =>
@@ -635,6 +641,10 @@ export default function VacationRequests({
 
   function reservedAnnualDays(employee?: Employee | null) {
     if (!employee) return 0;
+
+    const dbReserved = parseNumericValue(employee.vacation_reserved_days);
+    if (dbReserved !== null) return dbReserved;
+
     return allRequests
       .filter(
         (request) =>
@@ -804,7 +814,7 @@ export default function VacationRequests({
     return (
       impact.risky ||
       (isAnnual(request.type) &&
-        normalizedStatus(request.status) !== "rejected" &&
+        normalizedStatus(request.status) === "submitted" &&
         days > balance.left)
     );
   }
@@ -1262,7 +1272,7 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
               const status = normalizedStatus(request.status);
               const overBalance =
                 isAnnual(request.type) &&
-                status !== "rejected" &&
+                status === "submitted" &&
                 days > balance.left;
 
               return (
