@@ -112,6 +112,11 @@ type VacationRequest = {
   requested_days: number | null;
   note: string | null;
   created_at: string | null;
+  substitute_user_id?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  rejected_at?: string | null;
+  rejected_by?: string | null;
 };
 
 type ScheduleEntry = {
@@ -1138,28 +1143,17 @@ export default function TeamPage() {
   }
 
   async function loadDocumentAcknowledgements(orgId: string) {
-    const primaryResult = await supabase
-      .from("document_acknowledgements")
-      .select("*")
-      .eq("organization_id", orgId)
-      .order("created_at", { ascending: false });
-
-    if (!primaryResult.error) {
-      setDocumentAcknowledgements(
-        (primaryResult.data as DocumentAcknowledgement[]) || [],
-      );
-      return;
-    }
-
-    const fallbackResult = await supabase
+    // Šioje DB reali lentelė yra personnel_document_acknowledgements.
+    // Nebebandom document_acknowledgements, nes jos nėra ir tai teršia Console 404 klaidomis.
+    const result = await supabase
       .from("personnel_document_acknowledgements")
       .select("*")
       .eq("organization_id", orgId)
       .order("created_at", { ascending: false });
 
-    if (!fallbackResult.error) {
+    if (!result.error) {
       setDocumentAcknowledgements(
-        (fallbackResult.data as DocumentAcknowledgement[]) || [],
+        (result.data as DocumentAcknowledgement[]) || [],
       );
     } else {
       setDocumentAcknowledgements([]);
@@ -2367,6 +2361,7 @@ export default function TeamPage() {
 
   async function submitVacationRequest(options?: {
     allowNegativeBalance?: boolean;
+    negativeBalance?: { allowNegativeBalance: true; reason: string };
   }) {
     if (!organizationId) return;
 
@@ -2392,10 +2387,15 @@ export default function TeamPage() {
     const left = balance.left;
     const reserved = balance.reserved;
 
+    const negativeBalanceAllowed =
+      options?.allowNegativeBalance === true ||
+      options?.negativeBalance?.allowNegativeBalance === true;
+    const negativeBalanceReason = options?.negativeBalance?.reason?.trim() || "";
+
     if (
       isAnnualVacation(vacationForm.type) &&
       requestedDays > left &&
-      !options?.allowNegativeBalance
+      !negativeBalanceAllowed
     ) {
       const ok = window.confirm(
         `Darbuotojui trūksta atostogų likučio.\n\nLikutis: ${left} d.\nPrašoma: ${requestedDays} d.\n\nAr leisti atostogas į minusą?`,
@@ -2417,7 +2417,7 @@ export default function TeamPage() {
       }
       if (isAnnualVacation(vacationForm.type) && requestedDays > left) {
         noteParts.push(
-          `Leista į minusą: prašoma ${requestedDays} d., likutis ${left} d., rezervuota ${reserved} d.`,
+          `Leista į minusą: prašoma ${requestedDays} d., likutis ${left} d., rezervuota ${reserved} d.${negativeBalanceReason ? ` Priežastis: ${negativeBalanceReason}` : ""}`,
         );
       }
 
@@ -2532,6 +2532,16 @@ export default function TeamPage() {
   async function updateVacationStatus(
     id: string,
     status: "approved" | "rejected",
+    options?: {
+      substitution?: {
+        substituteUserId: string;
+        absentEmployeeId: string;
+        validFrom: string;
+        validUntil: string;
+        sourceRequestId: string;
+        reason: string;
+      };
+    },
   ) {
     if (!organizationId) {
       setMessage("Nepavyko nustatyti įstaigos.");
@@ -2541,33 +2551,117 @@ export default function TeamPage() {
     setSaving(true);
     try {
       const request = vacations.find((item) => item.id === id);
-      const { error } = await supabase
+      const now = new Date().toISOString();
+      const currentUserResult = await supabase.auth.getUser();
+      const currentUserId = currentUserResult.data.user?.id || null;
+
+      const requestPatch =
+        status === "approved"
+          ? { status, approved_at: now, approved_by: currentUserId }
+          : { status, rejected_at: now, rejected_by: currentUserId };
+
+      let vacationUpdate = await supabase
         .from("vacation_requests")
-        .update({ status })
+        .update(requestPatch)
         .eq("organization_id", organizationId)
-        .eq("id", id);
-      if (error) throw error;
+        .eq("id", id)
+        .select(
+          "id, employee_id, type, start_date, end_date, status, requested_days, note, created_at",
+        )
+        .maybeSingle();
+
+      // Senesnėse DB schemose approved_at / approved_by / rejected_at / rejected_by gali dar neegzistuoti.
+      // Tokiu atveju saugiai kartojame tik su status, kad UI neliktų melagingai patvirtintas vien lokaliai.
+      if (vacationUpdate.error) {
+        vacationUpdate = await supabase
+          .from("vacation_requests")
+          .update({ status })
+          .eq("organization_id", organizationId)
+          .eq("id", id)
+          .select(
+            "id, employee_id, type, start_date, end_date, status, requested_days, note, created_at",
+          )
+          .maybeSingle();
+      }
+
+      if (vacationUpdate.error) throw vacationUpdate.error;
+
+      const savedRequest =
+        ((vacationUpdate.data as VacationRequest | null) || request || null);
 
       if (status === "rejected") {
         const { error: substitutionError } = await supabase
           .from("employee_substitutions")
-          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .update({
+            status: "cancelled",
+            cancelled_at: now,
+            cancelled_by: currentUserId,
+          })
           .eq("organization_id", organizationId)
           .eq("source_vacation_request_id", id);
 
-        if (substitutionError) {
-          throw substitutionError;
-        }
+        if (substitutionError) throw substitutionError;
       } else if (status === "approved") {
-        const { error: substitutionError } = await supabase
-          .from("employee_substitutions")
-          .update({ status: "active", updated_at: new Date().toISOString() })
-          .eq("organization_id", organizationId)
-          .eq("source_vacation_request_id", id)
-          .eq("status", "pending");
+        const substitution = options?.substitution;
 
-        if (substitutionError) {
-          throw substitutionError;
+        if (substitution?.substituteUserId && substitution.substituteUserId !== substitution.absentEmployeeId) {
+          const { data: existingSubstitution, error: existingSubstitutionError } = await supabase
+            .from("employee_substitutions")
+            .select("id")
+            .eq("organization_id", organizationId)
+            .eq("source_vacation_request_id", id)
+            .maybeSingle();
+
+          if (existingSubstitutionError) throw existingSubstitutionError;
+
+          if (existingSubstitution?.id) {
+            const { error: substitutionError } = await supabase
+              .from("employee_substitutions")
+              .update({
+                substitute_user_id: substitution.substituteUserId,
+                absent_user_id: substitution.absentEmployeeId,
+                starts_on: substitution.validFrom,
+                ends_on: substitution.validUntil,
+                reason: substitution.reason,
+                status: "active",
+                activated_at: now,
+                activated_by: currentUserId,
+              })
+              .eq("organization_id", organizationId)
+              .eq("id", existingSubstitution.id);
+
+            if (substitutionError) throw substitutionError;
+          } else {
+            const { error: substitutionError } = await supabase
+              .from("employee_substitutions")
+              .insert({
+                organization_id: organizationId,
+                absent_user_id: substitution.absentEmployeeId,
+                substitute_user_id: substitution.substituteUserId,
+                starts_on: substitution.validFrom,
+                ends_on: substitution.validUntil,
+                source_vacation_request_id: substitution.sourceRequestId || id,
+                reason: substitution.reason,
+                status: "active",
+                activated_at: now,
+                activated_by: currentUserId,
+              });
+
+            if (substitutionError) throw substitutionError;
+          }
+        } else {
+          const { error: substitutionError } = await supabase
+            .from("employee_substitutions")
+            .update({
+              status: "active",
+              activated_at: now,
+              activated_by: currentUserId,
+            })
+            .eq("organization_id", organizationId)
+            .eq("source_vacation_request_id", id)
+            .eq("status", "pending");
+
+          if (substitutionError) throw substitutionError;
         }
       }
 
@@ -2590,17 +2684,17 @@ export default function TeamPage() {
 
       if (
         status === "approved" &&
-        request &&
-        !isTemporaryVacation(request.type)
+        savedRequest &&
+        !isTemporaryVacation(savedRequest.type)
       ) {
-        const meta = absenceTypeMeta(request.type);
-        const rows = datesBetween(request.start_date, request.end_date).map(
+        const meta = absenceTypeMeta(savedRequest.type);
+        const rows = datesBetween(savedRequest.start_date, savedRequest.end_date).map(
           (date) => ({
             organization_id: organizationId,
-            employee_id: request.employee_id,
+            employee_id: savedRequest.employee_id,
             date,
             status: `absence_${meta.code}`,
-            note: `${meta.label} · patvirtinta${request.note ? ` · ${request.note}` : ""}`,
+            note: `${meta.label} · patvirtinta${savedRequest.note ? ` · ${savedRequest.note}` : ""}`,
           }),
         );
 
@@ -2635,9 +2729,16 @@ export default function TeamPage() {
 
       setVacations((current) =>
         current.map((request) =>
-          request.id === id ? { ...request, status } : request,
+          request.id === id
+            ? {
+                ...request,
+                ...(savedRequest || {}),
+                status,
+              }
+            : request,
         ),
       );
+      await loadVacationEntitlements(organizationId);
       setMessage((current) =>
         current ||
         (status === "approved"
@@ -3394,8 +3495,13 @@ export default function TeamPage() {
             activeFilter={vacationFilter}
             onFilterChange={setVacationFilter}
             onFormChange={setVacationForm}
+            canViewSensitiveVacationData={canViewSensitiveFields}
+            employeesFilteredByPermissions={true}
+            canAllowNegativeVacationBalance={canViewSensitiveFields}
+            scheduleConflicts={[]}
+            scheduleConflictsChecked={true}
             onSubmit={submitVacationRequest}
-            onApprove={(id) => updateVacationStatus(id, "approved")}
+            onApprove={(id, options) => updateVacationStatus(id, "approved", options)}
             onReject={(id) => updateVacationStatus(id, "rejected")}
             employeeName={employeeName}
             employeeRole={employeeRole}
