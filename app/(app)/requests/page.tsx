@@ -14,7 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-type RequestStatus = "submitted" | "approved" | "rejected" | "canceled";
+type RequestStatus = "submitted" | "pending" | "approved" | "rejected" | "canceled";
 type RequestKind =
   | "annual_leave"
   | "temporary_leave"
@@ -126,7 +126,18 @@ function normalizeStatus(value?: string | null): RequestStatus {
   if (["approved", "confirmed", "patvirtinta"].includes(raw)) return "approved";
   if (["rejected", "atmesta"].includes(raw)) return "rejected";
   if (["canceled", "cancelled", "atšaukta", "atsaukta"].includes(raw)) return "canceled";
+  if (["pending", "laukia"].includes(raw)) return "pending";
   return "submitted";
+}
+
+function isWaitingStatus(status: RequestStatus) {
+  return status === "submitted" || status === "pending";
+}
+
+function matchesStatusFilter(requestStatus: RequestStatus, filterStatus: RequestStatus | "all") {
+  if (filterStatus === "all") return true;
+  if (filterStatus === "submitted") return isWaitingStatus(requestStatus);
+  return requestStatus === filterStatus;
 }
 
 function requestKindMeta(kind?: string | null) {
@@ -364,7 +375,7 @@ export default function RequestsPage() {
       requestedDays,
       status: normalizeStatus(row.status),
       balance: isTemporaryKind(meta.kind) ? "Likutis nekeičiamas" : "Likutis skaičiuojamas pagal patvirtintas atostogas",
-      risk: normalizeStatus(row.status) === "submitted" ? "Laukia sprendimo" : "—",
+      risk: isWaitingStatus(normalizeStatus(row.status)) ? "Laukia sprendimo" : "—",
       note: row.note || "—",
       rejectionReason: row.rejection_reason || null,
       createdAt: row.created_at,
@@ -512,7 +523,7 @@ export default function RequestsPage() {
 
       return (
         (!q || haystack.includes(q)) &&
-        (status === "all" || request.status === status) &&
+        matchesStatusFilter(request.status, status) &&
         (type === "all" || request.kind === type)
       );
     });
@@ -548,7 +559,7 @@ export default function RequestsPage() {
         .filter((request) => request.status === "approved")
         .reduce((sum, request) => sum + request.requestedDays, 0);
       const localReserved = employeeRequests
-        .filter((request) => request.status === "submitted")
+        .filter((request) => isWaitingStatus(request.status))
         .reduce((sum, request) => sum + request.requestedDays, 0);
 
       const baseAnnual =
@@ -592,7 +603,7 @@ export default function RequestsPage() {
     balances[0] ||
     null;
 
-  const submitted = visibleRequests.filter((request) => request.status === "submitted").length;
+  const submitted = visibleRequests.filter((request) => isWaitingStatus(request.status)).length;
   const approved = visibleRequests.filter((request) => request.status === "approved").length;
   const rejected = visibleRequests.filter((request) => request.status === "rejected").length;
   const total = visibleRequests.length;
@@ -619,7 +630,7 @@ export default function RequestsPage() {
 
       return (
         (!q || haystack.includes(q)) &&
-        (status === "all" || request.status === status) &&
+        matchesStatusFilter(request.status, status) &&
         (type === "all" || request.kind === type)
       );
     });
@@ -768,7 +779,7 @@ export default function RequestsPage() {
       .filter((row) => normalizeStatus(row.status) === "approved")
       .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
     const reservedDays = annualRows
-      .filter((row) => normalizeStatus(row.status) === "submitted")
+      .filter((row) => isWaitingStatus(normalizeStatus(row.status)))
       .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
 
     if (entitlement) {
@@ -823,7 +834,7 @@ export default function RequestsPage() {
         throw new Error("Galite atšaukti tik savo prašymą.");
       }
 
-      if (nextStatus === "canceled" && request.status !== "submitted") {
+      if (nextStatus === "canceled" && !isWaitingStatus(request.status)) {
         throw new Error("Galima atšaukti tik laukiantį prašymą.");
       }
 
@@ -835,7 +846,7 @@ export default function RequestsPage() {
         data: { session },
       } = await supabase.auth.getSession();
 
-      const response = await fetch(`/api/team/vacation-requests/${id}/cancel`, {
+      const response = await fetch(`/api/team/vacation-requests/${encodeURIComponent(id)}/cancel`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1004,7 +1015,7 @@ export default function RequestsPage() {
                           ) : null}
                         </td>
                         <td className="px-5 py-4">
-                          {request.status === "submitted" ? (
+                          {isWaitingStatus(request.status) ? (
                             <button
                               type="button"
                               disabled={saving}
@@ -1314,7 +1325,7 @@ function RequestTableRow({
         </span>
       </td>
       <td className="px-5 py-4">
-        {request.status === "submitted" ? (
+        {isWaitingStatus(request.status) ? (
           <div className="flex flex-col gap-2">
             <span className="text-sm font-black text-[#526174]">Laukia vadovo sprendimo</span>
             <button disabled={saving} type="button" onClick={onCancel} className="w-fit rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] disabled:opacity-60">
@@ -1365,7 +1376,7 @@ function RequestCard({
           Atmetimo priežastis: {request.rejectionReason}
         </p>
       ) : null}
-      {request.status === "submitted" ? (
+      {isWaitingStatus(request.status) ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="rounded-[14px] bg-amber-50 px-4 py-2 text-sm font-black text-amber-700">
             Laukia vadovo sprendimo
