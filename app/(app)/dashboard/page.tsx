@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getCurrentAccess } from "@/lib/app-access";
 
 type DashboardStats = {
   organizations: number;
@@ -99,6 +100,20 @@ export default function AdminDashboardPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [embeddedFormRoute, setEmbeddedFormRoute] = useState<string | null>(null);
+  const [accessChecked, setAccessChecked] = useState(false);
+
+  async function bootstrapDashboard() {
+    const currentAccess = await getCurrentAccess();
+    const currentRole = String(currentAccess?.role || "").toLowerCase();
+
+    if (currentRole === "employee") {
+      router.replace("/employee-dashboard");
+      return;
+    }
+
+    setAccessChecked(true);
+    await loadStats();
+  }
 
   async function loadStats() {
     setLoading(true);
@@ -177,7 +192,7 @@ export default function AdminDashboardPage() {
   }
 
   useEffect(() => {
-    void loadStats();
+    void bootstrapDashboard();
   }, []);
 
   const computed = useMemo(() => {
@@ -290,6 +305,16 @@ export default function AdminDashboardPage() {
     { key: "activity", label: "Veikla", icon: Activity },
     { key: "documents", label: "Dokumentai", icon: FileText },
   ];
+
+  if (!accessChecked) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f4f7f5] p-6 text-[#10251f]">
+        <div className="rounded-[24px] border border-[#c9d8d0] bg-white px-6 py-5 text-sm font-black text-[#486b5d] shadow-sm">
+          Kraunama...
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f4f7f5] p-4 text-[#10251f] sm:p-6">

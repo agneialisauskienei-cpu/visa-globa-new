@@ -117,6 +117,24 @@ type RejectOptions = {
   reason: string;
 };
 
+type ReasonDialogState =
+  | {
+      kind: "negativeBalance";
+      title: string;
+      message: string;
+      minLength: number;
+      confirmLabel: string;
+    }
+  | {
+      kind: "reject";
+      requestId: string;
+      title: string;
+      message: string;
+      minLength: number;
+      confirmLabel: string;
+    }
+  | null;
+
 type Props = {
   employees: Employee[];
   requests: VacationRequest[];
@@ -151,7 +169,9 @@ type Props = {
   onFormChange: (form: VacationForm) => void;
   // Must return the persisted DB row so optimistic UI can be reconciled with the real DB id.
   // The API/parent should also create the audit row in the same transaction.
-  onSubmit: (options?: SubmitOptions) => VacationRequest | Promise<VacationRequest>;
+  onSubmit: (
+    options?: SubmitOptions,
+  ) => VacationRequest | Promise<VacationRequest>;
   // The API/parent must approve/reject and write audit in one server-side transaction.
   onApprove: (id: string, options?: ApproveOptions) => void | Promise<void>;
   onReject: (id: string, options: RejectOptions) => void | Promise<void>;
@@ -191,8 +211,7 @@ function vacationEntitlement(employee?: Employee | null) {
       days: explicitDays,
       weeks: explicitDays >= 30 ? 6 : explicitDays >= 25 ? 5 : 4,
       source: "db" as const,
-      basis:
-        "Atostogų norma paimta iš darbuotojo / pareigybės DB lauko.",
+      basis: "Atostogų norma paimta iš darbuotojo / pareigybės DB lauko.",
     };
   }
 
@@ -335,7 +354,12 @@ function staffingGroupKey(employee?: Employee | null) {
   return (
     String(employee.staffing_group_id || "").trim() ||
     String(employee.position_id || "").trim() ||
-    [employee.department_id, employee.position, employee.staff_type, employee.department]
+    [
+      employee.department_id,
+      employee.position,
+      employee.staff_type,
+      employee.department,
+    ]
       .filter(Boolean)
       .join("|")
       .toLowerCase() ||
@@ -371,7 +395,9 @@ function employeeInitials(employee?: Employee | null) {
 }
 
 function isAnnual(type?: string | null) {
-  const normalized = String(type || "annual_leave").trim().toLowerCase();
+  const normalized = String(type || "annual_leave")
+    .trim()
+    .toLowerCase();
   return [
     "annual",
     "annual_leave",
@@ -383,7 +409,9 @@ function isAnnual(type?: string | null) {
 }
 
 function isTemporaryLeave(type?: string | null) {
-  const normalized = String(type || "").trim().toLowerCase();
+  const normalized = String(type || "")
+    .trim()
+    .toLowerCase();
   return normalized === "temporary_leave" || normalized === "short_leave";
 }
 
@@ -521,32 +549,8 @@ function buildSubstitutionPayload(
   };
 }
 
-function requireNegativeBalanceReason() {
-  const reason = window.prompt(
-    "Įrašykite priežastį, kodėl leidžiamas minusinis atostogų likutis. Šią teisę serveris privalo patikrinti ir įrašyti į auditą.",
-  );
-
-  const normalized = String(reason || "").trim();
-  if (normalized.length < 8) {
-    window.alert("Minusiniam likučiui būtina aiški priežastis, bent 8 simboliai.");
-    return null;
-  }
-
-  return normalized;
-}
-
-function requireRejectionReason() {
-  const reason = window.prompt(
-    "Įrašykite atmetimo priežastį. Ji bus matoma darbuotojui ir liks prašymo istorijoje.",
-  );
-
-  const normalized = String(reason || "").trim();
-  if (normalized.length < 10) {
-    window.alert("Atmetimui būtina aiški priežastis, bent 10 simbolių.");
-    return null;
-  }
-
-  return normalized;
+function normalizeReasonText(value: string) {
+  return value.trim().replace(/\s+/g, " ");
 }
 
 function rejectionReasonText(request?: VacationRequest | null) {
@@ -589,6 +593,8 @@ export default function VacationRequests({
   const [statusOverrides, setStatusOverrides] = useState<
     Record<string, VacationRequest["status"]>
   >({});
+  const [reasonDialog, setReasonDialog] = useState<ReasonDialogState>(null);
+  const [reasonText, setReasonText] = useState("");
   const employeeMap = useMemo(
     () => new Map(employees.map((employee) => [employee.user_id, employee])),
     [employees],
@@ -715,7 +721,9 @@ export default function VacationRequests({
       used,
       reserved,
       leftBeforeReservations: roundDays(
-        dbBalanceIsAuthoritative ? availableBeforeReservations + reserved : availableBeforeReservations,
+        dbBalanceIsAuthoritative
+          ? availableBeforeReservations + reserved
+          : availableBeforeReservations,
       ),
       left: Math.max(0, rawLeft),
       rawLeft,
@@ -760,6 +768,117 @@ export default function VacationRequests({
     );
   }
 
+  function isEmployeeActiveDuringRequest(
+    employee: Employee,
+    request: VacationRequest,
+  ) {
+    const startsAfterRequest =
+      employee.employment_start_date &&
+      employee.employment_start_date > request.end_date;
+    const endedBeforeRequest =
+      employee.termination_date &&
+      employee.termination_date < request.start_date;
+
+    return !startsAfterRequest && !endedBeforeRequest;
+  }
+
+  function hasOverlappingNonRejectedAbsence(
+    employeeId: string,
+    request: VacationRequest,
+  ) {
+    return allRequests.some((item) => {
+      if (item.id === request.id) return false;
+      if (item.employee_id !== employeeId) return false;
+      if (normalizedStatus(item.status) === "rejected") return false;
+      if (isTemporaryLeave(item.type)) return false;
+      return dateRangesOverlap(
+        request.start_date,
+        request.end_date,
+        item.start_date,
+        item.end_date,
+      );
+    });
+  }
+
+  function requiresSubstitution(request: VacationRequest) {
+    return !isTemporaryLeave(request.type) && requestDays(request) > 3;
+  }
+
+  function isSameStaffingGroup(
+    absent?: Employee | null,
+    substitute?: Employee | null,
+  ) {
+    if (!absent || !substitute) return false;
+    const absentKey = staffingGroupKey(absent);
+    const substituteKey = staffingGroupKey(substitute);
+
+    return (
+      absentKey !== "unknown" &&
+      substituteKey !== "unknown" &&
+      absentKey === substituteKey
+    );
+  }
+
+  function substitutionValidationMessagesFor(request: VacationRequest) {
+    const messages: string[] = [];
+    const absentEmployee = employeeMap.get(request.employee_id);
+    const substituteUserId = String(request.substitute_user_id || "").trim();
+
+    if (requiresSubstitution(request) && !substituteUserId) {
+      messages.push(
+        "Ilgesniam nei 3 d. neatvykimui pasirinkite pavaduotoją. Serveris vis tiek privalo dar kartą patikrinti pavadavimo teisę.",
+      );
+    }
+
+    if (!substituteUserId) return messages;
+
+    const substitute = employeeMap.get(substituteUserId);
+
+    if (substituteUserId === request.employee_id) {
+      messages.push("Darbuotojas negali pavaduoti pats savęs.");
+    }
+
+    if (!substitute) {
+      messages.push("Pasirinktas pavaduotojas nerastas darbuotojų sąraše.");
+      return messages;
+    }
+
+    if (!isSameStaffingGroup(absentEmployee, substitute)) {
+      messages.push(
+        "Pavaduotojas turi būti iš tos pačios pareigybės / personalo grupės. Jei reikia išimties, ją turi patvirtinti serverio teisės.",
+      );
+    }
+
+    if (!isEmployeeActiveDuringRequest(substitute, request)) {
+      messages.push(
+        "Pasirinktas pavaduotojas tuo laikotarpiu nėra aktyvus darbuotojas.",
+      );
+    }
+
+    if (hasOverlappingNonRejectedAbsence(substitute.user_id, request)) {
+      messages.push(
+        "Pasirinktas pavaduotojas tuo laikotarpiu pats turi neatvykimą.",
+      );
+    }
+
+    return messages;
+  }
+
+  function availableSubstitutesFor(request: VacationRequest) {
+    const absentEmployee = employeeMap.get(request.employee_id);
+
+    return employees.filter((employee) => {
+      if (!absentEmployee) return false;
+      if (employee.user_id === request.employee_id) return false;
+      if (!isSameStaffingGroup(absentEmployee, employee)) return false;
+      if (!isEmployeeActiveDuringRequest(employee, request)) return false;
+      if (hasOverlappingNonRejectedAbsence(employee.user_id, request))
+        return false;
+
+      return true;
+    });
+  }
+
   function validationMessagesFor(request: VacationRequest) {
     const messages: string[] = [];
     const employee = employeeMap.get(request.employee_id);
@@ -774,7 +893,9 @@ export default function VacationRequests({
 
     const overlaps = overlappingRequestsFor(request);
     if (overlaps.length) {
-      messages.push("Darbuotojas jau turi persidengiantį prašymą šiame laikotarpyje.");
+      messages.push(
+        "Darbuotojas jau turi persidengiantį prašymą šiame laikotarpyje.",
+      );
     }
 
     const scheduleMatches = scheduleConflictsFor(request);
@@ -791,11 +912,17 @@ export default function VacationRequests({
       );
     }
 
-    if (isAnnual(request.type) && employee && !hasRequiredDbVacationData(employee)) {
+    if (
+      isAnnual(request.type) &&
+      employee &&
+      !hasRequiredDbVacationData(employee)
+    ) {
       messages.push(
         "Darbuotojui nėra DB atostogų normos ir/ar DB likučio. Frontend fallback nenaudojamas kaip teisinis pagrindas pateikimui ar patvirtinimui.",
       );
     }
+
+    messages.push(...substitutionValidationMessagesFor(request));
 
     return messages;
   }
@@ -889,7 +1016,9 @@ export default function VacationRequests({
   const detailEmployee = historyEmployee || selectedEmployee;
   const detailBalance = remainingAnnualDays(detailEmployee);
   const detailAccrual = accrualInfo(detailEmployee, forecastDate);
-  const detailDbBalance = parseNumericValue(detailEmployee?.vacation_balance_days);
+  const detailDbBalance = parseNumericValue(
+    detailEmployee?.vacation_balance_days,
+  );
   const projectedAvailableAtForecast = detailEmployee
     ? Math.max(
         0,
@@ -927,6 +1056,9 @@ export default function VacationRequests({
         form.end_date &&
         isValidDateRange(form.start_date, form.end_date),
       );
+  const availableSubstitutes = canPreview
+    ? availableSubstitutesFor(previewRequest)
+    : [];
   const previewImpact = canPreview ? impactFor(previewRequest) : null;
   const previewDays = isTemporaryLeave(form.type)
     ? 0
@@ -1044,12 +1176,9 @@ export default function VacationRequests({
     }
   }
 
-  async function rejectRequest(id: string) {
+  async function rejectRequest(id: string, reason: string) {
     const existing = allRequests.find((request) => request.id === id);
     if (!existing) return;
-
-    const reason = requireRejectionReason();
-    if (!reason) return;
 
     setStatusOverrides((previous) => ({ ...previous, [id]: "rejected" }));
 
@@ -1065,6 +1194,62 @@ export default function VacationRequests({
     }
   }
 
+  function openNegativeBalanceDialog() {
+    setReasonText("");
+    setReasonDialog({
+      kind: "negativeBalance",
+      title: "Minusinio atostogų likučio priežastis",
+      message: `Darbuotojui trūksta atostogų likučio. Prašoma ${previewDays} d., likutis ${selectedBalance.left} d. Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
+      minLength: 8,
+      confirmLabel: "Pateikti su priežastimi",
+    });
+  }
+
+  function openRejectDialog(requestId: string) {
+    setReasonText("");
+    setReasonDialog({
+      kind: "reject",
+      requestId,
+      title: "Atmetimo priežastis",
+      message:
+        "Įrašykite aiškią atmetimo priežastį. Ji bus matoma darbuotojui ir liks prašymo istorijoje.",
+      minLength: 10,
+      confirmLabel: "Atmesti prašymą",
+    });
+  }
+
+  function closeReasonDialog() {
+    setReasonDialog(null);
+    setReasonText("");
+  }
+
+  async function confirmReasonDialog() {
+    if (!reasonDialog) return;
+
+    const normalized = normalizeReasonText(reasonText);
+    if (normalized.length < reasonDialog.minLength) {
+      window.alert(
+        `Būtina aiški priežastis, bent ${reasonDialog.minLength} simbolių.`,
+      );
+      return;
+    }
+
+    if (reasonDialog.kind === "negativeBalance") {
+      closeReasonDialog();
+      await submitRequest({
+        negativeBalance: {
+          allowNegativeBalance: true,
+          reason: normalized,
+        },
+      });
+      return;
+    }
+
+    const requestId = reasonDialog.requestId;
+    closeReasonDialog();
+    await rejectRequest(requestId, normalized);
+  }
+
   if (!canViewSensitiveVacationData || !employeesFilteredByPermissions) {
     return (
       <section className="vr-card">
@@ -1074,13 +1259,21 @@ export default function VacationRequests({
           <div>
             <b>Prieiga ribojama</b>
             <span>
-              Atostogų likučiai ir darbuotojų neatvykimų duomenys rodomi tik HR/admin aplinkoje.
+              Atostogų likučiai ir darbuotojų neatvykimų duomenys rodomi tik
+              HR/admin aplinkoje.
             </span>
             {!canViewSensitiveVacationData ? (
-              <span>Parent/API turi patvirtinti HR/admin teisę ir perduoti canViewSensitiveVacationData=true.</span>
+              <span>
+                Parent/API turi patvirtinti HR/admin teisę ir perduoti
+                canViewSensitiveVacationData=true.
+              </span>
             ) : null}
             {!employeesFilteredByPermissions ? (
-              <span>Parent/API turi perduoti tik pagal organizaciją, skyrių ir vartotojo teises perfiltruotus darbuotojus ir nustatyti employeesFilteredByPermissions=true.</span>
+              <span>
+                Parent/API turi perduoti tik pagal organizaciją, skyrių ir
+                vartotojo teises perfiltruotus darbuotojus ir nustatyti
+                employeesFilteredByPermissions=true.
+              </span>
             ) : null}
           </div>
         </div>
@@ -1223,14 +1416,19 @@ export default function VacationRequests({
           onChange={(event) => update("substitute_user_id", event.target.value)}
           title="Pavaduotojo pasirinkimas. Teisių suteikimą ir automatinį galiojimo pabaigos terminą turi įgyvendinti serverio logika."
         >
-          <option value="">Be pavadavimo</option>
-          {employees
-            .filter((employee) => employee.user_id !== form.employee_id)
-            .map((employee) => (
-              <option key={employee.user_id} value={employee.user_id}>
-                Pavaduotojas: {employeeDisplayName(employee)}
-              </option>
-            ))}
+          <option value="">
+            {requiresSubstitution(previewRequest)
+              ? "Pasirinkite pavaduotoją"
+              : "Be pavadavimo"}
+          </option>
+          {availableSubstitutes.map((employee) => (
+            <option key={employee.user_id} value={employee.user_id}>
+              Pavaduotojas: {employeeDisplayName(employee)}
+              {employeePositionText(employee)
+                ? ` — ${employeePositionText(employee)}`
+                : ""}
+            </option>
+          ))}
         </select>
         <button
           type="button"
@@ -1252,22 +1450,7 @@ export default function VacationRequests({
                 );
                 return;
               }
-              const reason = requireNegativeBalanceReason();
-              if (!reason) return;
-              const ok = window.confirm(
-                `Darbuotojui trūksta atostogų likučio. Prašoma ${previewDays} d., likutis ${selectedBalance.left} d.
-
-Priežastis bus perduota serveriui: ${reason}
-
-Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
-              );
-              if (!ok) return;
-              void submitRequest({
-                negativeBalance: {
-                  allowNegativeBalance: true,
-                  reason,
-                },
-              });
+              openNegativeBalanceDialog();
               return;
             }
             void submitRequest();
@@ -1276,6 +1459,21 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
           <Plus size={16} /> Pateikti prašymą
         </button>
       </div>
+
+      {canPreview &&
+      requiresSubstitution(previewRequest) &&
+      availableSubstitutes.length === 0 ? (
+        <div className="vr-validation" role="alert">
+          <AlertTriangle size={18} />
+          <div>
+            <b>Nėra tinkamo pavaduotojo</b>
+            <span>
+              Pagal dabartinius darbuotojų duomenis nerasta aktyvaus tos pačios
+              grupės pavaduotojo be persidengiančio neatvykimo.
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       {previewValidationMessages.length ? (
         <div className="vr-validation" role="alert">
@@ -1357,13 +1555,15 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
                     )}
                     {request.substitute_user_id ? (
                       <span className="vr-note">
-                        Pavadavimas: galioja tik {fmt(request.start_date)}–{fmt(request.end_date)}
+                        Pavadavimas: galioja tik {fmt(request.start_date)}–
+                        {fmt(request.end_date)}
                       </span>
                     ) : null}
                     {request.note ? (
                       <span className="vr-note">{request.note}</span>
                     ) : null}
-                    {normalizedStatus(request.status) === "rejected" && rejectionReasonText(request) ? (
+                    {normalizedStatus(request.status) === "rejected" &&
+                    rejectionReasonText(request) ? (
                       <span className="vr-note vr-rejection-reason">
                         Atmetimo priežastis: {rejectionReasonText(request)}
                       </span>
@@ -1422,7 +1622,7 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
                           type="button"
                           className="vr-reject"
                           disabled={saving}
-                          onClick={() => void rejectRequest(request.id)}
+                          onClick={() => openRejectDialog(request.id)}
                         >
                           Atmesti
                         </button>
@@ -1484,9 +1684,11 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
               Prognozė: {formatDays(projectedAvailableAtForecast)} d.
             </span>
             <small>{detailBalance.basis}</small>
-          {detailBalance.entitlementSource !== "db" ? (
-            <small className="vr-balance-warning">Teisinė norma nenustatyta DB / pareigybės nustatymuose.</small>
-          ) : null}
+            {detailBalance.entitlementSource !== "db" ? (
+              <small className="vr-balance-warning">
+                Teisinė norma nenustatyta DB / pareigybės nustatymuose.
+              </small>
+            ) : null}
           </div>
         ) : null}
 
@@ -1558,7 +1760,8 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
             ) : null}
             {!isTemporaryLeave(form.type) ? (
               <span>
-                Grupėje „{previewImpact.groupLabel}“ liks {previewImpact.left} iš {previewImpact.total}
+                Grupėje „{previewImpact.groupLabel}“ liks {previewImpact.left}{" "}
+                iš {previewImpact.total}
               </span>
             ) : (
               <span>Trumpas išvykimas valandomis</span>
@@ -1584,14 +1787,14 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
         ) : null}
 
         {detailEmployee ? (
-          <section
-            className="vr-rules"
-            aria-label="Atostogų normos valdymas"
-          >
+          <section className="vr-rules" aria-label="Atostogų normos valdymas">
             <div className="vr-rule-head">
               <div>
                 <span>Atostogų norma</span>
-                <h3>Norma ir likutis valdomi DB / API, ne statinėmis frontend taisyklėmis</h3>
+                <h3>
+                  Norma ir likutis valdomi DB / API, ne statinėmis frontend
+                  taisyklėmis
+                </h3>
               </div>
               <strong>DB valdoma</strong>
             </div>
@@ -1600,21 +1803,25 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
                 <b>Metinė norma iš DB</b>
                 <strong>{formatDays(detailBalance.entitlement)} d.</strong>
                 <p>
-                  Reikšmė turi ateiti iš darbuotojo pareigybės, sutarties arba vacation_entitlements lentelės.
+                  Reikšmė turi ateiti iš darbuotojo pareigybės, sutarties arba
+                  vacation_entitlements lentelės.
                 </p>
               </article>
               <article className="vr-rule-card">
                 <b>Dabartinis likutis</b>
                 <strong>{formatDays(detailBalance.left)} d.</strong>
                 <p>
-                  Likutis turi būti apskaičiuotas API/DB, įvertinus sukaupimą, korekcijas, rezervacijas ir patvirtintas atostogas.
+                  Likutis turi būti apskaičiuotas API/DB, įvertinus sukaupimą,
+                  korekcijas, rezervacijas ir patvirtintas atostogas.
                 </p>
               </article>
               <article className="vr-rule-card vr-rule-card-warn">
                 <b>Serverinė validacija</b>
                 <strong>Privaloma</strong>
                 <p>
-                  API turi tikrinti likutį, minusinio likučio teisę, grafiko konfliktus, pavadavimo galiojimą ir auditą vienoje transakcijoje.
+                  API turi tikrinti likutį, minusinio likučio teisę, grafiko
+                  konfliktus, pavadavimo galiojimą ir auditą vienoje
+                  transakcijoje.
                 </p>
               </article>
             </div>
@@ -1701,7 +1908,8 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
                           </span>
                           <span>{absenceStatusLabel(request.status)}</span>
                           <span>
-                            {normalizedStatus(request.status) === "rejected" && rejectionReasonText(request)
+                            {normalizedStatus(request.status) === "rejected" &&
+                            rejectionReasonText(request)
                               ? `Atmetimo priežastis: ${rejectionReasonText(request)}`
                               : request.note || "—"}
                           </span>
@@ -1723,6 +1931,54 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
           </div>
         )}
       </div>
+
+      {reasonDialog ? (
+        <div className="vr-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="vr-modal">
+            <div className="vr-modal-head">
+              <div>
+                <span>Priežastis</span>
+                <h3>{reasonDialog.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeReasonDialog}
+                aria-label="Uždaryti"
+              >
+                ×
+              </button>
+            </div>
+            <p>{reasonDialog.message}</p>
+            <textarea
+              value={reasonText}
+              onChange={(event) => setReasonText(event.target.value)}
+              placeholder="Įrašykite aiškią priežastį..."
+              rows={5}
+              autoFocus
+            />
+            <small>
+              Mažiausiai {reasonDialog.minLength} simboliai. Šią priežastį
+              privalo patikrinti ir įrašyti serveris / audit_log.
+            </small>
+            <div className="vr-modal-actions">
+              <button
+                type="button"
+                className="vr-modal-secondary"
+                onClick={closeReasonDialog}
+              >
+                Atšaukti
+              </button>
+              <button
+                type="button"
+                className="vr-modal-primary"
+                onClick={() => void confirmReasonDialog()}
+              >
+                {reasonDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

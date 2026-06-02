@@ -102,11 +102,23 @@ function toDateInput(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-const EMPTY_FORM = {
+type RequestForm = {
+  employeeId: string;
+  kind: RequestKind;
+  start: string;
+  end: string;
+  startTime: string;
+  endTime: string;
+  note: string;
+};
+
+const EMPTY_FORM: RequestForm = {
   employeeId: "",
-  kind: "annual_leave" as RequestKind,
+  kind: "annual_leave",
   start: toDateInput(new Date()),
   end: toDateInput(new Date()),
+  startTime: "",
+  endTime: "",
   note: "",
 };
 
@@ -334,6 +346,82 @@ function parseNumber(value: number | string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizeTimeInput(value?: string | null) {
+  const match = String(value || "")
+    .trim()
+    .match(/^(\d{1,2})(?::?(\d{2}))?$/);
+
+  if (!match) return "";
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+
+  if (hours < 0 || hours > 24 || minutes < 0 || minutes > 59 || (hours === 24 && minutes !== 0)) return "";
+
+  return `${String(hours % 24).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function timeRangeHours(start?: string | null, end?: string | null) {
+  const from = normalizeTimeInput(start);
+  const to = normalizeTimeInput(end);
+
+  if (!from || !to) return 0;
+
+  const [startHours, startMinutes] = from.split(":").map(Number);
+  const [endHours, endMinutes] = to.split(":").map(Number);
+  let diffMinutes = endHours * 60 + endMinutes - (startHours * 60 + startMinutes);
+
+  if (diffMinutes < 0) diffMinutes += 24 * 60;
+
+  return Math.round((diffMinutes / 60) * 100) / 100;
+}
+
+function temporaryLeaveHoursFromNote(note?: string | null) {
+  const text = String(note || "");
+  const direct = text.match(/(\d+(?:[,.]\d+)?)\s*val/i);
+
+  if (direct) return Number(direct[1].replace(",", "."));
+
+  const range = text.match(/(\d{1,2}:?\d{0,2})\s*[-–—]\s*(\d{1,2}:?\d{0,2})/);
+
+  if (!range) return null;
+
+  return timeRangeHours(range[1], range[2]);
+}
+
+function dateFromInput(value?: string | null) {
+  const normalized = normalizeIsoDateInput(value);
+  if (!normalized) return null;
+
+  const date = new Date(`${normalized}T00:00:00`);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function daysInYear(year: number) {
+  return new Date(year, 1, 29).getMonth() === 1 ? 366 : 365;
+}
+
+function dayOfYearInclusive(date: Date) {
+  const start = new Date(date.getFullYear(), 0, 1);
+  const current = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  return Math.floor((current.getTime() - start.getTime()) / 86400000) + 1;
+}
+
+function roundVacationDays(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function formatVacationDays(value: number) {
+  const rounded = roundVacationDays(value);
+
+  return rounded.toLocaleString("lt-LT", {
+    minimumFractionDigits: Number.isInteger(rounded) ? 0 : 1,
+    maximumFractionDigits: 2,
+  });
+}
+
 
 export default function RequestsPage() {
   const [query, setQuery] = useState("");
@@ -356,6 +444,7 @@ export default function RequestsPage() {
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
+  const [forecastDate, setForecastDate] = useState(() => toDateInput(new Date()));
 
   const isAdmin =
     currentUserRole === "owner" ||
@@ -376,7 +465,12 @@ export default function RequestsPage() {
     const employee = employeeList.find((item) => item.user_id === row.employee_id);
     const meta = requestKindMeta(row.type);
     const requestedDays = isTemporaryKind(meta.kind) ? 0 : row.requested_days || daysBetween(row.start_date, row.end_date);
-    const amount = isTemporaryKind(meta.kind) ? "Trumpas išvykimas" : `${requestedDays} d.`;
+    const temporaryHours = isTemporaryKind(meta.kind) ? temporaryLeaveHoursFromNote(row.note) : null;
+    const amount = isTemporaryKind(meta.kind)
+      ? temporaryHours
+        ? `${temporaryHours} val.`
+        : "Trumpas išvykimas"
+      : `${requestedDays} d.`;
 
     return {
       id: row.id,
@@ -491,12 +585,9 @@ export default function RequestsPage() {
         .eq("organization_id", orgId);
 
       if (!entitlementError) {
-        const currentYear = new Date().getFullYear();
         setVacationEntitlements(
           ((entitlementData || []) as VacationEntitlementDbRow[]).filter(
-            (row) =>
-              row.is_active !== false &&
-              (!row.year || Number(row.year) === currentYear),
+            (row) => row.is_active !== false,
           ),
         );
       } else {
@@ -621,6 +712,91 @@ export default function RequestsPage() {
     balances[0] ||
     null;
 
+  const selectedEntitlement = useMemo(() => {
+    if (!selectedBalance) return null;
+
+    const currentYear = new Date().getFullYear();
+
+    return (
+      vacationEntitlements.find(
+        (row) =>
+          row.employee_id === selectedBalance.employeeId &&
+          (!row.year || Number(row.year) === currentYear),
+      ) ||
+      vacationEntitlements.find((row) => row.employee_id === selectedBalance.employeeId) ||
+      null
+    );
+  }, [selectedBalance, vacationEntitlements]);
+
+  function entitlementForYear(employeeId: string, year: number) {
+    return (
+      vacationEntitlements.find(
+        (row) => row.employee_id === employeeId && Number(row.year || year) === year,
+      ) ||
+      vacationEntitlements.find((row) => row.employee_id === employeeId && !row.year) ||
+      vacationEntitlements.find((row) => row.employee_id === employeeId) ||
+      null
+    );
+  }
+
+  const futureBalance = useMemo(() => {
+    if (!selectedBalance) return null;
+
+    const target = dateFromInput(forecastDate) || new Date();
+    const targetDateInput = toDateInput(target);
+    const targetYear = target.getFullYear();
+    const currentYear = new Date().getFullYear();
+    const employee = employeeById(selectedBalance.employeeId);
+    const targetEntitlement = entitlementForYear(selectedBalance.employeeId, targetYear);
+    const fallbackBaseAnnual = vacationEntitlement(employee);
+    const baseAnnual =
+      parseNumber(targetEntitlement?.annual_days) ??
+      parseNumber(targetEntitlement?.entitlement_days) ??
+      Math.min(selectedBalance.annualTotal || fallbackBaseAnnual, fallbackBaseAnnual || selectedBalance.annualTotal || 20);
+    const carriedOver = parseNumber(targetEntitlement?.carried_over_days) ?? Math.max(0, selectedBalance.annualTotal - baseAnnual);
+    const targetYearRequests = requests.filter((request) => {
+      const requestStart = dateFromInput(request.start);
+
+      return (
+        request.employeeId === selectedBalance.employeeId &&
+        isAnnualKind(request.kind) &&
+        requestStart?.getFullYear() === targetYear &&
+        request.start <= targetDateInput
+      );
+    });
+    const approvedUntilTarget = targetYearRequests
+      .filter((request) => request.status === "approved")
+      .reduce((sum, request) => sum + request.requestedDays, 0);
+    const reservedUntilTarget = targetYearRequests
+      .filter((request) => request.status === "submitted" || request.status === "pending")
+      .reduce((sum, request) => sum + request.requestedDays, 0);
+    const annualAccrued =
+      targetYear === currentYear
+        ? roundVacationDays((baseAnnual / daysInYear(targetYear)) * dayOfYearInclusive(target))
+        : targetYear > currentYear
+          ? baseAnnual
+          : roundVacationDays((baseAnnual / daysInYear(targetYear)) * dayOfYearInclusive(target));
+    const availableBeforeReservations = roundVacationDays(
+      carriedOver + annualAccrued - approvedUntilTarget,
+    );
+    const projectedLeft = roundVacationDays(
+      availableBeforeReservations - reservedUntilTarget,
+    );
+
+    return {
+      target: targetDateInput,
+      baseAnnual: roundVacationDays(baseAnnual),
+      carriedOver: roundVacationDays(carriedOver),
+      accrued: annualAccrued,
+      approvedUntilTarget,
+      reservedUntilTarget,
+      availableBeforeReservations,
+      projectedLeft,
+      isPastYear: targetYear < currentYear,
+      isFutureYear: targetYear > currentYear,
+    };
+  }, [forecastDate, requests, selectedBalance, vacationEntitlements, employees]);
+
   const submitted = visibleRequests.filter((request) => (request.status === "submitted" || request.status === "pending")).length;
   const approved = visibleRequests.filter((request) => request.status === "approved").length;
   const rejected = visibleRequests.filter((request) => request.status === "rejected").length;
@@ -654,6 +830,11 @@ export default function RequestsPage() {
     });
   }, [history, query, status, type]);
 
+  const activeRequests = filtered
+    .filter((request) => request.status === "submitted" || request.status === "pending")
+    .slice()
+    .sort((a, b) => String(b.createdAt || b.start).localeCompare(String(a.createdAt || a.start)));
+
   function currentEmployeeName() {
     const employee = employeeById(isAdmin ? form.employeeId : currentUserId);
     return employeeName(employee) || currentUserEmail || "Mano prašymas";
@@ -682,13 +863,18 @@ export default function RequestsPage() {
       return;
     }
 
+    const note = request.note === "—" ? "" : request.note;
+    const timeMatch = note.match(/(\d{1,2}:?\d{0,2})\s*[-–—]\s*(\d{1,2}:?\d{0,2})/);
+
     setEditingRequestId(request.id);
     setForm({
       employeeId: request.employeeId,
       kind: request.kind,
       start: normalizeIsoDateInput(request.start),
       end: normalizeIsoDateInput(request.end),
-      note: request.note === "—" ? "" : request.note,
+      startTime: timeMatch ? normalizeTimeInput(timeMatch[1]) : "",
+      endTime: timeMatch ? normalizeTimeInput(timeMatch[2]) : "",
+      note: note.replace(/^(\d{1,2}:?\d{0,2})\s*[-–—]\s*(\d{1,2}:?\d{0,2})\s*(?:·\s*)?/, ""),
     });
 
     setMessage("Redaguojamas laukiantis prašymas. Pakeisk datas ar pastabą ir spausk „Išsaugoti“.");
@@ -724,21 +910,29 @@ export default function RequestsPage() {
     }
 
     const meta = requestKindMeta(form.kind);
+    const normalizedStartTime = normalizeTimeInput(form.startTime);
+    const normalizedEndTime = normalizeTimeInput(form.endTime);
     const requestedDays = await countRequestDays(employeeId, form.kind, startDate, endDate);
 
-    if (isAnnualKind(form.kind) && requestedDays < 1) {
-      setMessage(
-        "Pasirinktame laikotarpyje nėra darbo dienų.",
-      );
+    if (isTemporaryKind(form.kind) && (!normalizedStartTime || !normalizedEndTime)) {
+      setMessage("Trumpam išvykimui nurodyk pradžios ir pabaigos laiką, pvz. 10:00 ir 12:00.");
       return;
     }
 
     if (isAnnualKind(form.kind) && requestedDays <= 0) {
-      setMessage("Pasirinktame laikotarpyje nėra darbo dienų.");
+      setMessage(
+        "Pasirinktame laikotarpyje nėra darbo dienų. Patikrink, ar pasirinktos datos nepatenka tik į savaitgalį arba šventines dienas.",
+      );
       return;
     }
 
-    const noteParts = [];
+    const noteParts: string[] = [];
+
+    if (isTemporaryKind(form.kind)) {
+      const hours = timeRangeHours(normalizedStartTime, normalizedEndTime);
+      noteParts.push(`${normalizedStartTime}-${normalizedEndTime}`);
+      if (hours > 0) noteParts.push(`${hours} val.`);
+    }
 
     if (form.note.trim()) noteParts.push(form.note.trim());
 
@@ -746,6 +940,9 @@ export default function RequestsPage() {
     setMessage("");
 
     try {
+      const existingRequest = editingRequestId
+        ? requests.find((request) => request.id === editingRequestId)
+        : null;
       const payload = {
         organization_id: organizationId,
         employee_id: employeeId,
@@ -754,7 +951,7 @@ export default function RequestsPage() {
         end_date: isTemporaryKind(form.kind) ? startDate : endDate,
         requested_days: requestedDays,
         note: noteParts.length ? noteParts.join(" · ") : null,
-        status: "submitted",
+        status: editingRequestId ? existingRequest?.status || "submitted" : "submitted",
       };
 
       const requestQuery = editingRequestId
@@ -788,6 +985,8 @@ export default function RequestsPage() {
         kind: "annual_leave",
         start: toDateInput(new Date()),
         end: toDateInput(new Date()),
+        startTime: "",
+        endTime: "",
         note: "",
       }));
       setStatus("submitted");
@@ -841,15 +1040,26 @@ export default function RequestsPage() {
       .filter((row) => normalizeStatus(row.status) === "approved")
       .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
     const reservedDays = annualRows
-      .filter((row) => normalizeStatus(row.status) === "submitted")
+      .filter((row) => {
+        const status = normalizeStatus(row.status);
+        return status === "submitted" || status === "pending";
+      })
       .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
 
     if (entitlement) {
+      const baseAnnual =
+        parseNumber(entitlement.annual_days) ??
+        parseNumber(entitlement.entitlement_days) ??
+        0;
+      const carriedOver = parseNumber(entitlement.carried_over_days) ?? 0;
+      const remainingDays = Math.max(0, roundVacationDays(baseAnnual + carriedOver - usedDays - reservedDays));
+
       const { error } = await supabase
         .from("vacation_entitlements")
         .update({
           used_days: usedDays,
           reserved_days: reservedDays,
+          remaining_days: remainingDays,
           updated_at: new Date().toISOString(),
         })
         .eq("organization_id", organizationId)
@@ -866,11 +1076,20 @@ export default function RequestsPage() {
 
       if (!exists) return previous;
 
-      return previous.map((row) =>
-        row.employee_id === employeeId && (!row.year || Number(row.year) === currentYear)
-          ? { ...row, used_days: usedDays, reserved_days: reservedDays }
-          : row,
-      );
+      return previous.map((row) => {
+        if (row.employee_id !== employeeId || (row.year && Number(row.year) !== currentYear)) return row;
+
+        const baseAnnual = parseNumber(row.annual_days) ?? parseNumber(row.entitlement_days) ?? 0;
+        const carriedOver = parseNumber(row.carried_over_days) ?? 0;
+        const remainingDays = Math.max(0, roundVacationDays(baseAnnual + carriedOver - usedDays - reservedDays));
+
+        return {
+          ...row,
+          used_days: usedDays,
+          reserved_days: reservedDays,
+          remaining_days: remainingDays,
+        };
+      });
     });
   }
 
@@ -925,6 +1144,9 @@ export default function RequestsPage() {
       }
 
       setMessage("Prašymas atšauktas.");
+      if (isAnnualKind(request.kind)) {
+        await recalculateVacationEntitlement(request.employeeId);
+      }
       await loadPage();
     } catch (error) {
       setMessage(getReadableError(error));
@@ -1033,6 +1255,49 @@ export default function RequestsPage() {
                 <BalanceLine label="Rezervuota" value={`${selectedBalance?.annualReserved ?? 0} d.`} />
               </div>
             </div>
+
+            <div className="mt-5 rounded-[24px] border border-[#dbe6e0] bg-white p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Ateities skaičiuoklė</p>
+                  <h3 className="mt-1 text-lg font-black text-[#10251f]">Preliminarus likutis norimą dieną</h3>
+                </div>
+                <CalendarMiniIcon />
+              </div>
+
+              <label className="mt-4 block text-xs font-black uppercase tracking-[0.14em] text-[#526174]">
+                Norima data
+                <input
+                  type="date"
+                  value={forecastDate}
+                  onChange={(event) => setForecastDate(event.target.value)}
+                  className="mt-2 h-12 w-full rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                />
+              </label>
+
+              <div className="mt-4 rounded-[20px] bg-[#eef4f1] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#486b5d]">Prognozuojamas likutis</p>
+                <div className="mt-1 flex items-end justify-between gap-4">
+                  <p className={`text-4xl font-black tracking-[-0.06em] ${futureBalance && futureBalance.projectedLeft < 0 ? "text-rose-700" : "text-[#10251f]"}`}>
+                    {futureBalance ? formatVacationDays(futureBalance.projectedLeft) : "0"}
+                  </p>
+                  <p className="pb-1 text-sm font-black text-[#526174]">d. d.</p>
+                </div>
+              </div>
+
+              {futureBalance ? (
+                <div className="mt-4 divide-y divide-[#dbe6e0] overflow-hidden rounded-[18px] border border-[#dbe6e0] bg-[#fbfcfb]">
+                  <BalanceLine label="Perkelta" value={`${formatVacationDays(futureBalance.carriedOver)} d.`} />
+                  <BalanceLine label="Sukaupta iki datos" value={`${formatVacationDays(futureBalance.accrued)} d.`} />
+                  <BalanceLine label="Panaudota iki datos" value={`${formatVacationDays(futureBalance.approvedUntilTarget)} d.`} />
+                  <BalanceLine label="Rezervuota iki datos" value={`${formatVacationDays(futureBalance.reservedUntilTarget)} d.`} />
+                </div>
+              ) : null}
+
+              <p className="mt-3 text-xs font-bold leading-5 text-[#526174]">
+                Skaičiavimas preliminarus: metinė norma kaupiama proporcingai iki pasirinktos datos, o galutinį likutį vis tiek turi patvirtinti DB/API.
+              </p>
+            </div>
           </article>
 
           <article className="rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6">
@@ -1058,8 +1323,8 @@ export default function RequestsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleRequests.length ? (
-                    visibleRequests.slice(0, 6).map((request) => (
+                  {activeRequests.length ? (
+                    activeRequests.slice(0, 6).map((request) => (
                       <tr key={`active-request-${request.id}`} className="border-t border-[#eef2ef]">
                         <td className="px-5 py-4 text-sm font-black text-[#10251f]">{request.employee}</td>
                         <td className="px-5 py-4 text-sm font-black text-[#526174]">{request.start}</td>
@@ -1105,7 +1370,7 @@ export default function RequestsPage() {
                   ) : (
                     <tr>
                       <td colSpan={6} className="px-5 py-8 text-center text-sm font-bold text-[#526174]">
-                        Įrašų dar nėra.
+                        Laukiančių prašymų nėra.
                       </td>
                     </tr>
                   )}
@@ -1126,7 +1391,7 @@ export default function RequestsPage() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 lg:grid-cols-[1.2fr_1fr_150px_150px_1fr_auto]">
+          <div className="mt-6 grid gap-3 lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto]">
             <select
               value={isAdmin ? form.employeeId : currentUserId || form.employeeId}
               disabled={!isAdmin}
@@ -1148,7 +1413,16 @@ export default function RequestsPage() {
             </select>
             <select
               value={form.kind}
-              onChange={(event) => setForm((previous) => ({ ...previous, kind: event.target.value as RequestKind }))}
+              onChange={(event) => {
+                const nextKind = event.target.value as RequestKind;
+                setForm((previous) => ({
+                  ...previous,
+                  kind: nextKind,
+                  end: nextKind === "temporary_leave" ? previous.start : previous.end,
+                  startTime: nextKind === "temporary_leave" ? previous.startTime : "",
+                  endTime: nextKind === "temporary_leave" ? previous.endTime : "",
+                }));
+              }}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
             >
               <option value="annual_leave">Kasmetinės atostogos (A)</option>
@@ -1163,7 +1437,13 @@ export default function RequestsPage() {
               placeholder="YYYY-MM-DD"
               inputMode="numeric"
               value={form.start}
-              onChange={(event) => setForm((previous) => ({ ...previous, start: event.target.value, end: previous.end || event.target.value }))}
+              onChange={(event) =>
+                setForm((previous) => ({
+                  ...previous,
+                  start: event.target.value,
+                  end: previous.kind === "temporary_leave" ? event.target.value : previous.end || event.target.value,
+                }))
+              }
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
             />
             <input
@@ -1176,6 +1456,24 @@ export default function RequestsPage() {
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
             />
             <input
+              type="text"
+              placeholder="Nuo, pvz. 10:00"
+              value={form.startTime}
+              onChange={(event) => setForm((previous) => ({ ...previous, startTime: event.target.value }))}
+              onBlur={(event) => setForm((previous) => ({ ...previous, startTime: normalizeTimeInput(event.target.value) }))}
+              disabled={form.kind !== "temporary_leave"}
+              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+            />
+            <input
+              type="text"
+              placeholder="Iki, pvz. 12:00"
+              value={form.endTime}
+              onChange={(event) => setForm((previous) => ({ ...previous, endTime: event.target.value }))}
+              onBlur={(event) => setForm((previous) => ({ ...previous, endTime: normalizeTimeInput(event.target.value) }))}
+              disabled={form.kind !== "temporary_leave"}
+              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+            />
+            <input
               value={form.note}
               onChange={(event) => setForm((previous) => ({ ...previous, note: event.target.value }))}
               placeholder="Pastaba"
@@ -1184,7 +1482,11 @@ export default function RequestsPage() {
             <button
               type="button"
               onClick={() => void submitRequest()}
-              disabled={saving || (isAdmin && !form.employeeId)}
+              disabled={
+                saving ||
+                (isAdmin && !form.employeeId) ||
+                (form.kind === "temporary_leave" && (!form.startTime || !form.endTime))
+              }
               className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-[#10251f] px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#8ea0b5]"
             >
               {editingRequestId ? "Išsaugoti" : "Pateikti"}
@@ -1323,6 +1625,14 @@ function BalanceLine({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <span className="text-sm font-black uppercase tracking-[0.14em] text-[#526174]">{label}</span>
       <span className="text-base font-black text-[#10251f]">{value}</span>
+    </div>
+  );
+}
+
+function CalendarMiniIcon() {
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[#eef4f1] text-[#486b5d]">
+      <History className="h-4 w-4" />
     </div>
   );
 }

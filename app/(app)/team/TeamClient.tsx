@@ -27,7 +27,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getCurrentOrganizationId } from "@/lib/current-organization";
 import { getReadableError } from "@/lib/errors";
@@ -1096,6 +1096,7 @@ function canViewSensitiveEmployeeData(employee?: Employee | null) {
 }
 
 export default function TeamPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("employees");
@@ -1157,6 +1158,12 @@ export default function TeamPage() {
   useEffect(() => {
     void loadAll();
   }, []);
+
+  useEffect(() => {
+    if (loading || hasHrAccess) return;
+
+    router.replace("/employee-dashboard");
+  }, [loading, hasHrAccess, router]);
 
   useEffect(() => {
     function handleAuditWarning(event: Event) {
@@ -3166,33 +3173,7 @@ export default function TeamPage() {
   }
 
   if (!hasHrAccess) {
-    return (
-      <main className="min-h-screen bg-[#f3f6f4] p-5 text-[#10251f]">
-        <div className="mx-auto max-w-3xl pt-10">
-          <section className="rounded-3xl border border-amber-200 bg-white p-6 shadow-sm">
-            <div className="flex gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-                <AlertTriangle size={22} />
-              </div>
-
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">
-                  Prieiga ribojama
-                </p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
-                  Neturite teisės atidaryti personalo valdymo modulio
-                </h1>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Šis puslapis skirtas tik administratoriui, vadovui arba HR darbuotojui.
-                  Darbuotojo prašymai, grafikas, mokymai ir dokumentai turi būti pasiekiami
-                  per darbuotojo aplinką, o ne per bendrą personalo administravimo modulį.
-                </p>
-              </div>
-            </div>
-          </section>
-        </div>
-      </main>
-    );
+    return null;
   }
 
   return (
