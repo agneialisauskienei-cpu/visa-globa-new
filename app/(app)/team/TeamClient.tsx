@@ -791,8 +791,7 @@ function isBusinessDay(date: Date) {
 
 function businessDaysBetween(start: string, end: string) {
   const dates = datesBetween(start, end);
-  const count = dates.filter((date) => isBusinessDay(new Date(`${date}T00:00:00`))).length;
-  return Math.max(1, count);
+  return dates.filter((date) => isBusinessDay(new Date(`${date}T00:00:00`))).length;
 }
 
 function isScheduledWorkEntry(entry: {

@@ -737,7 +737,6 @@ const EXPORT_STYLE = `
   .coverage-cell { background: #e7f0eb; color: #6b8178; font-weight: 900; text-align: center; border: 2px solid #8fb0a5; }
   .small-day { width: 28px; min-width: 28px; border-left: 2px solid #6f978b !important; border-right: 1.5px solid #89a89d !important; }
   .timesheet-cell { width: 28px; min-width: 28px; height: 25px; text-align: center; font-weight: 900; border-left: 2px solid #6f978b; border-right: 1.25px solid #89a89d; border-top: 1.25px solid #89a89d; border-bottom: 1.25px solid #89a89d; padding: 1px; mso-number-format: "\@"; }
-  .shortLeave, .shortLeave .shiftbox { display: block; min-height: 24px; border-radius: 5px; border: 1.5px solid transparent; padding: 2px 1px; line-height: 10px; font-size: 10px; font-weight: 900; text-align: center; mso-number-format: "\@"; white-space: nowrap; }
   .legend-label { background: #eef5f1; font-weight: 900; padding: 6px 8px; }
   @media print {
     body { zoom: 0.48; }
@@ -808,9 +807,18 @@ function emptySettings(): TemplateSettings {
 
 type ScheduleSaveMode = "draft" | "published";
 
-function timeFromMinutesForDb(value: number | null | undefined) {
+function timeFromMinutesForDb(
+  value: number | null | undefined,
+  options?: { endOfDay?: boolean },
+) {
   if (value === null || value === undefined || !Number.isFinite(value))
     return null;
+
+  // DB `time` tipas paprastai nepalaiko 24:00.
+  // Grafiko UI leidžia įvesti 7-24 / 08:00-24:00, todėl į DB rašome
+  // paskutinę tos pačios dienos minutę, o eksportuose ir UI vis tiek rodome 24.
+  if (options?.endOfDay && value >= 1440) return "23:59";
+
   return normalizeTime(value);
 }
 
@@ -823,13 +831,10 @@ function nextDateKey(date: Date) {
 function isOvernightOrDutyShift(parsed: ParsedShift) {
   return Boolean(
     (parsed.kind === "work" || parsed.kind === "night") &&
-    parsed.startMinutes !== null &&
-    parsed.endMinutes !== null &&
-    parsed.grossHours !== null &&
-    (parsed.crossesMidnight ||
-      parsed.grossHours >= 24 ||
-      parsed.endMinutes >= 1440 ||
-      parsed.endMinutes <= parsed.startMinutes),
+      parsed.startMinutes !== null &&
+      parsed.endMinutes !== null &&
+      parsed.grossHours !== null &&
+      (parsed.crossesMidnight || parsed.endMinutes > 1440),
   );
 }
 
@@ -842,7 +847,7 @@ function splitShiftForDb(parsed: ParsedShift, shiftDate: string) {
       {
         shift_date: shiftDate,
         start_time: timeFromMinutesForDb(parsed.startMinutes),
-        end_time: timeFromMinutesForDb(parsed.endMinutes),
+        end_time: timeFromMinutesForDb(parsed.endMinutes, { endOfDay: true }),
         shift_type: baseType,
         notes: parsed.detail || null,
       },
@@ -1136,10 +1141,9 @@ export default function ScheduleBlock({
       vacationReservations,
     );
 
-    // Svarbu: po saugojimo tėvinis komponentas kartais dar grąžina seną
-    // scheduleGridData. Todėl lokaliai išsaugotą grafiko kopiją ne ignoruojame,
-    // o uždedame ant naujai atėjusio grid'o. Taip pakeitimai nepradingsta
-    // po mėnesio perjungimo, refresh ar kol Supabase query dar negrąžina naujų eilučių.
+    // Lokalus cache naudojamas tik kaip atsarginis juodraštis tuštiems langeliams.
+    // Jis nebegali perrašyti serverio grąžinto grafiko, kad UI nerodytų senos
+    // localStorage tiesos vietoje DB tiesos.
     try {
       const cached = window.localStorage.getItem(gridCacheKey);
       if (cached) {
@@ -1157,7 +1161,8 @@ export default function ScheduleBlock({
             scheduleDays.forEach((date, dayIndex) => {
               const cachedValue =
                 parsed.byEmployee?.[employee.user_id]?.[dayKey(date)];
-              if (cachedValue !== undefined)
+              const serverValue = cleanText(String(restored[rowIndex]?.[dayIndex + 1] || ""));
+              if (cachedValue !== undefined && !serverValue)
                 restored[rowIndex][dayIndex + 1] = cachedValue;
             });
           });
@@ -1181,7 +1186,8 @@ export default function ScheduleBlock({
             if (!restored[rowIndex]) restored[rowIndex] = [employee.user_id];
             scheduleDays.forEach((_, dayIndex) => {
               const cachedValue = source[dayIndex + 1];
-              if (cachedValue !== undefined)
+              const serverValue = cleanText(String(restored[rowIndex]?.[dayIndex + 1] || ""));
+              if (cachedValue !== undefined && !serverValue)
                 restored[rowIndex][dayIndex + 1] = cachedValue;
             });
           });
@@ -2112,40 +2118,48 @@ export default function ScheduleBlock({
     );
 
     try {
-      // Šis komponentas neberašo tiesiai į employee_schedules iš kliento.
-      // Svarbu, kad tėvinis komponentas / API atliktų saugojimą serverio pusėje:
-      // teisių patikra, transakcija, DK validacijos, atostogų rezervacijų sinchronizacija ir audit log.
+      const payloadChanges = effectiveChanges
+        .map(([row, col, oldValue, newValue]) => {
+          const employee = employees[row];
+          const date = scheduleDays[col - 1];
+          if (!employee || !date) return null;
+
+          return {
+            employeeId: employee.user_id,
+            employeeName: getName(employee),
+            date: dayKey(date),
+            oldValue,
+            value: parseShiftValue(newValue).normalized,
+          };
+        })
+        .filter(Boolean);
+
+      const response = await fetch("/api/team/schedule/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          status: mode,
+          publish,
+          month: scheduleDays[0] ? dayKey(scheduleDays[0]).slice(0, 7) : null,
+          changes: payloadChanges,
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.ok === false) {
+        throw new Error(result?.error || "Nepavyko išsaugoti grafiko serveryje.");
+      }
+
+      // Po serverinio išsaugojimo pranešame tėviniam komponentui, kad jis galėtų
+      // persikrauti duomenis / atnaujinti dashboard skaitiklius. Tiesioginio DB rašymo
+      // čia nebėra.
       await onSaveGridChanges(effectiveChanges, { status: mode, publish });
 
       try {
-        const snapshot = grid.map((row) => [...row]);
-        effectiveChanges.forEach(([row, col, , newValue]) => {
-          if (!snapshot[row]) snapshot[row] = [employees[row]?.user_id || ""];
-          snapshot[row][col] = newValue;
-        });
-
-        const byEmployee: Record<string, Record<string, string>> = {};
-        employees.forEach((employee, rowIndex) => {
-          scheduleDays.forEach((date, dayIndex) => {
-            const value = cleanText(
-              String(snapshot[rowIndex]?.[dayIndex + 1] || ""),
-            );
-            if (!value) return;
-            if (!byEmployee[employee.user_id])
-              byEmployee[employee.user_id] = {};
-            byEmployee[employee.user_id][dayKey(date)] = value;
-          });
-        });
-
-        window.localStorage.setItem(
-          gridCacheKey,
-          JSON.stringify({
-            version: 2,
-            savedAt: new Date().toISOString(),
-            employeeIds: employees.map((employee) => employee.user_id),
-            byEmployee,
-          }),
-        );
+        // Po sėkmingo serverinio išsaugojimo lokalus grafiko cache nebeturi
+        // likti alternatyvia tiesa. Paliekame tik šablonų nustatymus.
+        window.localStorage.removeItem(gridCacheKey);
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
       } catch {}
 
@@ -2167,23 +2181,9 @@ export default function ScheduleBlock({
     }
   };
 
-  // Automatinis juodraščio išsaugojimas.
-  // Pakeitimai pirmiausia įrašomi į lokalų grid per queueChanges(),
-  // tada po trumpos pauzės išsaugomi taip pat, kaip paspaudus „Išsaugoti juodraštį“.
-  useEffect(() => {
-    if (pendingChanges.length === 0) return;
-    if (localSaving || saving || publishing) return;
-
-    const timer = window.setTimeout(() => {
-      void saveScheduleChanges("draft");
-    }, 1200);
-
-    return () => window.clearTimeout(timer);
-    // Sąmoningai klausomės tik būsenų, kurios turi paleisti autosave.
-    // saveScheduleChanges yra komponento funkcija, todėl jos nededame į dependency,
-    // kad autosave nepersikurtų be realių pakeitimų.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingChanges.length, localSaving, saving, publishing]);
+  // Automatinis išsaugojimas išjungtas sąmoningai.
+  // Oficialus grafikas į serverį rašomas tik paspaudus „Išsaugoti juodraštį“
+  // arba „Paskelbti grafiką“, kad netyčiniai pakeitimai nepatektų į DB.
 
   const undo = () => {
     const item = undoStack[0];
@@ -5074,8 +5074,7 @@ export default function ScheduleBlock({
           color: #64748b;
         }
 
-        .shift-vacation,
-        .shift-shortLeave {
+        .shift-vacation {
           background: #f8f1f3;
           border-color: #e3c1cb;
           border-left-color: #b47a89;
@@ -5877,8 +5876,7 @@ export default function ScheduleBlock({
           color: #64756d;
           font-weight: 900;
         }
-        .shift-vacation,
-        .shift-shortLeave {
+        .shift-vacation {
           background: #d6b7be;
           color: #613846;
           font-weight: 900;
@@ -6241,8 +6239,7 @@ export default function ScheduleBlock({
           background: #52618a;
           color: #fff;
         }
-        .shift-vacation,
-        .shift-shortLeave {
+        .shift-vacation {
           background: #d5b0bd;
           color: #563240;
         }

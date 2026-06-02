@@ -338,6 +338,7 @@ export default function RequestsPage() {
   const [message, setMessage] = useState("");
 
   const [form, setForm] = useState(EMPTY_FORM);
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
 
   const isAdmin =
     currentUserRole === "owner" ||
@@ -662,6 +663,26 @@ export default function RequestsPage() {
     return daysBetween(start, end);
   }
 
+  function startEditRequest(request: RequestRow) {
+    if (!isWaitingStatus(request.status)) return;
+
+    setEditingRequestId(request.id);
+    setForm({
+      employeeId: request.employeeId,
+      kind: request.kind,
+      start: request.start,
+      end: request.end,
+      note: request.note === "—" ? "" : request.note,
+    });
+    setMessage("Redaguojamas nepatvirtintas prašymas.");
+  }
+
+  function cancelEditRequest() {
+    setEditingRequestId(null);
+    setForm(EMPTY_FORM);
+    setMessage("");
+  }
+
   async function submitRequest() {
     if (!organizationId || !currentUserId) return;
 
@@ -711,17 +732,54 @@ export default function RequestsPage() {
         status: "submitted",
       };
 
-      const { data, error } = await supabase
-        .from("vacation_requests")
-        .insert(payload)
-        .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
-        .single();
+      let data: VacationDbRow | null = null;
 
-      if (error) throw error;
+      if (editingRequestId) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        const response = await fetch(`/api/team/vacation-requests/${encodeURIComponent(editingRequestId)}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : {}),
+          },
+          body: JSON.stringify({
+            type: payload.type,
+            start_date: payload.start_date,
+            end_date: payload.end_date,
+            note: payload.note,
+          }),
+        });
+
+        const json = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(json?.error || "Nepavyko atnaujinti prašymo.");
+        }
+
+        data = json.request as VacationDbRow;
+      } else {
+        const { data: createdData, error } = await supabase
+          .from("vacation_requests")
+          .insert(payload)
+          .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
+          .single();
+
+        if (error) throw error;
+        data = createdData as VacationDbRow;
+      }
 
       const created = mapDbRequest(data as VacationDbRow, employees);
 
-      setRequests((previous) => [created, ...previous]);
+      setRequests((previous) =>
+        editingRequestId
+          ? previous.map((request) => (request.id === editingRequestId ? created : request))
+          : [created, ...previous],
+      );
       setForm((previous) => ({
         ...previous,
         kind: "annual_leave",
@@ -729,8 +787,15 @@ export default function RequestsPage() {
         end: new Date().toISOString().slice(0, 10),
         note: "",
       }));
+      setEditingRequestId(null);
       setStatus("submitted");
-      setMessage(isAdmin ? "Prašymas pateiktas." : "Prašymas pateiktas vadovo sprendimui.");
+      setMessage(
+        editingRequestId
+          ? "Prašymo pakeitimai išsaugoti."
+          : isAdmin
+            ? "Prašymas pateiktas."
+            : "Prašymas pateiktas vadovo sprendimui.",
+      );
 
       if (isAnnualKind(form.kind)) {
         await recalculateVacationEntitlement(employeeId);
@@ -1016,14 +1081,24 @@ export default function RequestsPage() {
                         </td>
                         <td className="px-5 py-4">
                           {isWaitingStatus(request.status) ? (
-                            <button
-                              type="button"
-                              disabled={saving}
-                              onClick={() => void updateRequestStatus(request.id, "canceled")}
-                              className="rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] disabled:opacity-60"
-                            >
-                              Atšaukti
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={() => startEditRequest(request)}
+                                className="rounded-[14px] bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-800 disabled:opacity-60"
+                              >
+                                Redaguoti
+                              </button>
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={() => void updateRequestStatus(request.id, "canceled")}
+                                className="rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] disabled:opacity-60"
+                              >
+                                Atšaukti
+                              </button>
+                            </div>
                           ) : (
                             <span className="font-black text-[#8ea0b5]">—</span>
                           )}
@@ -1057,7 +1132,7 @@ export default function RequestsPage() {
           <div className="mt-6 grid gap-3 lg:grid-cols-[1.2fr_1fr_150px_150px_1fr_auto]">
             <select
               value={isAdmin ? form.employeeId : currentUserId || form.employeeId}
-              disabled={!isAdmin}
+              disabled={!isAdmin || Boolean(editingRequestId)}
               onChange={(event) => setForm((previous) => ({ ...previous, employeeId: event.target.value }))}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1] disabled:text-[#486b5d]"
             >
@@ -1111,8 +1186,17 @@ export default function RequestsPage() {
               disabled={saving || (isAdmin && !form.employeeId)}
               className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-[#10251f] px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#8ea0b5]"
             >
-              Pateikti
+              {editingRequestId ? "Išsaugoti" : "Pateikti"}
             </button>
+            {editingRequestId ? (
+              <button
+                type="button"
+                onClick={cancelEditRequest}
+                className="inline-flex h-12 items-center justify-center rounded-[16px] bg-[#eef4f1] px-5 text-sm font-black text-[#486b5d]"
+              >
+                Atšaukti redagavimą
+              </button>
+            ) : null}
           </div>
         </section>
 

@@ -394,7 +394,13 @@ function normalizedStatus(status?: string | null) {
     ["rejected", "cancelled", "canceled", "atmesta", "atšaukta"].includes(raw)
   )
     return "rejected";
+  if (["pending", "laukia"].includes(raw)) return "pending";
   return "submitted";
+}
+
+function isWaitingStatus(status?: string | null) {
+  const normalized = normalizedStatus(status);
+  return normalized === "submitted" || normalized === "pending";
 }
 
 function normalizeTimeInput(value?: string) {
