@@ -1102,6 +1102,7 @@ export default function TeamPage() {
   const [tab, setTab] = useState<TabKey>("employees");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasHrAccess, setHasHrAccess] = useState(false);
 
   const [message, setMessage] = useState("");
   const [canViewSensitiveFields, setCanViewSensitiveFields] = useState(false);
@@ -1372,6 +1373,21 @@ export default function TeamPage() {
       const canViewSensitive = canViewSensitiveEmployeeData(currentMember);
 
       setCanViewSensitiveFields(canViewSensitive);
+      setHasHrAccess(canViewSensitive);
+
+      if (!canViewSensitive) {
+        setEmployees([]);
+        setCandidates([]);
+        setInvites([]);
+        setVacations([]);
+        setVacationEntitlements([]);
+        setScheduleEntries([]);
+        setTrainings([]);
+        setCredentials([]);
+        setDocumentAcknowledgements([]);
+        setPersonnelPositions([]);
+        return;
+      }
 
       const userIds = memberRows
         .map((employee) => employee.user_id)
@@ -3145,6 +3161,36 @@ export default function TeamPage() {
           <p className="mt-1 text-sm font-semibold text-[#526174]">
             Ruošiame personalo modulį.
           </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!hasHrAccess) {
+    return (
+      <main className="min-h-screen bg-[#f3f6f4] p-5 text-[#10251f]">
+        <div className="mx-auto max-w-3xl pt-10">
+          <section className="rounded-3xl border border-amber-200 bg-white p-6 shadow-sm">
+            <div className="flex gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+                <AlertTriangle size={22} />
+              </div>
+
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">
+                  Prieiga ribojama
+                </p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                  Neturite teisės atidaryti personalo valdymo modulio
+                </h1>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Šis puslapis skirtas tik administratoriui, vadovui arba HR darbuotojui.
+                  Darbuotojo prašymai, grafikas, mokymai ir dokumentai turi būti pasiekiami
+                  per darbuotojo aplinką, o ne per bendrą personalo administravimo modulį.
+                </p>
+              </div>
+            </div>
+          </section>
         </div>
       </main>
     );

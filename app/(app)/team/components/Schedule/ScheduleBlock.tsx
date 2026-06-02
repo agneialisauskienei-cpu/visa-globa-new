@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import {
   AlertTriangle,
   CalendarDays,
@@ -129,7 +128,6 @@ type ShiftKind =
   | "vacation"
   | "sick"
   | "reserved"
-  | "shortLeave"
   | "unknown";
 
 type ParsedShift = {
@@ -447,18 +445,6 @@ function parseShiftValue(input: string): ParsedShift {
       label: "Laukianti neatvykimo rezervacija",
       kind: "reserved",
     },
-    G: {
-      code: "G",
-      label: "Laikinas išvykimas pas gydytoją",
-      kind: "shortLeave",
-    },
-    GYDYTOJAS: {
-      code: "G",
-      label: "Laikinas išvykimas pas gydytoją",
-      kind: "shortLeave",
-    },
-    TI: { code: "TI", label: "Trumpas išvykimas", kind: "shortLeave" },
-    I: { code: "TI", label: "Trumpas išvykimas", kind: "shortLeave" },
   };
 
   if (statuses[upper]) {
@@ -477,24 +463,8 @@ function parseShiftValue(input: string): ParsedShift {
     };
   }
 
-  // Laikinas išvykimas su laiku: G 10-12 arba TI 14:00-15:30
-  const leaveMatch = upper.match(
-    /^(G|GYDYTOJAS|TI|I)\s+(\d{1,2}(?::?\d{2})?[-–]\d{1,2}(?::?\d{2})?)$/,
-  );
-  if (leaveMatch) {
-    const timeOnly = parseShiftValue(leaveMatch[2]);
-    if (timeOnly.kind === "work" || timeOnly.kind === "night") {
-      const code =
-        leaveMatch[1] === "G" || leaveMatch[1] === "GYDYTOJAS" ? "G" : "TI";
-      return {
-        ...timeOnly,
-        normalized: `${code} ${timeOnly.normalized}`,
-        label: code,
-        kind: "shortLeave",
-        detail: `${code === "G" ? "Išvykimas pas gydytoją" : "Trumpas išvykimas"} · ${timeOnly.normalized} · ${formatHours(timeOnly.hours)} val.`,
-      };
-    }
-  }
+  // Trumpi išvykimai nebelaikomi grafiko / tabelio kodais.
+  // Juos reikia registruoti atskirame neatvykimų / vidaus įvykių modulyje.
 
   // Pertrauka gali būti rašoma: 08-17 P30, 08-17 / P45, 08-17 pietūs 30
   const breakMatch = upper.match(
@@ -858,6 +828,7 @@ function isOvernightOrDutyShift(parsed: ParsedShift) {
     parsed.grossHours !== null &&
     (parsed.crossesMidnight ||
       parsed.grossHours >= 24 ||
+      parsed.endMinutes >= 1440 ||
       parsed.endMinutes <= parsed.startMinutes),
   );
 }
@@ -907,7 +878,6 @@ function shiftTypeForDb(parsed: ParsedShift) {
   if (parsed.kind === "vacation") return parsed.normalized || "vacation";
   if (parsed.kind === "sick") return "sick";
   if (parsed.kind === "reserved") return "reserved";
-  if (parsed.kind === "shortLeave") return "short_leave";
   return parsed.normalized || "unknown";
 }
 
@@ -941,27 +911,38 @@ function isApprovedReservation(reservation: VacationReservation) {
 function isPendingReservation(reservation: VacationReservation) {
   const status = reservationStatusKey(reservation.status);
   if (isApprovedReservation(reservation)) return false;
-  return !status || [
-    "pending",
-    "submitted",
-    "waiting",
-    "requested",
-    "laukiama",
-    "pateikta",
-    "prasymas",
-    "rezervacija",
-  ].some((item) => status.includes(item));
+  return (
+    !status ||
+    [
+      "pending",
+      "submitted",
+      "waiting",
+      "requested",
+      "laukiama",
+      "pateikta",
+      "prasymas",
+      "rezervacija",
+    ].some((item) => status.includes(item))
+  );
 }
 
 function reservationScheduleValue(reservation: VacationReservation) {
   const rawCode = cleanText(reservation.code || reservation.type).toUpperCase();
-  const rawType = reservationStatusKey(`${reservation.type} ${reservation.label}`);
+  const rawType = reservationStatusKey(
+    `${reservation.type} ${reservation.label}`,
+  );
 
   if (isPendingReservation(reservation)) return "R";
   if (rawCode) {
-    if (["ATOSTOGOS", "KASMETINES", "KASMETINĖS", "VACATION"].includes(rawCode)) return "A";
+    if (["ATOSTOGOS", "KASMETINES", "KASMETINĖS", "VACATION"].includes(rawCode))
+      return "A";
     if (["MAMADIENIS", "MAMADIENIAI"].includes(rawCode)) return "M";
-    if (["TEVADIENIS", "TĖVADIENIS", "TEVADIENIAI", "TĖVADIENIAI"].includes(rawCode)) return "T";
+    if (
+      ["TEVADIENIS", "TĖVADIENIS", "TEVADIENIAI", "TĖVADIENIAI"].includes(
+        rawCode,
+      )
+    )
+      return "T";
     if (["NEDARBINGUMAS", "SICK", "LIGA"].includes(rawCode)) return "L";
     return rawCode;
   }
@@ -981,8 +962,12 @@ function applyReservationsToGridRows(
 ) {
   if (!vacationReservations.length) return rows;
 
-  const employeeIndex = new Map(employees.map((employee, index) => [employee.user_id, index]));
-  const dateIndex = new Map(scheduleDays.map((date, index) => [dayKey(date), index + 1]));
+  const employeeIndex = new Map(
+    employees.map((employee, index) => [employee.user_id, index]),
+  );
+  const dateIndex = new Map(
+    scheduleDays.map((date, index) => [dayKey(date), index + 1]),
+  );
   const next = rows.map((row) => [...row]);
 
   vacationReservations.forEach((reservation) => {
@@ -1137,10 +1122,13 @@ export default function ScheduleBlock({
     const normalizedIncoming = applyReservationsToGridRows(
       employees.map((employee, rowIndex) => {
         const source = incoming[rowIndex] || [];
-        const row = Array.from({ length: scheduleDays.length + 1 }, (_, index) => {
-          if (index === 0) return source[0] || employee.user_id;
-          return source[index] || "";
-        });
+        const row = Array.from(
+          { length: scheduleDays.length + 1 },
+          (_, index) => {
+            if (index === 0) return source[0] || employee.user_id;
+            return source[index] || "";
+          },
+        );
         return row;
       }),
       employees,
@@ -1167,12 +1155,21 @@ export default function ScheduleBlock({
           employees.forEach((employee, rowIndex) => {
             if (!restored[rowIndex]) restored[rowIndex] = [employee.user_id];
             scheduleDays.forEach((date, dayIndex) => {
-              const cachedValue = parsed.byEmployee?.[employee.user_id]?.[dayKey(date)];
-              if (cachedValue !== undefined) restored[rowIndex][dayIndex + 1] = cachedValue;
+              const cachedValue =
+                parsed.byEmployee?.[employee.user_id]?.[dayKey(date)];
+              if (cachedValue !== undefined)
+                restored[rowIndex][dayIndex + 1] = cachedValue;
             });
           });
 
-          setGrid(applyReservationsToGridRows(restored, employees, scheduleDays, vacationReservations));
+          setGrid(
+            applyReservationsToGridRows(
+              restored,
+              employees,
+              scheduleDays,
+              vacationReservations,
+            ),
+          );
           return;
         }
 
@@ -1184,20 +1181,28 @@ export default function ScheduleBlock({
             if (!restored[rowIndex]) restored[rowIndex] = [employee.user_id];
             scheduleDays.forEach((_, dayIndex) => {
               const cachedValue = source[dayIndex + 1];
-              if (cachedValue !== undefined) restored[rowIndex][dayIndex + 1] = cachedValue;
+              if (cachedValue !== undefined)
+                restored[rowIndex][dayIndex + 1] = cachedValue;
             });
           });
 
-          setGrid(applyReservationsToGridRows(restored, employees, scheduleDays, vacationReservations));
+          setGrid(
+            applyReservationsToGridRows(
+              restored,
+              employees,
+              scheduleDays,
+              vacationReservations,
+            ),
+          );
           return;
         }
       }
     } catch {}
 
     setGrid(normalizedIncoming);
-  // Svarbu: dependency array turi būti pastovaus dydžio.
-  // Nenaudojame ...employees ar ...scheduleDays, nes React meta klaidą,
-  // kai darbuotojų / dienų kiekis pasikeičia tarp renderių.
+    // Svarbu: dependency array turi būti pastovaus dydžio.
+    // Nenaudojame ...employees ar ...scheduleDays, nes React meta klaidą,
+    // kai darbuotojų / dienų kiekis pasikeičia tarp renderių.
   }, [
     scheduleGridSignature,
     pendingChanges.length,
@@ -1470,22 +1475,7 @@ export default function ScheduleBlock({
             severity: "error",
             type: "format",
             title: "Neteisingas laiko formatas",
-            detail: `${date.getDate()} d. įrašas neatpažintas. Tinka: 08:00-17:00, 8-17, 08-17 P30, P, A, NA, M, T, L, G 10-12.`,
-          });
-        }
-
-        if (parsed.kind === "shortLeave") {
-          warnings.push({
-            id: `${employee.user_id}-${dateText}-temporary-leave`,
-            employeeId: employee.user_id,
-            employeeName: name,
-            date: dateText,
-            severity: "warning",
-            type: "temporary-leave",
-            title: parsed.normalized.startsWith("G")
-              ? "Išvykimas pas gydytoją"
-              : "Trumpas išvykimas",
-            detail: parsed.detail,
+            detail: `${date.getDate()} d. įrašas neatpažintas. Tinka: 08:00-17:00, 8-17, 08-17 P30, P, A, NA, M, T, L.`,
           });
         }
 
@@ -2066,9 +2056,17 @@ export default function ScheduleBlock({
     const changes: GridChange[] = [];
 
     vacationReservations.forEach((reservation) => {
-      if (!isApprovedReservation(reservation) && !isPendingReservation(reservation)) return;
-      const row = employees.findIndex((employee) => employee.user_id === reservation.employee_id);
-      const dayIndex = scheduleDays.findIndex((date) => dayKey(date) === reservation.date);
+      if (
+        !isApprovedReservation(reservation) &&
+        !isPendingReservation(reservation)
+      )
+        return;
+      const row = employees.findIndex(
+        (employee) => employee.user_id === reservation.employee_id,
+      );
+      const dayIndex = scheduleDays.findIndex(
+        (date) => dayKey(date) === reservation.date,
+      );
       if (row < 0 || dayIndex < 0) return;
 
       const col = dayIndex + 1;
@@ -2076,7 +2074,10 @@ export default function ScheduleBlock({
       const newValue = reservationScheduleValue(reservation);
       if (!newValue) return;
 
-      if (parseShiftValue(oldValue).normalized !== parseShiftValue(newValue).normalized) {
+      if (
+        parseShiftValue(oldValue).normalized !==
+        parseShiftValue(newValue).normalized
+      ) {
         changes.push([row, col, oldValue, newValue]);
       }
     });
@@ -2110,208 +2111,11 @@ export default function ScheduleBlock({
         : "Saugomas grafiko juodraštis...",
     );
 
-    const errorMessage = (error: unknown) =>
-      typeof error === "object" && error && "message" in error
-        ? String((error as { message?: string }).message || "")
-        : String(error || "");
-
-    const isMissingColumnError = (error: unknown, column: string) => {
-      const message = errorMessage(error);
-      return (
-        message.includes(`column employee_schedules.${column} does not exist`) ||
-        message.includes(`Could not find the '${column}' column`) ||
-        message.includes(`'${column}' column`) ||
-        message.includes(`${column} column`)
-      );
-    };
-
-    const missingColumnFromError = (error: unknown) => {
-      const message = errorMessage(error);
-      const patterns = [
-        /column employee_schedules\.([a-zA-Z0-9_]+) does not exist/,
-        /Could not find the '([a-zA-Z0-9_]+)' column/,
-        /'([a-zA-Z0-9_]+)' column/,
-      ];
-
-      for (const pattern of patterns) {
-        const match = message.match(pattern);
-        if (match?.[1]) return match[1];
-      }
-
-      return null;
-    };
-
-    const safeDeleteSchedules = async (
-      organizationId: string,
-      employeeId: string,
-      shiftDate: string,
-      splitParentMarker: string,
-    ) => {
-      const idColumns = ["user_id", "employee_id"] as const;
-      const dateColumns = ["shift_date", "date"] as const;
-
-      for (const idColumn of idColumns) {
-        for (const dateColumn of dateColumns) {
-          const { error } = await supabase
-            .from("employee_schedules")
-            .delete()
-            .eq("organization_id", organizationId)
-            .eq(idColumn, employeeId)
-            .eq(dateColumn, shiftDate);
-
-          if (error) {
-            if (isMissingColumnError(error, idColumn) || isMissingColumnError(error, dateColumn)) continue;
-            throw error;
-          }
-        }
-      }
-
-      // Jei grafikas buvo skeltas per parą, papildomai bandome ištrinti tęsinio eilutę pagal notes markerį.
-      for (const idColumn of idColumns) {
-        const { error } = await supabase
-          .from("employee_schedules")
-          .delete()
-          .eq("organization_id", organizationId)
-          .eq(idColumn, employeeId)
-          .ilike("notes", `%${splitParentMarker}%`);
-
-        if (error && !isMissingColumnError(error, idColumn) && !isMissingColumnError(error, "notes")) throw error;
-      }
-    };
-
-    const insertSchedulesWithFallback = async (
-      basePayloads: Array<Record<string, unknown>>,
-    ) => {
-      if (basePayloads.length === 0) return;
-
-      let payloads = basePayloads.map((payload) => ({ ...payload }));
-      let lastError: unknown = null;
-
-      // Skirtingose migracijose employee_schedules buvo naudoti skirtingi stulpeliai
-      // (date/shift_date, start_datetime/start_time, employee_id/user_id).
-      // Todėl pradedame nuo pilno payload ir, jei PostgREST praneša apie neegzistuojantį
-      // stulpelį, tą stulpelį pašaliname ir bandome dar kartą.
-      for (let attempt = 0; attempt < 16; attempt += 1) {
-        const { error } = await supabase.from("employee_schedules").insert(payloads);
-        if (!error) return;
-
-        lastError = error;
-        const missingColumn = missingColumnFromError(error);
-
-        if (missingColumn) {
-          payloads = payloads.map(({ [missingColumn]: _removed, ...payload }) => payload);
-          continue;
-        }
-
-        const message = errorMessage(error);
-
-        // Jei viena iš porinių ID reikšmių sukelia NOT NULL / FK problemą,
-        // bandome minimalistinį variantą, kuris dažniausiai tinka senai lentelei.
-        if (message.includes("violates not-null constraint") || message.includes("violates foreign key constraint")) {
-          payloads = payloads.map(({
-            date,
-            start_datetime,
-            end_datetime,
-            is_published,
-            published_at,
-            published_by,
-            ...payload
-          }) => payload);
-          continue;
-        }
-
-        throw error;
-      }
-
-      throw lastError instanceof Error
-        ? lastError
-        : new Error("Nepavyko įrašyti grafiko į employee_schedules.");
-    };
-
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      const { data: membership } = await supabase
-        .from("organization_members")
-        .select("organization_id")
-        .eq("user_id", user?.id || "")
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle();
-
-      const fallbackOrganizationId =
-        (membership as { organization_id?: string | null } | null)
-          ?.organization_id ||
-        (schedule.find((item) => item.organization_id)?.organization_id ?? null);
-
-      if (!fallbackOrganizationId) {
-        throw new Error(
-          "Nepavyko nustatyti organizacijos. Patikrinkite, ar vartotojas turi aktyvią organizaciją.",
-        );
-      }
-
-      for (const [row, col, , newValue] of effectiveChanges) {
-        const employee = employees[row];
-        const date = scheduleDays[col - 1];
-        if (!employee || !date) continue;
-
-        const shiftDate = dayKey(date);
-        const parsed = parseShiftValue(newValue);
-        const splitParentMarker = `split_parent=${shiftDate}`;
-
-        await safeDeleteSchedules(
-          fallbackOrganizationId,
-          employee.user_id,
-          shiftDate,
-          splitParentMarker,
-        );
-
-        if (!parsed.normalized || parsed.kind === "empty") continue;
-
-        const reservation = vacationReservations.find(
-          (item) => item.employee_id === employee.user_id && item.date === shiftDate,
-        );
-        const reservationNote = reservation
-          ? `Neatvykimas: ${reservation.label || reservation.type || reservation.code}${reservation.note ? ` · ${reservation.note}` : ""}`
-          : null;
-
-        const payloads = splitShiftForDb(parsed, shiftDate).map((part) => {
-          const startDateTime = part.start_time
-            ? `${part.shift_date}T${part.start_time}:00`
-            : null;
-          const endDateTime = part.end_time
-            ? `${part.shift_date}T${part.end_time}:00`
-            : null;
-
-          return {
-            organization_id: fallbackOrganizationId,
-            user_id: employee.user_id,
-            employee_id: employee.user_id,
-            shift_date: part.shift_date,
-            date: part.shift_date,
-            start_time: part.start_time,
-            end_time: part.end_time,
-            start_datetime: startDateTime,
-            end_datetime: endDateTime,
-            shift_type: part.shift_type,
-            status: mode,
-            is_published: publish,
-            published_at: publish ? new Date().toISOString() : null,
-            published_by: publish ? user?.id || null : null,
-            notes: reservationNote || part.notes,
-          };
-        });
-
-        await insertSchedulesWithFallback(payloads);
-      }
-
-      try {
-        await onSaveGridChanges(effectiveChanges, { status: mode, publish });
-      } catch (fallbackError) {
-        console.warn("[ScheduleBlock] parent save skipped:", fallbackError);
-      }
+      // Šis komponentas neberašo tiesiai į employee_schedules iš kliento.
+      // Svarbu, kad tėvinis komponentas / API atliktų saugojimą serverio pusėje:
+      // teisių patikra, transakcija, DK validacijos, atostogų rezervacijų sinchronizacija ir audit log.
+      await onSaveGridChanges(effectiveChanges, { status: mode, publish });
 
       try {
         const snapshot = grid.map((row) => [...row]);
@@ -2323,9 +2127,12 @@ export default function ScheduleBlock({
         const byEmployee: Record<string, Record<string, string>> = {};
         employees.forEach((employee, rowIndex) => {
           scheduleDays.forEach((date, dayIndex) => {
-            const value = cleanText(String(snapshot[rowIndex]?.[dayIndex + 1] || ""));
+            const value = cleanText(
+              String(snapshot[rowIndex]?.[dayIndex + 1] || ""),
+            );
             if (!value) return;
-            if (!byEmployee[employee.user_id]) byEmployee[employee.user_id] = {};
+            if (!byEmployee[employee.user_id])
+              byEmployee[employee.user_id] = {};
             byEmployee[employee.user_id][dayKey(date)] = value;
           });
         });
@@ -2359,7 +2166,6 @@ export default function ScheduleBlock({
       setPublishing(false);
     }
   };
-
 
   // Automatinis juodraščio išsaugojimas.
   // Pakeitimai pirmiausia įrašomi į lokalų grid per queueChanges(),
@@ -2655,11 +2461,15 @@ export default function ScheduleBlock({
 
   const excelShiftClass = (parsed: ParsedShift) => {
     if (!parsed.normalized || parsed.kind === "empty") return "";
-    if ((parsed.kind === "work" || parsed.kind === "night") && parsed.grossHours === 24) return "duty";
+    if (
+      (parsed.kind === "work" || parsed.kind === "night") &&
+      parsed.grossHours === 24
+    )
+      return "duty";
     if (parsed.kind === "work") return "work";
     if (parsed.kind === "night") return "night";
     if (parsed.kind === "off") return "off";
-    if (parsed.kind === "vacation" || parsed.kind === "shortLeave") return "vacation";
+    if (parsed.kind === "vacation") return "vacation";
     if (parsed.kind === "sick") return "sick";
     if (parsed.kind === "reserved") return "reserved";
     return "meta";
@@ -2671,14 +2481,18 @@ export default function ScheduleBlock({
 
   const exportCellClass = (parsed: ParsedShift) => {
     if (!parsed.normalized || parsed.kind === "empty") return "shift-empty";
-    if ((parsed.kind === "work" || parsed.kind === "night") && parsed.grossHours === 24) return "duty";
+    if (
+      (parsed.kind === "work" || parsed.kind === "night") &&
+      parsed.grossHours === 24
+    )
+      return "duty";
     if (parsed.kind === "work") return "work";
     if (parsed.kind === "night") return "night";
     if (parsed.kind === "off") return "off";
     if (parsed.kind === "vacation") return "vacation";
     if (parsed.kind === "sick") return "sick";
     if (parsed.kind === "reserved") return "reserved";
-    if (parsed.kind === "shortLeave") return "shortLeave";
+
     return "meta";
   };
 
@@ -2707,7 +2521,7 @@ export default function ScheduleBlock({
     }
     if (parsed.kind === "sick") return "L";
     if (parsed.kind === "reserved") return "R";
-    if (parsed.kind === "shortLeave") return "TI";
+
     return parsed.normalized;
   };
 
@@ -2723,9 +2537,11 @@ export default function ScheduleBlock({
     }
     if (parsed.kind === "sick") return "L";
     if (parsed.kind === "reserved") return "R";
-    if (parsed.kind === "shortLeave") return "TI";
 
-    if ((parsed.kind === "work" || parsed.kind === "night") && parsed.grossHours !== null) {
+    if (
+      (parsed.kind === "work" || parsed.kind === "night") &&
+      parsed.grossHours !== null
+    ) {
       const gross = parsed.grossHours;
       let hours = gross;
 
@@ -2742,7 +2558,11 @@ export default function ScheduleBlock({
   };
 
   const timesheetCountHours = (parsed: ParsedShift) => {
-    if (!(parsed.kind === "work" || parsed.kind === "night") || parsed.grossHours === null) return 0;
+    if (
+      !(parsed.kind === "work" || parsed.kind === "night") ||
+      parsed.grossHours === null
+    )
+      return 0;
 
     const gross = parsed.grossHours;
     if (gross >= 8.5 && gross <= 9) return 8;
@@ -2796,8 +2616,12 @@ export default function ScheduleBlock({
                 : "weekday-bg";
             const shiftClassName = exportCellClass(parsed);
             const value = graphExportValue(parsed);
-            const baseClass = value ? `${shiftClassName} ${dayClass}` : `shift-empty ${dayClass}`;
-            const content = value ? `<span class="shiftbox"><span>${exportCellText(value)}</span></span>` : "";
+            const baseClass = value
+              ? `${shiftClassName} ${dayClass}`
+              : `shift-empty ${dayClass}`;
+            const content = value
+              ? `<span class="shiftbox"><span>${exportCellText(value)}</span></span>`
+              : "";
             return `<td class="${baseClass} shift-cell">${content}</td>`;
           })
           .join("");
@@ -2825,7 +2649,6 @@ export default function ScheduleBlock({
         <td class="legend-sample off"><span class="shiftbox">P</span></td><td>Poilsis</td>
         <td class="legend-sample vacation"><span class="shiftbox">A</span></td><td>Atostogos / M / T / NA</td>
         <td class="legend-sample sick"><span class="shiftbox">L</span></td><td>Liga</td>
-        <td class="legend-sample shortLeave"><span class="shiftbox">TI</span></td><td>Trumpa išvyka</td>
       </tr>
     </table>`;
 
@@ -2852,7 +2675,7 @@ export default function ScheduleBlock({
 
   const exportTimesheet = () => {
     const monthTitle = monthLabel(scheduleMonth);
-    const totalColumns = 4 + scheduleDays.length + 8;
+    const totalColumns = 4 + scheduleDays.length + 7;
 
     const colgroup = `<colgroup>
       <col style="width:132px" />
@@ -2860,7 +2683,6 @@ export default function ScheduleBlock({
       <col style="width:70px" />
       <col style="width:105px" />
       ${scheduleDays.map(() => '<col style="width:30px" />').join("")}
-      <col style="width:76px" />
       <col style="width:76px" />
       <col style="width:76px" />
       <col style="width:76px" />
@@ -2888,7 +2710,6 @@ export default function ScheduleBlock({
       vacation: 0,
       sick: 0,
       unpaid: 0,
-      shortLeave: 0,
       balance: 0,
     };
 
@@ -2900,7 +2721,6 @@ export default function ScheduleBlock({
         let vacation = 0;
         let sick = 0;
         let unpaid = 0;
-        let shortLeave = 0;
 
         const dayCells = scheduleDays
           .map((date, dayIndex) => {
@@ -2923,12 +2743,11 @@ export default function ScheduleBlock({
               else vacation += 8;
             } else if (parsed.kind === "sick") {
               sick += 8;
-            } else if (parsed.kind === "shortLeave") {
-              // Trumpos išvykos tabelyje matomos, bet valandų normoje neskaičiuojamos.
-              shortLeave += 0;
             }
 
-            const baseClass = value ? `${shiftClassName} ${dayClass}` : `shift-empty ${dayClass}`;
+            const baseClass = value
+              ? `${shiftClassName} ${dayClass}`
+              : `shift-empty ${dayClass}`;
             return `<td class="${baseClass} timesheet-cell">${exportCellText(value)}</td>`;
           })
           .join("");
@@ -2942,7 +2761,6 @@ export default function ScheduleBlock({
         totals.vacation += vacation;
         totals.sick += sick;
         totals.unpaid += unpaid;
-        totals.shortLeave += shortLeave;
         totals.balance += balance;
 
         return `<tr>
@@ -2956,7 +2774,6 @@ export default function ScheduleBlock({
           <td class="total">${escapeHtml(formatHours(vacation))}</td>
           <td class="total">${escapeHtml(formatHours(sick))}</td>
           <td class="total">${escapeHtml(formatHours(unpaid))}</td>
-          <td class="total">${escapeHtml(formatHours(shortLeave))}</td>
           <td class="total">${escapeHtml(formatHours(allHours))}</td>
           <td class="total ${balance > 0 || balance < -8 ? "warn" : ""}">${balance > 0 ? "+" : ""}${escapeHtml(formatHours(balance))}</td>
         </tr>`;
@@ -2974,7 +2791,6 @@ export default function ScheduleBlock({
       <td class="total">${escapeHtml(formatHours(totals.vacation))}</td>
       <td class="total">${escapeHtml(formatHours(totals.sick))}</td>
       <td class="total">${escapeHtml(formatHours(totals.unpaid))}</td>
-      <td class="total">${escapeHtml(formatHours(totals.shortLeave))}</td>
       <td class="total">${escapeHtml(formatHours(totals.worked + totals.vacation + totals.sick + totals.unpaid))}</td>
       <td class="total ${totals.balance > 0 || totals.balance < -8 ? "warn" : ""}">${totals.balance > 0 ? "+" : ""}${escapeHtml(formatHours(totals.balance))}</td>
     </tr>`;
@@ -2982,7 +2798,7 @@ export default function ScheduleBlock({
     const html = `<table class="schedule-table">
       ${colgroup}
       <tr><td class="title" colspan="${totalColumns}">KR tabelis · ${escapeHtml(monthTitle)}</td></tr>
-      <tr><td class="subtitle" colspan="${totalColumns}">PDF tabelyje rodomas visas mėnesio kalendorius. Darbo pamainos rodomos valandomis, pvz. 8 arba 12; neatvykimai – A, M, T, L, P, NA. Trumpos išvykos matomos, bet į darbo valandas neskaičiuojamos.</td></tr>
+      <tr><td class="subtitle" colspan="${totalColumns}">PDF tabelyje rodomas visas mėnesio kalendorius. Darbo pamainos rodomos valandomis, pvz. 8 arba 12; neatvykimai – A, M, T, L, P, NA.</td></tr>
       <tr>
         <th class="employee-head">Darbuotojas</th>
         <th class="small-head">Etatas</th>
@@ -2994,7 +2810,6 @@ export default function ScheduleBlock({
         <th class="norm-head">A/M/T</th>
         <th class="norm-head">Liga</th>
         <th class="norm-head">NA</th>
-        <th class="norm-head">Trumpi išv.</th>
         <th class="norm-head">Iš viso</th>
         <th class="norm-head">Likutis</th>
       </tr>
@@ -4358,7 +4173,10 @@ export default function ScheduleBlock({
               trainingIssues.length ? (
                 <div className="issues-list modal-list">
                   {trainingIssues.slice(0, 120).map((issue) => (
-                    <div key={issue.id} className={`issue ${issue.severity === "error" ? "bad" : "warn"}`}>
+                    <div
+                      key={issue.id}
+                      className={`issue ${issue.severity === "error" ? "bad" : "warn"}`}
+                    >
                       <b>{issue.employeeName}</b> · {issue.title}
                       <br />
                       <span>{issue.detail}</span>

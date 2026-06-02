@@ -85,7 +85,6 @@ type VacationEntitlementDbRow = {
   year?: number | null;
   annual_days?: number | string | null;
   entitlement_days?: number | string | null;
-  days?: number | string | null;
   carried_over_days?: number | string | null;
   used_days?: number | string | null;
   reserved_days?: number | string | null;
@@ -228,7 +227,7 @@ function isBusinessDay(date: Date) {
 }
 
 function businessDaysBetween(start: string, end: string) {
-  const dates = datesBetween(start, end);
+  const dates = dateRange(start, end);
   return dates.filter((date) =>
     isBusinessDay(new Date(`${date}T00:00:00`)),
   ).length;
@@ -459,7 +458,7 @@ export default function RequestsPage() {
 
       const { data: entitlementData, error: entitlementError } = await supabase
         .from("vacation_entitlements")
-        .select("employee_id, year, annual_days, entitlement_days, days, carried_over_days, used_days, reserved_days, remaining_days, is_active")
+        .select("employee_id, year, annual_days, entitlement_days, carried_over_days, used_days, reserved_days, remaining_days, is_active")
         .eq("organization_id", orgId);
 
       if (!entitlementError) {
@@ -555,7 +554,6 @@ export default function RequestsPage() {
       const baseAnnual =
         parseNumber(entitlement?.annual_days) ??
         parseNumber(entitlement?.entitlement_days) ??
-        parseNumber(entitlement?.days) ??
         vacationEntitlement(employee);
       const carriedOver = parseNumber(entitlement?.carried_over_days) ?? 0;
       const annualTotal = baseAnnual + carriedOver;
@@ -740,7 +738,7 @@ export default function RequestsPage() {
     const currentYear = new Date().getFullYear();
     const { data: entitlementRows } = await supabase
       .from("vacation_entitlements")
-      .select("employee_id, year, annual_days, entitlement_days, days, carried_over_days, used_days, reserved_days, remaining_days, is_active")
+      .select("employee_id, year, annual_days, entitlement_days, carried_over_days, used_days, reserved_days, remaining_days, is_active")
       .eq("organization_id", organizationId)
       .eq("employee_id", employeeId);
 
