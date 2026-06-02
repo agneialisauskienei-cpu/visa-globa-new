@@ -393,11 +393,26 @@ function toEmployee(member: any, profile?: any): EmployeeOption {
 }
 
 function detectRequirement(employee: EmployeeOption) {
-  if (!employee.position_key) return UNKNOWN_REQUIREMENT;
+  if (employee.position_key) {
+    const byKey = POSITION_REQUIREMENTS.find(
+      (requirement) => requirement.key === employee.position_key,
+    );
+
+    if (byKey) return byKey;
+  }
+
+  const haystack = normalize(
+    [employee.position, employee.role, employee.department, employee.full_name, employee.name]
+      .filter(Boolean)
+      .join(" "),
+  );
 
   return (
-    POSITION_REQUIREMENTS.find((requirement) => requirement.key === employee.position_key) ||
-    UNKNOWN_REQUIREMENT
+    POSITION_REQUIREMENTS.find((requirement) =>
+      requirement.positionKeywords.some((keyword) =>
+        haystack.includes(normalize(keyword)),
+      ),
+    ) || UNKNOWN_REQUIREMENT
   );
 }
 
@@ -615,7 +630,7 @@ export default function TrainingModule({
             )
             .eq("organization_id", organizationId)
             .eq("is_active", true)
-            .neq("is_archived", true)
+            .or("is_archived.is.null,is_archived.eq.false")
             .order("position", { ascending: true });
 
           if (membersError) throw membersError;
@@ -1209,7 +1224,7 @@ export default function TrainingModule({
     }
     setApprovingId(trainingId);
     setMessage(null);
-    const previous = trainings;
+    const previous = internalTrainings;
     try {
       const result = await apiRequest<{ data: TrainingRecord }>(`/api/personnel/trainings/${trainingId}/approve`, { method: "POST" });
       setInternalTrainings((prev) => prev.map((training) => training.id === trainingId ? { ...training, ...result.data } : training));
@@ -1231,7 +1246,7 @@ export default function TrainingModule({
     }
     setApprovingId(trainingId);
     setMessage(null);
-    const previous = trainings;
+    const previous = internalTrainings;
     try {
       const result = await apiRequest<{ data: TrainingRecord }>(`/api/personnel/trainings/${trainingId}/reject`, { method: "POST" });
       setInternalTrainings((prev) => prev.map((training) => training.id === trainingId ? { ...training, ...result.data } : training));
@@ -1251,7 +1266,7 @@ export default function TrainingModule({
       setMessage({ type: "error", text: "Neturi teisės archyvuoti mokymų." });
       return;
     }
-    const previous = trainings;
+    const previous = internalTrainings;
     setArchivingId(trainingId);
     setMessage(null);
     try {

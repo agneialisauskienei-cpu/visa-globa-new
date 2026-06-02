@@ -2611,6 +2611,10 @@ export default function TeamPage() {
         sourceRequestId: string;
         reason: string;
       };
+      negativeBalance?: {
+        allowNegativeBalance: true;
+        reason: string;
+      };
     },
   ) {
     if (!organizationId) {
@@ -2619,47 +2623,93 @@ export default function TeamPage() {
     }
 
     setSaving(true);
+    setMessage("");
+
     try {
-      const request = vacations.find((item) => item.id === id);
-      const now = new Date().toISOString();
-      const currentUserResult = await supabase.auth.getUser();
-      const currentUserId = currentUserResult.data.user?.id || null;
+      const previousRequest = vacations.find((item) => item.id === id) || null;
+      let savedRequest: VacationRequest | null = previousRequest;
 
-      const requestPatch =
-        status === "approved"
-          ? { status, approved_at: now, approved_by: currentUserId }
-          : { status, rejected_at: now, rejected_by: currentUserId };
+      if (status === "approved") {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      let vacationUpdate = await supabase
-        .from("vacation_requests")
-        .update(requestPatch)
-        .eq("organization_id", organizationId)
-        .eq("id", id)
-        .select(
-          "id, employee_id, type, start_date, end_date, status, requested_days, note, created_at",
-        )
-        .maybeSingle();
+        const response = await fetch(`/api/team/vacation-requests/${id}/approve`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : {}),
+          },
+          body: JSON.stringify(options || {}),
+        });
 
-      // Senesnėse DB schemose approved_at / approved_by / rejected_at / rejected_by gali dar neegzistuoti.
-      // Tokiu atveju saugiai kartojame tik su status, kad UI neliktų melagingai patvirtintas vien lokaliai.
-      if (vacationUpdate.error) {
-        vacationUpdate = await supabase
+        const json = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(json?.error || "Nepavyko patvirtinti prašymo.");
+        }
+
+        const returnedRequest =
+          (json?.request as VacationRequest | undefined) ||
+          (json?.data?.request as VacationRequest | undefined) ||
+          null;
+
+        savedRequest = returnedRequest
+          ? {
+              ...returnedRequest,
+              start_date:
+                returnedRequest.start_date ||
+                previousRequest?.start_date ||
+                toDateInput(new Date()),
+              end_date:
+                returnedRequest.end_date ||
+                returnedRequest.start_date ||
+                previousRequest?.end_date ||
+                toDateInput(new Date()),
+              status: "approved",
+            }
+          : previousRequest
+            ? { ...previousRequest, status: "approved" }
+            : null;
+      } else {
+        const now = new Date().toISOString();
+        const currentUserResult = await supabase.auth.getUser();
+        const currentUserId = currentUserResult.data.user?.id || null;
+
+        let vacationUpdate = await supabase
           .from("vacation_requests")
-          .update({ status })
+          .update({
+            status: "rejected",
+            rejected_at: now,
+            rejected_by: currentUserId,
+          })
           .eq("organization_id", organizationId)
           .eq("id", id)
           .select(
             "id, employee_id, type, start_date, end_date, status, requested_days, note, created_at",
           )
           .maybeSingle();
-      }
 
-      if (vacationUpdate.error) throw vacationUpdate.error;
+        // Senesnėse DB schemose rejected_at / rejected_by gali dar neegzistuoti.
+        if (vacationUpdate.error) {
+          vacationUpdate = await supabase
+            .from("vacation_requests")
+            .update({ status: "rejected" })
+            .eq("organization_id", organizationId)
+            .eq("id", id)
+            .select(
+              "id, employee_id, type, start_date, end_date, status, requested_days, note, created_at",
+            )
+            .maybeSingle();
+        }
 
-      const savedRequest =
-        ((vacationUpdate.data as VacationRequest | null) || request || null);
+        if (vacationUpdate.error) throw vacationUpdate.error;
 
-      if (status === "rejected") {
+        savedRequest =
+          ((vacationUpdate.data as VacationRequest | null) || previousRequest || null);
+
         const { error: substitutionError } = await supabase
           .from("employee_substitutions")
           .update({
@@ -2671,71 +2721,9 @@ export default function TeamPage() {
           .eq("source_vacation_request_id", id);
 
         if (substitutionError) throw substitutionError;
-      } else if (status === "approved") {
-        const substitution = options?.substitution;
-
-        if (substitution?.substituteUserId && substitution.substituteUserId !== substitution.absentEmployeeId) {
-          const { data: existingSubstitution, error: existingSubstitutionError } = await supabase
-            .from("employee_substitutions")
-            .select("id")
-            .eq("organization_id", organizationId)
-            .eq("source_vacation_request_id", id)
-            .maybeSingle();
-
-          if (existingSubstitutionError) throw existingSubstitutionError;
-
-          if (existingSubstitution?.id) {
-            const { error: substitutionError } = await supabase
-              .from("employee_substitutions")
-              .update({
-                substitute_user_id: substitution.substituteUserId,
-                absent_user_id: substitution.absentEmployeeId,
-                starts_on: substitution.validFrom,
-                ends_on: substitution.validUntil,
-                reason: substitution.reason,
-                status: "active",
-                activated_at: now,
-                activated_by: currentUserId,
-              })
-              .eq("organization_id", organizationId)
-              .eq("id", existingSubstitution.id);
-
-            if (substitutionError) throw substitutionError;
-          } else {
-            const { error: substitutionError } = await supabase
-              .from("employee_substitutions")
-              .insert({
-                organization_id: organizationId,
-                absent_user_id: substitution.absentEmployeeId,
-                substitute_user_id: substitution.substituteUserId,
-                starts_on: substitution.validFrom,
-                ends_on: substitution.validUntil,
-                source_vacation_request_id: substitution.sourceRequestId || id,
-                reason: substitution.reason,
-                status: "active",
-                activated_at: now,
-                activated_by: currentUserId,
-              });
-
-            if (substitutionError) throw substitutionError;
-          }
-        } else {
-          const { error: substitutionError } = await supabase
-            .from("employee_substitutions")
-            .update({
-              status: "active",
-              activated_at: now,
-              activated_by: currentUserId,
-            })
-            .eq("organization_id", organizationId)
-            .eq("source_vacation_request_id", id)
-            .eq("status", "pending");
-
-          if (substitutionError) throw substitutionError;
-        }
       }
 
-      if (request) {
+      if (previousRequest) {
         await safeAuditLog({
           organizationId,
           tableName: "vacation_requests",
@@ -2743,9 +2731,9 @@ export default function TeamPage() {
           action:
             status === "approved" ? "vacation.approved" : "vacation.rejected",
           changes: getChangedFields(
-            request as unknown as Record<string, unknown>,
+            previousRequest as unknown as Record<string, unknown>,
             {
-              ...(request as unknown as Record<string, unknown>),
+              ...(previousRequest as unknown as Record<string, unknown>),
               status,
             },
           ),
@@ -2772,28 +2760,29 @@ export default function TeamPage() {
           const { error: scheduleError } = await supabase
             .from("work_schedule_entries")
             .upsert(rows, { onConflict: "organization_id,employee_id,date" });
+
           if (scheduleError) {
             throw scheduleError;
-          } else {
-            setScheduleEntries((current) => {
-              const savedKeys = new Set(
-                rows.map((row) => `${row.employee_id}:${row.date}`),
-              );
-              const kept = current.filter(
-                (entry) => !savedKeys.has(`${entry.employee_id}:${entry.date}`),
-              );
-
-              return [
-                ...kept,
-                ...rows.map((row) => ({
-                  employee_id: row.employee_id,
-                  date: row.date,
-                  status: row.status,
-                  note: row.note,
-                })),
-              ];
-            });
           }
+
+          setScheduleEntries((current) => {
+            const savedKeys = new Set(
+              rows.map((row) => `${row.employee_id}:${row.date}`),
+            );
+            const kept = current.filter(
+              (entry) => !savedKeys.has(`${entry.employee_id}:${entry.date}`),
+            );
+
+            return [
+              ...kept,
+              ...rows.map((row) => ({
+                employee_id: row.employee_id,
+                date: row.date,
+                status: row.status,
+                note: row.note,
+              })),
+            ];
+          });
         }
       }
 
@@ -2808,11 +2797,15 @@ export default function TeamPage() {
             : request,
         ),
       );
-      await loadVacationEntitlements(organizationId);
+
+      // Reload all HR data after approval/rejection so vacation_entitlements are
+      // remapped back into employees immediately. This avoids stale balance cards.
+      await loadAll();
+
       setMessage((current) =>
         current ||
         (status === "approved"
-          ? "Prašymas patvirtintas ir grafike rodomas kaip neatvykimas."
+          ? "Prašymas patvirtintas serverio transakcijoje, likutis perskaičiuotas ir grafike rodomas kaip neatvykimas."
           : "Prašymas atmestas."),
       );
     } catch (error) {
@@ -3546,11 +3539,18 @@ export default function TeamPage() {
               name: employeeName(employee),
               role: employee.position || employee.role || null,
               department: employee.department || null,
+              position: employee.position || null,
+              // Kol organization_members neturi stabilaus position_key, TrainingModule
+              // turi fallback pagal position/role tekstą. Kai pereisim prie FK, čia bus realus key.
+              position_key: null,
             }))}
             trainings={trainings.map((training) => ({
               ...training,
               title: training.title || "Mokymas",
             }))}
+            canManageTrainings={canViewSensitiveFields}
+            canApproveTrainings={canViewSensitiveFields}
+            canManageRequirements={canViewSensitiveFields}
             onRefresh={loadAll}
           />
         )}

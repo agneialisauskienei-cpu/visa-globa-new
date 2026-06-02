@@ -664,9 +664,17 @@ export default function VacationRequests({
     // vacation_balance_days is treated as the current DB-authoritative balance
     // before pending reservations. Do not subtract already-used days again here,
     // because that would double-count usage when DB has already calculated it.
-    const availableBeforeReservations =
-      dbBalance !== null ? dbBalance : accrual.accrued - used;
-    const rawLeft = roundDays(availableBeforeReservations - reserved);
+    const dbBalanceIsAuthoritative = dbBalance !== null;
+    const availableBeforeReservations = dbBalanceIsAuthoritative
+      ? dbBalance
+      : accrual.accrued - used;
+    // vacation_entitlements.remaining_days DB pusėje jau yra annual + carried_over - used - reserved.
+    // Todėl kai turime DB balansą, pending rezervacijų nebeatimame antrą kartą.
+    const rawLeft = roundDays(
+      dbBalanceIsAuthoritative
+        ? availableBeforeReservations
+        : availableBeforeReservations - reserved,
+    );
 
     return {
       entitlement: accrual.annualNorm,
@@ -674,12 +682,14 @@ export default function VacationRequests({
       weeks: entitlement.weeks,
       used,
       reserved,
-      leftBeforeReservations: roundDays(availableBeforeReservations),
+      leftBeforeReservations: roundDays(
+        dbBalanceIsAuthoritative ? availableBeforeReservations + reserved : availableBeforeReservations,
+      ),
       left: Math.max(0, rawLeft),
       rawLeft,
       basis:
         dbBalance !== null
-          ? `${entitlement.basis} Likutis paimtas iš DB kaip dabartinis likutis prieš laukiančias rezervacijas: ${formatDays(dbBalance)} d.${employee?.vacation_balance_as_of ? ` (${employee.vacation_balance_as_of})` : ""}`
+          ? `${entitlement.basis} Likutis paimtas iš DB vacation_entitlements.remaining_days: ${formatDays(dbBalance)} d.${employee?.vacation_balance_as_of ? ` (${employee.vacation_balance_as_of})` : ""}`
           : `${entitlement.basis} Likutis skaičiuojamas pagal realiai sukauptą dalį iki šiandienos, ne pagal visą metinę normą.`,
       entitlementSource: entitlement.source,
     };
