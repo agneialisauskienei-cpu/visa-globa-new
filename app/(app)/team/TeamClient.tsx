@@ -118,6 +118,7 @@ type VacationRequest = {
   status: string;
   requested_days: number | null;
   note: string | null;
+  rejection_reason?: string | null;
   created_at: string | null;
   substitute_user_id?: string | null;
   approved_at?: string | null;
@@ -1455,7 +1456,7 @@ export default function TeamPage() {
       const vacationResult = await supabase
         .from("vacation_requests")
         .select(
-          "id, employee_id, type, start_date, end_date, status, requested_days, note, created_at",
+          "id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at",
         )
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false });
@@ -2355,6 +2356,83 @@ export default function TeamPage() {
     );
   }
 
+  async function recalculateVacationEntitlementForRequest(
+    request?: Pick<
+      VacationRequest,
+      "organization_id" | "employee_id" | "type" | "start_date"
+    > | null,
+  ) {
+    if (!organizationId || !request?.employee_id || !request.start_date) return;
+    if (!isAnnualVacation(request.type)) return;
+
+    const requestOrganizationId =
+      String(request.organization_id || organizationId).trim() || organizationId;
+    const year = new Date(`${request.start_date}T00:00:00`).getFullYear();
+
+    const { error: ensureError } = await supabase
+      .from("vacation_entitlements")
+      .upsert(
+        {
+          organization_id: requestOrganizationId,
+          employee_id: request.employee_id,
+          year,
+          annual_days: 30,
+          carried_over_days: 0,
+          used_days: 0,
+          reserved_days: 0,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "organization_id,employee_id,year",
+          ignoreDuplicates: true,
+        },
+      );
+
+    if (ensureError) throw ensureError;
+
+    const { data: requestRows, error: requestRowsError } = await supabase
+      .from("vacation_requests")
+      .select("status, requested_days, type, start_date")
+      .eq("organization_id", requestOrganizationId)
+      .eq("employee_id", request.employee_id);
+
+    if (requestRowsError) throw requestRowsError;
+
+    const annualRows = (
+      (requestRows || []) as Array<{
+        status: string | null;
+        requested_days: number | string | null;
+        type: string | null;
+        start_date: string | null;
+      }>
+    ).filter((row) => {
+      if (!isAnnualVacation(row.type) || !row.start_date) return false;
+      return new Date(`${row.start_date}T00:00:00`).getFullYear() === year;
+    });
+
+    const usedDays = annualRows
+      .filter((row) => row.status === "approved")
+      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
+
+    const reservedDays = annualRows
+      .filter((row) => row.status === "submitted" || row.status === "pending")
+      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
+
+    const { error: entitlementError } = await supabase
+      .from("vacation_entitlements")
+      .update({
+        used_days: roundFte(usedDays),
+        reserved_days: roundFte(reservedDays),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("organization_id", requestOrganizationId)
+      .eq("employee_id", request.employee_id)
+      .eq("year", year);
+
+    if (entitlementError) throw entitlementError;
+  }
+
   function vacationEntitlementDays(employee?: Employee | null) {
     const entitlement = vacationEntitlementRecord(employee?.user_id);
 
@@ -2515,7 +2593,7 @@ export default function TeamPage() {
         .from("vacation_requests")
         .insert(payload)
         .select(
-          "id, employee_id, type, start_date, end_date, status, requested_days, note, created_at",
+          "id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at",
         )
         .single();
 
@@ -2566,6 +2644,8 @@ export default function TeamPage() {
         }
       }
 
+      await recalculateVacationEntitlementForRequest(created);
+
       setVacations((current) => [created, ...current]);
       setVacationForm({
         employee_id: vacationForm.employee_id,
@@ -2613,6 +2693,9 @@ export default function TeamPage() {
       };
       negativeBalance?: {
         allowNegativeBalance: true;
+        reason: string;
+      };
+      rejection?: {
         reason: string;
       };
     },
@@ -2674,29 +2757,42 @@ export default function TeamPage() {
             ? { ...previousRequest, status: "approved" }
             : null;
       } else {
+        const rejectionReason = String(options?.rejection?.reason || "").trim();
+
+        if (rejectionReason.length < 10) {
+          throw new Error("Atmetimui būtina aiški priežastis, bent 10 simbolių.");
+        }
+
         const now = new Date().toISOString();
         const currentUserResult = await supabase.auth.getUser();
         const currentUserId = currentUserResult.data.user?.id || null;
+        const rejectedNote = previousRequest?.note
+          ? `${previousRequest.note} · Atmetimo priežastis: ${rejectionReason}`
+          : `Atmetimo priežastis: ${rejectionReason}`;
 
         let vacationUpdate = await supabase
           .from("vacation_requests")
           .update({
             status: "rejected",
+            rejection_reason: rejectionReason,
             rejected_at: now,
             rejected_by: currentUserId,
           })
           .eq("organization_id", organizationId)
           .eq("id", id)
           .select(
-            "id, employee_id, type, start_date, end_date, status, requested_days, note, created_at",
+            "id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at",
           )
           .maybeSingle();
 
-        // Senesnėse DB schemose rejected_at / rejected_by gali dar neegzistuoti.
+        // Senesnėse DB schemose rejected_at / rejected_by arba rejection_reason gali dar neegzistuoti.
         if (vacationUpdate.error) {
           vacationUpdate = await supabase
             .from("vacation_requests")
-            .update({ status: "rejected" })
+            .update({
+              status: "rejected",
+              note: rejectedNote,
+            })
             .eq("organization_id", organizationId)
             .eq("id", id)
             .select(
@@ -2710,6 +2806,10 @@ export default function TeamPage() {
         savedRequest =
           ((vacationUpdate.data as VacationRequest | null) || previousRequest || null);
 
+        if (savedRequest && !savedRequest.rejection_reason) {
+          savedRequest = { ...savedRequest, rejection_reason: rejectionReason };
+        }
+
         const { error: substitutionError } = await supabase
           .from("employee_substitutions")
           .update({
@@ -2721,6 +2821,8 @@ export default function TeamPage() {
           .eq("source_vacation_request_id", id);
 
         if (substitutionError) throw substitutionError;
+
+        await recalculateVacationEntitlementForRequest(savedRequest);
       }
 
       if (previousRequest) {
@@ -2735,6 +2837,9 @@ export default function TeamPage() {
             {
               ...(previousRequest as unknown as Record<string, unknown>),
               status,
+              ...(status === "rejected" && options?.rejection?.reason
+                ? { rejection_reason: options.rejection.reason }
+                : {}),
             },
           ),
         });
@@ -3572,7 +3677,7 @@ export default function TeamPage() {
             scheduleConflictsChecked={true}
             onSubmit={submitVacationRequest}
             onApprove={(id, options) => updateVacationStatus(id, "approved", options)}
-            onReject={(id) => updateVacationStatus(id, "rejected")}
+            onReject={(id, options) => updateVacationStatus(id, "rejected", { rejection: options })}
             employeeName={employeeName}
             employeeRole={employeeRole}
             daysBetween={daysBetween}

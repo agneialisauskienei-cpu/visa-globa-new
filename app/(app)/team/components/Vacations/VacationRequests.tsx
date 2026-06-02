@@ -51,6 +51,7 @@ type VacationRequest = {
   status: string;
   requested_days: number | null;
   note: string | null;
+  rejection_reason?: string | null;
   created_at: string | null;
   substitute_user_id?: string | null;
 };
@@ -109,6 +110,13 @@ type ApproveOptions = {
   substitution?: ApprovalSubstitution;
 };
 
+type RejectOptions = {
+  /**
+   * Privaloma atmetimo priežastis. Ji turi būti įrašoma DB ir rodoma darbuotojui.
+   */
+  reason: string;
+};
+
 type Props = {
   employees: Employee[];
   requests: VacationRequest[];
@@ -146,7 +154,7 @@ type Props = {
   onSubmit: (options?: SubmitOptions) => VacationRequest | Promise<VacationRequest>;
   // The API/parent must approve/reject and write audit in one server-side transaction.
   onApprove: (id: string, options?: ApproveOptions) => void | Promise<void>;
-  onReject: (id: string) => void | Promise<void>;
+  onReject: (id: string, options: RejectOptions) => void | Promise<void>;
   daysBetween: (start: string, end: string) => number;
   fmt: (value?: string | null) => string;
   absenceTypeMeta: (type?: string | null) => AbsenceType;
@@ -519,6 +527,24 @@ function requireNegativeBalanceReason() {
   }
 
   return normalized;
+}
+
+function requireRejectionReason() {
+  const reason = window.prompt(
+    "Įrašykite atmetimo priežastį. Ji bus matoma darbuotojui ir liks prašymo istorijoje.",
+  );
+
+  const normalized = String(reason || "").trim();
+  if (normalized.length < 10) {
+    window.alert("Atmetimui būtina aiški priežastis, bent 10 simbolių.");
+    return null;
+  }
+
+  return normalized;
+}
+
+function rejectionReasonText(request?: VacationRequest | null) {
+  return String(request?.rejection_reason || "").trim();
 }
 
 export default function VacationRequests({
@@ -1016,10 +1042,13 @@ export default function VacationRequests({
     const existing = allRequests.find((request) => request.id === id);
     if (!existing) return;
 
+    const reason = requireRejectionReason();
+    if (!reason) return;
+
     setStatusOverrides((previous) => ({ ...previous, [id]: "rejected" }));
 
     try {
-      await onReject(id);
+      await onReject(id, { reason });
     } catch (error) {
       setStatusOverrides((previous) => {
         const next = { ...previous };
@@ -1327,6 +1356,11 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
                     ) : null}
                     {request.note ? (
                       <span className="vr-note">{request.note}</span>
+                    ) : null}
+                    {normalizedStatus(request.status) === "rejected" && rejectionReasonText(request) ? (
+                      <span className="vr-note vr-rejection-reason">
+                        Atmetimo priežastis: {rejectionReasonText(request)}
+                      </span>
                     ) : null}
                   </div>
                   <div className="vr-balance-cell">
@@ -1660,7 +1694,11 @@ Serveris privalo dar kartą patikrinti teisę ir įrašyti auditą.`,
                               : `${requestDays(request)} d.`}
                           </span>
                           <span>{absenceStatusLabel(request.status)}</span>
-                          <span>{request.note || "—"}</span>
+                          <span>
+                            {normalizedStatus(request.status) === "rejected" && rejectionReasonText(request)
+                              ? `Atmetimo priežastis: ${rejectionReasonText(request)}`
+                              : request.note || "—"}
+                          </span>
                         </div>
                       );
                     })
@@ -1840,6 +1878,7 @@ const css = `
 .vr-meta span{ background:#f8faf8; border:1px solid #dbe6e0; border-radius:999px; padding:7px 10px; }
 .vr-type b{ color:#486b5d; }
 .vr-note{ border-radius:10px!important; max-width:100%; white-space:normal; }
+.vr-rejection-reason{ background:#fff1f2!important; color:#7f1d1d!important; border-color:#fecdd3!important; }
 .vr-balance-cell { display:grid; gap:3px; color:#40594f; font-weight:900; }
 .vr-balance-cell small { color:#6a7e75; font-weight:800; }
 .vr-status{ display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:999px; padding:8px 11px; font-weight:950; white-space:nowrap; }

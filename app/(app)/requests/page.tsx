@@ -44,6 +44,7 @@ type VacationDbRow = {
   status: string | null;
   requested_days: number | null;
   note: string | null;
+  rejection_reason?: string | null;
   created_at: string | null;
 };
 
@@ -64,6 +65,7 @@ type RequestRow = {
   balance: string;
   risk: string;
   note: string;
+  rejectionReason?: string | null;
   createdAt?: string | null;
 };
 
@@ -77,6 +79,20 @@ type VacationBalanceRow = {
   annualReserved: number;
   annualLeft: number;
 };
+
+type VacationEntitlementDbRow = {
+  employee_id: string;
+  year?: number | null;
+  annual_days?: number | string | null;
+  entitlement_days?: number | string | null;
+  days?: number | string | null;
+  carried_over_days?: number | string | null;
+  used_days?: number | string | null;
+  reserved_days?: number | string | null;
+  remaining_days?: number | string | null;
+  is_active?: boolean | null;
+};
+
 
 const EMPTY_FORM = {
   employeeId: "",
@@ -203,6 +219,13 @@ function getReadableError(error: unknown) {
   return "Nepavyko atlikti veiksmo.";
 }
 
+function parseNumber(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(String(value).replace(",", ".").trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+
 export default function RequestsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | RequestStatus>("all");
@@ -217,6 +240,7 @@ export default function RequestsPage() {
 
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [vacationEntitlements, setVacationEntitlements] = useState<VacationEntitlementDbRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -261,6 +285,7 @@ export default function RequestsPage() {
       balance: isTemporaryKind(meta.kind) ? "Likutis nekeičiamas" : "Likutis skaičiuojamas pagal patvirtintas atostogas",
       risk: normalizeStatus(row.status) === "submitted" ? "Laukia sprendimo" : "—",
       note: row.note || "—",
+      rejectionReason: row.rejection_reason || null,
       createdAt: row.created_at,
     };
   }
@@ -344,11 +369,29 @@ export default function RequestsPage() {
 
       const { data: vacationData, error: vacationError } = await supabase
         .from("vacation_requests")
-        .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, created_at")
+        .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false });
 
       if (vacationError) throw vacationError;
+
+      const { data: entitlementData, error: entitlementError } = await supabase
+        .from("vacation_entitlements")
+        .select("employee_id, year, annual_days, entitlement_days, days, carried_over_days, used_days, reserved_days, remaining_days, is_active")
+        .eq("organization_id", orgId);
+
+      if (!entitlementError) {
+        const currentYear = new Date().getFullYear();
+        setVacationEntitlements(
+          ((entitlementData || []) as VacationEntitlementDbRow[]).filter(
+            (row) =>
+              row.is_active !== false &&
+              (!row.year || Number(row.year) === currentYear),
+          ),
+        );
+      } else {
+        setVacationEntitlements([]);
+      }
 
       setRequests(((vacationData || []) as VacationDbRow[]).map((row) => mapDbRequest(row, mergedEmployees)));
     } catch (error) {
@@ -395,17 +438,50 @@ export default function RequestsPage() {
   }, [query, status, type, visibleRequests]);
 
   const balances = useMemo<VacationBalanceRow[]>(() => {
-    const sourceEmployees = isAdmin ? employees : employees.filter((employee) => employee.user_id === currentUserId);
+    const sourceEmployees = isAdmin
+      ? employees
+      : employees.filter((employee) => employee.user_id === currentUserId);
+    const currentYear = new Date().getFullYear();
+    const entitlementMap = new Map(
+      vacationEntitlements.map((row) => [
+        `${row.employee_id}:${Number(row.year || currentYear)}`,
+        row,
+      ]),
+    );
+
+    function entitlementFor(employeeId: string) {
+      return (
+        entitlementMap.get(`${employeeId}:${currentYear}`) ||
+        vacationEntitlements.find((row) => row.employee_id === employeeId) ||
+        null
+      );
+    }
 
     return sourceEmployees.map((employee) => {
-      const annualTotal = vacationEntitlement(employee);
-      const employeeRequests = requests.filter((request) => request.employeeId === employee.user_id && isAnnualKind(request.kind));
-      const annualUsed = employeeRequests
+      const entitlement = entitlementFor(employee.user_id);
+      const employeeRequests = requests.filter(
+        (request) => request.employeeId === employee.user_id && isAnnualKind(request.kind),
+      );
+
+      const localUsed = employeeRequests
         .filter((request) => request.status === "approved")
         .reduce((sum, request) => sum + request.requestedDays, 0);
-      const annualReserved = employeeRequests
+      const localReserved = employeeRequests
         .filter((request) => request.status === "submitted")
         .reduce((sum, request) => sum + request.requestedDays, 0);
+
+      const baseAnnual =
+        parseNumber(entitlement?.annual_days) ??
+        parseNumber(entitlement?.entitlement_days) ??
+        parseNumber(entitlement?.days) ??
+        vacationEntitlement(employee);
+      const carriedOver = parseNumber(entitlement?.carried_over_days) ?? 0;
+      const annualTotal = baseAnnual + carriedOver;
+      const annualUsed = parseNumber(entitlement?.used_days) ?? localUsed;
+      const annualReserved = parseNumber(entitlement?.reserved_days) ?? localReserved;
+      const availableLeft =
+        parseNumber(entitlement?.remaining_days) ??
+        Math.max(0, annualTotal - annualUsed - annualReserved);
 
       return {
         employeeId: employee.user_id,
@@ -415,10 +491,10 @@ export default function RequestsPage() {
         annualTotal,
         annualUsed,
         annualReserved,
-        annualLeft: Math.max(0, annualTotal - annualUsed - annualReserved),
+        annualLeft: Math.max(0, availableLeft - annualReserved),
       };
     });
-  }, [currentUserId, employees, isAdmin, requests]);
+  }, [currentUserId, employees, isAdmin, requests, vacationEntitlements]);
 
   const filteredBalances = useMemo(() => {
     const search = employeeSearch.trim().toLowerCase();
@@ -521,7 +597,7 @@ export default function RequestsPage() {
       const { data, error } = await supabase
         .from("vacation_requests")
         .insert(payload)
-        .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, created_at")
+        .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
         .single();
 
       if (error) throw error;
@@ -538,11 +614,85 @@ export default function RequestsPage() {
       }));
       setStatus("submitted");
       setMessage(isAdmin ? "Prašymas pateiktas." : "Prašymas pateiktas vadovo sprendimui.");
+
+      if (isAnnualKind(form.kind)) {
+        await recalculateVacationEntitlement(employeeId);
+        await loadPage();
+      }
     } catch (error) {
       setMessage(getReadableError(error));
     } finally {
       setSaving(false);
     }
+  }
+
+  async function recalculateVacationEntitlement(employeeId: string) {
+    if (!organizationId) return;
+
+    const currentYear = new Date().getFullYear();
+    const { data: entitlementRows } = await supabase
+      .from("vacation_entitlements")
+      .select("employee_id, year, annual_days, entitlement_days, days, carried_over_days, used_days, reserved_days, remaining_days, is_active")
+      .eq("organization_id", organizationId)
+      .eq("employee_id", employeeId);
+
+    const entitlement = ((entitlementRows || []) as VacationEntitlementDbRow[]).find(
+      (row) => !row.year || Number(row.year) === currentYear,
+    );
+
+    const { data: requestRows, error: requestError } = await supabase
+      .from("vacation_requests")
+      .select("status, requested_days, type, start_date")
+      .eq("organization_id", organizationId)
+      .eq("employee_id", employeeId);
+
+    if (requestError) throw requestError;
+
+    const annualRows = ((requestRows || []) as Array<{
+      status: string | null;
+      requested_days: number | null;
+      type: string | null;
+      start_date: string | null;
+    }>).filter((row) => {
+      if (!isAnnualKind(row.type) || !row.start_date) return false;
+      return new Date(`${row.start_date}T00:00:00`).getFullYear() === currentYear;
+    });
+
+    const usedDays = annualRows
+      .filter((row) => normalizeStatus(row.status) === "approved")
+      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
+    const reservedDays = annualRows
+      .filter((row) => normalizeStatus(row.status) === "submitted")
+      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
+
+    if (entitlement) {
+      const { error } = await supabase
+        .from("vacation_entitlements")
+        .update({
+          used_days: usedDays,
+          reserved_days: reservedDays,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("organization_id", organizationId)
+        .eq("employee_id", employeeId)
+        .eq("year", entitlement.year || currentYear);
+
+      if (error) {
+        console.warn("[requests] Nepavyko perskaičiuoti atostogų likučio", error);
+      }
+    }
+
+    setVacationEntitlements((previous) => {
+      const exists = previous.some((row) => row.employee_id === employeeId);
+
+      if (!exists) return previous;
+
+      return previous.map((row) =>
+        row.employee_id === employeeId && (!row.year || Number(row.year) === currentYear)
+          ? { ...row, used_days: usedDays, reserved_days: reservedDays }
+          : row,
+      );
+    });
   }
 
   async function updateRequestStatus(id: string, nextStatus: RequestStatus) {
@@ -554,55 +704,52 @@ export default function RequestsPage() {
 
       if (!request) return;
 
+      const ownsRequest =
+        request.employeeId === currentUserId ||
+        String(request.employeeEmail || "").toLowerCase() ===
+          String(currentUserEmail || "").toLowerCase();
+
+      if (!isAdmin && nextStatus !== "canceled") {
+        throw new Error("Darbuotojas gali tik atšaukti savo laukiantį prašymą.");
+      }
+
+      if (!isAdmin && !ownsRequest) {
+        throw new Error("Galite atšaukti tik savo prašymą.");
+      }
+
+      if (nextStatus === "canceled" && request.status !== "submitted") {
+        throw new Error("Galima atšaukti tik laukiantį prašymą.");
+      }
+
+      if (nextStatus === "approved" || nextStatus === "rejected") {
+        throw new Error("Tvirtinimas ir atmetimas vykdomi HR / admin atostogų modulyje.");
+      }
+
       const { error } = await supabase
         .from("vacation_requests")
-        .update({ status: nextStatus })
-        .eq("id", id);
+        .update({ status: "canceled" })
+        .eq("id", id)
+        .eq("employee_id", request.employeeId)
+        .in("status", ["submitted", "pending"]);
 
       if (error) throw error;
 
-      if (nextStatus === "approved" && !isTemporaryKind(request.kind) && organizationId) {
-        const meta = requestKindMeta(request.kind);
-        const rows = dateRange(request.start, request.end).map((date) => ({
-          organization_id: organizationId,
-          employee_id: request.employeeId,
-          date,
-          status: `absence_${meta.code}`,
-          note: `${meta.label} · patvirtinta${request.note && request.note !== "—" ? ` · ${request.note}` : ""}`,
-        }));
-
-        if (rows.length) {
-          const { error: scheduleError } = await supabase.from("work_schedule_entries").insert(rows);
-          if (scheduleError) console.warn("[requests] Nepavyko įrašyti į grafiką", scheduleError);
-        }
-      }
+      await recalculateVacationEntitlement(request.employeeId);
 
       setRequests((previous) =>
         previous.map((item) =>
           item.id === id
             ? {
                 ...item,
-                status: nextStatus,
-                note:
-                  nextStatus === "approved"
-                    ? "Prašymas patvirtintas."
-                    : nextStatus === "rejected"
-                      ? "Prašymas atmestas."
-                      : nextStatus === "canceled"
-                        ? "Prašymą atšaukė darbuotojas."
-                        : item.note,
+                status: "canceled",
+                note: "Prašymą atšaukė darbuotojas.",
               }
             : item,
         ),
       );
 
-      setMessage(
-        nextStatus === "approved"
-          ? "Prašymas patvirtintas ir perduotas į grafiką."
-          : nextStatus === "rejected"
-            ? "Prašymas atmestas."
-            : "Prašymas atšauktas.",
-      );
+      setMessage("Prašymas atšauktas.");
+      await loadPage();
     } catch (error) {
       setMessage(getReadableError(error));
     } finally {
@@ -731,6 +878,7 @@ export default function RequestsPage() {
                     <TableHead>Tipas</TableHead>
                     <TableHead>Kiekis</TableHead>
                     <TableHead>Statusas</TableHead>
+                    <TableHead>Veiksmai</TableHead>
                   </tr>
                 </thead>
                 <tbody>
@@ -747,11 +895,25 @@ export default function RequestsPage() {
                             {statusLabel(request.status)}
                           </span>
                         </td>
+                        <td className="px-5 py-4">
+                          {request.status === "submitted" ? (
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => void updateRequestStatus(request.id, "canceled")}
+                              className="rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] disabled:opacity-60"
+                            >
+                              Atšaukti
+                            </button>
+                          ) : (
+                            <span className="font-black text-[#8ea0b5]">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-5 py-8 text-center text-sm font-bold text-[#526174]">
+                      <td colSpan={6} className="px-5 py-8 text-center text-sm font-bold text-[#526174]">
                         Įrašų dar nėra.
                       </td>
                     </tr>
@@ -1031,7 +1193,11 @@ function RequestTableRow({
       <td className="px-5 py-4 text-sm font-black text-[#10251f]">{request.amount}</td>
       <td className="px-5 py-4">
         <div className="font-black text-[#10251f]">{request.balance}</div>
-        <div className="mt-1 text-sm font-semibold text-[#526174]">{request.risk}</div>
+        <div className="mt-1 text-sm font-semibold text-[#526174]">
+          {request.status === "rejected" && request.rejectionReason
+            ? `Atmetimo priežastis: ${request.rejectionReason}`
+            : request.risk}
+        </div>
       </td>
       <td className="px-5 py-4">
         <span className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-black ${statusClass(request.status)}`}>
@@ -1086,6 +1252,11 @@ function RequestCard({
         <span className="rounded-full bg-[#f8faf8] px-3 py-1.5">{request.amount}</span>
       </div>
       <p className="mt-4 text-sm font-semibold text-[#526174]">{request.note}</p>
+      {request.status === "rejected" && request.rejectionReason ? (
+        <p className="mt-3 rounded-[14px] bg-rose-50 px-4 py-3 text-sm font-black text-rose-800">
+          Atmetimo priežastis: {request.rejectionReason}
+        </p>
+      ) : null}
       {request.status === "submitted" ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="rounded-[14px] bg-amber-50 px-4 py-2 text-sm font-black text-amber-700">

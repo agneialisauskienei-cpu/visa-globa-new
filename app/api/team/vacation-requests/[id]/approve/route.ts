@@ -10,23 +10,24 @@ async function readParams(params: RouteContext["params"]) {
   return await Promise.resolve(params);
 }
 
-export async function POST(
-  request: Request,
-  context: RouteContext,
-) {
+export async function POST(request: Request, context: RouteContext) {
   try {
     const supabase = await createClient();
-
     const { id } = await readParams(context.params);
-
     const body = await request.json().catch(() => ({}));
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const authHeader = request.headers.get("authorization");
+    const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
 
-    if (userError || !user) {
+    let userResult = await supabase.auth.getUser();
+
+    if ((!userResult.data.user || userResult.error) && token) {
+      userResult = await supabase.auth.getUser(token);
+    }
+
+    const user = userResult.data.user;
+
+    if (!user) {
       return NextResponse.json(
         { error: "Prisijungimas būtinas." },
         { status: 401 },
@@ -37,31 +38,23 @@ export async function POST(
       requestId: id,
       actorUserId: user.id,
       substitution: body?.substitution?.substituteUserId
-        ? {
-            substituteUserId:
-              body.substitution.substituteUserId,
-          }
+        ? { substituteUserId: body.substitution.substituteUserId }
         : undefined,
       negativeBalance: body?.negativeBalance?.allowNegativeBalance
         ? {
             allowNegativeBalance: true,
-            reason: String(
-              body.negativeBalance.reason || "",
-            ),
+            reason: String(body.negativeBalance.reason || ""),
           }
         : undefined,
     });
 
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Nepavyko patvirtinti prašymo.",
-      },
-      { status: 400 },
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Nepavyko patvirtinti prašymo.";
+
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
