@@ -164,12 +164,93 @@ function isTemporaryKind(kind?: string | null) {
   return requestKindMeta(kind).kind === "temporary_leave";
 }
 
+
+function lithuanianEasterDate(year: number) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function addDays(date: Date, amount: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function isLithuanianPublicHoliday(date: Date) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const fixed = new Set([
+    "1-1",
+    "2-16",
+    "3-11",
+    "5-1",
+    "6-24",
+    "7-6",
+    "8-15",
+    "11-1",
+    "11-2",
+    "12-24",
+    "12-25",
+    "12-26",
+  ]);
+
+  if (fixed.has(`${month}-${day}`)) return true;
+
+  const easter = lithuanianEasterDate(year);
+  const easterMonday = addDays(easter, 1);
+  const mothersDay = new Date(year, 4, 1);
+  mothersDay.setDate(1 + ((7 - mothersDay.getDay()) % 7));
+  const fathersDay = new Date(year, 5, 1);
+  fathersDay.setDate(1 + ((7 - fathersDay.getDay()) % 7));
+
+  return [easter, easterMonday, mothersDay, fathersDay].some(
+    (holiday) => toDateInput(holiday) === toDateInput(date),
+  );
+}
+
+function isBusinessDay(date: Date) {
+  const day = date.getDay();
+  return day !== 0 && day !== 6 && !isLithuanianPublicHoliday(date);
+}
+
+function businessDaysBetween(start: string, end: string) {
+  const dates = datesBetween(start, end);
+  const count = dates.filter((date) => isBusinessDay(new Date(`${date}T00:00:00`))).length;
+  return Math.max(1, count);
+}
+
+function isScheduledWorkEntry(entry: {
+  status?: string | null;
+  start_datetime?: string | null;
+  end_datetime?: string | null;
+}) {
+  const status = String(entry.status || "").trim().toLowerCase();
+
+  if (status.startsWith("absence_")) return false;
+  if (["off", "free", "poilsis", "laisva", "holiday", "svente", "šventė"].includes(status)) return false;
+  if (entry.start_datetime && entry.end_datetime) return true;
+  if (["work", "p", "d", "dirba"].includes(status)) return true;
+
+  return false;
+}
+
 function daysBetween(start: string, end: string) {
-  const startDate = new Date(`${start}T00:00:00`);
-  const endDate = new Date(`${end}T00:00:00`);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 1;
-  const diff = Math.floor((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
-  return Math.max(1, diff);
+  if (!start || !end) return 1;
+  return businessDaysBetween(start, end);
 }
 
 function dateRange(start: string, end: string) {
@@ -553,6 +634,34 @@ export default function RequestsPage() {
     return employeeById(isAdmin ? form.employeeId : currentUserId)?.position || "Darbuotojas";
   }
 
+  async function countRequestDays(employeeId: string, kind: RequestKind, start: string, end: string) {
+    if (isTemporaryKind(kind)) return 0;
+
+    if (organizationId && employeeId && start && end) {
+      const { data, error } = await supabase
+        .from("work_schedule_entries")
+        .select("date, status, start_datetime, end_datetime")
+        .eq("organization_id", organizationId)
+        .eq("employee_id", employeeId)
+        .gte("date", start)
+        .lte("date", end);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const scheduledWorkDates = new Set(
+          data
+            .filter((entry) => isScheduledWorkEntry(entry))
+            .map((entry) => String(entry.date)),
+        );
+
+        if (scheduledWorkDates.size > 0) {
+          return scheduledWorkDates.size;
+        }
+      }
+    }
+
+    return daysBetween(start, end);
+  }
+
   async function submitRequest() {
     if (!organizationId || !currentUserId) return;
 
@@ -574,7 +683,7 @@ export default function RequestsPage() {
     }
 
     const meta = requestKindMeta(form.kind);
-    const requestedDays = isTemporaryKind(form.kind) ? 0 : daysBetween(form.start, form.end);
+    const requestedDays = await countRequestDays(employeeId, form.kind, form.start, form.end);
     const noteParts = [];
 
     if (form.note.trim()) noteParts.push(form.note.trim());
@@ -894,6 +1003,11 @@ export default function RequestsPage() {
                             {statusIcon(request.status)}
                             {statusLabel(request.status)}
                           </span>
+                          {request.status === "rejected" && request.rejectionReason ? (
+                            <p className="mt-2 max-w-xs text-xs font-bold text-rose-700">
+                              Priežastis: {request.rejectionReason}
+                            </p>
+                          ) : null}
                         </td>
                         <td className="px-5 py-4">
                           {request.status === "submitted" ? (

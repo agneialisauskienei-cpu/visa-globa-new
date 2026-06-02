@@ -726,10 +726,93 @@ function datesBetween(start: string, end: string) {
   return rows;
 }
 
+
+function lithuanianEasterDate(year: number) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function addDays(date: Date, amount: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function isLithuanianPublicHoliday(date: Date) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const fixed = new Set([
+    "1-1",
+    "2-16",
+    "3-11",
+    "5-1",
+    "6-24",
+    "7-6",
+    "8-15",
+    "11-1",
+    "11-2",
+    "12-24",
+    "12-25",
+    "12-26",
+  ]);
+
+  if (fixed.has(`${month}-${day}`)) return true;
+
+  const easter = lithuanianEasterDate(year);
+  const easterMonday = addDays(easter, 1);
+  const mothersDay = new Date(year, 4, 1);
+  mothersDay.setDate(1 + ((7 - mothersDay.getDay()) % 7));
+  const fathersDay = new Date(year, 5, 1);
+  fathersDay.setDate(1 + ((7 - fathersDay.getDay()) % 7));
+
+  return [easter, easterMonday, mothersDay, fathersDay].some(
+    (holiday) => toDateInput(holiday) === toDateInput(date),
+  );
+}
+
+function isBusinessDay(date: Date) {
+  const day = date.getDay();
+  return day !== 0 && day !== 6 && !isLithuanianPublicHoliday(date);
+}
+
+function businessDaysBetween(start: string, end: string) {
+  const dates = datesBetween(start, end);
+  const count = dates.filter((date) => isBusinessDay(new Date(`${date}T00:00:00`))).length;
+  return Math.max(1, count);
+}
+
+function isScheduledWorkEntry(entry: {
+  status?: string | null;
+  start_datetime?: string | null;
+  end_datetime?: string | null;
+}) {
+  const status = String(entry.status || "").trim().toLowerCase();
+
+  if (status.startsWith("absence_")) return false;
+  if (["off", "free", "poilsis", "laisva", "holiday", "svente", "šventė"].includes(status)) return false;
+  if (entry.start_datetime && entry.end_datetime) return true;
+  if (["work", "p", "d", "dirba"].includes(status)) return true;
+
+  return false;
+}
+
 function daysBetween(start: string, end: string) {
   if (!start || !end) return 0;
-  const days = datesBetween(start, end).length;
-  return Math.max(1, days);
+  return businessDaysBetween(start, end);
 }
 
 function absenceTypeMeta(type?: string | null): AbsenceType {
@@ -2356,83 +2439,6 @@ export default function TeamPage() {
     );
   }
 
-  async function recalculateVacationEntitlementForRequest(
-    request?: Pick<
-      VacationRequest,
-      "organization_id" | "employee_id" | "type" | "start_date"
-    > | null,
-  ) {
-    if (!organizationId || !request?.employee_id || !request.start_date) return;
-    if (!isAnnualVacation(request.type)) return;
-
-    const requestOrganizationId =
-      String(request.organization_id || organizationId).trim() || organizationId;
-    const year = new Date(`${request.start_date}T00:00:00`).getFullYear();
-
-    const { error: ensureError } = await supabase
-      .from("vacation_entitlements")
-      .upsert(
-        {
-          organization_id: requestOrganizationId,
-          employee_id: request.employee_id,
-          year,
-          annual_days: 30,
-          carried_over_days: 0,
-          used_days: 0,
-          reserved_days: 0,
-          is_active: true,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "organization_id,employee_id,year",
-          ignoreDuplicates: true,
-        },
-      );
-
-    if (ensureError) throw ensureError;
-
-    const { data: requestRows, error: requestRowsError } = await supabase
-      .from("vacation_requests")
-      .select("status, requested_days, type, start_date")
-      .eq("organization_id", requestOrganizationId)
-      .eq("employee_id", request.employee_id);
-
-    if (requestRowsError) throw requestRowsError;
-
-    const annualRows = (
-      (requestRows || []) as Array<{
-        status: string | null;
-        requested_days: number | string | null;
-        type: string | null;
-        start_date: string | null;
-      }>
-    ).filter((row) => {
-      if (!isAnnualVacation(row.type) || !row.start_date) return false;
-      return new Date(`${row.start_date}T00:00:00`).getFullYear() === year;
-    });
-
-    const usedDays = annualRows
-      .filter((row) => row.status === "approved")
-      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
-
-    const reservedDays = annualRows
-      .filter((row) => row.status === "submitted" || row.status === "pending")
-      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
-
-    const { error: entitlementError } = await supabase
-      .from("vacation_entitlements")
-      .update({
-        used_days: roundFte(usedDays),
-        reserved_days: roundFte(reservedDays),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("organization_id", requestOrganizationId)
-      .eq("employee_id", request.employee_id)
-      .eq("year", year);
-
-    if (entitlementError) throw entitlementError;
-  }
-
   function vacationEntitlementDays(employee?: Employee | null) {
     const entitlement = vacationEntitlementRecord(employee?.user_id);
 
@@ -2507,6 +2513,34 @@ export default function TeamPage() {
       );
   }
 
+  async function countVacationRequestDays(employeeId: string, type: string, start: string, end: string) {
+    if (isTemporaryVacation(type)) return 0;
+
+    if (organizationId && employeeId && start && end) {
+      const { data, error } = await supabase
+        .from("work_schedule_entries")
+        .select("date, status, start_datetime, end_datetime")
+        .eq("organization_id", organizationId)
+        .eq("employee_id", employeeId)
+        .gte("date", start)
+        .lte("date", end);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const scheduledWorkDates = new Set(
+          data
+            .filter((entry) => isScheduledWorkEntry(entry))
+            .map((entry) => String(entry.date)),
+        );
+
+        if (scheduledWorkDates.size > 0) {
+          return scheduledWorkDates.size;
+        }
+      }
+    }
+
+    return daysBetween(start, end);
+  }
+
   async function submitVacationRequest(options?: {
     allowNegativeBalance?: boolean;
     negativeBalance?: { allowNegativeBalance: true; reason: string };
@@ -2528,9 +2562,12 @@ export default function TeamPage() {
       return;
     }
 
-    const requestedDays = isTemporaryVacation(vacationForm.type)
-      ? 0
-      : daysBetween(vacationForm.start_date, vacationForm.end_date);
+    const requestedDays = await countVacationRequestDays(
+      vacationForm.employee_id,
+      vacationForm.type,
+      vacationForm.start_date,
+      vacationForm.end_date,
+    );
     const balance = vacationBalance(vacationForm.employee_id);
     const left = balance.left;
     const reserved = balance.reserved;
@@ -2643,8 +2680,6 @@ export default function TeamPage() {
           );
         }
       }
-
-      await recalculateVacationEntitlementForRequest(created);
 
       setVacations((current) => [created, ...current]);
       setVacationForm({
@@ -2821,8 +2856,6 @@ export default function TeamPage() {
           .eq("source_vacation_request_id", id);
 
         if (substitutionError) throw substitutionError;
-
-        await recalculateVacationEntitlementForRequest(savedRequest);
       }
 
       if (previousRequest) {
