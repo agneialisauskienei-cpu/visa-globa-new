@@ -93,11 +93,20 @@ type VacationEntitlementDbRow = {
 };
 
 
+
+function toDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 const EMPTY_FORM = {
   employeeId: "",
   kind: "annual_leave" as RequestKind,
-  start: new Date().toISOString().slice(0, 10),
-  end: new Date().toISOString().slice(0, 10),
+  start: toDateInput(new Date()),
+  end: toDateInput(new Date()),
   note: "",
 };
 
@@ -264,7 +273,7 @@ function dateRange(start: string, end: string) {
   if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime())) return days;
 
   while (cursor <= last) {
-    days.push(cursor.toISOString().slice(0, 10));
+    days.push(toDateInput(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
 
@@ -777,8 +786,8 @@ export default function RequestsPage() {
       setForm((previous) => ({
         ...previous,
         kind: "annual_leave",
-        start: new Date().toISOString().slice(0, 10),
-        end: new Date().toISOString().slice(0, 10),
+        start: toDateInput(new Date()),
+        end: toDateInput(new Date()),
         note: "",
       }));
       setStatus("submitted");
@@ -1109,7 +1118,7 @@ export default function RequestsPage() {
         <section className="rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6 lg:p-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-700">Naujas prašymas</p>
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-700">{editingRequestId ? "Redagavimas" : "Naujas prašymas"}</p>
               <h2 className="mt-2 text-2xl font-black tracking-tight lg:text-3xl">{editingRequestId ? "Redaguoti prašymą" : "Pateikti prašymą"}</h2>
               <p className="mt-1 font-semibold text-[#526174]">
                 {editingRequestId ? "Keiti jau pateiktą laukiantį prašymą. Išsaugojus jis liks laukti vadovo sprendimo." : "Užpildyk prašymo informaciją ir pateik vadovui tvirtinti."}
