@@ -229,8 +229,9 @@ function isBusinessDay(date: Date) {
 
 function businessDaysBetween(start: string, end: string) {
   const dates = datesBetween(start, end);
-  const count = dates.filter((date) => isBusinessDay(new Date(`${date}T00:00:00`))).length;
-  return Math.max(1, count);
+  return dates.filter((date) =>
+    isBusinessDay(new Date(`${date}T00:00:00`)),
+  ).length;
 }
 
 function isScheduledWorkEntry(entry: {
@@ -572,7 +573,8 @@ export default function RequestsPage() {
         annualTotal,
         annualUsed,
         annualReserved,
-        annualLeft: Math.max(0, availableLeft - annualReserved),
+        // remaining_days DB jau yra po used_days ir reserved_days, todėl rezervuotos dienos neatimamos antrą kartą.
+        annualLeft: Math.max(0, availableLeft),
       };
     });
   }, [currentUserId, employees, isAdmin, requests, vacationEntitlements]);
@@ -634,30 +636,19 @@ export default function RequestsPage() {
     return employeeById(isAdmin ? form.employeeId : currentUserId)?.position || "Darbuotojas";
   }
 
-  async function countRequestDays(employeeId: string, kind: RequestKind, start: string, end: string) {
+  async function countRequestDays(
+    employeeId: string,
+    kind: RequestKind,
+    start: string,
+    end: string,
+  ) {
+    // Atostogų prašymų dienos skaičiuojamos stabiliai:
+    // I–V minus Lietuvos šventinės dienos.
+    // Sąmoningai nenaudojame work_schedule_entries, kad grafiko nebuvimas
+    // ar netikslūs grafiko įrašai nekeistų darbuotojo atostogų likučio.
+    void employeeId;
+
     if (isTemporaryKind(kind)) return 0;
-
-    if (organizationId && employeeId && start && end) {
-      const { data, error } = await supabase
-        .from("work_schedule_entries")
-        .select("date, status, start_datetime, end_datetime")
-        .eq("organization_id", organizationId)
-        .eq("employee_id", employeeId)
-        .gte("date", start)
-        .lte("date", end);
-
-      if (!error && Array.isArray(data) && data.length > 0) {
-        const scheduledWorkDates = new Set(
-          data
-            .filter((entry) => isScheduledWorkEntry(entry))
-            .map((entry) => String(entry.date)),
-        );
-
-        if (scheduledWorkDates.size > 0) {
-          return scheduledWorkDates.size;
-        }
-      }
-    }
 
     return daysBetween(start, end);
   }
@@ -684,6 +675,14 @@ export default function RequestsPage() {
 
     const meta = requestKindMeta(form.kind);
     const requestedDays = await countRequestDays(employeeId, form.kind, form.start, form.end);
+
+    if (isAnnualKind(form.kind) && requestedDays < 1) {
+      setMessage(
+        "Pasirinktame laikotarpyje nėra darbo dienų pagal grafiką arba darbo dienų kalendorių.",
+      );
+      return;
+    }
+
     const noteParts = [];
 
     if (form.note.trim()) noteParts.push(form.note.trim());
@@ -834,28 +833,25 @@ export default function RequestsPage() {
         throw new Error("Tvirtinimas ir atmetimas vykdomi HR / admin atostogų modulyje.");
       }
 
-      const { error } = await supabase
-        .from("vacation_requests")
-        .update({ status: "canceled" })
-        .eq("id", id)
-        .eq("employee_id", request.employeeId)
-        .in("status", ["submitted", "pending"]);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (error) throw error;
+      const response = await fetch(`/api/team/vacation-requests/${id}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
+      });
 
-      await recalculateVacationEntitlement(request.employeeId);
+      const json = await response.json().catch(() => ({}));
 
-      setRequests((previous) =>
-        previous.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                status: "canceled",
-                note: "Prašymą atšaukė darbuotojas.",
-              }
-            : item,
-        ),
-      );
+      if (!response.ok) {
+        throw new Error(json?.error || "Nepavyko atšaukti prašymo.");
+      }
 
       setMessage("Prašymas atšauktas.");
       await loadPage();
