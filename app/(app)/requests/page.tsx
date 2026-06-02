@@ -126,18 +126,8 @@ function normalizeStatus(value?: string | null): RequestStatus {
   if (["approved", "confirmed", "patvirtinta"].includes(raw)) return "approved";
   if (["rejected", "atmesta"].includes(raw)) return "rejected";
   if (["canceled", "cancelled", "atšaukta", "atsaukta"].includes(raw)) return "canceled";
-  if (["pending", "laukia"].includes(raw)) return "pending";
+  if (["pending", "laukiama"].includes(raw)) return "pending";
   return "submitted";
-}
-
-function isWaitingStatus(status: RequestStatus) {
-  return status === "submitted" || status === "pending";
-}
-
-function matchesStatusFilter(requestStatus: RequestStatus, filterStatus: RequestStatus | "all") {
-  if (filterStatus === "all") return true;
-  if (filterStatus === "submitted") return isWaitingStatus(requestStatus);
-  return requestStatus === filterStatus;
 }
 
 function requestKindMeta(kind?: string | null) {
@@ -239,9 +229,11 @@ function isBusinessDay(date: Date) {
 
 function businessDaysBetween(start: string, end: string) {
   const dates = dateRange(start, end);
-  return dates.filter((date) =>
-    isBusinessDay(new Date(`${date}T00:00:00`)),
-  ).length;
+
+  return dates.filter((date) => {
+    const current = new Date(`${date}T00:00:00`);
+    return isBusinessDay(current);
+  }).length;
 }
 
 function isScheduledWorkEntry(entry: {
@@ -260,7 +252,7 @@ function isScheduledWorkEntry(entry: {
 }
 
 function daysBetween(start: string, end: string) {
-  if (!start || !end) return 1;
+  if (!start || !end) return 0;
   return businessDaysBetween(start, end);
 }
 
@@ -302,6 +294,22 @@ function vacationEntitlement(employee?: EmployeeRow | null) {
   }
 
   return 20;
+}
+
+function normalizeIsoDateInput(value?: string | null) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+  if (slash) {
+    const [, day, month, year] = slash;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  return raw;
 }
 
 function getReadableError(error: unknown) {
@@ -376,7 +384,7 @@ export default function RequestsPage() {
       requestedDays,
       status: normalizeStatus(row.status),
       balance: isTemporaryKind(meta.kind) ? "Likutis nekeičiamas" : "Likutis skaičiuojamas pagal patvirtintas atostogas",
-      risk: isWaitingStatus(normalizeStatus(row.status)) ? "Laukia sprendimo" : "—",
+      risk: normalizeStatus(row.status) === "submitted" ? "Laukia sprendimo" : "—",
       note: row.note || "—",
       rejectionReason: row.rejection_reason || null,
       createdAt: row.created_at,
@@ -524,7 +532,7 @@ export default function RequestsPage() {
 
       return (
         (!q || haystack.includes(q)) &&
-        matchesStatusFilter(request.status, status) &&
+        (status === "all" || request.status === status) &&
         (type === "all" || request.kind === type)
       );
     });
@@ -560,7 +568,7 @@ export default function RequestsPage() {
         .filter((request) => request.status === "approved")
         .reduce((sum, request) => sum + request.requestedDays, 0);
       const localReserved = employeeRequests
-        .filter((request) => isWaitingStatus(request.status))
+        .filter((request) => (request.status === "submitted" || request.status === "pending"))
         .reduce((sum, request) => sum + request.requestedDays, 0);
 
       const baseAnnual =
@@ -604,7 +612,7 @@ export default function RequestsPage() {
     balances[0] ||
     null;
 
-  const submitted = visibleRequests.filter((request) => isWaitingStatus(request.status)).length;
+  const submitted = visibleRequests.filter((request) => (request.status === "submitted" || request.status === "pending")).length;
   const approved = visibleRequests.filter((request) => request.status === "approved").length;
   const rejected = visibleRequests.filter((request) => request.status === "rejected").length;
   const total = visibleRequests.length;
@@ -631,7 +639,7 @@ export default function RequestsPage() {
 
       return (
         (!q || haystack.includes(q)) &&
-        matchesStatusFilter(request.status, status) &&
+        (status === "all" || request.status === status) &&
         (type === "all" || request.kind === type)
       );
     });
@@ -652,10 +660,6 @@ export default function RequestsPage() {
     start: string,
     end: string,
   ) {
-    // Atostogų prašymų dienos skaičiuojamos stabiliai:
-    // I–V minus Lietuvos šventinės dienos.
-    // Sąmoningai nenaudojame work_schedule_entries, kad grafiko nebuvimas
-    // ar netikslūs grafiko įrašai nekeistų darbuotojo atostogų likučio.
     void employeeId;
 
     if (isTemporaryKind(kind)) return 0;
@@ -664,17 +668,21 @@ export default function RequestsPage() {
   }
 
   function startEditRequest(request: RequestRow) {
-    if (!isWaitingStatus(request.status)) return;
+    if (request.status !== "submitted" && request.status !== "pending") {
+      setMessage("Redaguoti galima tik laukiantį prašymą.");
+      return;
+    }
 
     setEditingRequestId(request.id);
     setForm({
       employeeId: request.employeeId,
       kind: request.kind,
-      start: request.start,
-      end: request.end,
+      start: normalizeIsoDateInput(request.start),
+      end: normalizeIsoDateInput(request.end),
       note: request.note === "—" ? "" : request.note,
     });
-    setMessage("Redaguojamas nepatvirtintas prašymas.");
+
+    setMessage("Redaguojamas laukiantis prašymas. Pakeisk datas ar pastabą ir spausk „Išsaugoti“.");
   }
 
   function cancelEditRequest() {
@@ -693,23 +701,31 @@ export default function RequestsPage() {
       return;
     }
 
-    if (!form.start || !form.end) {
-      setMessage("Nurodyk pradžios ir pabaigos datą.");
+    const startDate = normalizeIsoDateInput(form.start);
+    const endDate = normalizeIsoDateInput(form.end);
+
+    if (!startDate || !endDate) {
+      setMessage("Nurodyk pradžios ir pabaigos datą formatu YYYY-MM-DD.");
       return;
     }
 
-    if (form.end < form.start) {
+    if (endDate < startDate) {
       setMessage("Pabaigos data negali būti ankstesnė už pradžios datą.");
       return;
     }
 
     const meta = requestKindMeta(form.kind);
-    const requestedDays = await countRequestDays(employeeId, form.kind, form.start, form.end);
+    const requestedDays = await countRequestDays(employeeId, form.kind, startDate, endDate);
 
     if (isAnnualKind(form.kind) && requestedDays < 1) {
       setMessage(
-        "Pasirinktame laikotarpyje nėra darbo dienų pagal grafiką arba darbo dienų kalendorių.",
+        "Pasirinktame laikotarpyje nėra darbo dienų.",
       );
+      return;
+    }
+
+    if (isAnnualKind(form.kind) && requestedDays <= 0) {
+      setMessage("Pasirinktame laikotarpyje nėra darbo dienų.");
       return;
     }
 
@@ -725,60 +741,38 @@ export default function RequestsPage() {
         organization_id: organizationId,
         employee_id: employeeId,
         type: form.kind,
-        start_date: form.start,
-        end_date: isTemporaryKind(form.kind) ? form.start : form.end,
+        start_date: startDate,
+        end_date: isTemporaryKind(form.kind) ? startDate : endDate,
         requested_days: requestedDays,
         note: noteParts.length ? noteParts.join(" · ") : null,
         status: "submitted",
       };
 
-      let data: VacationDbRow | null = null;
+      const requestQuery = editingRequestId
+        ? supabase
+            .from("vacation_requests")
+            .update(payload)
+            .eq("id", editingRequestId)
+            .eq("employee_id", employeeId)
+            .in("status", ["submitted", "pending"])
+            .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
+            .single()
+        : supabase
+            .from("vacation_requests")
+            .insert(payload)
+            .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
+            .single();
 
-      if (editingRequestId) {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+      const { data, error } = await requestQuery;
 
-        const response = await fetch(`/api/team/vacation-requests/${encodeURIComponent(editingRequestId)}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.access_token
-              ? { Authorization: `Bearer ${session.access_token}` }
-              : {}),
-          },
-          body: JSON.stringify({
-            type: payload.type,
-            start_date: payload.start_date,
-            end_date: payload.end_date,
-            note: payload.note,
-          }),
-        });
+      if (error) throw error;
 
-        const json = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(json?.error || "Nepavyko atnaujinti prašymo.");
-        }
-
-        data = json.request as VacationDbRow;
-      } else {
-        const { data: createdData, error } = await supabase
-          .from("vacation_requests")
-          .insert(payload)
-          .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
-          .single();
-
-        if (error) throw error;
-        data = createdData as VacationDbRow;
-      }
-
-      const created = mapDbRequest(data as VacationDbRow, employees);
+      const saved = mapDbRequest(data as VacationDbRow, employees);
 
       setRequests((previous) =>
         editingRequestId
-          ? previous.map((request) => (request.id === editingRequestId ? created : request))
-          : [created, ...previous],
+          ? previous.map((item) => (item.id === editingRequestId ? saved : item))
+          : [saved, ...previous],
       );
       setForm((previous) => ({
         ...previous,
@@ -787,15 +781,9 @@ export default function RequestsPage() {
         end: new Date().toISOString().slice(0, 10),
         note: "",
       }));
-      setEditingRequestId(null);
       setStatus("submitted");
-      setMessage(
-        editingRequestId
-          ? "Prašymo pakeitimai išsaugoti."
-          : isAdmin
-            ? "Prašymas pateiktas."
-            : "Prašymas pateiktas vadovo sprendimui.",
-      );
+      setEditingRequestId(null);
+      setMessage(editingRequestId ? "Prašymas atnaujintas." : isAdmin ? "Prašymas pateiktas." : "Prašymas pateiktas vadovo sprendimui.");
 
       if (isAnnualKind(form.kind)) {
         await recalculateVacationEntitlement(employeeId);
@@ -844,7 +832,7 @@ export default function RequestsPage() {
       .filter((row) => normalizeStatus(row.status) === "approved")
       .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
     const reservedDays = annualRows
-      .filter((row) => isWaitingStatus(normalizeStatus(row.status)))
+      .filter((row) => normalizeStatus(row.status) === "submitted")
       .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
 
     if (entitlement) {
@@ -899,7 +887,7 @@ export default function RequestsPage() {
         throw new Error("Galite atšaukti tik savo prašymą.");
       }
 
-      if (nextStatus === "canceled" && !isWaitingStatus(request.status)) {
+      if (nextStatus === "canceled" && request.status !== "submitted") {
         throw new Error("Galima atšaukti tik laukiantį prašymą.");
       }
 
@@ -1080,13 +1068,13 @@ export default function RequestsPage() {
                           ) : null}
                         </td>
                         <td className="px-5 py-4">
-                          {isWaitingStatus(request.status) ? (
+                          {(request.status === "submitted" || request.status === "pending") ? (
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
                                 disabled={saving}
                                 onClick={() => startEditRequest(request)}
-                                className="rounded-[14px] bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-800 disabled:opacity-60"
+                                className="rounded-[14px] bg-white px-4 py-2 text-sm font-black text-[#486b5d] ring-1 ring-[#dbe6e0] disabled:opacity-60"
                               >
                                 Redaguoti
                               </button>
@@ -1122,9 +1110,9 @@ export default function RequestsPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-700">Naujas prašymas</p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight lg:text-3xl">Pateikti prašymą</h2>
+              <h2 className="mt-2 text-2xl font-black tracking-tight lg:text-3xl">{editingRequestId ? "Redaguoti prašymą" : "Pateikti prašymą"}</h2>
               <p className="mt-1 font-semibold text-[#526174]">
-                Užpildyk prašymo informaciją ir pateik vadovui tvirtinti.
+                {editingRequestId ? "Keiti jau pateiktą laukiantį prašymą. Išsaugojus jis liks laukti vadovo sprendimo." : "Užpildyk prašymo informaciją ir pateik vadovui tvirtinti."}
               </p>
             </div>
           </div>
@@ -1132,7 +1120,7 @@ export default function RequestsPage() {
           <div className="mt-6 grid gap-3 lg:grid-cols-[1.2fr_1fr_150px_150px_1fr_auto]">
             <select
               value={isAdmin ? form.employeeId : currentUserId || form.employeeId}
-              disabled={!isAdmin || Boolean(editingRequestId)}
+              disabled={!isAdmin}
               onChange={(event) => setForm((previous) => ({ ...previous, employeeId: event.target.value }))}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1] disabled:text-[#486b5d]"
             >
@@ -1162,13 +1150,17 @@ export default function RequestsPage() {
               <option value="training">Mokymai / komandiruotė (K)</option>
             </select>
             <input
-              type="date"
+              type="text"
+              placeholder="YYYY-MM-DD"
+              inputMode="numeric"
               value={form.start}
               onChange={(event) => setForm((previous) => ({ ...previous, start: event.target.value, end: previous.end || event.target.value }))}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
             />
             <input
-              type="date"
+              type="text"
+              placeholder="YYYY-MM-DD"
+              inputMode="numeric"
               value={form.end}
               onChange={(event) => setForm((previous) => ({ ...previous, end: event.target.value }))}
               disabled={form.kind === "temporary_leave"}
@@ -1409,7 +1401,7 @@ function RequestTableRow({
         </span>
       </td>
       <td className="px-5 py-4">
-        {isWaitingStatus(request.status) ? (
+        {(request.status === "submitted" || request.status === "pending") ? (
           <div className="flex flex-col gap-2">
             <span className="text-sm font-black text-[#526174]">Laukia vadovo sprendimo</span>
             <button disabled={saving} type="button" onClick={onCancel} className="w-fit rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] disabled:opacity-60">
@@ -1460,7 +1452,7 @@ function RequestCard({
           Atmetimo priežastis: {request.rejectionReason}
         </p>
       ) : null}
-      {isWaitingStatus(request.status) ? (
+      {(request.status === "submitted" || request.status === "pending") ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="rounded-[14px] bg-amber-50 px-4 py-2 text-sm font-black text-amber-700">
             Laukia vadovo sprendimo
