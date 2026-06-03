@@ -1446,7 +1446,7 @@ export default function EmployeeDashboardPage() {
         <DashboardModal
           title={modalTitle(modal)}
           onClose={() => setModal(null)}
-          wide={modal === "requests"}
+          wide={false}
           compactBody={modal === "requests"}
         >
           {modal === "profile" ? (

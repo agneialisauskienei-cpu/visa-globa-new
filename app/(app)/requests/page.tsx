@@ -1289,7 +1289,7 @@ export default function RequestsPage() {
           : "px-4 pb-24 pt-4 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8"
       }`}
     >
-      <div className={`mx-auto space-y-5 ${embedded ? "max-w-[1180px]" : "max-w-7xl lg:space-y-7"}`}>
+      <div className={`mx-auto space-y-5 ${embedded ? "max-w-[760px]" : "max-w-7xl lg:space-y-7"}`}>
         <section className={`${embedded ? "hidden" : ""} overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]`}>
           <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-5">
@@ -1336,8 +1336,8 @@ export default function RequestsPage() {
           </div>
         ) : null}
 
-        <section className="grid items-start gap-5 lg:grid-cols-[420px_1fr]">
-          <article className="rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6">
+        <section className={`grid items-start gap-5 ${embedded ? "" : "lg:grid-cols-[420px_1fr]"}`}>
+          <article className={`${embedded ? "hidden" : ""} rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6`}>
             <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-700">Likutis</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight">Atostogų likutis</h2>
             <p className="mt-1 text-sm font-semibold text-[#526174]">
@@ -1432,7 +1432,7 @@ export default function RequestsPage() {
             </div>
           </article>
 
-          <article className="rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6">
+          <article className={`${embedded ? "hidden" : ""} rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6`}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-700">Prašymai</p>
@@ -1536,7 +1536,7 @@ export default function RequestsPage() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto]">
+          <div className={`mt-6 grid gap-3 ${embedded ? "grid-cols-1" : "lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto]"}`}>
             <select
               value={isAdmin ? form.employeeId : currentUserId || form.employeeId}
               disabled={!isAdmin}
@@ -1647,6 +1647,66 @@ export default function RequestsPage() {
             ) : null}
           </div>
         </section>
+        ) : null}
+
+        {embedded ? (
+          <section className="rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6">
+            <button
+              type="button"
+              onClick={() => setForecastOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+                  Preliminarus skaičiavimas
+                </p>
+                <h3 className="mt-1 text-2xl font-black text-[#10251f]">
+                  Prognozuojamas likutis
+                </h3>
+                <p className="mt-1 text-sm font-black text-[#486b5d]">
+                  {futureBalance
+                    ? `${formatVacationDays(futureBalance.projectedLeft)} d. d.`
+                    : "Skaičiuoti"}
+                </p>
+              </div>
+              <CalendarMiniIcon />
+            </button>
+
+            {forecastOpen ? (
+              <>
+                <label className="mt-4 block text-xs font-black uppercase tracking-[0.14em] text-[#526174]">
+                  Norima data
+                  <input
+                    type="date"
+                    value={forecastDate}
+                    onChange={(event) => setForecastDate(event.target.value)}
+                    className="mt-2 h-12 w-full rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                  />
+                </label>
+
+                {futureBalance ? (
+                  <div className="mt-4 divide-y divide-[#dbe6e0] overflow-hidden rounded-[18px] border border-[#dbe6e0] bg-[#fbfcfb]">
+                    <BalanceLine
+                      label="Dabartinis likutis"
+                      value={`${formatVacationDays(selectedBalance.annualLeft)} d.`}
+                    />
+                    <BalanceLine
+                      label="Papildomai sukaups"
+                      value={`${formatVacationDays(futureBalance.additionalAccrued)} d.`}
+                    />
+                    <BalanceLine
+                      label="Sukaupta iki datos"
+                      value={`${formatVacationDays(futureBalance.accrued)} d.`}
+                    />
+                  </div>
+                ) : null}
+
+                <p className="mt-3 text-xs font-bold leading-5 text-[#526174]">
+                  Skaičiavimas preliminarus: imamas dabartinis likutis ir pridedama iki pasirinktos datos sukaupta dalis.
+                </p>
+              </>
+            ) : null}
+          </section>
         ) : null}
 
         <section className="rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6 lg:p-7">
