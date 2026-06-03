@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -14,6 +14,26 @@ type PatchBody = {
 
 async function readParams(params: RouteContext["params"]) {
   return await Promise.resolve(params);
+}
+
+function createRequestClient(request: Request) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const authorization =
+    request.headers.get("authorization") ||
+    request.headers.get("Authorization") ||
+    "";
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Trūksta Supabase URL arba publishable/anon key.");
+  }
+
+  return createSupabaseClient(supabaseUrl, supabaseKey, {
+    global: authorization ? { headers: { Authorization: authorization } } : undefined,
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
 function normalizeStatus(value?: string | null) {
@@ -116,7 +136,7 @@ function businessDaysBetween(start: string, end: string) {
 }
 
 async function recalculateVacationEntitlement(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient,
   organizationId: string,
   employeeId: string,
   years: number[],
@@ -166,7 +186,7 @@ async function recalculateVacationEntitlement(
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const supabase = await createClient();
+    const supabase = createRequestClient(request);
     const { id } = await readParams(context.params);
     const body = (await request.json()) as PatchBody;
 
