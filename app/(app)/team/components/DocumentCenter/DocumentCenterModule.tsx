@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { getChangedFields, logAudit } from "@/lib/audit"
 import {
   AlertTriangle,
   CheckCircle2,
@@ -126,6 +127,27 @@ function safeFileName(name: string) {
       return map[char] || char
     })
     .replace(/[^a-z0-9._-]/g, "-")
+}
+
+async function writeDocumentAudit(input: {
+  organizationId?: string | null
+  tableName: string
+  recordId?: string | null
+  action: "insert" | "update" | "delete"
+  before?: Record<string, unknown>
+  after?: Record<string, unknown>
+}) {
+  try {
+    await logAudit({
+      organizationId: input.organizationId || null,
+      tableName: input.tableName,
+      recordId: input.recordId || null,
+      action: input.action,
+      changes: getChangedFields(input.before || {}, input.after || {}),
+    })
+  } catch (error) {
+    console.warn("[DocumentCenterModule] audit skipped", error)
+  }
 }
 
 export default function DocumentCenterModule({
@@ -396,6 +418,20 @@ export default function DocumentCenterModule({
         }
       }
 
+      await writeDocumentAudit({
+        organizationId,
+        tableName: "company_documents",
+        recordId: created.id,
+        action: "insert",
+        after: {
+          title: normalizedTitle,
+          type,
+          version: normalizedVersion,
+          status: publishNow ? "published" : "draft",
+          file_name: upload.fileName,
+        },
+      })
+
       setMessage({
         type: "success",
         text: publishNow ? "Dokumentas išsaugotas ir publikuotas." : "Dokumentas išsaugotas kaip juodraštis.",
@@ -422,13 +458,15 @@ export default function DocumentCenterModule({
       return
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("company_documents")
       .update({
         status: "published",
         published_at: new Date().toISOString(),
       })
       .eq("id", document.id)
+      .select("id")
+      .maybeSingle()
 
     if (error) {
       setMessage({
@@ -438,6 +476,23 @@ export default function DocumentCenterModule({
       })
       return
     }
+
+    if (!data?.id) {
+      setMessage({
+        type: "error",
+        text: "Dokumentas nerastas arba neturite teisės jo publikuoti.",
+      })
+      return
+    }
+
+    await writeDocumentAudit({
+      organizationId,
+      tableName: "company_documents",
+      recordId: document.id,
+      action: "update",
+      before: { status: document.status || "draft", published_at: document.published_at || null },
+      after: { status: "published", published_at: "now" },
+    })
 
     setMessage({ type: "success", text: "Dokumentas publikuotas." })
     await onRefresh?.()
@@ -469,13 +524,40 @@ export default function DocumentCenterModule({
     setSaving(true)
 
     try {
-      const rows = selectedEmployeeIds.map((employeeId) => ({
+      const selectedVersion = selectedDocument.version || "1.0"
+      const existingAssignmentKeys = new Set(
+        acknowledgements
+          .filter(
+            (item) =>
+              item.organization_id === organizationId &&
+              item.document_id === selectedDocument.id &&
+              String(item.document_version || "1.0") === selectedVersion &&
+              item.status !== "archived",
+          )
+          .map((item) => item.employee_id),
+      )
+      const duplicateEmployeeIds = selectedEmployeeIds.filter((employeeId) =>
+        existingAssignmentKeys.has(employeeId),
+      )
+      const newEmployeeIds = selectedEmployeeIds.filter(
+        (employeeId) => !existingAssignmentKeys.has(employeeId),
+      )
+
+      if (!newEmployeeIds.length) {
+        setMessage({
+          type: "warning",
+          text: "Šis dokumentas pasirinktai versijai jau priskirtas pasirinktiems darbuotojams.",
+        })
+        return
+      }
+
+      const rows = newEmployeeIds.map((employeeId) => ({
         organization_id: organizationId,
         employee_id: employeeId,
         document_id: selectedDocument.id,
         document_title: selectedDocument.title,
         document_type: selectedDocument.type,
-        document_version: selectedDocument.version,
+        document_version: selectedVersion,
         status: "sent",
         assigned_by: currentUserId || null,
         assigned_at: new Date().toISOString(),
@@ -483,9 +565,10 @@ export default function DocumentCenterModule({
         note: assignmentNote.trim() || null,
       }))
 
-      const { error } = await supabase
+      const { data: createdRows, error } = await supabase
         .from("personnel_document_acknowledgements")
         .insert(rows)
+        .select("id, employee_id, document_id, document_version")
 
       if (error) {
         setMessage({
@@ -496,7 +579,30 @@ export default function DocumentCenterModule({
         return
       }
 
-      setMessage({ type: "success", text: "Dokumentas priskirtas darbuotojams." })
+      await Promise.all(
+        (createdRows || []).map((created) =>
+          writeDocumentAudit({
+            organizationId,
+            tableName: "personnel_document_acknowledgements",
+            recordId: created.id,
+            action: "insert",
+            after: {
+              employee_id: created.employee_id,
+              document_id: created.document_id,
+              document_version: created.document_version,
+              status: "sent",
+              due_date: dueDate || null,
+            },
+          }),
+        ),
+      )
+
+      setMessage({
+        type: duplicateEmployeeIds.length ? "warning" : "success",
+        text: duplicateEmployeeIds.length
+          ? `Dokumentas priskirtas naujiems darbuotojams. ${duplicateEmployeeIds.length} dubl. praleista.`
+          : "Dokumentas priskirtas darbuotojams.",
+      })
       setSelectedEmployeeIds([])
       setDueDate("")
       setAssignmentNote("")
@@ -566,6 +672,15 @@ export default function DocumentCenterModule({
     }
 
     setMessage({ type: "success", text: "Susipažinimo faktas išsaugotas." })
+    await writeDocumentAudit({
+      organizationId,
+      tableName: "personnel_document_acknowledgements",
+      recordId: item.id,
+      action: "update",
+      before: { status: item.status || "sent", acknowledged_at: item.acknowledged_at || null },
+      after: { status: "acknowledged", acknowledged_at: "now", employee_id: item.employee_id },
+    })
+
     setAckConfirm(false)
     await onRefresh?.()
   }
