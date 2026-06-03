@@ -701,12 +701,19 @@ export default function AdminDashboardPage() {
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
                 Veiksmai
               </p>
-              <h2 className="mt-1 text-2xl font-black">Dokumentų valdymas</h2>
+              <h2 className="mt-1 text-2xl font-black">Patvirtinimas</h2>
 
               <div className="mt-5 grid gap-3">
-                <QuickLink title="Tikrinti darbuotojų dokumentus" onClick={() => router.push("/team?module=docs")} />
-                <QuickLink title="Dokumentų audit žurnalas" onClick={() => router.push("/audit")} />
-                <QuickLink title="Dokumentų ataskaitos" onClick={() => router.push("/reports")} />
+                <button
+                  type="button"
+                  onClick={() => router.push("/team?module=docs")}
+                  className="min-h-14 rounded-xl bg-[#047857] px-5 text-left text-base font-black text-white transition hover:bg-[#065f46]"
+                >
+                  Atidaryti dokumentų patvirtinimą
+                </button>
+                <p className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-sm font-bold text-[#486b5d]">
+                  Atsidariusiame sąraše prie laukiančių įrašų spauskite „Patvirtinti“.
+                </p>
               </div>
             </section>
           </section>

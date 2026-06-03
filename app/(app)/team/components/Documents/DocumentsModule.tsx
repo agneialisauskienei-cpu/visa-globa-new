@@ -109,7 +109,7 @@ function getDocumentStatus(record?: CredentialRecord | null) {
     return {
       key: "pending" as const,
       label: "Laukia peržiūros",
-      className: "bg-amber-100 text-amber-900",
+      className: "bg-[#fff7d6] text-[#8a4b00] ring-1 ring-[#f1d58a]",
     };
   }
 
@@ -580,6 +580,82 @@ export default function DocumentsModule({
     }
   }
 
+  async function approveCredential(row: {
+    id: string;
+    employee_id: string;
+    type: string;
+    record: CredentialRecord | null;
+  }) {
+    setMessage(null);
+
+    if (!canManage) {
+      setMessage({
+        type: "error",
+        text: "Neturite teisės patvirtinti darbuotojų dokumentų.",
+      });
+      return;
+    }
+
+    if (!row.record?.id) {
+      setMessage({
+        type: "error",
+        text: "Dokumento įrašas nerastas.",
+      });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("personnel_credentials")
+        .update({ status: "active" })
+        .eq("id", row.record.id)
+        .eq("organization_id", organizationId)
+        .select("id")
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data?.id) {
+        throw new Error("Dokumento įrašas nerastas arba neturite teisės jo keisti.");
+      }
+
+      try {
+        await logAudit({
+          organizationId: organizationId || null,
+          tableName: "personnel_credentials",
+          recordId: row.record.id,
+          action: "document.approved",
+          changes: getChangedFields(
+            { status: row.record.status || "pending" },
+            {
+              employee_id: row.employee_id,
+              type: row.type,
+              status: "active",
+            },
+          ),
+        });
+      } catch (auditError) {
+        console.warn("[DocumentsModule] approve audit skipped", auditError);
+      }
+
+      setMessage({
+        type: "success",
+        text: "Dokumentas patvirtintas.",
+      });
+      await onRefresh?.();
+    } catch (error: unknown) {
+      setMessage({
+        type: "error",
+        text: "Nepavyko patvirtinti dokumento.",
+        details: errorDetails(error),
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="rounded-lg border border-[#dbe6e0] bg-white p-5 shadow-sm">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -922,7 +998,7 @@ export default function DocumentsModule({
                       <td className="px-4 py-3">{row.expires_at}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`rounded-full px-3 py-1 text-xs font-black ${row.status.className}`}
+                          className={`inline-flex max-w-[130px] items-center justify-center rounded-full px-3 py-1 text-center text-xs font-black leading-tight ${row.status.className}`}
                         >
                           {row.status.label}
                         </span>
@@ -941,6 +1017,29 @@ export default function DocumentsModule({
                           >
                             Pridėti dokumentą
                           </button>
+                        ) : row.status.key === "pending" ? (
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => void approveCredential(row)}
+                              className="rounded-xl bg-[#047857] px-3 py-2 text-xs font-black text-white hover:bg-[#065f46] disabled:opacity-60"
+                            >
+                              Patvirtinti
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                fillFromMissing({
+                                  employee_id: row.employee_id,
+                                  type: row.type,
+                                })
+                              }
+                              className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
+                            >
+                              Keisti
+                            </button>
+                          </div>
                         ) : (
                           <button
                             type="button"
