@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getChangedFields, logAudit } from "@/lib/audit";
 
@@ -113,6 +113,14 @@ function getDocumentStatus(record?: CredentialRecord | null) {
     };
   }
 
+  if (String(record.status || "").toLowerCase() === "rejected") {
+    return {
+      key: "expired" as const,
+      label: "Atmesta",
+      className: "bg-red-100 text-red-800",
+    };
+  }
+
   const expires = parseDate(record.expires_at);
   if (!expires) {
     return {
@@ -215,6 +223,13 @@ export default function DocumentsModule({
   const [checkedAt, setCheckedAt] = useState(todayIso());
   const [checkedByText, setCheckedByText] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [editingCredentialId, setEditingCredentialId] = useState<string | null>(
+    null,
+  );
+  const [rejectingCredentialId, setRejectingCredentialId] = useState<
+    string | null
+  >(null);
+  const [rejectReason, setRejectReason] = useState("");
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [canManage, setCanManage] = useState(false);
 
@@ -339,6 +354,7 @@ export default function DocumentsModule({
   function fillFromMissing(
     row: MissingDocumentRecord | { employee_id: string; type: string },
   ) {
+    setEditingCredentialId(null);
     setEmployeeId(row.employee_id);
     setType(normalizeCredentialType(row.type));
     setNumber("");
@@ -357,6 +373,43 @@ export default function DocumentsModule({
         block: "start",
       });
     });
+  }
+
+  function fillFromCredential(record: CredentialRecord) {
+    setEditingCredentialId(record.id);
+    setEmployeeId(record.employee_id);
+    setType(normalizeCredentialType(record.type));
+    setNumber(record.number || "");
+    setIssuer(record.issuer || "");
+    setIssuedAt(record.issued_at || todayIso());
+    setExpiresAt(record.expires_at || "");
+    setNote(record.note || "");
+    setCheckMethod(CHECK_METHODS[0]);
+    setCheckedAt(todayIso());
+    setCheckedByText("");
+    setConfirmed(false);
+    setMessage(null);
+    window.requestAnimationFrame(() => {
+      document.getElementById("documents-form")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
+  function resetForm() {
+    setEditingCredentialId(null);
+    setEmployeeId("");
+    setType(CREDENTIAL_TYPES[0]);
+    setNumber("");
+    setIssuer("");
+    setIssuedAt(todayIso());
+    setExpiresAt("");
+    setNote("");
+    setCheckMethod(CHECK_METHODS[0]);
+    setCheckedAt(todayIso());
+    setCheckedByText("");
+    setConfirmed(false);
   }
 
   function compactPayload<T extends Record<string, unknown>>(payload: T) {
@@ -544,7 +597,27 @@ export default function DocumentsModule({
         note: note.trim() || null,
       });
 
-      const credential = await insertCredentialWithFallback(credentialPayload);
+      let credential: { id?: string | null } | null = null;
+
+      if (editingCredentialId) {
+        const { data, error } = await supabase
+          .from("personnel_credentials")
+          .update(credentialPayload)
+          .eq("id", editingCredentialId)
+          .eq("organization_id", organizationId)
+          .select("id")
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data?.id) {
+          throw new Error("Dokumento įrašas nerastas arba neturite teisės jo keisti.");
+        }
+
+        credential = data;
+      } else {
+        credential = await insertCredentialWithFallback(credentialPayload);
+      }
       const verificationSaved = await trySaveVerification(
         credential?.id || null,
       );
@@ -567,6 +640,7 @@ export default function DocumentsModule({
       setCheckedAt(todayIso());
       setCheckedByText("");
       setConfirmed(false);
+      setEditingCredentialId(null);
 
       await onRefresh?.();
     } catch (error: unknown) {
@@ -607,9 +681,133 @@ export default function DocumentsModule({
     setSaving(true);
 
     try {
+      const checkedAtValue = todayIso();
       const { data, error } = await supabase
         .from("personnel_credentials")
         .update({ status: "active" })
+        .eq("id", row.record.id)
+        .eq("organization_id", organizationId)
+        .select("id")
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data?.id) {
+        throw new Error("Dokumento įrašas nerastas arba neturite teisės jo keisti.");
+      }
+
+      try {
+        const { error: verificationError } = await supabase
+          .from("document_verifications")
+          .insert({
+            organization_id: organizationId,
+            employee_id: row.employee_id,
+            credential_id: row.record.id,
+            type: normalizeCredentialType(row.type),
+            method: CHECK_METHODS[0],
+            checked_at: checkedAtValue,
+            checked_by: currentUserId || null,
+            checked_by_text: "Administratorius",
+            result: "confirmed",
+            note: "Patvirtinta administratoriaus: matytas originalas.",
+          });
+
+        if (verificationError) {
+          console.warn(
+            "[DocumentsModule] approve verification skipped",
+            verificationError,
+          );
+        }
+      } catch (verificationError) {
+        console.warn(
+          "[DocumentsModule] approve verification skipped",
+          verificationError,
+        );
+      }
+
+      try {
+        await logAudit({
+          organizationId: organizationId || null,
+          tableName: "personnel_credentials",
+          recordId: row.record.id,
+          action: "document.approved",
+          changes: getChangedFields(
+            { status: row.record.status || "pending" },
+            {
+              employee_id: row.employee_id,
+              type: row.type,
+              status: "active",
+              check_method: CHECK_METHODS[0],
+              checked_at: checkedAtValue,
+            },
+          ),
+        });
+      } catch (auditError) {
+        console.warn("[DocumentsModule] approve audit skipped", auditError);
+      }
+
+      setMessage({
+        type: "success",
+        text: "Dokumentas patvirtintas ir originalo peržiūra užfiksuota.",
+      });
+      await onRefresh?.();
+    } catch (error: unknown) {
+      setMessage({
+        type: "error",
+        text: "Nepavyko patvirtinti dokumento.",
+        details: errorDetails(error),
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function rejectCredential(row: {
+    employee_id: string;
+    type: string;
+    record: CredentialRecord | null;
+  }) {
+    setMessage(null);
+
+    if (!canManage) {
+      setMessage({
+        type: "error",
+        text: "Neturite teisės atmesti darbuotojų dokumentų.",
+      });
+      return;
+    }
+
+    if (!row.record?.id) {
+      setMessage({
+        type: "error",
+        text: "Dokumento įrašas nerastas.",
+      });
+      return;
+    }
+
+    const reason = rejectReason.trim();
+    if (reason.length < 5) {
+      setMessage({
+        type: "error",
+        text: "Įrašykite aiškią atmetimo priežastį.",
+      });
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const previousNote = row.record.note?.trim();
+      const nextNote = previousNote
+        ? `${previousNote}\n\nAtmetimo priežastis: ${reason}`
+        : `Atmetimo priežastis: ${reason}`;
+
+      const { data, error } = await supabase
+        .from("personnel_credentials")
+        .update({
+          status: "rejected",
+          note: nextNote,
+        })
         .eq("id", row.record.id)
         .eq("organization_id", organizationId)
         .select("id")
@@ -626,29 +824,32 @@ export default function DocumentsModule({
           organizationId: organizationId || null,
           tableName: "personnel_credentials",
           recordId: row.record.id,
-          action: "document.approved",
+          action: "document.rejected",
           changes: getChangedFields(
-            { status: row.record.status || "pending" },
+            { status: row.record.status || "pending", note: row.record.note || null },
             {
               employee_id: row.employee_id,
               type: row.type,
-              status: "active",
+              status: "rejected",
+              rejection_reason: reason,
             },
           ),
         });
       } catch (auditError) {
-        console.warn("[DocumentsModule] approve audit skipped", auditError);
+        console.warn("[DocumentsModule] reject audit skipped", auditError);
       }
 
+      setRejectingCredentialId(null);
+      setRejectReason("");
       setMessage({
         type: "success",
-        text: "Dokumentas patvirtintas.",
+        text: "Dokumentas atmestas. Priežastis išsaugota prie įrašo.",
       });
       await onRefresh?.();
     } catch (error: unknown) {
       setMessage({
         type: "error",
-        text: "Nepavyko patvirtinti dokumento.",
+        text: "Nepavyko atmesti dokumento.",
         details: errorDetails(error),
       });
     } finally {
@@ -742,7 +943,7 @@ export default function DocumentsModule({
           className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8]/70 p-5"
         >
           <h3 className="text-2xl font-black text-[#10251f]">
-            Pridėti dokumentą
+            {editingCredentialId ? "Redaguoti dokumentą" : "Pridėti dokumentą"}
           </h3>
           <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
             Įvedamas dokumento faktas ir privalomas patikrinimas. Failų kelti
@@ -932,13 +1133,22 @@ export default function DocumentsModule({
           ) : null}
 
           <div className="mt-5 flex justify-end">
+            {editingCredentialId ? (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="mr-3 inline-flex min-h-10 items-center justify-center rounded-lg border border-[#dbe6e0] px-5 text-base font-black text-[#40594f] transition hover:bg-[#f8faf8]"
+              >
+                Atšaukti redagavimą
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={handleSave}
               disabled={saving}
               className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#486b5d] px-5 text-base font-black text-white shadow-sm transition hover:bg-[#39594c] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {saving ? "Saugoma..." : "+ Išsaugoti"}
+              {saving ? "Saugoma..." : editingCredentialId ? "Išsaugoti pakeitimus" : "+ Išsaugoti"}
             </button>
           </div>
         </div>
@@ -989,7 +1199,8 @@ export default function DocumentsModule({
               <tbody className="divide-y divide-slate-100">
                 {filteredRows.length ? (
                   filteredRows.map((row) => (
-                    <tr key={row.id}>
+                    <Fragment key={row.id}>
+                    <tr>
                       <td className="px-4 py-3 font-semibold text-slate-900">
                         {row.employee_name}
                       </td>
@@ -1025,19 +1236,25 @@ export default function DocumentsModule({
                               onClick={() => void approveCredential(row)}
                               className="rounded-xl bg-[#047857] px-3 py-2 text-xs font-black text-white hover:bg-[#065f46] disabled:opacity-60"
                             >
-                              Patvirtinti
+                              Patvirtinti originalą
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                fillFromMissing({
-                                  employee_id: row.employee_id,
-                                  type: row.type,
-                                })
-                              }
+                              onClick={() => row.record && fillFromCredential(row.record)}
                               className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
                             >
-                              Keisti
+                              Redaguoti
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRejectingCredentialId(row.record?.id || null);
+                                setRejectReason("");
+                                setMessage(null);
+                              }}
+                              className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-800 hover:bg-red-100"
+                            >
+                              Atmesti
                             </button>
                           </div>
                         ) : (
@@ -1056,6 +1273,49 @@ export default function DocumentsModule({
                         )}
                       </td>
                     </tr>
+                    {row.status.key === "pending" &&
+                    row.record?.id &&
+                    rejectingCredentialId === row.record.id ? (
+                      <tr>
+                        <td colSpan={6} className="bg-red-50/60 px-4 py-4">
+                          <div className="rounded-xl border border-red-200 bg-white p-4">
+                            <label className="block space-y-2">
+                              <span className="text-sm font-black text-red-900">
+                                Atmetimo priežastis
+                              </span>
+                              <textarea
+                                value={rejectReason}
+                                onChange={(event) => setRejectReason(event.target.value)}
+                                rows={3}
+                                placeholder="Pvz., dokumento originalas neatitiko įvestų duomenų."
+                                className="w-full resize-none rounded-lg border border-red-200 px-4 py-3 text-sm font-bold text-[#10251f] outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                              />
+                            </label>
+                            <div className="mt-3 flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRejectingCredentialId(null);
+                                  setRejectReason("");
+                                }}
+                                className="rounded-xl border border-[#dbe6e0] px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#f8faf8]"
+                              >
+                                Atšaukti
+                              </button>
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={() => void rejectCredential(row)}
+                                className="rounded-xl bg-red-700 px-4 py-2 text-sm font-black text-white hover:bg-red-800 disabled:opacity-60"
+                              >
+                                Atmesti dokumentą
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
                   ))
                 ) : (
                   <tr>
