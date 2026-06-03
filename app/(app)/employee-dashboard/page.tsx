@@ -469,6 +469,9 @@ export default function EmployeeDashboardPage() {
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
   const [schedule, setSchedule] = useState<EmployeeSchedule[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [employeeCredentials, setEmployeeCredentials] = useState<
+    EmployeeCredentialRow[]
+  >([]);
   const [vacationRequests, setVacationRequests] = useState<
     VacationRequestRow[]
   >([]);
@@ -803,6 +806,7 @@ export default function EmployeeDashboardPage() {
       setProfile(mergedProfile);
       setTasks(tasksData);
       setNotifications(notificationsData);
+      setEmployeeCredentials(submittedCredentials);
       setVacationRequests(vacationRequestsData);
       setSchedule(loadedSchedule);
       setTrainings(trainingData);
@@ -1442,6 +1446,8 @@ export default function EmployeeDashboardPage() {
         <DashboardModal
           title={modalTitle(modal)}
           onClose={() => setModal(null)}
+          wide={modal === "requests"}
+          compactBody={modal === "requests"}
         >
           {modal === "profile" ? (
             <div className="grid gap-4">
@@ -1496,137 +1502,11 @@ export default function EmployeeDashboardPage() {
           ) : null}
 
           {modal === "requests" ? (
-            <div className="space-y-3">
-              <div className="rounded-[18px] border border-[#dbe6e0] bg-white p-4">
-                <div>
-                  <div className="font-black text-[#10251f]">
-                    {editingVacationRequestId
-                      ? "Redaguojamas prašymas"
-                      : "Naujas prašymas"}
-                  </div>
-                  <div className="mt-1 text-sm font-bold text-[#526174]">
-                    Viskas lieka šiame lange, be perėjimo į kitą puslapį.
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_1fr_1fr_auto]">
-                  <label className="grid gap-2 text-sm font-black text-[#486b5d]">
-                    Tipas
-                    <select
-                      value={vacationRequestForm.type}
-                      onChange={(event) =>
-                        setVacationRequestForm((prev) => ({
-                          ...prev,
-                          type: event.target.value,
-                        }))
-                      }
-                      className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
-                    >
-                      <option value="annual_leave">Kasmetinės atostogos</option>
-                      <option value="mamadienis">Mamadienis</option>
-                      <option value="tevadienis">Tėvadienis</option>
-                      <option value="sick_leave">Nedarbingumas</option>
-                      <option value="training">Mokymai / komandiruotė</option>
-                    </select>
-                  </label>
-                  <ModalField
-                    label="Nuo"
-                    type="date"
-                    value={vacationRequestForm.startDate}
-                    onChange={(value) =>
-                      setVacationRequestForm((prev) => ({
-                        ...prev,
-                        startDate: value,
-                        endDate: prev.endDate < value ? value : prev.endDate,
-                      }))
-                    }
-                  />
-                  <ModalField
-                    label="Iki"
-                    type="date"
-                    value={vacationRequestForm.endDate}
-                    onChange={(value) =>
-                      setVacationRequestForm((prev) => ({
-                        ...prev,
-                        endDate: value,
-                      }))
-                    }
-                  />
-                  <div className="rounded-[16px] bg-[#eef4f1] px-4 py-3 text-sm font-black text-[#486b5d]">
-                    <div className="text-[11px] uppercase tracking-wide">
-                      Kiekis
-                    </div>
-                    <div className="mt-1 text-lg text-[#10251f]">
-                      {formatRequestDays(
-                        countBusinessDays(
-                          vacationRequestForm.startDate,
-                          vacationRequestForm.endDate,
-                        ),
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <label className="mt-3 grid gap-2 text-sm font-black text-[#486b5d]">
-                  Pastaba
-                  <input
-                    value={vacationRequestForm.note}
-                    onChange={(event) =>
-                      setVacationRequestForm((prev) => ({
-                        ...prev,
-                        note: event.target.value,
-                      }))
-                    }
-                    className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
-                  />
-                </label>
-
-                {vacationRequestMessage ? (
-                  <div className="mt-3 rounded-[14px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">
-                    {vacationRequestMessage}
-                  </div>
-                ) : null}
-
-                <div className="mt-4 flex flex-wrap justify-end gap-3">
-                  {editingVacationRequestId ? (
-                    <button
-                      type="button"
-                      onClick={resetVacationRequestForm}
-                      className="rounded-[16px] border border-[#c9d8d0] bg-white px-5 py-3 font-black text-[#486b5d]"
-                    >
-                      Atšaukti redagavimą
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void submitVacationRequest()}
-                    disabled={saving}
-                    className="rounded-[16px] bg-[#047857] px-5 py-3 font-black text-white disabled:opacity-60"
-                  >
-                    {saving
-                      ? "Saugoma..."
-                      : editingVacationRequestId
-                        ? "Išsaugoti"
-                        : "Pateikti"}
-                  </button>
-                </div>
-              </div>
-
-              {vacationRequests.map((request) => (
-                <VacationRequestCard
-                  key={request.id}
-                  request={request}
-                  onEdit={() => startEditVacationRequest(request)}
-                />
-              ))}
-              {!vacationRequests.length ? (
-                <EmptyState
-                  icon={<CalendarX className="h-7 w-7" />}
-                  title="Prašymų nėra"
-                  desc="Kai pateiksi prašymą, jo būsena atsiras čia."
-                />
-              ) : null}
-            </div>
+            <iframe
+              title="Prašymai"
+              src="/requests?embedded=1"
+              className="h-[78vh] w-full border-0 bg-[#f3f6f4]"
+            />
           ) : null}
 
           {modal === "notifications" ? (
@@ -1677,6 +1557,15 @@ export default function EmployeeDashboardPage() {
 
           {modal === "documents" ? (
             <div className="grid gap-4">
+              {employeeCredentials.some(
+                (credential) =>
+                  String(credential.status || "").toLowerCase() === "pending",
+              ) ? (
+                <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black leading-6 text-amber-900">
+                  Dokumentų informacija pateikta ir laukia administratoriaus
+                  patvirtinimo.
+                </div>
+              ) : null}
               <ModalField
                 label="Sveikatos pažyma galioja iki"
                 type="date"
@@ -2242,10 +2131,14 @@ function DashboardModal({
   title,
   children,
   onClose,
+  wide = false,
+  compactBody = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  wide?: boolean;
+  compactBody?: boolean;
 }) {
   return (
     <div
@@ -2253,7 +2146,9 @@ function DashboardModal({
       onClick={onClose}
     >
       <section
-        className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-[28px] bg-white shadow-2xl"
+        className={`max-h-[92vh] w-full overflow-hidden rounded-[28px] bg-white shadow-2xl ${
+          wide ? "max-w-[1500px]" : "max-w-3xl"
+        }`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 bg-[#486b5d] p-6 text-white">
@@ -2272,7 +2167,11 @@ function DashboardModal({
             <X className="h-6 w-6" />
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto bg-[#f8faf8] p-5">
+        <div
+          className={`overflow-y-auto bg-[#f8faf8] ${
+            compactBody ? "max-h-[78vh] p-0" : "max-h-[70vh] p-5"
+          }`}
+        >
           {children}
         </div>
       </section>

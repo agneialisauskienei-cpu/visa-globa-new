@@ -36,6 +36,19 @@ function createRequestClient(request: Request) {
   });
 }
 
+function createAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing Supabase URL or service role key.");
+  }
+
+  return createSupabaseClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 function normalizeStatus(value?: string | null) {
   return String(value || "").trim().toLowerCase();
 }
@@ -186,11 +199,14 @@ async function recalculateVacationEntitlement(
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const supabase = createRequestClient(request);
+    const supabase = createAdminClient();
     const { id } = await readParams(context.params);
     const body = (await request.json()) as PatchBody;
 
-    const authHeader = request.headers.get("authorization");
+    const authHeader =
+      request.headers.get("authorization") ||
+      request.headers.get("Authorization") ||
+      "";
     const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
 
     let userResult = await supabase.auth.getUser();
