@@ -217,6 +217,9 @@ type Credential = {
   type: string;
   number: string | null;
   expires_at: string | null;
+  status?: string | null;
+  note?: string | null;
+  created_at?: string | null;
 };
 
 type DocumentAcknowledgement = Record<string, unknown>;
@@ -1346,9 +1349,9 @@ export default function TeamPage() {
           .order("completed_at", { ascending: false }),
         supabase
           .from("personnel_credentials")
-          .select("id, employee_id, type, number, expires_at")
+          .select("id, employee_id, type, number, expires_at, status, note, created_at")
           .eq("organization_id", orgId)
-          .order("expires_at", { ascending: true }),
+          .order("created_at", { ascending: false }),
         supabase
           .from("personnel_positions")
           .select(

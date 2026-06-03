@@ -39,7 +39,7 @@ type DocumentsModuleProps = {
   onRefresh?: () => void | Promise<void>;
 };
 
-type DocsFilter = "all" | "valid" | "expiring" | "expired" | "missing";
+type DocsFilter = "all" | "pending" | "valid" | "expiring" | "expired" | "missing";
 
 const DOCUMENT_MANAGER_ROLES = new Set(["owner", "admin", "director", "hr"]);
 
@@ -105,6 +105,14 @@ function getDocumentStatus(record?: CredentialRecord | null) {
     };
   }
 
+  if (String(record.status || "").toLowerCase() === "pending") {
+    return {
+      key: "pending" as const,
+      label: "Laukia peržiūros",
+      className: "bg-amber-100 text-amber-900",
+    };
+  }
+
   const expires = parseDate(record.expires_at);
   if (!expires) {
     return {
@@ -146,6 +154,15 @@ function employeeName(employees: EmployeeOption[], id: string) {
 
 function canManageDocuments(role?: string | null) {
   return DOCUMENT_MANAGER_ROLES.has(String(role || "").trim().toLowerCase());
+}
+
+function errorDetails(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const details = error as { message?: string; details?: string };
+    return details.message || details.details || String(error);
+  }
+  return String(error);
 }
 
 function makeMissingDocuments(
@@ -232,13 +249,13 @@ export default function DocumentsModule({
 
         if (!mounted) return;
         setCanManage(Boolean(data?.is_active) && canManageDocuments(data?.role));
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (!mounted) return;
         setCanManage(false);
         setMessage({
           type: "error",
           text: "Nepavyko patikrinti dokumentų modulio teisių.",
-          details: error?.message || error?.details || String(error),
+          details: errorDetails(error),
         });
       } finally {
         if (mounted) setCheckingAccess(false);
@@ -289,6 +306,7 @@ export default function DocumentsModule({
   const counts = useMemo(() => {
     const base = {
       all: credentialRows.length,
+      pending: 0,
       valid: 0,
       expiring: 0,
       expired: 0,
@@ -304,7 +322,11 @@ export default function DocumentsModule({
 
   const compliancePercent = useMemo(() => {
     const total =
-      counts.valid + counts.expiring + counts.expired + counts.missing;
+      counts.pending +
+      counts.valid +
+      counts.expiring +
+      counts.expired +
+      counts.missing;
     if (!total) return 100;
     return Math.round(((counts.valid + counts.expiring) / total) * 100);
   }, [counts]);
@@ -547,11 +569,11 @@ export default function DocumentsModule({
       setConfirmed(false);
 
       await onRefresh?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: "error",
         text: "Klaida saugant dokumentą.",
-        details: error?.message || error?.details || String(error),
+        details: errorDetails(error),
       });
     } finally {
       setSaving(false);
@@ -608,10 +630,11 @@ export default function DocumentsModule({
       )}
 
       <div className="mb-5 flex flex-wrap gap-3">
-        {[
-          ["all", "Visi", counts.all],
-          ["valid", "Galioja", counts.valid],
-          ["expiring", "Baigiasi", counts.expiring],
+          {[
+            ["all", "Visi", counts.all],
+            ["pending", "Laukia", counts.pending],
+            ["valid", "Galioja", counts.valid],
+            ["expiring", "Baigiasi", counts.expiring],
           ["expired", "Pasibaigę", counts.expired],
           ["missing", "Trūksta", counts.missing],
         ].map(([key, label, count]) => (
@@ -848,6 +871,8 @@ export default function DocumentsModule({
                 Filtras:{" "}
                 {filter === "all"
                   ? "Visi"
+                  : filter === "pending"
+                    ? "Laukia peržiūros"
                   : filter === "valid"
                     ? "Galioja"
                     : filter === "expiring"

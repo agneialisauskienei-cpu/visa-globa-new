@@ -137,8 +137,19 @@ type ProfileRow = {
 
 type MembershipRow = {
   id?: string | null;
+  organization_id?: string | null;
   position?: string | null;
   department?: string | null;
+};
+
+type EmployeeCredentialRow = {
+  id: string;
+  type?: string | null;
+  number?: string | null;
+  expires_at?: string | null;
+  status?: string | null;
+  note?: string | null;
+  created_at?: string | null;
 };
 
 type Toast = { title: string; message: string };
@@ -325,6 +336,20 @@ function formatRequestDays(value?: number | string | null) {
   })} d.`;
 }
 
+function credentialTypeKey(value?: string | null) {
+  const raw = String(value || "").toLowerCase();
+  if (raw.includes("licenc")) return "license";
+  if (raw.includes("sveikat")) return "health";
+  return raw;
+}
+
+function newestCredential(
+  credentials: EmployeeCredentialRow[],
+  key: "health" | "license",
+) {
+  return credentials.find((credential) => credentialTypeKey(credential.type) === key);
+}
+
 async function safeSelect<T>(
   query: PromiseLike<{ data: T[] | null; error: unknown }>,
 ) {
@@ -344,6 +369,7 @@ export default function EmployeeDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
@@ -545,6 +571,27 @@ export default function EmployeeDashboardPage() {
     return [] as AssignedResident[];
   }
 
+  async function loadSubmittedCredentials(accessToken?: string | null) {
+    if (!accessToken) return [] as EmployeeCredentialRow[];
+
+    const response = await fetch("/api/personnel/credentials", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      console.warn(
+        "[employee-dashboard] credentials skipped:",
+        await response.text(),
+      );
+      return [] as EmployeeCredentialRow[];
+    }
+
+    const payload = (await response.json()) as {
+      credentials?: EmployeeCredentialRow[];
+    };
+    return payload.credentials || [];
+  }
+
   async function loadDashboard(showLoader = true) {
     if (showLoader) setLoading(true);
     setLoadError("");
@@ -558,6 +605,8 @@ export default function EmployeeDashboardPage() {
       if (userError) throw userError;
       if (!user) return;
       setUserId(user.id);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token || null;
 
       const [
         profileData,
@@ -576,7 +625,7 @@ export default function EmployeeDashboardPage() {
           .maybeSingle(),
         supabase
           .from("organization_members")
-          .select("id, position, department")
+          .select("id, organization_id, position, department")
           .eq("user_id", user.id)
           .limit(1)
           .maybeSingle(),
@@ -631,8 +680,13 @@ export default function EmployeeDashboardPage() {
         );
 
       const memberId = (membershipData.data as MembershipRow | null)?.id || null;
+      const currentOrganizationId =
+        (membershipData.data as MembershipRow | null)?.organization_id || null;
       const loadedSchedule = await loadEmployeeSchedule(user.id, memberId);
       const loadedResidents = await loadAssignedResidents(user.id, memberId);
+      const submittedCredentials = await loadSubmittedCredentials(accessToken);
+      const healthCredential = newestCredential(submittedCredentials, "health");
+      const licenseCredential = newestCredential(submittedCredentials, "license");
 
       const mergedProfile: ProfileRow = {
         ...(profileData.data || {}),
@@ -640,6 +694,7 @@ export default function EmployeeDashboardPage() {
         email: profileData.data?.email || user.email || null,
       };
 
+      setOrganizationId(currentOrganizationId);
       setProfile(mergedProfile);
       setTasks(tasksData);
       setNotifications(notificationsData);
@@ -653,9 +708,14 @@ export default function EmployeeDashboardPage() {
         address: mergedProfile.address || "",
       });
       setDocumentForm({
-        healthCertificateUntil: mergedProfile.health_certificate_until || "",
-        licenseUntil: mergedProfile.license_until || "",
-        licenseNumber: mergedProfile.license_number || "",
+        healthCertificateUntil:
+          healthCredential?.expires_at ||
+          mergedProfile.health_certificate_until ||
+          "",
+        licenseUntil:
+          licenseCredential?.expires_at || mergedProfile.license_until || "",
+        licenseNumber:
+          licenseCredential?.number || mergedProfile.license_number || "",
       });
     } catch (error) {
       setLoadError(readableError(error));
@@ -750,21 +810,59 @@ export default function EmployeeDashboardPage() {
   async function submitDocuments() {
     setSaving(true);
     try {
-      if (userId) {
-        await supabase.from("notifications").insert({
-          user_id: userId,
-          title: "Dokumentų pakeitimai pateikti",
-          message:
-            "Dokumentų pakeitimai laukia administratoriaus patvirtinimo.",
-          type: "documents",
-          is_read: false,
-        });
+      const credentials = [
+        {
+          type: "Sveikatos pažyma",
+          expires_at: documentForm.healthCertificateUntil,
+          note: "Pateikta darbuotojo paskyroje.",
+        },
+        {
+          type: "Profesinė licencija",
+          number: documentForm.licenseNumber,
+          expires_at: documentForm.licenseUntil,
+          note: "Pateikta darbuotojo paskyroje.",
+        },
+      ].filter((credential) => credential.expires_at || credential.number);
+
+      if (!credentials.length) {
+        showToast(
+          "Nėra ką pateikti",
+          "Įveskite bent vieną dokumento datą arba licencijos numerį.",
+        );
+        return;
       }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token || null;
+
+      const response = await fetch("/api/personnel/credentials", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({
+          organization_id: organizationId,
+          credentials,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Nepavyko pateikti dokumentų.");
+      }
+
       showToast(
         "Dokumentai pateikti",
         "Pakeitimai perduoti administratoriui patvirtinti.",
       );
       setModal(null);
+      await loadDashboard(false);
+    } catch (error) {
+      showToast("Dokumentų pateikti nepavyko", readableError(error));
     } finally {
       setSaving(false);
     }
