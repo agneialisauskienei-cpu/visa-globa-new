@@ -432,7 +432,7 @@ export default function RequestsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
   const [forecastDate, setForecastDate] = useState(() => toDateInput(new Date()));
-  const [forecastOpen, setForecastOpen] = useState(false);
+  const [forecastOpen, setForecastOpen] = useState(true);
 
   const isAdmin =
     currentUserRole === "owner" ||
@@ -831,6 +831,19 @@ export default function RequestsPage() {
     return employeeById(isAdmin ? form.employeeId : currentUserId)?.position || "Darbuotojas";
   }
 
+  function currentRequestTitle() {
+    const meta = requestKindMeta(form.kind);
+    const titles: Record<RequestKind, string> = {
+      annual_leave: "Kasmetinių atostogų prašymas",
+      temporary_leave: "Trumpo išvykimo prašymas",
+      mamadienis: "Mamadienio prašymas",
+      tevadienis: "Tėvadienio prašymas",
+      sick_leave: "Nedarbingumo prašymas",
+      training: "Mokymų / komandiruotės prašymas",
+    };
+    return titles[meta.kind];
+  }
+
   async function countRequestDays(
     employeeId: string,
     kind: RequestKind,
@@ -970,9 +983,10 @@ export default function RequestsPage() {
             .from("vacation_requests")
             .insert(payload)
             .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
+        if (!inserted?.id) throw new Error("Prašymas išsaugotas, bet DB negrąžino įrašo ID. Patikrink RLS.");
         data = inserted as VacationDbRow;
       }
 
@@ -997,8 +1011,12 @@ export default function RequestsPage() {
       setMessage(editingRequestId ? "Prašymas atnaujintas." : isAdmin ? "Prašymas pateiktas." : "Prašymas pateiktas vadovo sprendimui.");
 
       if (isAnnualKind(form.kind)) {
-        await recalculateVacationEntitlement(employeeId, new Date(`${startDate}T00:00:00`).getFullYear());
-        await loadPage();
+        try {
+          await recalculateVacationEntitlement(employeeId, new Date(`${startDate}T00:00:00`).getFullYear());
+          await loadPage();
+        } catch (recalculateError) {
+          console.warn("[requests] Prašymas pateiktas, bet likučio perskaičiavimas praleistas", recalculateError);
+        }
       }
     } catch (error) {
       setMessage(getReadableError(error));
@@ -1185,7 +1203,7 @@ export default function RequestsPage() {
               ))}
             </>
           ) : (
-            <option value={currentUserId || form.employeeId}>Mano prašymas</option>
+            <option value={currentUserId || form.employeeId}>{currentRequestTitle()}</option>
           )}
         </select>
         <select
@@ -1553,7 +1571,7 @@ export default function RequestsPage() {
                   ))}
                 </>
               ) : (
-                <option value={currentUserId || form.employeeId}>Mano prašymas</option>
+                <option value={currentUserId || form.employeeId}>{currentRequestTitle()}</option>
               )}
             </select>
             <select
