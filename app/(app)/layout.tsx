@@ -1,12 +1,20 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { NotificationProvider } from "@/components/providers/NotificationProvider"
 import AppSidebar from "@/components/layout/AppSidebar"
 
 export default function AppLayout({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<AppLayoutShell embedded={false}>Kraunama...</AppLayoutShell>}>
+      <AppLayoutContent>{children}</AppLayoutContent>
+    </Suspense>
+  )
+}
+
+function AppLayoutContent({ children }: { children: ReactNode }) {
   const [isDesktop, setIsDesktop] = useState(false)
   const searchParams = useSearchParams()
   const embedded = searchParams.get("embedded") === "1"
@@ -23,9 +31,25 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }, [])
 
   return (
+    <AppLayoutShell embedded={embedded} showSidebar={isDesktop && !embedded}>
+      {children}
+    </AppLayoutShell>
+  )
+}
+
+function AppLayoutShell({
+  children,
+  embedded,
+  showSidebar = false,
+}: {
+  children: ReactNode
+  embedded: boolean
+  showSidebar?: boolean
+}) {
+  return (
     <NotificationProvider>
       <div style={styles.shell}>
-        {isDesktop && !embedded ? <AppSidebar /> : null}
+        {showSidebar ? <AppSidebar /> : null}
 
         <main style={embedded ? styles.embeddedMain : styles.main}>
           <div style={styles.content}>{children}</div>

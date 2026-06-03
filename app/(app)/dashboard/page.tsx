@@ -416,81 +416,17 @@ export default function AdminDashboardPage() {
           <TopMetric title="Etatai" value={loading ? "…" : formatFte(stats.freeFte)} meta={`laisva iš ${formatFte(stats.plannedFte)} et.`} accent={stats.freeFte > 0 ? "red" : "emerald"} onClick={() => router.push("/team?module=fte")} />
           <TopMetric title="Užduotys" value={loading ? "…" : String(stats.pendingTasks)} meta={stats.pendingTasks ? "laukia" : "nėra"} accent={stats.pendingTasks ? "amber" : "emerald"} onClick={() => router.push("/tasks")} />
           <TopMetric title="Mokymai" value={loading ? "…" : `${computed.trainingCompletion}%`} meta="sutvarkyta" accent={computed.trainingCompletion < 70 ? "amber" : "emerald"} onClick={() => router.push("/team?module=trainings")} />
-          <TopMetric title="Dokumentai" value={loading ? "…" : String(stats.expiringCertificates)} meta="baigiasi" accent={stats.expiringCertificates ? "red" : "emerald"} onClick={() => router.push("/team?module=docs")} />
+          <TopMetric
+            title="Dokumentai"
+            value={loading ? "…" : String(stats.pendingDocumentApprovals + stats.expiringCertificates)}
+            meta={stats.pendingDocumentApprovals ? "laukia patvirtinimo" : "baigiasi"}
+            accent={stats.pendingDocumentApprovals || stats.expiringCertificates ? "amber" : "emerald"}
+            onClick={() => setActiveTab("documents")}
+          />
         </section>
-
-        <section className="flex flex-col gap-3 border-y border-[#dbe6e0] bg-white/80 px-4 py-3 shadow-[0_1px_5px_rgba(16,37,31,0.06)] sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="mr-2 text-[11px] font-black uppercase tracking-[0.22em] text-[#6a7e75]">Veiksmai</span>
-            <button type="button" onClick={() => router.push("/team?module=vacations")} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Užklausos</button>
-            <button type="button" onClick={() => router.push("/tasks")} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Užduotys</button>
-            <button type="button" onClick={() => router.push("/team?module=invites")} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Kvietimai</button>
-            <button type="button" onClick={loadStats} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Atnaujinti</button>
-          </div>
-          <div className="inline-flex w-fit rounded-lg border border-[#ead8a7] bg-[#fff9e8] px-4 py-2 text-sm font-black text-[#8a5a13]">
-            Rizikos: {computed.totalRisks + stats.pendingLeaves + stats.expiringCertificates + stats.pendingDocumentApprovals + stats.pendingInvites}
-          </div>
-        </section>
-
-        {(stats.pendingLeaves > 0 || stats.pendingInvites > 0 || stats.pendingDocumentApprovals > 0 || stats.todayAbsences > 0 || stats.replacementNeededFte > 0) ? (
-          <section className="grid gap-3 lg:grid-cols-4">
-            <CriticalStrip
-              icon={<UserPlus />}
-              title="Laukia kvietimai"
-              text={`${stats.pendingInvites} darbuotojų kvietimai dar nepriimti`}
-              color={stats.pendingInvites > 0 ? "blue" : "amber"}
-              onClick={() => {
-                setActiveTab("risks");
-                router.push("/team?module=invites");
-              }}
-            />
-            <CriticalStrip
-              icon={<CalendarCheck />}
-              title="Laukia prašymai"
-              text={`${stats.pendingLeaves} atostogų / išvykimo užklausos laukia sprendimo`}
-              color="amber"
-              onClick={() => {
-                setActiveTab("risks");
-                router.push("/team?module=vacations");
-              }}
-            />
-            {stats.pendingDocumentApprovals > 0 ? (
-              <CriticalStrip
-                icon={<FileText />}
-                title="Dokumentai patvirtinimui"
-                text={`${stats.pendingDocumentApprovals} dokumentų pakeitimai laukia patvirtinimo`}
-                color="amber"
-                onClick={() => {
-                  setActiveTab("risks");
-                  router.push("/team?module=docs");
-                }}
-              />
-            ) : null}
-            <CriticalStrip
-              icon={<Users />}
-              title="Šiandien nėra darbuotojų"
-              text={`${stats.todayAbsences} patvirtinti neatvykimai šiandien`}
-              color={stats.todayAbsences > 0 ? "amber" : "blue"}
-              onClick={() => {
-                setActiveTab("capacity");
-                router.push("/team?module=schedule");
-              }}
-            />
-            <CriticalStrip
-              icon={<ShieldAlert />}
-              title="Pavadavimo poreikis"
-              text={`${formatFte(stats.replacementNeededFte)} et. reikia padengti`}
-              color={stats.replacementNeededFte > 0 ? "red" : "blue"}
-              onClick={() => {
-                setActiveTab("capacity");
-                router.push("/team?module=schedule");
-              }}
-            />
-          </section>
-        ) : null}
 
         {activeTab === "overview" ? (
-          <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <section className="grid gap-4">
             <div className="grid gap-4">
               <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -562,20 +498,6 @@ export default function AdminDashboardPage() {
               </section>
             </div>
 
-            <DashboardSidePanel
-              pendingLeaves={stats.pendingLeaves}
-              pendingInvites={stats.pendingInvites}
-              totalInvites={stats.totalInvites}
-              todayAbsences={stats.todayAbsences}
-              expiringCertificates={stats.expiringCertificates}
-              pendingDocumentApprovals={stats.pendingDocumentApprovals}
-              trainingCompletion={computed.trainingCompletion}
-              lastUpdated={lastUpdated}
-              onVacations={() => router.push("/team?module=vacations")}
-              onInvites={() => router.push("/team?module=invites")}
-              onSchedule={() => router.push("/team?module=schedule")}
-              onDocuments={() => router.push("/team?module=docs")}
-            />
           </section>
         ) : null}
 
@@ -761,16 +683,18 @@ export default function AdminDashboardPage() {
           <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
-                Dokumentai ir mokymai
+                Dokumentai
               </p>
-              <h2 className="mt-1 text-2xl font-black">Atitikties santrauka</h2>
+              <h2 className="mt-1 text-2xl font-black">Darbuotojų pateikti duomenys</h2>
 
               <div className="mt-5 grid gap-3 md:grid-cols-2">
-                <FteSummaryCard label="Mokymai" value={`${computed.trainingCompletion}%`} tone={computed.trainingCompletion < 70 ? "amber" : "emerald"} />
+                <FteSummaryCard label="Laukia patvirtinimo" value={String(stats.pendingDocumentApprovals)} tone={stats.pendingDocumentApprovals > 0 ? "amber" : "emerald"} />
                 <FteSummaryCard label="Baigiasi dokumentai" value={String(stats.expiringCertificates)} tone={stats.expiringCertificates > 0 ? "red" : "emerald"} />
-                <FteSummaryCard label="Baigta mokymų" value={String(stats.completedTrainings)} />
-                <FteSummaryCard label="Reikalaujama" value={String(stats.requiredTrainings)} />
               </div>
+
+              <p className="mt-5 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-sm font-bold text-[#486b5d]">
+                Čia rodoma tik dokumentų būsena: darbuotojo pateikti pakeitimai ir artėjantys terminai.
+              </p>
             </section>
 
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
@@ -780,10 +704,9 @@ export default function AdminDashboardPage() {
               <h2 className="mt-1 text-2xl font-black">Dokumentų valdymas</h2>
 
               <div className="mt-5 grid gap-3">
-                <QuickLink title="Mokymų patvirtinimai" onClick={() => router.push("/team?module=trainings")} />
-                <QuickLink title="Darbuotojų dokumentai" onClick={() => router.push("/team?module=docs")} />
-                <QuickLink title="Susipažinimai" onClick={() => router.push("/team?module=document-acknowledgements")} />
-                <QuickLink title="Ataskaitos" onClick={() => router.push("/reports")} />
+                <QuickLink title="Tikrinti darbuotojų dokumentus" onClick={() => router.push("/team?module=docs")} />
+                <QuickLink title="Dokumentų audit žurnalas" onClick={() => router.push("/audit")} />
+                <QuickLink title="Dokumentų ataskaitos" onClick={() => router.push("/reports")} />
               </div>
             </section>
           </section>
