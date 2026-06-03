@@ -62,6 +62,7 @@ type EmployeeFilter =
   | "withoutRights";
 
 const PAGE_SIZE = 10;
+const ACCESS_MANAGER_ROLES = new Set(["owner", "admin", "director", "hr"]);
 
 type AccessGroupValue =
   | "administration"
@@ -312,6 +313,10 @@ function roleLabel(value?: string | null) {
   return value || "Nepasirinkta";
 }
 
+function canManageStaffAccess(role?: string | null) {
+  return ACCESS_MANAGER_ROLES.has(String(role || "").trim().toLowerCase());
+}
+
 function permissionLabel(permission: Permission) {
   return (
     PERMISSION_OPTIONS.find((item) => item.value === permission)?.label ||
@@ -482,6 +487,7 @@ export default function StaffTypesModulePage() {
   const [activeFilter, setActiveFilter] = useState<EmployeeFilter>("all");
   const [page, setPage] = useState(1);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [canManageAccess, setCanManageAccess] = useState(false);
 
   async function loadEmployees() {
     setLoading(true);
@@ -492,8 +498,46 @@ export default function StaffTypesModulePage() {
 
       if (!organizationId) {
         setEmployees([]);
+        setCanManageAccess(false);
         setMessageType("error");
         setMessage("Nepavyko nustatyti įstaigos.");
+        return;
+      }
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw userError;
+
+      if (!user) {
+        setEmployees([]);
+        setCanManageAccess(false);
+        setMessageType("error");
+        setMessage("Prisijunkite, kad galėtumėte valdyti darbuotojų teises.");
+        return;
+      }
+
+      const { data: currentMember, error: currentMemberError } = await supabase
+        .from("organization_members")
+        .select("role, is_active")
+        .eq("organization_id", organizationId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (currentMemberError) throw currentMemberError;
+
+      const hasAccess =
+        Boolean(currentMember?.is_active) &&
+        canManageStaffAccess(currentMember?.role);
+
+      setCanManageAccess(hasAccess);
+
+      if (!hasAccess) {
+        setEmployees([]);
+        setMessageType("error");
+        setMessage("Šį modulį gali valdyti tik savininkas, administratorius, direktorius arba HR.");
         return;
       }
 
@@ -540,6 +584,7 @@ export default function StaffTypesModulePage() {
         (previous) => previous || nextEmployees[0]?.user_id || null,
       );
     } catch (error) {
+      setCanManageAccess(false);
       setMessageType("error");
       setMessage(getReadableError(error));
     } finally {
@@ -570,6 +615,12 @@ export default function StaffTypesModulePage() {
       >
     >,
   ) {
+    if (!canManageAccess) {
+      setMessageType("error");
+      setMessage("Neturite teisės keisti darbuotojų prieigų.");
+      return;
+    }
+
     const currentEmployee = latestEmployee(employee);
 
     if (currentEmployee.role === "owner") {
