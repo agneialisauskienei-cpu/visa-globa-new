@@ -595,6 +595,8 @@ export default function VacationRequests({
   >({});
   const [reasonDialog, setReasonDialog] = useState<ReasonDialogState>(null);
   const [reasonText, setReasonText] = useState("");
+  const [rejectRequestId, setRejectRequestId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const employeeMap = useMemo(
     () => new Map(employees.map((employee) => [employee.user_id, employee])),
     [employees],
@@ -1206,16 +1208,8 @@ export default function VacationRequests({
   }
 
   function openRejectDialog(requestId: string) {
-    setReasonText("");
-    setReasonDialog({
-      kind: "reject",
-      requestId,
-      title: "Atmetimo priežastis",
-      message:
-        "Įrašykite aiškią atmetimo priežastį. Ji bus matoma darbuotojui ir liks prašymo istorijoje.",
-      minLength: 10,
-      confirmLabel: "Atmesti prašymą",
-    });
+    setRejectRequestId((current) => (current === requestId ? null : requestId));
+    setRejectReason("");
   }
 
   function closeReasonDialog() {
@@ -1247,6 +1241,19 @@ export default function VacationRequests({
 
     const requestId = reasonDialog.requestId;
     closeReasonDialog();
+    await rejectRequest(requestId, normalized);
+  }
+
+  async function confirmInlineReject(requestId: string) {
+    const normalized = normalizeReasonText(rejectReason);
+
+    if (normalized.length < 10) {
+      window.alert("Būtina aiški atmetimo priežastis, bent 10 simbolių.");
+      return;
+    }
+
+    setRejectRequestId(null);
+    setRejectReason("");
     await rejectRequest(requestId, normalized);
   }
 
@@ -1519,8 +1526,8 @@ export default function VacationRequests({
                 days > balance.left;
 
               return (
+                <div key={request.id} className="vr-request-block">
                 <article
-                  key={request.id}
                   className={`vr-row ${status === "submitted" ? "vr-row-pending" : ""}`}
                 >
                   <button
@@ -1632,6 +1639,43 @@ export default function VacationRequests({
                     )}
                   </div>
                 </article>
+                {rejectRequestId === request.id && status === "submitted" ? (
+                  <div className="vr-inline-reject">
+                    <div>
+                      <span>Atmetimo priežastis</span>
+                      <h3>Įrašykite aiškią priežastį</h3>
+                      <p>Ji bus matoma darbuotojui ir liks prašymo istorijoje.</p>
+                    </div>
+                    <textarea
+                      value={rejectReason}
+                      onChange={(event) => setRejectReason(event.target.value)}
+                      placeholder="Įrašykite aiškią atmetimo priežastį..."
+                      rows={3}
+                    />
+                    <small>Mažiausiai 10 simbolių. Priežastį serveris įrašo kartu su atmetimu ir auditu.</small>
+                    <div className="vr-inline-reject-actions">
+                      <button
+                        type="button"
+                        className="vr-modal-secondary"
+                        onClick={() => {
+                          setRejectRequestId(null);
+                          setRejectReason("");
+                        }}
+                      >
+                        Atšaukti
+                      </button>
+                      <button
+                        type="button"
+                        className="vr-modal-primary"
+                        disabled={saving}
+                        onClick={() => void confirmInlineReject(request.id)}
+                      >
+                        Atmesti prašymą
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                </div>
               );
             })
           ) : (
@@ -2121,12 +2165,13 @@ const css = `
   font-weight:950;
 }
 .vr-list { display:grid; }
+.vr-request-block{ border-top:1px solid #dbe6e0; }
 .vr-row {
   display:grid;
   grid-template-columns:minmax(180px,1.15fr) minmax(260px,1.45fr) minmax(150px,.8fr) minmax(130px,.7fr) minmax(140px,.8fr) minmax(170px,.9fr);
   gap:12px;
   align-items:center;
-  border-top:1px solid #dbe6e0;
+  border-top:0;
   padding:14px 16px;
   background:#fff;
 }
@@ -2155,6 +2200,23 @@ const css = `
 .vr-approve{ background:#486b5d; color:#fff; }
 .vr-reject{ background:#fff0f0; color:#8a2f27; }
 .vr-empty{ border-top:1px solid #dbe6e0; padding:28px; text-align:center; color:#6a7e75; font-weight:900; background:#f8faf8; }
+.vr-inline-reject{
+  display:grid;
+  grid-template-columns:minmax(180px,.8fr) minmax(260px,1.2fr) minmax(180px,.9fr) auto;
+  gap:12px;
+  align-items:end;
+  padding:14px 16px 16px;
+  background:#fff8f8;
+  border-top:1px solid #fecdd3;
+}
+.vr-inline-reject span{ display:block; text-transform:uppercase; letter-spacing:.14em; font-size:11px; font-weight:950; color:#8a2f27; }
+.vr-inline-reject h3{ margin:4px 0 0; color:#10251f; font-size:17px; line-height:1.2; font-weight:950; }
+.vr-inline-reject p{ margin:5px 0 0; color:#40594f; font-size:13px; line-height:1.35; font-weight:800; }
+.vr-inline-reject textarea{ width:100%; min-height:88px; resize:vertical; border:1px solid #fecdd3; border-radius:14px; background:#fff; padding:12px; color:#10251f; font:inherit; font-weight:800; outline:none; }
+.vr-inline-reject textarea:focus{ border-color:#8a2f27; box-shadow:0 0 0 3px rgba(138,47,39,.12); }
+.vr-inline-reject small{ color:#6a7e75; font-size:12px; line-height:1.35; font-weight:800; }
+.vr-inline-reject-actions{ display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+.vr-inline-reject-actions button{ min-height:42px; border:0; border-radius:12px; padding:0 14px; font-weight:950; cursor:pointer; }
 .vr-modal-backdrop{
   position:fixed;
   inset:0;
@@ -2352,6 +2414,8 @@ const css = `
   .vr-forecast-grid{ grid-template-columns:1fr 1fr; }
   .vr-table-head{ display:none; }
   .vr-row{ grid-template-columns:1fr 1fr; border-top:1px solid #dbe6e0; }
+  .vr-request-block .vr-row{ border-top:0; }
+  .vr-inline-reject{ grid-template-columns:1fr; align-items:stretch; }
   .vr-actions{ justify-content:flex-start; }
 }
 @container (max-width: 720px){
@@ -2370,5 +2434,7 @@ const css = `
   .vr-modal-head h3{ font-size:20px; }
   .vr-modal-actions{ flex-direction:column-reverse; }
   .vr-modal-actions button{ width:100%; }
+  .vr-inline-reject-actions{ flex-direction:column-reverse; }
+  .vr-inline-reject-actions button{ width:100%; }
 }
 `;
