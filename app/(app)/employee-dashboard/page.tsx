@@ -75,6 +75,8 @@ type NotificationRow = {
 
 type VacationRequestRow = {
   id: string;
+  organization_id?: string | null;
+  employee_id?: string | null;
   type?: string | null;
   start_date?: string | null;
   end_date?: string | null;
@@ -83,6 +85,13 @@ type VacationRequestRow = {
   note?: string | null;
   rejection_reason?: string | null;
   created_at?: string | null;
+};
+
+type VacationRequestForm = {
+  type: string;
+  startDate: string;
+  endDate: string;
+  note: string;
 };
 
 type TrainingRow = {
@@ -336,6 +345,91 @@ function formatRequestDays(value?: number | string | null) {
   })} d.`;
 }
 
+function toDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeDateInput(value?: string | null) {
+  const raw = String(value || "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
+}
+
+function lithuanianEasterDate(year: number) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function addDays(date: Date, amount: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function isLithuanianPublicHoliday(date: Date) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const fixed = new Set([
+    "1-1",
+    "2-16",
+    "3-11",
+    "5-1",
+    "6-24",
+    "7-6",
+    "8-15",
+    "11-1",
+    "11-2",
+    "12-24",
+    "12-25",
+    "12-26",
+  ]);
+
+  if (fixed.has(`${month}-${day}`)) return true;
+
+  const easter = lithuanianEasterDate(year);
+  const easterMonday = addDays(easter, 1);
+  const mothersDay = new Date(year, 4, 1);
+  mothersDay.setDate(1 + ((7 - mothersDay.getDay()) % 7));
+  const fathersDay = new Date(year, 5, 1);
+  fathersDay.setDate(1 + ((7 - fathersDay.getDay()) % 7));
+
+  return [easter, easterMonday, mothersDay, fathersDay].some(
+    (holiday) => toDateInput(holiday) === toDateInput(date),
+  );
+}
+
+function countBusinessDays(start: string, end: string) {
+  const cursor = new Date(`${start}T00:00:00`);
+  const last = new Date(`${end}T00:00:00`);
+  let count = 0;
+
+  while (!Number.isNaN(cursor.getTime()) && cursor <= last) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6 && !isLithuanianPublicHoliday(cursor)) {
+      count += 1;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return count;
+}
+
 function credentialTypeKey(value?: string | null) {
   const raw = String(value || "").toLowerCase();
   if (raw.includes("licenc")) return "license";
@@ -378,6 +472,17 @@ export default function EmployeeDashboardPage() {
   const [vacationRequests, setVacationRequests] = useState<
     VacationRequestRow[]
   >([]);
+  const [editingVacationRequestId, setEditingVacationRequestId] = useState<
+    string | null
+  >(null);
+  const [vacationRequestMessage, setVacationRequestMessage] = useState("");
+  const [vacationRequestForm, setVacationRequestForm] =
+    useState<VacationRequestForm>({
+      type: "annual_leave",
+      startDate: toDateInput(new Date()),
+      endDate: toDateInput(new Date()),
+      note: "",
+    });
   const [trainings, setTrainings] = useState<TrainingRow[]>([]);
   const [assignedResidents, setAssignedResidents] = useState<
     AssignedResident[]
@@ -652,7 +757,7 @@ export default function EmployeeDashboardPage() {
           supabase
             .from("vacation_requests")
             .select(
-              "id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at",
+              "id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at",
             )
             .eq("employee_id", user.id)
             .order("created_at", { ascending: false })
@@ -863,6 +968,151 @@ export default function EmployeeDashboardPage() {
       await loadDashboard(false);
     } catch (error) {
       showToast("Dokumentų pateikti nepavyko", readableError(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function resetVacationRequestForm() {
+    setEditingVacationRequestId(null);
+    setVacationRequestMessage("");
+    setVacationRequestForm({
+      type: "annual_leave",
+      startDate: toDateInput(new Date()),
+      endDate: toDateInput(new Date()),
+      note: "",
+    });
+  }
+
+  function startEditVacationRequest(request: VacationRequestRow) {
+    const status = normalizeRequestStatus(request.status);
+    if (status !== "submitted" && status !== "pending") {
+      setVacationRequestMessage("Redaguoti galima tik laukiantį prašymą.");
+      return;
+    }
+
+    const startDate =
+      normalizeDateInput(request.start_date) || toDateInput(new Date());
+    const endDate = normalizeDateInput(request.end_date) || startDate;
+
+    setEditingVacationRequestId(request.id);
+    setVacationRequestForm({
+      type: request.type || "annual_leave",
+      startDate,
+      endDate,
+      note: request.note || "",
+    });
+    setVacationRequestMessage("Redaguojamas laukiantis prašymas.");
+  }
+
+  async function submitVacationRequest() {
+    if (!organizationId || !userId) {
+      setVacationRequestMessage("Nepavyko nustatyti organizacijos.");
+      return;
+    }
+
+    const startDate = normalizeDateInput(vacationRequestForm.startDate);
+    const endDate = normalizeDateInput(vacationRequestForm.endDate);
+
+    if (!startDate || !endDate) {
+      setVacationRequestMessage("Nurodykite pradžios ir pabaigos datas.");
+      return;
+    }
+
+    if (endDate < startDate) {
+      setVacationRequestMessage("Pabaigos data negali būti ankstesnė.");
+      return;
+    }
+
+    const requestedDays = countBusinessDays(startDate, endDate);
+
+    if (vacationRequestForm.type === "annual_leave" && requestedDays < 1) {
+      setVacationRequestMessage(
+        "Pasirinktame laikotarpyje nėra darbo dienų.",
+      );
+      return;
+    }
+
+    setSaving(true);
+    setVacationRequestMessage("");
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      let saved: VacationRequestRow | null = null;
+
+      if (editingVacationRequestId) {
+        const response = await fetch(
+          `/api/team/vacation-requests/${encodeURIComponent(
+            editingVacationRequestId,
+          )}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              ...(session?.access_token
+                ? { Authorization: `Bearer ${session.access_token}` }
+                : {}),
+            },
+            body: JSON.stringify({
+              type: vacationRequestForm.type,
+              start_date: startDate,
+              end_date: endDate,
+              note: vacationRequestForm.note.trim() || null,
+            }),
+          },
+        );
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          request?: VacationRequestRow;
+          error?: string;
+        };
+
+        if (!response.ok || !payload.request) {
+          throw new Error(payload.error || "Prašymo atnaujinti nepavyko.");
+        }
+
+        saved = payload.request;
+      } else {
+        const { data, error } = await supabase
+          .from("vacation_requests")
+          .insert({
+            organization_id: organizationId,
+            employee_id: userId,
+            type: vacationRequestForm.type,
+            start_date: startDate,
+            end_date: endDate,
+            requested_days: requestedDays,
+            note: vacationRequestForm.note.trim() || null,
+            status: "submitted",
+          })
+          .select(
+            "id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at",
+          )
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) throw new Error("DB negrąžino išsaugoto prašymo.");
+        saved = data as VacationRequestRow;
+      }
+
+      setVacationRequests((previous) =>
+        editingVacationRequestId
+          ? previous.map((request) =>
+              request.id === editingVacationRequestId ? saved! : request,
+            )
+          : [saved!, ...previous],
+      );
+      showToast(
+        editingVacationRequestId ? "Prašymas atnaujintas" : "Prašymas pateiktas",
+        "Prašymas laukia vadovo sprendimo.",
+      );
+      resetVacationRequestForm();
+      await loadDashboard(false);
+    } catch (error) {
+      setVacationRequestMessage(readableError(error));
     } finally {
       setSaving(false);
     }
@@ -1247,26 +1497,127 @@ export default function EmployeeDashboardPage() {
 
           {modal === "requests" ? (
             <div className="space-y-3">
-              <div className="flex flex-col gap-3 rounded-[18px] border border-[#dbe6e0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="rounded-[18px] border border-[#dbe6e0] bg-white p-4">
                 <div>
                   <div className="font-black text-[#10251f]">
-                    Mano prašymai
+                    {editingVacationRequestId
+                      ? "Redaguojamas prašymas"
+                      : "Naujas prašymas"}
                   </div>
                   <div className="mt-1 text-sm font-bold text-[#526174]">
-                    Laukiantys, patvirtinti ir atmesti įrašai.
+                    Viskas lieka šiame lange, be perėjimo į kitą puslapį.
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => router.push("/requests")}
-                  className="rounded-[14px] bg-[#047857] px-4 py-3 text-sm font-black text-white transition hover:bg-[#065f46]"
-                >
-                  Pateikti / tvarkyti
-                </button>
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_1fr_1fr_auto]">
+                  <label className="grid gap-2 text-sm font-black text-[#486b5d]">
+                    Tipas
+                    <select
+                      value={vacationRequestForm.type}
+                      onChange={(event) =>
+                        setVacationRequestForm((prev) => ({
+                          ...prev,
+                          type: event.target.value,
+                        }))
+                      }
+                      className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
+                    >
+                      <option value="annual_leave">Kasmetinės atostogos</option>
+                      <option value="mamadienis">Mamadienis</option>
+                      <option value="tevadienis">Tėvadienis</option>
+                      <option value="sick_leave">Nedarbingumas</option>
+                      <option value="training">Mokymai / komandiruotė</option>
+                    </select>
+                  </label>
+                  <ModalField
+                    label="Nuo"
+                    type="date"
+                    value={vacationRequestForm.startDate}
+                    onChange={(value) =>
+                      setVacationRequestForm((prev) => ({
+                        ...prev,
+                        startDate: value,
+                        endDate: prev.endDate < value ? value : prev.endDate,
+                      }))
+                    }
+                  />
+                  <ModalField
+                    label="Iki"
+                    type="date"
+                    value={vacationRequestForm.endDate}
+                    onChange={(value) =>
+                      setVacationRequestForm((prev) => ({
+                        ...prev,
+                        endDate: value,
+                      }))
+                    }
+                  />
+                  <div className="rounded-[16px] bg-[#eef4f1] px-4 py-3 text-sm font-black text-[#486b5d]">
+                    <div className="text-[11px] uppercase tracking-wide">
+                      Kiekis
+                    </div>
+                    <div className="mt-1 text-lg text-[#10251f]">
+                      {formatRequestDays(
+                        countBusinessDays(
+                          vacationRequestForm.startDate,
+                          vacationRequestForm.endDate,
+                        ),
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <label className="mt-3 grid gap-2 text-sm font-black text-[#486b5d]">
+                  Pastaba
+                  <input
+                    value={vacationRequestForm.note}
+                    onChange={(event) =>
+                      setVacationRequestForm((prev) => ({
+                        ...prev,
+                        note: event.target.value,
+                      }))
+                    }
+                    className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
+                  />
+                </label>
+
+                {vacationRequestMessage ? (
+                  <div className="mt-3 rounded-[14px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">
+                    {vacationRequestMessage}
+                  </div>
+                ) : null}
+
+                <div className="mt-4 flex flex-wrap justify-end gap-3">
+                  {editingVacationRequestId ? (
+                    <button
+                      type="button"
+                      onClick={resetVacationRequestForm}
+                      className="rounded-[16px] border border-[#c9d8d0] bg-white px-5 py-3 font-black text-[#486b5d]"
+                    >
+                      Atšaukti redagavimą
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void submitVacationRequest()}
+                    disabled={saving}
+                    className="rounded-[16px] bg-[#047857] px-5 py-3 font-black text-white disabled:opacity-60"
+                  >
+                    {saving
+                      ? "Saugoma..."
+                      : editingVacationRequestId
+                        ? "Išsaugoti"
+                        : "Pateikti"}
+                  </button>
+                </div>
               </div>
 
               {vacationRequests.map((request) => (
-                <VacationRequestCard key={request.id} request={request} />
+                <VacationRequestCard
+                  key={request.id}
+                  request={request}
+                  onEdit={() => startEditVacationRequest(request)}
+                />
               ))}
               {!vacationRequests.length ? (
                 <EmptyState
@@ -1779,8 +2130,15 @@ function NotificationMini({ item }: { item: NotificationRow }) {
   );
 }
 
-function VacationRequestCard({ request }: { request: VacationRequestRow }) {
+function VacationRequestCard({
+  request,
+  onEdit,
+}: {
+  request: VacationRequestRow;
+  onEdit?: () => void;
+}) {
   const status = normalizeRequestStatus(request.status);
+  const canEdit = status === "submitted" || status === "pending";
   const period =
     request.start_date === request.end_date
       ? fmtDate(request.start_date)
@@ -1821,6 +2179,16 @@ function VacationRequestCard({ request }: { request: VacationRequestRow }) {
       <div className="mt-3 text-xs font-bold text-[#6a7e75]">
         Pateikta: {fmtDateTime(request.created_at)}
       </div>
+
+      {canEdit && onEdit ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="mt-3 rounded-[14px] border border-[#c9d8d0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
+        >
+          Redaguoti
+        </button>
+      ) : null}
     </article>
   );
 }

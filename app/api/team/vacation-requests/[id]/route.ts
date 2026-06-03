@@ -270,19 +270,37 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const { data: updatedRequest, error: updateError } = await supabase
+    const updatePayload = {
+      type,
+      start_date: startDate,
+      end_date: endDate,
+      requested_days: requestedDays,
+      note: String(body.note || "").trim() || null,
+    };
+
+    let updateResult = await supabase
       .from("vacation_requests")
       .update({
-        type,
-        start_date: startDate,
-        end_date: endDate,
-        requested_days: requestedDays,
-        note: String(body.note || "").trim() || null,
+        ...updatePayload,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
       .maybeSingle();
+
+    if (
+      updateResult.error &&
+      String(updateResult.error.message || "").toLowerCase().includes("updated_at")
+    ) {
+      updateResult = await supabase
+        .from("vacation_requests")
+        .update(updatePayload)
+        .eq("id", id)
+        .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
+        .maybeSingle();
+    }
+
+    const { data: updatedRequest, error: updateError } = updateResult;
 
     if (updateError) throw updateError;
     if (!updatedRequest) {
