@@ -448,7 +448,11 @@ export default function RequestsPage() {
   function mapDbRequest(row: VacationDbRow, employeeList = employees): RequestRow {
     const employee = employeeList.find((item) => item.user_id === row.employee_id);
     const meta = requestKindMeta(row.type);
-    const requestedDays = isTemporaryKind(meta.kind) ? 0 : row.requested_days || daysBetween(row.start_date, row.end_date);
+    const requestedDays = isAnnualKind(meta.kind)
+      ? daysBetween(row.start_date, row.end_date)
+      : isTemporaryKind(meta.kind)
+        ? 0
+        : row.requested_days || daysBetween(row.start_date, row.end_date);
     const temporaryHours = isTemporaryKind(meta.kind) ? temporaryLeaveHoursFromNote(row.note) : null;
     const amount = isTemporaryKind(meta.kind)
       ? temporaryHours
@@ -470,7 +474,7 @@ export default function RequestsPage() {
       amount,
       requestedDays,
       status: normalizeStatus(row.status),
-      balance: isTemporaryKind(meta.kind) ? "Likutis nekeičiamas" : "Likutis skaičiuojamas pagal patvirtintas atostogas",
+      balance: isTemporaryKind(meta.kind) ? "Likutis nekeičiamas" : "Pagal darbo dienas",
       risk: normalizeStatus(row.status) === "submitted" ? "Laukia sprendimo" : "—",
       note: row.note || "—",
       rejectionReason: row.rejection_reason || null,
@@ -661,11 +665,9 @@ export default function RequestsPage() {
         vacationEntitlement(employee);
       const carriedOver = parseNumber(entitlement?.carried_over_days) ?? 0;
       const annualTotal = baseAnnual + carriedOver;
-      const annualUsed = parseNumber(entitlement?.used_days) ?? localUsed;
-      const annualReserved = parseNumber(entitlement?.reserved_days) ?? localReserved;
-      const availableLeft =
-        parseNumber(entitlement?.remaining_days) ??
-        Math.max(0, annualTotal - annualUsed - annualReserved);
+      const annualUsed = localUsed;
+      const annualReserved = localReserved;
+      const availableLeft = Math.max(0, annualTotal - annualUsed - annualReserved);
 
       return {
         employeeId: employee.user_id,
@@ -1017,7 +1019,7 @@ export default function RequestsPage() {
 
     const { data: requestRows, error: requestError } = await supabase
       .from("vacation_requests")
-      .select("status, requested_days, type, start_date")
+      .select("status, requested_days, type, start_date, end_date")
       .eq("organization_id", organizationId)
       .eq("employee_id", employeeId);
 
@@ -1028,6 +1030,7 @@ export default function RequestsPage() {
       requested_days: number | null;
       type: string | null;
       start_date: string | null;
+      end_date: string | null;
     }>).filter((row) => {
       if (!isAnnualKind(row.type) || !row.start_date) return false;
       return new Date(`${row.start_date}T00:00:00`).getFullYear() === currentYear;
@@ -1035,13 +1038,13 @@ export default function RequestsPage() {
 
     const usedDays = annualRows
       .filter((row) => normalizeStatus(row.status) === "approved")
-      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
+      .reduce((sum, row) => sum + daysBetween(row.start_date || "", row.end_date || row.start_date || ""), 0);
     const reservedDays = annualRows
       .filter((row) => {
         const status = normalizeStatus(row.status);
         return status === "submitted" || status === "pending";
       })
-      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
+      .reduce((sum, row) => sum + daysBetween(row.start_date || "", row.end_date || row.start_date || ""), 0);
 
     if (entitlement) {
       const baseAnnual =
@@ -1318,7 +1321,7 @@ export default function RequestsPage() {
           </div>
         ) : null}
 
-        <section className="grid gap-5 lg:grid-cols-[420px_1fr]">
+        <section className="grid items-start gap-5 lg:grid-cols-[420px_1fr]">
           <article className="rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6">
             <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-700">Likutis</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight">Atostogų likutis</h2>

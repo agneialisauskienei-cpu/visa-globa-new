@@ -123,7 +123,7 @@ async function recalculateVacationEntitlement(
 ) {
   const { data: rows, error } = await supabase
     .from("vacation_requests")
-    .select("status, requested_days, type, start_date")
+    .select("status, requested_days, type, start_date, end_date")
     .eq("organization_id", organizationId)
     .eq("employee_id", employeeId);
 
@@ -135,6 +135,7 @@ async function recalculateVacationEntitlement(
       requested_days: number | null;
       type: string | null;
       start_date: string | null;
+      end_date: string | null;
     }>).filter((row) => {
       if (!isAnnualVacation(row.type) || !row.start_date) return false;
       return new Date(`${row.start_date}T00:00:00`).getFullYear() === year;
@@ -142,11 +143,11 @@ async function recalculateVacationEntitlement(
 
     const usedDays = annualRows
       .filter((row) => normalizeStatus(row.status) === "approved")
-      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
+      .reduce((sum, row) => sum + businessDaysBetween(row.start_date || "", row.end_date || row.start_date || ""), 0);
 
     const reservedDays = annualRows
       .filter((row) => ["submitted", "pending"].includes(normalizeStatus(row.status)))
-      .reduce((sum, row) => sum + Number(row.requested_days || 0), 0);
+      .reduce((sum, row) => sum + businessDaysBetween(row.start_date || "", row.end_date || row.start_date || ""), 0);
 
     const { error: updateError } = await supabase
       .from("vacation_entitlements")
