@@ -409,7 +409,7 @@ function formatVacationDays(value: number) {
 
 export default function RequestsPage() {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"all" | RequestStatus>("all");
+  const [status, setStatus] = useState<"all" | RequestStatus>("submitted");
   const [type, setType] = useState<"all" | RequestKind>("all");
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
@@ -429,6 +429,7 @@ export default function RequestsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
   const [forecastDate, setForecastDate] = useState(() => toDateInput(new Date()));
+  const [forecastOpen, setForecastOpen] = useState(false);
 
   const isAdmin =
     currentUserRole === "owner" ||
@@ -1379,46 +1380,46 @@ export default function RequestsPage() {
             </div>
 
             <div className="mt-5 rounded-[24px] border border-[#dbe6e0] bg-white p-5">
-              <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setForecastOpen((open) => !open)}
+                className="flex w-full items-center justify-between gap-3 text-left"
+              >
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Ateities skaičiuoklė</p>
-                  <h3 className="mt-1 text-lg font-black text-[#10251f]">Preliminarus likutis norimą dieną</h3>
+                  <h3 className="mt-1 text-lg font-black text-[#10251f]">Prognozuojamas likutis</h3>
+                  <p className="mt-1 text-sm font-black text-[#486b5d]">
+                    {futureBalance ? `${formatVacationDays(futureBalance.projectedLeft)} d. d.` : "Skaičiuoti"}
+                  </p>
                 </div>
                 <CalendarMiniIcon />
-              </div>
+              </button>
 
-              <label className="mt-4 block text-xs font-black uppercase tracking-[0.14em] text-[#526174]">
-                Norima data
-                <input
-                  type="date"
-                  value={forecastDate}
-                  onChange={(event) => setForecastDate(event.target.value)}
-                  className="mt-2 h-12 w-full rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
-                />
-              </label>
+              {forecastOpen ? (
+                <>
+                  <label className="mt-4 block text-xs font-black uppercase tracking-[0.14em] text-[#526174]">
+                    Norima data
+                    <input
+                      type="date"
+                      value={forecastDate}
+                      onChange={(event) => setForecastDate(event.target.value)}
+                      className="mt-2 h-12 w-full rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                    />
+                  </label>
 
-              <div className="mt-4 rounded-[20px] bg-[#eef4f1] p-4">
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#486b5d]">Prognozuojamas likutis</p>
-                <div className="mt-1 flex items-end justify-between gap-4">
-                  <p className={`text-4xl font-black tracking-[-0.06em] ${futureBalance && futureBalance.projectedLeft < 0 ? "text-rose-700" : "text-[#10251f]"}`}>
-                    {futureBalance ? formatVacationDays(futureBalance.projectedLeft) : "0"}
+                  {futureBalance ? (
+                    <div className="mt-4 divide-y divide-[#dbe6e0] overflow-hidden rounded-[18px] border border-[#dbe6e0] bg-[#fbfcfb]">
+                      <BalanceLine label="Dabartinis likutis" value={`${formatVacationDays(selectedBalance.annualLeft)} d.`} />
+                      <BalanceLine label="Papildomai sukaups" value={`${formatVacationDays(futureBalance.additionalAccrued)} d.`} />
+                      <BalanceLine label="Sukaupta iki datos" value={`${formatVacationDays(futureBalance.accrued)} d.`} />
+                    </div>
+                  ) : null}
+
+                  <p className="mt-3 text-xs font-bold leading-5 text-[#526174]">
+                    Skaičiavimas preliminarus: imamas dabartinis likutis ir pridedama iki pasirinktos datos sukaupta dalis.
                   </p>
-                  <p className="pb-1 text-sm font-black text-[#526174]">d. d.</p>
-                </div>
-              </div>
-
-              {futureBalance ? (
-                <div className="mt-4 divide-y divide-[#dbe6e0] overflow-hidden rounded-[18px] border border-[#dbe6e0] bg-[#fbfcfb]">
-                  <BalanceLine label="Dabartinis likutis" value={`${formatVacationDays(selectedBalance.annualLeft)} d.`} />
-                  <BalanceLine label="Papildomai sukaups" value={`${formatVacationDays(futureBalance.additionalAccrued)} d.`} />
-                  <BalanceLine label="Dar neįskaityta rezervacija" value={`${formatVacationDays(futureBalance.reservedUntilTarget)} d.`} />
-                  <BalanceLine label="Sukaupta iki datos" value={`${formatVacationDays(futureBalance.accrued)} d.`} />
-                </div>
+                </>
               ) : null}
-
-              <p className="mt-3 text-xs font-bold leading-5 text-[#526174]">
-                Skaičiavimas preliminarus: imamas dabartinis likutis, pridedama papildomai iki pasirinktos datos sukaupta dalis ir atimami dar neįskaityti laukiantys prašymai.
-              </p>
             </div>
           </article>
 
@@ -1426,7 +1427,7 @@ export default function RequestsPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.25em] text-emerald-700">Prašymai</p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight">"Mano prašymai"</h2>
+                <h2 className="mt-2 text-2xl font-black tracking-tight">Mano prašymai</h2>
                 <p className="mt-1 text-sm font-semibold text-[#526174]">Čia matai būseną ir gali atšaukti laukiantį įrašą.</p>
               </div>
               <Umbrella className="h-6 w-6 text-[#486b5d]" />
@@ -1651,16 +1652,18 @@ export default function RequestsPage() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 lg:grid-cols-[1fr_220px_220px_auto]">
-            <label className="flex h-12 items-center gap-3 rounded-[16px] border border-[#dbe6e0] bg-white px-4">
-              <Search className="h-4 w-4 text-[#8ea0b5]" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Ieškoti pagal darbuotoją, tipą, pastabą..."
-                className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[#10251f] outline-none placeholder:text-[#8ea0b5]"
-              />
-            </label>
+          <div className={`mt-6 grid gap-3 ${isAdmin ? "lg:grid-cols-[1fr_220px_220px_auto]" : "lg:grid-cols-[220px_220px_auto]"}`}>
+            {isAdmin ? (
+              <label className="flex h-12 items-center gap-3 rounded-[16px] border border-[#dbe6e0] bg-white px-4">
+                <Search className="h-4 w-4 text-[#8ea0b5]" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Ieškoti pagal darbuotoją, tipą, pastabą..."
+                  className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[#10251f] outline-none placeholder:text-[#8ea0b5]"
+                />
+              </label>
+            ) : null}
             <select
               value={status}
               onChange={(event) => setStatus(event.target.value as typeof status)}
@@ -1687,7 +1690,7 @@ export default function RequestsPage() {
             <button
               onClick={() => {
                 setQuery("");
-                setStatus("all");
+                setStatus("submitted");
                 setType("all");
               }}
               className="h-12 rounded-[16px] bg-[#eef4f1] px-5 text-sm font-black text-[#486b5d]"
