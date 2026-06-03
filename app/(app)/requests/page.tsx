@@ -711,9 +711,11 @@ export default function RequestsPage() {
     if (!selectedBalance) return null;
 
     const target = dateFromInput(forecastDate) || new Date();
+    const today = new Date();
+    const todayInput = toDateInput(today);
     const targetDateInput = toDateInput(target);
     const targetYear = target.getFullYear();
-    const currentYear = new Date().getFullYear();
+    const currentYear = today.getFullYear();
     const employee = employeeById(selectedBalance.employeeId);
     const targetEntitlement = entitlementForYear(selectedBalance.employeeId, targetYear);
     const fallbackBaseAnnual = vacationEntitlement(employee);
@@ -722,6 +724,16 @@ export default function RequestsPage() {
       parseNumber(targetEntitlement?.entitlement_days) ??
       Math.min(selectedBalance.annualTotal || fallbackBaseAnnual, fallbackBaseAnnual || selectedBalance.annualTotal || 20);
     const carriedOver = parseNumber(targetEntitlement?.carried_over_days) ?? Math.max(0, selectedBalance.annualTotal - baseAnnual);
+    const currentYearAccrued = roundVacationDays(
+      (baseAnnual / daysInYear(currentYear)) * dayOfYearInclusive(today),
+    );
+    const targetYearAccrued = roundVacationDays(
+      (baseAnnual / daysInYear(targetYear)) * dayOfYearInclusive(target),
+    );
+    const additionalAccrued =
+      targetYear === currentYear && targetDateInput > todayInput
+        ? Math.max(0, roundVacationDays(targetYearAccrued - currentYearAccrued))
+        : 0;
     const targetYearRequests = requests.filter((request) => {
       const requestStart = dateFromInput(request.start);
 
@@ -732,29 +744,33 @@ export default function RequestsPage() {
         request.start <= targetDateInput
       );
     });
+    const futureRequestsUntilTarget = targetYearRequests.filter((request) => request.start > todayInput);
     const approvedUntilTarget = targetYearRequests
       .filter((request) => request.status === "approved")
       .reduce((sum, request) => sum + request.requestedDays, 0);
     const reservedUntilTarget = targetYearRequests
       .filter((request) => request.status === "submitted" || request.status === "pending")
       .reduce((sum, request) => sum + request.requestedDays, 0);
-    const annualAccrued = roundVacationDays(
-      (baseAnnual / daysInYear(targetYear)) * dayOfYearInclusive(target),
+    const futureReservedUntilTarget = futureRequestsUntilTarget
+      .filter((request) => request.status === "submitted" || request.status === "pending")
+      .reduce((sum, request) => sum + request.requestedDays, 0);
+    const additionalReserved = Math.max(
+      0,
+      roundVacationDays(futureReservedUntilTarget - selectedBalance.annualReserved),
     );
-    const availableBeforeReservations = roundVacationDays(
-      carriedOver + annualAccrued - approvedUntilTarget,
-    );
+    const availableBeforeReservations = roundVacationDays(selectedBalance.annualLeft + additionalAccrued);
     const projectedLeft = roundVacationDays(
-      availableBeforeReservations - reservedUntilTarget,
+      availableBeforeReservations - additionalReserved,
     );
 
     return {
       target: targetDateInput,
       baseAnnual: roundVacationDays(baseAnnual),
       carriedOver: roundVacationDays(carriedOver),
-      accrued: annualAccrued,
+      accrued: targetYearAccrued,
+      additionalAccrued,
       approvedUntilTarget,
-      reservedUntilTarget,
+      reservedUntilTarget: additionalReserved,
       availableBeforeReservations,
       projectedLeft,
       isPastYear: targetYear < currentYear,
@@ -1385,15 +1401,15 @@ export default function RequestsPage() {
 
               {futureBalance ? (
                 <div className="mt-4 divide-y divide-[#dbe6e0] overflow-hidden rounded-[18px] border border-[#dbe6e0] bg-[#fbfcfb]">
-                  <BalanceLine label="Perkelta" value={`${formatVacationDays(futureBalance.carriedOver)} d.`} />
+                  <BalanceLine label="Dabartinis likutis" value={`${formatVacationDays(selectedBalance.annualLeft)} d.`} />
+                  <BalanceLine label="Papildomai sukaups" value={`${formatVacationDays(futureBalance.additionalAccrued)} d.`} />
+                  <BalanceLine label="Dar neįskaityta rezervacija" value={`${formatVacationDays(futureBalance.reservedUntilTarget)} d.`} />
                   <BalanceLine label="Sukaupta iki datos" value={`${formatVacationDays(futureBalance.accrued)} d.`} />
-                  <BalanceLine label="Panaudota iki datos" value={`${formatVacationDays(futureBalance.approvedUntilTarget)} d.`} />
-                  <BalanceLine label="Rezervuota iki datos" value={`${formatVacationDays(futureBalance.reservedUntilTarget)} d.`} />
                 </div>
               ) : null}
 
               <p className="mt-3 text-xs font-bold leading-5 text-[#526174]">
-                Skaičiavimas preliminarus: metinė norma kaupiama proporcingai iki pasirinktos datos, o galutinį likutį vis tiek turi patvirtinti DB/API.
+                Skaičiavimas preliminarus: imamas dabartinis likutis, pridedama papildomai iki pasirinktos datos sukaupta dalis ir atimami dar neįskaityti laukiantys prašymai.
               </p>
             </div>
           </article>
