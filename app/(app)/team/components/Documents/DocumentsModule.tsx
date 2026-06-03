@@ -617,6 +617,12 @@ export default function DocumentsModule({
       ) : (
         <>
 
+      {counts.pending > 0 ? (
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
+          {counts.pending} dokumentų pakeitimai laukia administratoriaus patvirtinimo.
+        </div>
+      ) : null}
+
       {counts.expiring > 0 || counts.expired > 0 || counts.missing > 0 ? (
         <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
           Yra dokumentų rizikų: {counts.expiring} baigiasi, {counts.expired}{" "}

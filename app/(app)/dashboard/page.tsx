@@ -35,6 +35,7 @@ type DashboardStats = {
   pendingLeaves: number;
   pendingInvites: number;
   totalInvites: number;
+  pendingDocumentApprovals: number;
   expiringCertificates: number;
   completedTrainings: number;
   requiredTrainings: number;
@@ -75,6 +76,7 @@ const EMPTY_STATS: DashboardStats = {
   pendingLeaves: 0,
   pendingInvites: 0,
   totalInvites: 0,
+  pendingDocumentApprovals: 0,
   expiringCertificates: 0,
   completedTrainings: 0,
   requiredTrainings: 0,
@@ -126,6 +128,7 @@ export default function AdminDashboardPage() {
       pendingTasks,
       pendingLeaves,
       inviteStats,
+      pendingDocumentApprovals,
       expiringCertificates,
       trainingStats,
       capacity,
@@ -148,6 +151,7 @@ export default function AdminDashboardPage() {
       ]),
       countPendingLeaveRequests(),
       countInviteStats(),
+      countPendingDocumentApprovals(),
       countExpiringCertificates(),
       countTrainingProgress(),
       getOrganizationCapacity(),
@@ -170,6 +174,7 @@ export default function AdminDashboardPage() {
       pendingLeaves,
       pendingInvites: inviteStats.pending,
       totalInvites: inviteStats.total,
+      pendingDocumentApprovals,
       expiringCertificates,
       completedTrainings: trainingStats.completed,
       requiredTrainings: trainingStats.required,
@@ -211,7 +216,11 @@ export default function AdminDashboardPage() {
       : 0;
 
     const workloadRisk = clamp((stats.pendingTasks + stats.pendingLeaves) * 10, 0, 100);
-    const documentRisk = clamp(stats.expiringCertificates * 20, 0, 100);
+    const documentRisk = clamp(
+      (stats.expiringCertificates + stats.pendingDocumentApprovals) * 20,
+      0,
+      100,
+    );
     const careRisk = clamp((stats.incidentAlerts + stats.medicationAlerts + stats.activityGaps) * 15, 0, 100);
     const shiftCoverage = stats.activeEmployees > 0
       ? percentage(stats.todayShiftEntries, stats.activeEmployees)
@@ -253,9 +262,22 @@ export default function AdminDashboardPage() {
     },
     {
       title: "Baigiasi pažymos",
-      desc: `${stats.expiringCertificates} pažym. baigiasi per 14 dienų.`,
-      badge: stats.expiringCertificates ? "Skubu" : "Gerai",
-      color: stats.expiringCertificates ? "red" as const : "emerald" as const,
+      desc:
+        stats.pendingDocumentApprovals > 0
+          ? `${stats.pendingDocumentApprovals} dokumentų pakeitimai laukia patvirtinimo.`
+          : `${stats.expiringCertificates} pažym. baigiasi per 14 dienų.`,
+      badge:
+        stats.pendingDocumentApprovals > 0
+          ? "Patvirtinti"
+          : stats.expiringCertificates
+            ? "Skubu"
+            : "Gerai",
+      color:
+        stats.pendingDocumentApprovals > 0
+          ? "amber" as const
+          : stats.expiringCertificates
+            ? "red" as const
+            : "emerald" as const,
       onClick: () => router.push("/team?module=docs"),
     },
     {
@@ -406,11 +428,11 @@ export default function AdminDashboardPage() {
             <button type="button" onClick={loadStats} className="rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]">Atnaujinti</button>
           </div>
           <div className="inline-flex w-fit rounded-lg border border-[#ead8a7] bg-[#fff9e8] px-4 py-2 text-sm font-black text-[#8a5a13]">
-            Rizikos: {computed.totalRisks + stats.pendingLeaves + stats.expiringCertificates + stats.pendingInvites}
+            Rizikos: {computed.totalRisks + stats.pendingLeaves + stats.expiringCertificates + stats.pendingDocumentApprovals + stats.pendingInvites}
           </div>
         </section>
 
-        {(stats.pendingLeaves > 0 || stats.pendingInvites > 0 || stats.todayAbsences > 0 || stats.replacementNeededFte > 0) ? (
+        {(stats.pendingLeaves > 0 || stats.pendingInvites > 0 || stats.pendingDocumentApprovals > 0 || stats.todayAbsences > 0 || stats.replacementNeededFte > 0) ? (
           <section className="grid gap-3 lg:grid-cols-4">
             <CriticalStrip
               icon={<UserPlus />}
@@ -432,6 +454,18 @@ export default function AdminDashboardPage() {
                 router.push("/team?module=vacations");
               }}
             />
+            {stats.pendingDocumentApprovals > 0 ? (
+              <CriticalStrip
+                icon={<FileText />}
+                title="Dokumentai patvirtinimui"
+                text={`${stats.pendingDocumentApprovals} dokumentų pakeitimai laukia patvirtinimo`}
+                color="amber"
+                onClick={() => {
+                  setActiveTab("risks");
+                  router.push("/team?module=docs");
+                }}
+              />
+            ) : null}
             <CriticalStrip
               icon={<Users />}
               title="Šiandien nėra darbuotojų"
@@ -534,6 +568,7 @@ export default function AdminDashboardPage() {
               totalInvites={stats.totalInvites}
               todayAbsences={stats.todayAbsences}
               expiringCertificates={stats.expiringCertificates}
+              pendingDocumentApprovals={stats.pendingDocumentApprovals}
               trainingCompletion={computed.trainingCompletion}
               lastUpdated={lastUpdated}
               onVacations={() => router.push("/team?module=vacations")}
@@ -633,12 +668,25 @@ export default function AdminDashboardPage() {
                 <RiskAttentionCard
                   title="Dokumentų terminai"
                   text={
-                    stats.expiringCertificates > 0
-                      ? `${stats.expiringCertificates} darbuotojų dokumentai baigiasi.`
+                    stats.pendingDocumentApprovals > 0
+                      ? `${stats.pendingDocumentApprovals} dokumentų pakeitimai laukia patvirtinimo.`
+                      : stats.expiringCertificates > 0
+                        ? `${stats.expiringCertificates} darbuotojų dokumentai baigiasi.`
                       : "Baigiančių galioti dokumentų nėra."
                   }
-                  badge={stats.expiringCertificates > 0 ? "Įspėjimas" : "Gerai"}
-                  tone={stats.expiringCertificates > 0 ? "amber" : "emerald"}
+                  badge={
+                    stats.pendingDocumentApprovals > 0
+                      ? "Patvirtinti"
+                      : stats.expiringCertificates > 0
+                        ? "Įspėjimas"
+                        : "Gerai"
+                  }
+                  tone={
+                    stats.pendingDocumentApprovals > 0 ||
+                    stats.expiringCertificates > 0
+                      ? "amber"
+                      : "emerald"
+                  }
                   onClick={() => router.push("/team?module=docs")}
                 />
 
@@ -683,7 +731,12 @@ export default function AdminDashboardPage() {
               <div className="mt-4 space-y-3">
                 <TimelineItem color="#047857" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
                 <TimelineItem color="#8a5a13" title="Atostogų / išvykimo užklausos" meta={`${stats.pendingLeaves} laukia sprendimo`} warm />
-                <TimelineItem color="#b91c1c" title="Dokumentų terminai" meta={`${stats.expiringCertificates} įspėjimai`} danger />
+                <TimelineItem
+                  color="#b91c1c"
+                  title="Dokumentų terminai"
+                  meta={`${stats.pendingDocumentApprovals + stats.expiringCertificates} įspėjimai`}
+                  danger
+                />
                 <TimelineItem color="#2563eb" title="Mokymai" meta={`${computed.trainingCompletion}% užbaigta`} blue />
               </div>
             </section>
@@ -811,6 +864,12 @@ async function countPendingLeaveRequests(): Promise<number> {
     () => safeCountResult("leave_requests", (q) => q.in("status", pendingStatuses)),
     () => safeCountResult("absence_requests", (q) => q.in("status", pendingStatuses)),
   ]);
+}
+
+async function countPendingDocumentApprovals(): Promise<number> {
+  return safeCount("personnel_credentials", (q) =>
+    q.eq("status", "pending"),
+  );
 }
 
 
@@ -1257,6 +1316,7 @@ function DashboardSidePanel({
   totalInvites,
   todayAbsences,
   expiringCertificates,
+  pendingDocumentApprovals,
   trainingCompletion,
   lastUpdated,
   onVacations,
@@ -1269,6 +1329,7 @@ function DashboardSidePanel({
   totalInvites: number;
   todayAbsences: number;
   expiringCertificates: number;
+  pendingDocumentApprovals: number;
   trainingCompletion: number;
   lastUpdated: Date | null;
   onVacations: () => void;
@@ -1321,12 +1382,24 @@ function DashboardSidePanel({
           <RiskAttentionCard
             title="Dokumentų terminai"
             text={
-              expiringCertificates > 0
-                ? `${expiringCertificates} darbuotojų dokumentai baigiasi.`
+              pendingDocumentApprovals > 0
+                ? `${pendingDocumentApprovals} dokumentų pakeitimai laukia patvirtinimo.`
+                : expiringCertificates > 0
+                  ? `${expiringCertificates} darbuotojų dokumentai baigiasi.`
                 : "Baigiančių galioti dokumentų nėra."
             }
-            badge={expiringCertificates > 0 ? "Įspėjimas" : "Gerai"}
-            tone={expiringCertificates > 0 ? "amber" : "emerald"}
+            badge={
+              pendingDocumentApprovals > 0
+                ? "Patvirtinti"
+                : expiringCertificates > 0
+                  ? "Įspėjimas"
+                  : "Gerai"
+            }
+            tone={
+              pendingDocumentApprovals > 0 || expiringCertificates > 0
+                ? "amber"
+                : "emerald"
+            }
             onClick={onDocuments}
           />
         </div>
@@ -1342,7 +1415,12 @@ function DashboardSidePanel({
           <TimelineItem color="#047857" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
           <TimelineItem color="#2563eb" title="Darbuotojų kvietimai" meta={`${pendingInvites} laukia atsakymo`} blue />
           <TimelineItem color="#8a5a13" title="Atostogų / išvykimo užklausos" meta={`${pendingLeaves} laukia sprendimo`} warm />
-          <TimelineItem color="#b91c1c" title="Dokumentų terminai" meta={`${expiringCertificates} įspėjimai`} danger />
+          <TimelineItem
+            color="#b91c1c"
+            title="Dokumentų terminai"
+            meta={`${pendingDocumentApprovals + expiringCertificates} įspėjimai`}
+            danger
+          />
           <TimelineItem color="#2563eb" title="Mokymai" meta={`${trainingCompletion}% užbaigta`} blue />
         </div>
       </section>

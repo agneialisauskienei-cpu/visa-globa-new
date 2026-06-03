@@ -34,7 +34,7 @@ import { getReadableError } from "@/lib/errors";
 import { getChangedFields, logAudit } from "@/lib/audit";
 import CandidatesModule from "./components/Candidates/CandidatesModule";
 import TrainingModule from "./components/Trainings/TrainingModule";
-import DocumentAcknowledgementsModule from "./components/DocumentAcknowledgements/DocumentAcknowledgementsModule";
+import DocumentsModule from "./components/Documents/DocumentsModule";
 import StaffTypesModule from "./components/StaffTypes/StaffTypesModule";
 import ScheduleBlock from "./components/Schedule/ScheduleBlock";
 import VacationRequests from "./components/Vacations/VacationRequests";
@@ -1102,6 +1102,7 @@ export default function TeamPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("employees");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1375,9 +1376,10 @@ export default function TeamPage() {
       }));
 
       const currentUserResult = await supabase.auth.getUser();
-      const currentUserId = currentUserResult.data.user?.id || null;
-      const currentMember = currentUserId
-        ? memberRows.find((employee) => employee.user_id === currentUserId) || null
+      const loadedCurrentUserId = currentUserResult.data.user?.id || null;
+      setCurrentUserId(loadedCurrentUserId);
+      const currentMember = loadedCurrentUserId
+        ? memberRows.find((employee) => employee.user_id === loadedCurrentUserId) || null
         : null;
       const canViewSensitive = canViewSensitiveEmployeeData(currentMember);
 
@@ -2067,11 +2069,18 @@ export default function TeamPage() {
   const expiringCredentials = credentials.filter((item) =>
     isExpiring(item.expires_at),
   );
+  const pendingCredentials = credentials.filter(
+    (item) => String(item.status || "").toLowerCase() === "pending",
+  );
   const expiringEmployeeDocs = employees.filter(
     (employee) =>
       isExpiring(employee.professional_license_valid_until) ||
       isExpiring(employee.occupational_health_valid_until),
   );
+  const documentAttentionCount =
+    pendingCredentials.length +
+    expiringCredentials.length +
+    expiringEmployeeDocs.length;
   const trainingIssues = employees.filter((employee) => {
     const employeeTrainings = trainings.filter(
       (item) => item.employee_id === employee.user_id,
@@ -3157,7 +3166,7 @@ export default function TeamPage() {
     },
     {
       title: "Dokumentų terminai",
-      meta: `${expiringCredentials.length + expiringEmployeeDocs.length} reikia dėmesio`,
+      meta: `${documentAttentionCount} reikia dėmesio`,
     },
   ];
 
@@ -3348,9 +3357,11 @@ export default function TeamPage() {
               Dokumentai
             </p>
             <p className="mt-1 text-2xl font-black text-[#10251f]">
-              {expiringCredentials.length + expiringEmployeeDocs.length}
+              {documentAttentionCount}
             </p>
-            <p className="mt-1 text-xs font-bold text-slate-500">baigiasi</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">
+              laukia / baigiasi
+            </p>
           </button>
 
           <button
@@ -3429,6 +3440,7 @@ export default function TeamPage() {
               </h2>
               <div className="mt-5 space-y-3">
                 {[
+                  ...pendingCredentials.slice(0, 6),
                   ...expiringCredentials.slice(0, 6),
                   ...expiringEmployeeDocs.slice(0, 6).map(
                     (employee) =>
@@ -3451,8 +3463,7 @@ export default function TeamPage() {
                       meta={`Galioja iki: ${fmt(item.expires_at)} · Nr.: ${item.number || "—"}`}
                     />
                   ))}
-                {expiringCredentials.length + expiringEmployeeDocs.length ===
-                  0 && (
+                {documentAttentionCount === 0 && (
                   <EmptyState text="Dokumentų terminų artimiausiu metu nėra." />
                 )}
               </div>
@@ -3685,14 +3696,16 @@ export default function TeamPage() {
         {tab === "access" && <StaffTypesModule />}
 
         {tab === "docs" && (
-          <DocumentAcknowledgementsModule
+          <DocumentsModule
             organizationId={organizationId}
+            currentUserId={currentUserId}
             employees={employees.map((employee) => ({
               id: employee.user_id,
               full_name: employeeName(employee),
+              name: employeeName(employee),
               role: employee.position || employee.role || null,
             }))}
-            acknowledgements={documentAcknowledgements}
+            credentials={credentials}
             onRefresh={loadAll}
           />
         )}
@@ -5158,6 +5171,15 @@ function EmployeeTabbedEditor({
             </Field>
 
             <div className="md:col-span-3 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+              {credentials.some(
+                (credential) =>
+                  String(credential.status || "").toLowerCase() === "pending",
+              ) ? (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">
+                  Yra darbuotojo pateiktų dokumentų duomenų, laukiančių
+                  patvirtinimo.
+                </div>
+              ) : null}
               <p className="text-sm font-black text-[#10251f]">
                 Darbuotojo dokumentų įrašai
               </p>
