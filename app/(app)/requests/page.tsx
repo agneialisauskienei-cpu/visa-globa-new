@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
   History,
-  Plus,
   RefreshCw,
   Search,
   Umbrella,
@@ -255,21 +254,6 @@ function businessDaysBetween(start: string, end: string) {
     const current = new Date(`${date}T00:00:00`);
     return isBusinessDay(current);
   }).length;
-}
-
-function isScheduledWorkEntry(entry: {
-  status?: string | null;
-  start_datetime?: string | null;
-  end_datetime?: string | null;
-}) {
-  const status = String(entry.status || "").trim().toLowerCase();
-
-  if (status.startsWith("absence_")) return false;
-  if (["off", "free", "poilsis", "laisva", "holiday", "svente", "šventė"].includes(status)) return false;
-  if (entry.start_datetime && entry.end_datetime) return true;
-  if (["work", "p", "d", "dirba"].includes(status)) return true;
-
-  return false;
 }
 
 function daysBetween(start: string, end: string) {
@@ -712,22 +696,6 @@ export default function RequestsPage() {
     balances[0] ||
     null;
 
-  const selectedEntitlement = useMemo(() => {
-    if (!selectedBalance) return null;
-
-    const currentYear = new Date().getFullYear();
-
-    return (
-      vacationEntitlements.find(
-        (row) =>
-          row.employee_id === selectedBalance.employeeId &&
-          (!row.year || Number(row.year) === currentYear),
-      ) ||
-      vacationEntitlements.find((row) => row.employee_id === selectedBalance.employeeId) ||
-      null
-    );
-  }, [selectedBalance, vacationEntitlements]);
-
   function entitlementForYear(employeeId: string, year: number) {
     return (
       vacationEntitlements.find(
@@ -770,12 +738,9 @@ export default function RequestsPage() {
     const reservedUntilTarget = targetYearRequests
       .filter((request) => request.status === "submitted" || request.status === "pending")
       .reduce((sum, request) => sum + request.requestedDays, 0);
-    const annualAccrued =
-      targetYear === currentYear
-        ? roundVacationDays((baseAnnual / daysInYear(targetYear)) * dayOfYearInclusive(target))
-        : targetYear > currentYear
-          ? baseAnnual
-          : roundVacationDays((baseAnnual / daysInYear(targetYear)) * dayOfYearInclusive(target));
+    const annualAccrued = roundVacationDays(
+      (baseAnnual / daysInYear(targetYear)) * dayOfYearInclusive(target),
+    );
     const availableBeforeReservations = roundVacationDays(
       carriedOver + annualAccrued - approvedUntilTarget,
     );
@@ -940,9 +905,6 @@ export default function RequestsPage() {
     setMessage("");
 
     try {
-      const existingRequest = editingRequestId
-        ? requests.find((request) => request.id === editingRequestId)
-        : null;
       const payload = {
         organization_id: organizationId,
         employee_id: employeeId,
@@ -951,29 +913,48 @@ export default function RequestsPage() {
         end_date: isTemporaryKind(form.kind) ? startDate : endDate,
         requested_days: requestedDays,
         note: noteParts.length ? noteParts.join(" · ") : null,
-        status: editingRequestId ? existingRequest?.status || "submitted" : "submitted",
+        status: "submitted",
       };
 
-      const requestQuery = editingRequestId
-        ? supabase
-            .from("vacation_requests")
-            .update(payload)
-            .eq("id", editingRequestId)
-            .eq("employee_id", employeeId)
-            .in("status", ["submitted", "pending"])
-            .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
-            .single()
-        : supabase
+      let data: VacationDbRow | null = null;
+
+      if (editingRequestId) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        const response = await fetch(`/api/team/vacation-requests/${encodeURIComponent(editingRequestId)}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({
+            type: payload.type,
+            start_date: payload.start_date,
+            end_date: payload.end_date,
+            note: payload.note,
+          }),
+        });
+        const json = (await response.json().catch(() => ({}))) as { request?: VacationDbRow; error?: string };
+
+        if (!response.ok || !json.request) {
+          throw new Error(json.error || "Nepavyko atnaujinti prašymo.");
+        }
+
+        data = json.request;
+      } else {
+        const { data: inserted, error } = await supabase
             .from("vacation_requests")
             .insert(payload)
             .select("id, organization_id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at")
             .single();
 
-      const { data, error } = await requestQuery;
+        if (error) throw error;
+        data = inserted as VacationDbRow;
+      }
 
-      if (error) throw error;
-
-      const saved = mapDbRequest(data as VacationDbRow, employees);
+      const saved = mapDbRequest(data, employees);
 
       setRequests((previous) =>
         editingRequestId
@@ -994,7 +975,7 @@ export default function RequestsPage() {
       setMessage(editingRequestId ? "Prašymas atnaujintas." : isAdmin ? "Prašymas pateiktas." : "Prašymas pateiktas vadovo sprendimui.");
 
       if (isAnnualKind(form.kind)) {
-        await recalculateVacationEntitlement(employeeId);
+        await recalculateVacationEntitlement(employeeId, new Date(`${startDate}T00:00:00`).getFullYear());
         await loadPage();
       }
     } catch (error) {
@@ -1004,10 +985,10 @@ export default function RequestsPage() {
     }
   }
 
-  async function recalculateVacationEntitlement(employeeId: string) {
+  async function recalculateVacationEntitlement(employeeId: string, targetYear = new Date().getFullYear()) {
     if (!organizationId) return;
 
-    const currentYear = new Date().getFullYear();
+    const currentYear = targetYear;
     const { data: entitlementRows } = await supabase
       .from("vacation_entitlements")
       .select("employee_id, year, annual_days, entitlement_days, carried_over_days, used_days, reserved_days, remaining_days, is_active")
@@ -1054,17 +1035,21 @@ export default function RequestsPage() {
       const carriedOver = parseNumber(entitlement.carried_over_days) ?? 0;
       const remainingDays = Math.max(0, roundVacationDays(baseAnnual + carriedOver - usedDays - reservedDays));
 
-      const { error } = await supabase
+      const updatePayload = {
+        used_days: usedDays,
+        reserved_days: reservedDays,
+        remaining_days: remainingDays,
+      };
+
+      const updateQuery = supabase
         .from("vacation_entitlements")
-        .update({
-          used_days: usedDays,
-          reserved_days: reservedDays,
-          remaining_days: remainingDays,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("organization_id", organizationId)
-        .eq("employee_id", employeeId)
-        .eq("year", entitlement.year || currentYear);
+        .eq("employee_id", employeeId);
+
+      const { error } = entitlement.year
+        ? await updateQuery.eq("year", entitlement.year)
+        : await updateQuery.is("year", null);
 
       if (error) {
         console.warn("[requests] Nepavyko perskaičiuoti atostogų likučio", error);
@@ -1115,7 +1100,7 @@ export default function RequestsPage() {
         throw new Error("Galite atšaukti tik savo prašymą.");
       }
 
-      if (nextStatus === "canceled" && request.status !== "submitted") {
+      if (nextStatus === "canceled" && !["submitted", "pending"].includes(request.status)) {
         throw new Error("Galima atšaukti tik laukiantį prašymą.");
       }
 
@@ -1145,7 +1130,7 @@ export default function RequestsPage() {
 
       setMessage("Prašymas atšauktas.");
       if (isAnnualKind(request.kind)) {
-        await recalculateVacationEntitlement(request.employeeId);
+        await recalculateVacationEntitlement(request.employeeId, new Date(`${request.start}T00:00:00`).getFullYear());
       }
       await loadPage();
     } catch (error) {
@@ -1153,6 +1138,119 @@ export default function RequestsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function renderRequestForm(actions: { mode: "create" | "edit"; compact?: boolean }) {
+    const isEditMode = actions.mode === "edit";
+
+    return (
+      <div className={`grid gap-3 ${actions.compact ? "lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto_auto]" : "mt-6 lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto]"}`}>
+        <select
+          value={isAdmin ? form.employeeId : currentUserId || form.employeeId}
+          disabled={!isAdmin || isEditMode}
+          onChange={(event) => setForm((previous) => ({ ...previous, employeeId: event.target.value }))}
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1] disabled:text-[#486b5d]"
+        >
+          {isAdmin ? (
+            <>
+              <option value="">Pasirinkti darbuotoją</option>
+              {employees.map((employee) => (
+                <option key={employee.user_id} value={employee.user_id}>
+                  {employeeName(employee)} · {employee.position || "Darbuotojas"}
+                </option>
+              ))}
+            </>
+          ) : (
+            <option value={currentUserId || form.employeeId}>Mano prašymas</option>
+          )}
+        </select>
+        <select
+          value={form.kind}
+          onChange={(event) => {
+            const nextKind = event.target.value as RequestKind;
+            setForm((previous) => ({
+              ...previous,
+              kind: nextKind,
+              end: nextKind === "temporary_leave" ? previous.start : previous.end,
+              startTime: nextKind === "temporary_leave" ? previous.startTime : "",
+              endTime: nextKind === "temporary_leave" ? previous.endTime : "",
+            }));
+          }}
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
+        >
+          <option value="annual_leave">Kasmetinės atostogos (A)</option>
+          <option value="temporary_leave">Trumpas išvykimas (TI)</option>
+          <option value="mamadienis">Mamadienis (MD)</option>
+          <option value="tevadienis">Tėvadienis (TD)</option>
+          <option value="sick_leave">Nedarbingumas (L)</option>
+          <option value="training">Mokymai / komandiruotė (K)</option>
+        </select>
+        <input
+          type="date"
+          value={form.start}
+          onChange={(event) =>
+            setForm((previous) => ({
+              ...previous,
+              start: event.target.value,
+              end: previous.kind === "temporary_leave" ? event.target.value : previous.end || event.target.value,
+            }))
+          }
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
+        />
+        <input
+          type="date"
+          value={form.end}
+          onChange={(event) => setForm((previous) => ({ ...previous, end: event.target.value }))}
+          disabled={form.kind === "temporary_leave"}
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+        />
+        <input
+          type="text"
+          placeholder="Nuo, pvz. 10:00"
+          value={form.startTime}
+          onChange={(event) => setForm((previous) => ({ ...previous, startTime: event.target.value }))}
+          onBlur={(event) => setForm((previous) => ({ ...previous, startTime: normalizeTimeInput(event.target.value) }))}
+          disabled={form.kind !== "temporary_leave"}
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+        />
+        <input
+          type="text"
+          placeholder="Iki, pvz. 12:00"
+          value={form.endTime}
+          onChange={(event) => setForm((previous) => ({ ...previous, endTime: event.target.value }))}
+          onBlur={(event) => setForm((previous) => ({ ...previous, endTime: normalizeTimeInput(event.target.value) }))}
+          disabled={form.kind !== "temporary_leave"}
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+        />
+        <input
+          value={form.note}
+          onChange={(event) => setForm((previous) => ({ ...previous, note: event.target.value }))}
+          placeholder="Pastaba"
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
+        />
+        <button
+          type="button"
+          onClick={() => void submitRequest()}
+          disabled={
+            saving ||
+            (isAdmin && !form.employeeId) ||
+            (form.kind === "temporary_leave" && (!form.startTime || !form.endTime))
+          }
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-[#10251f] px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#8ea0b5]"
+        >
+          {isEditMode ? "Išsaugoti" : "Pateikti"}
+        </button>
+        {isEditMode ? (
+          <button
+            type="button"
+            onClick={cancelEditRequest}
+            className="inline-flex h-12 items-center justify-center rounded-[16px] bg-[#eef4f1] px-5 text-sm font-black text-[#486b5d]"
+          >
+            Atšaukti
+          </button>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -1325,7 +1423,8 @@ export default function RequestsPage() {
                 <tbody>
                   {activeRequests.length ? (
                     activeRequests.slice(0, 6).map((request) => (
-                      <tr key={`active-request-${request.id}`} className="border-t border-[#eef2ef]">
+                      <Fragment key={`active-request-${request.id}`}>
+                      <tr className="border-t border-[#eef2ef]">
                         <td className="px-5 py-4 text-sm font-black text-[#10251f]">{request.employee}</td>
                         <td className="px-5 py-4 text-sm font-black text-[#526174]">{request.start}</td>
                         <td className="px-5 py-4 text-sm font-black text-[#10251f]">{request.kindLabel}</td>
@@ -1366,6 +1465,17 @@ export default function RequestsPage() {
                           )}
                         </td>
                       </tr>
+                      {editingRequestId === request.id ? (
+                        <tr className="border-t border-emerald-100 bg-[#f4fbf7]">
+                          <td colSpan={6} className="px-5 py-5">
+                            <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+                              Redaguojamas prašymas
+                            </p>
+                            {renderRequestForm({ mode: "edit", compact: true })}
+                          </td>
+                        </tr>
+                      ) : null}
+                      </Fragment>
                     ))
                   ) : (
                     <tr>
@@ -1380,6 +1490,7 @@ export default function RequestsPage() {
           </article>
         </section>
 
+        {!editingRequestId ? (
         <section className="rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6 lg:p-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1502,6 +1613,7 @@ export default function RequestsPage() {
             ) : null}
           </div>
         </section>
+        ) : null}
 
         <section className="rounded-[30px] border border-[#dbe6e0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6 lg:p-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1580,10 +1692,7 @@ export default function RequestsPage() {
                       <RequestTableRow
                         key={request.id}
                         request={request}
-                        isAdmin={isAdmin}
                         saving={saving}
-                        onApprove={() => void updateRequestStatus(request.id, "approved")}
-                        onReject={() => void updateRequestStatus(request.id, "rejected")}
                         onCancel={() => void updateRequestStatus(request.id, "canceled")}
                       />
                     ))}
@@ -1596,9 +1705,6 @@ export default function RequestsPage() {
                   <RequestCard
                     key={request.id}
                     request={request}
-                    isAdmin={isAdmin}
-                    onApprove={() => void updateRequestStatus(request.id, "approved")}
-                    onReject={() => void updateRequestStatus(request.id, "rejected")}
                     onCancel={() => void updateRequestStatus(request.id, "canceled")}
                   />
                 ))}
@@ -1679,17 +1785,11 @@ function TableHead({ children }: { children: React.ReactNode }) {
 
 function RequestTableRow({
   request,
-  isAdmin,
   saving,
-  onApprove,
-  onReject,
   onCancel,
 }: {
   request: RequestRow;
-  isAdmin: boolean;
   saving: boolean;
-  onApprove: () => void;
-  onReject: () => void;
   onCancel: () => void;
 }) {
   return (
@@ -1737,15 +1837,9 @@ function RequestTableRow({
 
 function RequestCard({
   request,
-  isAdmin,
-  onApprove,
-  onReject,
   onCancel,
 }: {
   request: RequestRow;
-  isAdmin: boolean;
-  onApprove?: () => void;
-  onReject?: () => void;
   onCancel?: () => void;
 }) {
   return (
