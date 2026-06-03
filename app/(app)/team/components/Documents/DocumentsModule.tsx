@@ -41,6 +41,8 @@ type DocumentsModuleProps = {
 
 type DocsFilter = "all" | "valid" | "expiring" | "expired" | "missing";
 
+const DOCUMENT_MANAGER_ROLES = new Set(["owner", "admin", "director", "hr"]);
+
 const CREDENTIAL_TYPES = [
   "Sveikatos pažyma",
   "Profesinė licencija",
@@ -142,6 +144,10 @@ function employeeName(employees: EmployeeOption[], id: string) {
   return employee?.full_name || employee?.name || "Darbuotojas";
 }
 
+function canManageDocuments(role?: string | null) {
+  return DOCUMENT_MANAGER_ROLES.has(String(role || "").trim().toLowerCase());
+}
+
 function makeMissingDocuments(
   employees: EmployeeOption[],
   credentials: CredentialRecord[],
@@ -192,6 +198,8 @@ export default function DocumentsModule({
   const [checkedAt, setCheckedAt] = useState(todayIso());
   const [checkedByText, setCheckedByText] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
+  const [canManage, setCanManage] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{
@@ -199,6 +207,50 @@ export default function DocumentsModule({
     text: string;
     details?: string;
   } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkAccess() {
+      setCheckingAccess(true);
+
+      try {
+        if (!organizationId || !currentUserId) {
+          if (!mounted) return;
+          setCanManage(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("organization_members")
+          .select("role, is_active")
+          .eq("organization_id", organizationId)
+          .eq("user_id", currentUserId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!mounted) return;
+        setCanManage(Boolean(data?.is_active) && canManageDocuments(data?.role));
+      } catch (error: any) {
+        if (!mounted) return;
+        setCanManage(false);
+        setMessage({
+          type: "error",
+          text: "Nepavyko patikrinti dokumentų modulio teisių.",
+          details: error?.message || error?.details || String(error),
+        });
+      } finally {
+        if (mounted) setCheckingAccess(false);
+      }
+    }
+
+    void checkAccess();
+
+    return () => {
+      mounted = false;
+    };
+  }, [organizationId, currentUserId]);
 
   const missingDocuments = useMemo(
     () => makeMissingDocuments(employees, credentials, requiredDocuments),
@@ -320,9 +372,15 @@ export default function DocumentsModule({
         .from("personnel_credentials")
         .insert(payload)
         .select("id")
-        .single();
+        .maybeSingle();
 
-      if (!error) return data as { id?: string | null } | null;
+      if (!error) {
+        if (!data?.id) {
+          throw new Error("Dokumentas išsaugotas, bet DB negrąžino įrašo ID. Patikrink RLS.");
+        }
+
+        return data as { id?: string | null } | null;
+      }
       lastError = error;
 
       const message = String(error.message || "");
@@ -408,6 +466,14 @@ export default function DocumentsModule({
 
   async function handleSave() {
     setMessage(null);
+
+    if (!canManage) {
+      setMessage({
+        type: "error",
+        text: "Neturite teisės tvarkyti darbuotojų dokumentų.",
+      });
+      return;
+    }
 
     if (!organizationId) {
       setMessage({
@@ -517,6 +583,17 @@ export default function DocumentsModule({
           </div>
         </div>
       </div>
+
+      {checkingAccess ? (
+        <div className="rounded-lg border border-[#dbe6e0] bg-[#f8faf8] px-5 py-4 text-sm font-black text-[#40594f]">
+          Tikrinamos dokumentų modulio teisės...
+        </div>
+      ) : !canManage ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
+          Dokumentų modulį gali valdyti tik savininkas, administratorius, direktorius arba HR.
+        </div>
+      ) : (
+        <>
 
       {counts.expiring > 0 || counts.expired > 0 || counts.missing > 0 ? (
         <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
@@ -865,6 +942,8 @@ export default function DocumentsModule({
           </div>
         </div>
       </div>
+        </>
+      )}
     </section>
   );
 }
