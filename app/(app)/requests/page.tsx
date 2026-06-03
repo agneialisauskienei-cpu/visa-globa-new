@@ -1163,7 +1163,7 @@ export default function RequestsPage() {
     const isEditMode = actions.mode === "edit";
 
     return (
-      <div className={`grid gap-3 ${actions.compact ? "lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto_auto]" : "mt-6 lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto]"}`}>
+      <div className={`grid gap-3 ${actions.compact ? "md:grid-cols-2 xl:grid-cols-4" : "mt-6 lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto]"}`}>
         <select
           value={isAdmin ? form.employeeId : currentUserId || form.employeeId}
           disabled={!isAdmin || isEditMode}
@@ -1427,7 +1427,7 @@ export default function RequestsPage() {
               <Umbrella className="h-6 w-6 text-[#486b5d]" />
             </div>
 
-            <div className="mt-5 overflow-hidden rounded-[22px] border border-[#dbe6e0]">
+              <div className="mt-5 overflow-x-auto rounded-[22px] border border-[#dbe6e0]">
               <table className="w-full border-collapse bg-white text-left">
                 <thead className="bg-[#f8faf8]">
                   <tr>
