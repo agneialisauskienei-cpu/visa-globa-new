@@ -1161,9 +1161,10 @@ export default function RequestsPage() {
 
   function renderRequestForm(actions: { mode: "create" | "edit"; compact?: boolean }) {
     const isEditMode = actions.mode === "edit";
+    const dateInputType = actions.compact ? "text" : "date";
 
     return (
-      <div className={`grid gap-3 ${actions.compact ? "md:grid-cols-2 xl:grid-cols-4" : "mt-6 lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto]"}`}>
+      <div className={`grid min-w-0 gap-3 ${actions.compact ? "md:grid-cols-2 xl:grid-cols-4" : "mt-6 lg:grid-cols-[1.2fr_1fr_150px_150px_120px_120px_1fr_auto]"}`}>
         <select
           value={isAdmin ? form.employeeId : currentUserId || form.employeeId}
           disabled={!isAdmin || isEditMode}
@@ -1197,15 +1198,17 @@ export default function RequestsPage() {
           }}
           className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
         >
-          <option value="annual_leave">Kasmetinės atostogos (A)</option>
-          <option value="temporary_leave">Trumpas išvykimas (TI)</option>
+          <option value="annual_leave">{actions.compact ? "Atostogos (A)" : "Kasmetinės atostogos (A)"}</option>
+          <option value="temporary_leave">{actions.compact ? "Išvykimas (TI)" : "Trumpas išvykimas (TI)"}</option>
           <option value="mamadienis">Mamadienis (MD)</option>
           <option value="tevadienis">Tėvadienis (TD)</option>
           <option value="sick_leave">Nedarbingumas (L)</option>
-          <option value="training">Mokymai / komandiruotė (K)</option>
+          <option value="training">{actions.compact ? "Mokymai (K)" : "Mokymai / komandiruotė (K)"}</option>
         </select>
         <input
-          type="date"
+          type={dateInputType}
+          inputMode={actions.compact ? "numeric" : undefined}
+          placeholder="YYYY-MM-DD"
           value={form.start}
           onChange={(event) =>
             setForm((previous) => ({
@@ -1214,14 +1217,16 @@ export default function RequestsPage() {
               end: previous.kind === "temporary_leave" ? event.target.value : previous.end || event.target.value,
             }))
           }
-          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
+          className="h-12 min-w-0 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
         />
         <input
-          type="date"
+          type={dateInputType}
+          inputMode={actions.compact ? "numeric" : undefined}
+          placeholder="YYYY-MM-DD"
           value={form.end}
           onChange={(event) => setForm((previous) => ({ ...previous, end: event.target.value }))}
           disabled={form.kind === "temporary_leave"}
-          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+          className="h-12 min-w-0 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
         />
         <input
           type="text"
