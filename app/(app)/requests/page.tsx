@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import {
   AlertTriangle,
@@ -408,6 +409,8 @@ function formatVacationDays(value: number) {
 
 
 export default function RequestsPage() {
+  const searchParams = useSearchParams();
+  const embedded = searchParams.get("embedded") === "1";
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | RequestStatus>("submitted");
   const [type, setType] = useState<"all" | RequestKind>("all");
@@ -1279,9 +1282,15 @@ export default function RequestsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f3f6f4] px-4 pb-24 pt-4 text-[#10251f] sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
-      <div className="mx-auto max-w-7xl space-y-5 lg:space-y-7">
-        <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]">
+    <main
+      className={`min-h-screen bg-[#f3f6f4] text-[#10251f] ${
+        embedded
+          ? "px-3 pb-6 pt-3 sm:px-4"
+          : "px-4 pb-24 pt-4 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8"
+      }`}
+    >
+      <div className={`mx-auto space-y-5 ${embedded ? "max-w-[1180px]" : "max-w-7xl lg:space-y-7"}`}>
+        <section className={`${embedded ? "hidden" : ""} overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]`}>
           <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-5">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[24px] bg-[#e8f7ef] text-[#486b5d]">

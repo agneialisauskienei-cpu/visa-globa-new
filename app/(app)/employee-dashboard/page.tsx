@@ -2147,7 +2147,7 @@ function DashboardModal({
     >
       <section
         className={`max-h-[92vh] w-full overflow-hidden rounded-[28px] bg-white shadow-2xl ${
-          wide ? "max-w-[1500px]" : "max-w-3xl"
+          wide ? "max-w-[1250px]" : "max-w-3xl"
         }`}
         onClick={(event) => event.stopPropagation()}
       >
@@ -2195,6 +2195,7 @@ function ModalField({
       {label}
       <input
         type={type}
+        lang={type === "date" ? "lt-LT" : undefined}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
