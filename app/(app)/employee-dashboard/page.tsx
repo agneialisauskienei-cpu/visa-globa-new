@@ -25,6 +25,7 @@ import { supabase } from "@/lib/supabase";
 
 type PanelKey =
   | "overview"
+  | "requests"
   | "tasks"
   | "notifications"
   | "residents"
@@ -69,6 +70,18 @@ type NotificationRow = {
   type?: string | null;
   is_read?: boolean | null;
   read_at?: string | null;
+  created_at?: string | null;
+};
+
+type VacationRequestRow = {
+  id: string;
+  type?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status?: string | null;
+  requested_days?: number | string | null;
+  note?: string | null;
+  rejection_reason?: string | null;
   created_at?: string | null;
 };
 
@@ -120,6 +133,12 @@ type ProfileRow = {
   license_number?: string | null;
   license_until?: string | null;
   health_certificate_until?: string | null;
+};
+
+type MembershipRow = {
+  id?: string | null;
+  position?: string | null;
+  department?: string | null;
 };
 
 type Toast = { title: string; message: string };
@@ -255,12 +274,63 @@ function readableError(error: unknown) {
   return String(error);
 }
 
+function normalizeRequestStatus(value?: string | null) {
+  const raw = String(value || "submitted").toLowerCase();
+  if (["approved", "confirmed", "patvirtinta"].includes(raw))
+    return "approved";
+  if (["rejected", "atmesta"].includes(raw)) return "rejected";
+  if (["canceled", "cancelled", "atsaukta", "atšaukta"].includes(raw))
+    return "canceled";
+  if (["pending", "laukiama"].includes(raw)) return "pending";
+  return "submitted";
+}
+
+function requestStatusLabel(value?: string | null) {
+  const status = normalizeRequestStatus(value);
+  if (status === "approved") return "Patvirtinta";
+  if (status === "rejected") return "Atmesta";
+  if (status === "canceled") return "Atšaukta";
+  return "Laukia";
+}
+
+function requestStatusClass(value?: string | null) {
+  const status = normalizeRequestStatus(value);
+  if (status === "approved")
+    return "border-emerald-100 bg-emerald-50 text-emerald-800";
+  if (status === "rejected")
+    return "border-rose-100 bg-rose-50 text-rose-800";
+  if (status === "canceled")
+    return "border-slate-200 bg-slate-50 text-slate-700";
+  return "border-amber-100 bg-amber-50 text-amber-800";
+}
+
+function requestKindLabel(value?: string | null) {
+  const raw = String(value || "annual_leave").toLowerCase();
+  if (["temporary_leave", "short_leave", "ti"].includes(raw))
+    return "Trumpas išvykimas";
+  if (["mamadienis", "mother_day", "md"].includes(raw)) return "Mamadienis";
+  if (["tevadienis", "father_day", "td"].includes(raw)) return "Tėvadienis";
+  if (["sick", "sick_leave", "nedarbingumas", "l"].includes(raw))
+    return "Nedarbingumas";
+  if (["training", "business_trip", "komandiruote", "mokymai", "k"].includes(raw))
+    return "Mokymai / komandiruotė";
+  return "Kasmetinės atostogos";
+}
+
+function formatRequestDays(value?: number | string | null) {
+  const days = Number(value);
+  if (!Number.isFinite(days)) return "—";
+  return `${days.toLocaleString("lt-LT", {
+    maximumFractionDigits: 2,
+  })} d.`;
+}
+
 async function safeSelect<T>(
-  query: PromiseLike<{ data: T[] | null; error: any }>,
+  query: PromiseLike<{ data: T[] | null; error: unknown }>,
 ) {
   const { data, error } = await query;
   if (error) {
-    console.warn("[employee-dashboard] query skipped:", error.message || error);
+    console.warn("[employee-dashboard] query skipped:", readableError(error));
     return [] as T[];
   }
   return data || [];
@@ -279,6 +349,9 @@ export default function EmployeeDashboardPage() {
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
   const [schedule, setSchedule] = useState<EmployeeSchedule[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [vacationRequests, setVacationRequests] = useState<
+    VacationRequestRow[]
+  >([]);
   const [trainings, setTrainings] = useState<TrainingRow[]>([]);
   const [assignedResidents, setAssignedResidents] = useState<
     AssignedResident[]
@@ -491,6 +564,7 @@ export default function EmployeeDashboardPage() {
         membershipData,
         tasksData,
         notificationsData,
+        vacationRequestsData,
         trainingData,
       ] = await Promise.all([
         supabase
@@ -525,6 +599,16 @@ export default function EmployeeDashboardPage() {
             .order("created_at", { ascending: false })
             .limit(12),
         ),
+        safeSelect<VacationRequestRow>(
+          supabase
+            .from("vacation_requests")
+            .select(
+              "id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at",
+            )
+            .eq("employee_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(10),
+        ),
         safeSelect<TrainingRow>(
           supabase
             .from("training_records")
@@ -546,7 +630,7 @@ export default function EmployeeDashboardPage() {
           membershipData.error.message,
         );
 
-      const memberId = (membershipData.data as any)?.id || null;
+      const memberId = (membershipData.data as MembershipRow | null)?.id || null;
       const loadedSchedule = await loadEmployeeSchedule(user.id, memberId);
       const loadedResidents = await loadAssignedResidents(user.id, memberId);
 
@@ -559,6 +643,7 @@ export default function EmployeeDashboardPage() {
       setProfile(mergedProfile);
       setTasks(tasksData);
       setNotifications(notificationsData);
+      setVacationRequests(vacationRequestsData);
       setSchedule(loadedSchedule);
       setTrainings(trainingData);
       setAssignedResidents(loadedResidents);
@@ -703,6 +788,10 @@ export default function EmployeeDashboardPage() {
   const expiringTrainings = trainings.filter((item) =>
     isExpiringSoon(item.valid_until || item.expires_at),
   );
+  const pendingRequestCount = vacationRequests.filter((request) => {
+    const status = normalizeRequestStatus(request.status);
+    return status === "submitted" || status === "pending";
+  }).length;
   const nextShift = schedule[0];
   const openTaskCount = tasks.length;
 
@@ -781,10 +870,11 @@ export default function EmployeeDashboardPage() {
               label="Grafikas"
             />
             <TopTab
-              active={false}
-              onClick={() => router.push("/requests")}
+              active={activePanel === "requests"}
+              onClick={() => openPanel("requests")}
               icon={<CalendarX className="h-4 w-4" />}
               label="Prašymai"
+              count={pendingRequestCount}
             />
             <TopTab
               active={activePanel === "tasks"}
@@ -1057,6 +1147,39 @@ export default function EmployeeDashboardPage() {
             </div>
           ) : null}
 
+          {modal === "requests" ? (
+            <div className="space-y-3">
+              <div className="flex flex-col gap-3 rounded-[18px] border border-[#dbe6e0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="font-black text-[#10251f]">
+                    Mano prašymai
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-[#526174]">
+                    Laukiantys, patvirtinti ir atmesti įrašai.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push("/requests")}
+                  className="rounded-[14px] bg-[#047857] px-4 py-3 text-sm font-black text-white transition hover:bg-[#065f46]"
+                >
+                  Pateikti / tvarkyti
+                </button>
+              </div>
+
+              {vacationRequests.map((request) => (
+                <VacationRequestCard key={request.id} request={request} />
+              ))}
+              {!vacationRequests.length ? (
+                <EmptyState
+                  icon={<CalendarX className="h-7 w-7" />}
+                  title="Prašymų nėra"
+                  desc="Kai pateiksi prašymą, jo būsena atsiras čia."
+                />
+              ) : null}
+            </div>
+          ) : null}
+
           {modal === "notifications" ? (
             <div className="space-y-3">
               <button
@@ -1216,6 +1339,7 @@ export default function EmployeeDashboardPage() {
 function modalTitle(panel: PanelKey) {
   const labels: Record<PanelKey, string> = {
     overview: "Apžvalga",
+    requests: "Prašymai",
     profile: "Mano profilis",
     tasks: "Mano užduotys",
     notifications: "Pranešimai",
@@ -1554,6 +1678,52 @@ function NotificationMini({ item }: { item: NotificationRow }) {
         {fmtDateTime(item.created_at)}
       </div>
     </div>
+  );
+}
+
+function VacationRequestCard({ request }: { request: VacationRequestRow }) {
+  const status = normalizeRequestStatus(request.status);
+  const period =
+    request.start_date === request.end_date
+      ? fmtDate(request.start_date)
+      : `${fmtDate(request.start_date)} - ${fmtDate(request.end_date)}`;
+
+  return (
+    <article className="rounded-[18px] border border-[#dbe6e0] bg-white p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="font-black text-[#10251f]">
+            {requestKindLabel(request.type)}
+          </div>
+          <div className="mt-1 text-sm font-bold text-[#526174]">
+            {period} · {formatRequestDays(request.requested_days)}
+          </div>
+        </div>
+        <span
+          className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-sm font-black ${requestStatusClass(
+            request.status,
+          )}`}
+        >
+          {requestStatusLabel(request.status)}
+        </span>
+      </div>
+
+      {request.note ? (
+        <p className="mt-3 rounded-[14px] bg-[#f8faf8] px-3 py-2 text-sm font-bold leading-6 text-[#526174]">
+          {request.note}
+        </p>
+      ) : null}
+
+      {status === "rejected" && request.rejection_reason ? (
+        <div className="mt-3 rounded-[14px] border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-bold leading-6 text-rose-800">
+          Atmetimo priežastis: {request.rejection_reason}
+        </div>
+      ) : null}
+
+      <div className="mt-3 text-xs font-bold text-[#6a7e75]">
+        Pateikta: {fmtDateTime(request.created_at)}
+      </div>
+    </article>
   );
 }
 
