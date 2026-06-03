@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { getChangedFields, logAudit } from "@/lib/audit"
 
 type EmployeeOption = {
   id: string
@@ -40,6 +41,8 @@ type DocumentsModuleProps = {
 
 type DocsFilter = "all" | "valid" | "expiring" | "expired" | "missing"
 
+const DOCUMENT_MANAGER_ROLES = new Set(["owner", "admin", "director", "hr"])
+
 const CREDENTIAL_TYPES = [
   "Sveikatos pažyma",
   "Profesinė licencija",
@@ -56,6 +59,19 @@ const CHECK_METHODS = [
   "Pateikta darbuotojo informacija",
   "Patikrinta pagal vidinę tvarką",
 ]
+
+function canManageDocuments(role?: string | null) {
+  return DOCUMENT_MANAGER_ROLES.has(String(role || "").trim().toLowerCase())
+}
+
+function errorDetails(error: unknown) {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === "object") {
+    const details = error as { message?: string; details?: string }
+    return details.message || details.details || String(error)
+  }
+  return String(error)
+}
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -188,6 +204,8 @@ export default function DocumentsModule({
   const [checkedAt, setCheckedAt] = useState(todayIso())
   const [checkedByText, setCheckedByText] = useState("")
   const [confirmed, setConfirmed] = useState(false)
+  const [checkingAccess, setCheckingAccess] = useState(true)
+  const [canManage, setCanManage] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{
@@ -211,6 +229,50 @@ export default function DocumentsModule({
         : DEFAULT_REQUIRED_DOCUMENTS,
     [requiredDocumentsInput],
   )
+
+  useEffect(() => {
+    let mounted = true
+
+    async function checkAccess() {
+      setCheckingAccess(true)
+
+      try {
+        if (!organizationId || !currentUserId) {
+          if (!mounted) return
+          setCanManage(false)
+          return
+        }
+
+        const { data, error } = await supabase
+          .from("organization_members")
+          .select("role, is_active")
+          .eq("organization_id", organizationId)
+          .eq("user_id", currentUserId)
+          .maybeSingle()
+
+        if (error) throw error
+
+        if (!mounted) return
+        setCanManage(Boolean(data?.is_active) && canManageDocuments(data?.role))
+      } catch (error: unknown) {
+        if (!mounted) return
+        setCanManage(false)
+        setMessage({
+          type: "error",
+          text: "Nepavyko patikrinti dokumentų modulio teisių.",
+          details: errorDetails(error),
+        })
+      } finally {
+        if (mounted) setCheckingAccess(false)
+      }
+    }
+
+    void checkAccess()
+
+    return () => {
+      mounted = false
+    }
+  }, [organizationId, currentUserId])
 
   const missingDocuments = useMemo(
     () => makeMissingDocuments(employees, credentials, requiredDocuments),
@@ -296,6 +358,14 @@ export default function DocumentsModule({
   async function handleSave() {
     setMessage(null)
 
+    if (!canManage) {
+      setMessage({
+        type: "error",
+        text: "Neturite teisės tvarkyti darbuotojų dokumentų.",
+      })
+      return
+    }
+
     if (!organizationId) {
       setMessage({
         type: "error",
@@ -331,12 +401,29 @@ export default function DocumentsModule({
     setSaving(true)
 
     try {
+      const normalizedType = normalizeCredentialType(type)
+      const duplicate = credentials.some(
+        (credential) =>
+          credential.employee_id === employeeId &&
+          normalizeCredentialType(credential.type) === normalizedType &&
+          String(credential.status || "active").toLowerCase() === "active" &&
+          getDocumentStatus(credential).key !== "expired",
+      )
+
+      if (duplicate) {
+        setMessage({
+          type: "error",
+          text: "Šis darbuotojas jau turi aktyvų tokio tipo dokumentą. Naudokite atnaujinimą vietoje naujo įrašo.",
+        })
+        return
+      }
+
       const { data: credential, error: credentialError } = await supabase
         .from("personnel_credentials")
         .insert({
           organization_id: organizationId,
           employee_id: employeeId,
-          type: normalizeCredentialType(type),
+          type: normalizedType,
           number: number.trim() || null,
           issuer: issuer.trim() || null,
           issued_at: issuedAt || null,
@@ -345,7 +432,7 @@ export default function DocumentsModule({
           note: note.trim() || null,
         })
         .select("id")
-        .single()
+        .maybeSingle()
 
       if (credentialError) {
         setMessage({
@@ -356,13 +443,21 @@ export default function DocumentsModule({
         return
       }
 
+      if (!credential?.id) {
+        setMessage({
+          type: "error",
+          text: "Dokumentas išsaugotas, bet DB negrąžino įrašo ID. Patikrink RLS.",
+        })
+        return
+      }
+
       const { error: verificationError } = await supabase
         .from("document_verifications")
         .insert({
           organization_id: organizationId,
           employee_id: employeeId,
-          credential_id: credential?.id || null,
-          type: normalizeCredentialType(type),
+          credential_id: credential.id,
+          type: normalizedType,
           method: checkMethod,
           checked_at: checkedAt || todayIso(),
           checked_by: currentUserId || null,
@@ -372,13 +467,47 @@ export default function DocumentsModule({
         })
 
       if (verificationError) {
+        await supabase
+          .from("personnel_credentials")
+          .delete()
+          .eq("id", credential.id)
+          .eq("organization_id", organizationId)
+
         setMessage({
           type: "error",
-          text: "Dokumentas išsaugotas, bet nepavyko išsaugoti patikrinimo fakto.",
+          text: "Patikrinimo fakto išsaugoti nepavyko, todėl dokumento įrašas atšauktas.",
           details: verificationError.message,
         })
         await onRefresh?.()
         return
+      }
+
+      try {
+        await logAudit({
+          organizationId: organizationId || null,
+          tableName: "personnel_credentials",
+          recordId: credential.id,
+          action: "insert",
+          changes: getChangedFields(
+            {},
+            {
+              employee_id: employeeId,
+              type: normalizedType,
+              number: number.trim() || null,
+              issuer: issuer.trim() || null,
+              issued_at: issuedAt || null,
+              expires_at: expiresAt || null,
+              status: "active",
+              check_method: checkMethod,
+              checked_at: checkedAt || todayIso(),
+              checked_by: currentUserId || null,
+              checked_by_text: checkedByText.trim() || null,
+              note: note.trim() || null,
+            },
+          ),
+        })
+      } catch (auditError) {
+        console.warn("[DocumentAcknowledgementsModule] audit skipped", auditError)
       }
 
       setMessage({
@@ -444,6 +573,16 @@ export default function DocumentsModule({
         </div>
       )}
 
+      {checkingAccess ? (
+        <div className="rounded-lg border border-[#dbe6e0] bg-[#f8faf8] px-5 py-4 text-sm font-black text-[#40594f]">
+          Tikrinamos dokumentų modulio teisės...
+        </div>
+      ) : !canManage ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
+          Dokumentų modulį gali valdyti tik savininkas, administratorius, direktorius arba HR.
+        </div>
+      ) : (
+        <>
       <div className="mb-5 flex flex-wrap gap-3">
         {[
           ["all", "Visi", counts.all],
@@ -720,6 +859,8 @@ export default function DocumentsModule({
           </div>
         </div>
       </div>
+        </>
+      )}
     </section>
   )
 }
