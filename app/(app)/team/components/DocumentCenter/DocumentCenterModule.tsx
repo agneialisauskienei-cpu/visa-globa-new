@@ -1,13 +1,10 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import {
   AlertTriangle,
   CheckCircle2,
-  Copy,
-  Eye,
-  FileText,
   Plus,
   Send,
   Upload,
@@ -70,6 +67,12 @@ const DOCUMENT_TYPES = [
   "Vidaus procedūra",
   "Kita",
 ]
+
+const DOCUMENT_MANAGER_ROLES = new Set(["owner", "admin", "director", "hr"])
+
+function canManageDocuments(role?: string | null) {
+  return DOCUMENT_MANAGER_ROLES.has(String(role || "").trim().toLowerCase())
+}
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -152,6 +155,8 @@ export default function DocumentCenterModule({
   const [employeePreviewId, setEmployeePreviewId] = useState("")
   const [ackConfirm, setAckConfirm] = useState(false)
 
+  const [checkingAccess, setCheckingAccess] = useState(true)
+  const [canManage, setCanManage] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{
     type: "success" | "error" | "warning"
@@ -159,7 +164,61 @@ export default function DocumentCenterModule({
     details?: string
   } | null>(null)
 
+  useEffect(() => {
+    let mounted = true
+
+    async function checkAccess() {
+      setCheckingAccess(true)
+
+      try {
+        if (!organizationId || !currentUserId) {
+          if (!mounted) return
+          setCanManage(false)
+          return
+        }
+
+        const { data, error } = await supabase
+          .from("organization_members")
+          .select("role, is_active")
+          .eq("organization_id", organizationId)
+          .eq("user_id", currentUserId)
+          .maybeSingle()
+
+        if (error) throw error
+
+        if (!mounted) return
+        setCanManage(Boolean(data?.is_active) && canManageDocuments(data?.role))
+      } catch (error) {
+        if (!mounted) return
+        setCanManage(false)
+        setMessage({
+          type: "error",
+          text: "Nepavyko patikrinti dokumentų centro teisių.",
+          details: error instanceof Error ? error.message : String(error),
+        })
+      } finally {
+        if (mounted) setCheckingAccess(false)
+      }
+    }
+
+    void checkAccess()
+
+    return () => {
+      mounted = false
+    }
+  }, [organizationId, currentUserId])
+
   const publishedDocuments = documents.filter((doc) => doc.status === "published")
+
+  const effectiveActiveTab: Tab = canManage ? activeTab : "employee-view"
+
+  const visibleTabs: Array<[Tab, string]> = canManage
+    ? [
+        ["library", "Biblioteka"],
+        ["assignments", "Priskyrimai"],
+        ["employee-view", "Darbuotojo vaizdas"],
+      ]
+    : [["employee-view", "Mano dokumentai"]]
 
   const selectedDocument = useMemo(
     () => documents.find((doc) => doc.id === selectedDocumentId) || null,
@@ -167,9 +226,10 @@ export default function DocumentCenterModule({
   )
 
   const employeeAssignments = useMemo(() => {
-    if (!employeePreviewId) return []
-    return acknowledgements.filter((item) => item.employee_id === employeePreviewId)
-  }, [acknowledgements, employeePreviewId])
+    const previewId = canManage ? employeePreviewId : currentUserId
+    if (!previewId) return []
+    return acknowledgements.filter((item) => item.employee_id === previewId)
+  }, [acknowledgements, canManage, currentUserId, employeePreviewId])
 
   const counts = useMemo(() => {
     return acknowledgements.reduce(
@@ -230,6 +290,11 @@ export default function DocumentCenterModule({
   async function handleSaveDocument() {
     setMessage(null)
 
+    if (!canManage) {
+      setMessage({ type: "error", text: "Neturite teisės kurti dokumentų." })
+      return
+    }
+
     if (!organizationId) {
       setMessage({ type: "error", text: "Nenustatyta organizacija." })
       return
@@ -253,13 +318,31 @@ export default function DocumentCenterModule({
     setSaving(true)
 
     try {
+      const normalizedTitle = title.trim()
+      const normalizedVersion = version.trim() || "1.0"
+      const duplicate = documents.some(
+        (document) =>
+          document.organization_id === organizationId &&
+          document.title.trim().toLowerCase() === normalizedTitle.toLowerCase() &&
+          String(document.version || "1.0").trim().toLowerCase() ===
+            normalizedVersion.toLowerCase(),
+      )
+
+      if (duplicate) {
+        setMessage({
+          type: "error",
+          text: "Toks dokumento pavadinimas ir versija jau yra.",
+        })
+        return
+      }
+
       const { data: created, error: insertError } = await supabase
         .from("company_documents")
         .insert({
           organization_id: organizationId,
-          title: title.trim(),
+          title: normalizedTitle,
           type,
-          version: version.trim() || "1.0",
+          version: normalizedVersion,
           content_text: mode === "text" ? contentText.trim() : null,
           file_path: null,
           file_name: null,
@@ -268,13 +351,21 @@ export default function DocumentCenterModule({
           published_at: publishNow ? new Date().toISOString() : null,
         })
         .select("id")
-        .single()
+        .maybeSingle()
 
       if (insertError) {
         setMessage({
           type: "error",
           text: "Nepavyko išsaugoti dokumento.",
           details: insertError.message,
+        })
+        return
+      }
+
+      if (!created?.id) {
+        setMessage({
+          type: "error",
+          text: "Dokumentas išsaugotas, bet DB negrąžino įrašo ID. Patikrink RLS.",
         })
         return
       }
@@ -291,9 +382,13 @@ export default function DocumentCenterModule({
           .eq("id", created.id)
 
         if (updateError) {
+          await supabase.storage
+            .from("company-documents")
+            .remove([upload.filePath])
+
           setMessage({
-            type: "warning",
-            text: "Dokumentas sukurtas, bet PDF kelio nepavyko priskirti.",
+            type: "error",
+            text: "Dokumentas sukurtas, bet PDF kelio nepavyko priskirti. Failas pašalintas iš storage.",
             details: updateError.message,
           })
           await onRefresh?.()
@@ -322,6 +417,11 @@ export default function DocumentCenterModule({
   async function publishDocument(document: CompanyDocument) {
     setMessage(null)
 
+    if (!canManage) {
+      setMessage({ type: "error", text: "Neturite teisės publikuoti dokumentų." })
+      return
+    }
+
     const { error } = await supabase
       .from("company_documents")
       .update({
@@ -345,6 +445,11 @@ export default function DocumentCenterModule({
 
   async function assignDocument() {
     setMessage(null)
+
+    if (!canManage) {
+      setMessage({ type: "error", text: "Neturite teisės priskirti dokumentų." })
+      return
+    }
 
     if (!organizationId) {
       setMessage({ type: "error", text: "Nenustatyta organizacija." })
@@ -410,6 +515,17 @@ export default function DocumentCenterModule({
   async function acknowledge(item: DocumentAcknowledgement) {
     setMessage(null)
 
+    const canAcknowledgeForEmployee =
+      canManage || (!!currentUserId && item.employee_id === currentUserId)
+
+    if (!canAcknowledgeForEmployee) {
+      setMessage({
+        type: "error",
+        text: "Negalima pažymėti susipažinimo už kitą darbuotoją.",
+      })
+      return
+    }
+
     if (!ackConfirm) {
       setMessage({
         type: "error",
@@ -418,7 +534,7 @@ export default function DocumentCenterModule({
       return
     }
 
-    const { error } = await supabase
+    let updateQuery = supabase
       .from("personnel_document_acknowledgements")
       .update({
         status: "acknowledged",
@@ -426,11 +542,25 @@ export default function DocumentCenterModule({
       })
       .eq("id", item.id)
 
+    if (!canManage) {
+      updateQuery = updateQuery.eq("employee_id", currentUserId || "")
+    }
+
+    const { data, error } = await updateQuery.select("id").maybeSingle()
+
     if (error) {
       setMessage({
         type: "error",
         text: "Nepavyko išsaugoti susipažinimo fakto.",
         details: error.message,
+      })
+      return
+    }
+
+    if (!data?.id) {
+      setMessage({
+        type: "error",
+        text: "Susipažinimo įrašas nerastas arba neturite teisės jo keisti.",
       })
       return
     }
@@ -487,19 +617,27 @@ export default function DocumentCenterModule({
         faktas. Nereikia rinkti perteklinių darbuotojo duomenų ar kelti jo asmeninių dokumentų kopijų.
       </div>
 
+      {checkingAccess ? (
+        <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-black text-slate-700">
+          Tikrinamos dokumentų centro teisės...
+        </div>
+      ) : null}
+
+      {!checkingAccess && !canManage ? (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
+          Rodomi tik jūsų dokumentai ir susipažinimo veiksmai.
+        </div>
+      ) : null}
+
       <div className="mb-5 flex flex-wrap gap-3">
-        {[
-          ["library", "Biblioteka"],
-          ["assignments", "Priskyrimai"],
-          ["employee-view", "Darbuotojo vaizdas"],
-        ].map(([key, label]) => (
+        {visibleTabs.map(([key, label]) => (
           <button
             key={key}
             type="button"
             onClick={() => setActiveTab(key as Tab)}
             className={[
               "rounded-2xl border px-4 py-2 text-sm font-black transition",
-              activeTab === key
+              effectiveActiveTab === key
                 ? "border-slate-900 bg-slate-900 text-white"
                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
             ].join(" ")}
@@ -529,7 +667,7 @@ export default function DocumentCenterModule({
         </div>
       ) : null}
 
-      {activeTab === "library" ? (
+      {effectiveActiveTab === "library" ? (
         <div className="grid gap-5 xl:grid-cols-[0.9fr_1.2fr]">
           <div className="rounded-[28px] border border-slate-200 bg-slate-50/70 p-6">
             <h3 className="text-2xl font-black text-slate-950">Sukurti dokumentą</h3>
@@ -724,7 +862,7 @@ export default function DocumentCenterModule({
         </div>
       ) : null}
 
-      {activeTab === "assignments" ? (
+      {effectiveActiveTab === "assignments" ? (
         <div className="grid gap-5 xl:grid-cols-[0.9fr_1.2fr]">
           <div className="rounded-[28px] border border-slate-200 bg-slate-50/70 p-6">
             <h3 className="text-2xl font-black text-slate-950">Priskirti darbuotojams</h3>
@@ -818,7 +956,7 @@ export default function DocumentCenterModule({
         </div>
       ) : null}
 
-      {activeTab === "employee-view" ? (
+      {effectiveActiveTab === "employee-view" ? (
         <div className="grid gap-5 xl:grid-cols-[0.75fr_1.25fr]">
           <div className="rounded-[28px] border border-slate-200 bg-slate-50/70 p-6">
             <h3 className="text-2xl font-black text-slate-950">Darbuotojo vaizdas</h3>
@@ -829,8 +967,11 @@ export default function DocumentCenterModule({
             <label className="mt-5 block space-y-2">
               <span className="text-sm font-black text-slate-600">Darbuotojas</span>
               <select
-                value={employeePreviewId}
-                onChange={(event) => setEmployeePreviewId(event.target.value)}
+                value={canManage ? employeePreviewId : currentUserId || ""}
+                onChange={(event) => {
+                  if (canManage) setEmployeePreviewId(event.target.value)
+                }}
+                disabled={!canManage}
                 className="h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
               >
                 <option value="">Pasirinkti darbuotoją</option>
