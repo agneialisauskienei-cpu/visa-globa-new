@@ -11,6 +11,7 @@ import {
   CalendarX,
   CheckCircle2,
   ClipboardList,
+  Clock,
   FileCheck2,
   GraduationCap,
   Loader2,
@@ -56,7 +57,11 @@ type EmployeeSchedule = {
   shift_end?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
+  shift_type?: string | null;
   department?: string | null;
+  location?: string | null;
+  note?: string | null;
+  notes?: string | null;
   position?: string | null;
   status?: string | null;
   is_published?: boolean | null;
@@ -197,6 +202,60 @@ function timeOnly(value?: string | null) {
   });
 }
 
+function dateObject(value?: string | null) {
+  if (!value) return null;
+  const clean = String(value).slice(0, 10);
+  const date = new Date(`${clean}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function shortDate(value?: string | null) {
+  return value ? String(value).slice(0, 10) : "—";
+}
+
+function weekday(value?: string | null) {
+  const date = dateObject(value);
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("lt-LT", { weekday: "short" })
+    .format(date)
+    .replace(".", "");
+}
+
+function cleanTime(value?: string | null) {
+  if (!value) return "--:--";
+  return String(value).slice(0, 5);
+}
+
+function minutesFromTime(value?: string | null) {
+  const time = cleanTime(value);
+  const [h, m] = time.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+}
+
+function durationHours(shift: EmployeeSchedule) {
+  const start = minutesFromTime(getScheduleStart(shift));
+  const end = minutesFromTime(getScheduleEnd(shift));
+  if (start === null || end === null) return null;
+  let diff = end - start;
+  if (diff <= 0) diff += 24 * 60;
+  if (cleanTime(getScheduleEnd(shift)) === "23:59") diff += 1;
+  const breakMinutes = /P30|pertrauka 30/i.test(
+    String(shift.notes || shift.note || ""),
+  )
+    ? 30
+    : 0;
+  return Math.max(0, diff - breakMinutes) / 60;
+}
+
+function technicalNoteHidden(value?: string | null) {
+  if (!value) return "";
+  return String(value)
+    .replace(/\s*·?\s*split_parent=\d{4}-\d{2}-\d{2}/g, "")
+    .replace(/split_parent=\d{4}-\d{2}-\d{2}/g, "")
+    .trim();
+}
+
 function getScheduleDate(shift: EmployeeSchedule) {
   return (
     shift.shift_date ||
@@ -213,6 +272,53 @@ function getScheduleStart(shift: EmployeeSchedule) {
 
 function getScheduleEnd(shift: EmployeeSchedule) {
   return shift.end_time || shift.shift_end || shift.ends_at || "";
+}
+
+function shiftLabel(shift: EmployeeSchedule) {
+  const note = String(shift.notes || shift.note || "").toLowerCase();
+  const type = String(shift.shift_type || "").toLowerCase();
+  const start = cleanTime(getScheduleStart(shift));
+  const end = cleanTime(getScheduleEnd(shift));
+
+  if (note.includes("paros") && start !== "00:00") return "Paros pamaina";
+  if (note.includes("paros") && start === "00:00") {
+    return "Paros pamainos tęsinys";
+  }
+  if (start === end && start !== "--:--") return "Paros pamaina";
+  if (type === "day" || type === "work") return "Dieninė pamaina";
+  if (type === "night") return "Naktinė pamaina";
+  if (type === "off") return "Poilsis";
+  if (type === "sick") return "Liga";
+  if (type === "reserved") return "Rezervacija";
+  if (type === "short_leave") return "Trumpas išvykimas";
+  if (["a", "m", "t", "na", "vacation"].includes(type)) {
+    return "Atostogos / neatvykimas";
+  }
+  return "Pamaina";
+}
+
+function shiftTone(shift: EmployeeSchedule) {
+  const label = shiftLabel(shift).toLowerCase();
+  const type = String(shift.shift_type || "").toLowerCase();
+  if (label.includes("paros") || type === "night") {
+    return "border-indigo-100 bg-indigo-50 text-indigo-950";
+  }
+  if (type === "off") return "border-slate-200 bg-slate-50 text-slate-700";
+  if (type === "sick") return "border-rose-100 bg-rose-50 text-rose-900";
+  if (type === "reserved") {
+    return "border-violet-100 bg-violet-50 text-violet-900";
+  }
+  if (["a", "m", "t", "na", "vacation"].includes(type)) {
+    return "border-amber-100 bg-amber-50 text-amber-900";
+  }
+  return "border-emerald-100 bg-emerald-50 text-emerald-950";
+}
+
+function timeText(shift: EmployeeSchedule) {
+  const start = cleanTime(getScheduleStart(shift));
+  const end = cleanTime(getScheduleEnd(shift));
+  if (end === "23:59") return `${start}–24:00`;
+  return `${start}–${end}`;
 }
 
 function isSchedulePublished(shift: EmployeeSchedule) {
@@ -1180,16 +1286,44 @@ export default function EmployeeDashboardPage() {
         {activePanel === "schedule" ? (
           twoColumnLayout(
             schedule.length ? (
-              <div className="overflow-hidden rounded-[18px] border border-[#dbe6e0] bg-white">
-                <div className="hidden grid-cols-[1fr_150px_1fr] gap-4 bg-[#eef4f1] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
-                  <span>Data</span>
-                  <span>Laikas</span>
-                  <span>Informacija</span>
+              <>
+                <div className="hidden overflow-hidden rounded-[22px] border border-slate-200 lg:block">
+                  <table className="w-full border-collapse bg-white text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Data
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Diena
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Laikas
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Tipas
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Valandos
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Pastaba
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schedule.map((shift) => (
+                        <DesktopShiftRow key={shift.id} shift={shift} />
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                {schedule.map((shift) => (
-                  <ShiftRow key={shift.id} shift={shift} />
-                ))}
-              </div>
+                <div className="space-y-3 lg:hidden">
+                  {schedule.map((shift) => (
+                    <ShiftMobileCard key={shift.id} shift={shift} />
+                  ))}
+                </div>
+              </>
             ) : (
               <EmptyState
                 icon={<CalendarX className="h-7 w-7" />}
@@ -1208,7 +1342,7 @@ export default function EmployeeDashboardPage() {
                 value={nextShift ? fmtDate(getScheduleDate(nextShift)) : "—"}
                 desc={
                   nextShift
-                    ? `${timeOnly(getScheduleStart(nextShift)) || "—"}–${timeOnly(getScheduleEnd(nextShift)) || "—"}`
+                    ? `${timeText(nextShift)} · ${shiftLabel(nextShift)}`
                     : "Pamainų nėra"
                 }
               />
@@ -2049,35 +2183,89 @@ function ShiftCard({ shift }: { shift: EmployeeSchedule }) {
   );
 }
 
-function ShiftRow({ shift }: { shift: EmployeeSchedule }) {
-  const start = timeOnly(getScheduleStart(shift)) || "—";
-  const end = timeOnly(getScheduleEnd(shift)) || "—";
+function DesktopShiftRow({ shift }: { shift: EmployeeSchedule }) {
+  const date = getScheduleDate(shift);
+  const hours = durationHours(shift);
+  const cleanNote = technicalNoteHidden(shift.notes || shift.note || "");
 
   return (
-    <div className="grid gap-2 border-t border-[#dbe6e0] px-4 py-4 text-[#10251f] md:grid-cols-[1fr_150px_1fr] md:items-center md:gap-4">
-      <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6a7e75] md:hidden">
-          Data
-        </p>
-        <p className="break-words font-black">{fmtDate(getScheduleDate(shift))}</p>
+    <tr className="border-t border-slate-100">
+      <td className="px-5 py-4 text-base font-black text-slate-950">
+        {shortDate(date)}
+      </td>
+      <td className="px-5 py-4 text-sm font-extrabold capitalize text-slate-600">
+        {weekday(date)}
+      </td>
+      <td className="px-5 py-4">
+        <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-4 py-2 text-sm font-black text-slate-800">
+          <Clock className="h-4 w-4" />
+          {timeText(shift)}
+        </span>
+      </td>
+      <td className="px-5 py-4">
+        <span
+          className={`inline-flex rounded-full border px-4 py-2 text-sm font-black ${shiftTone(shift)}`}
+        >
+          {shiftLabel(shift)}
+        </span>
+      </td>
+      <td className="px-5 py-4 text-sm font-black text-slate-700">
+        {hours === null
+          ? "—"
+          : `${hours.toFixed(hours % 1 === 0 ? 0 : 1)} val.`}
+      </td>
+      <td className="max-w-md px-5 py-4 text-sm font-semibold text-slate-500">
+        {cleanNote ||
+          [shift.location, shift.department, shift.position]
+            .filter(Boolean)
+            .join(" · ") ||
+          "—"}
+      </td>
+    </tr>
+  );
+}
+
+function ShiftMobileCard({ shift }: { shift: EmployeeSchedule }) {
+  const date = getScheduleDate(shift);
+  const hours = durationHours(shift);
+  const cleanNote = technicalNoteHidden(shift.notes || shift.note || "");
+
+  return (
+    <article className="rounded-[20px] border border-[#dbe6e0] bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
+            {weekday(date)}
+          </p>
+          <h3 className="mt-1 text-xl font-black leading-tight text-[#10251f]">
+            {shortDate(date)}
+          </h3>
+        </div>
+        <span
+          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-black ${shiftTone(shift)}`}
+        >
+          {shiftLabel(shift)}
+        </span>
       </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6a7e75] md:hidden">
-          Laikas
-        </p>
-        <p className="font-black">
-          {start}–{end}
-        </p>
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm font-black text-slate-800">
+        <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2">
+          <Clock className="h-4 w-4" />
+          {timeText(shift)}
+        </span>
+        {hours !== null ? (
+          <span className="rounded-full bg-slate-50 px-3 py-2">
+            {hours.toFixed(hours % 1 === 0 ? 0 : 1)} val.
+          </span>
+        ) : null}
       </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6a7e75] md:hidden">
-          Informacija
+      {(shift.location || shift.department || shift.position || cleanNote) ? (
+        <p className="mt-3 text-sm font-bold leading-5 text-[#526174]">
+          {[shift.location, shift.department, shift.position, cleanNote]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
-        <p className="break-words text-sm font-bold text-[#526174]">
-          {shift.position || shift.department || "Paskelbta pamaina"}
-        </p>
-      </div>
-    </div>
+      ) : null}
+    </article>
   );
 }
 

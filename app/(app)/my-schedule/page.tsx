@@ -221,11 +221,17 @@ export default function MySchedulePage() {
       let found: ScheduleRow[] = [];
 
       for (const candidate of candidates) {
-        const { data, error } = await supabase
+        let query = supabase
           .from("employee_schedules")
           .select("*")
           .eq(candidate.column, candidate.value)
           .limit(220);
+
+        if (currentMembership?.organization_id) {
+          query = query.eq("organization_id", currentMembership.organization_id);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.warn(`[my-schedule] skipped ${candidate.column}:`, error.message);
