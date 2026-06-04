@@ -1382,8 +1382,8 @@ export default function EmployeeDashboardPage() {
     <main className="min-h-screen bg-[#f3f6f4] px-3 pb-24 pt-3 text-[#10251f] sm:p-5 sm:pb-24 lg:p-6 lg:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-3 sm:space-y-4">
         <section className="overflow-hidden rounded-[22px] border border-[#c9d8d0] bg-white shadow-sm sm:rounded-[24px]">
-          <div className="flex flex-col gap-4 bg-[#486b5d] px-4 py-4 text-white sm:px-5 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-start gap-3 sm:gap-4">
+          <div className="flex flex-col items-center gap-4 bg-[#486b5d] px-4 py-4 text-center text-white sm:items-stretch sm:px-5 sm:py-5 sm:text-left lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start sm:gap-4">
               <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[16px] bg-[#e8f7ef] text-[#486b5d] sm:h-14 sm:w-14 sm:rounded-[18px]">
                 <UserRound className="h-6 w-6 sm:h-7 sm:w-7" />
               </div>
@@ -1401,7 +1401,7 @@ export default function EmployeeDashboardPage() {
               </div>
             </div>
 
-            <div className="grid gap-2 rounded-[18px] border border-white/15 bg-white/10 p-3 text-sm backdrop-blur sm:p-4 lg:min-w-[320px]">
+            <div className="grid w-full max-w-[420px] gap-2 rounded-[18px] border border-white/15 bg-white/10 p-3 text-sm backdrop-blur sm:max-w-none sm:p-4 lg:min-w-[320px] lg:max-w-[360px]">
               <InfoLine
                 label="Pareigos"
                 value={profile?.position || "Darbuotojas"}
@@ -1415,7 +1415,7 @@ export default function EmployeeDashboardPage() {
             </div>
           </div>
 
-          <nav className="flex gap-1 overflow-x-auto border-t border-[#dbe6e0] bg-[#eef4f1] px-2 py-2 text-sm font-black text-[#486b5d] sm:flex-wrap sm:px-4">
+          <nav className="grid grid-cols-2 gap-2 border-t border-[#dbe6e0] bg-[#eef4f1] px-3 py-3 text-sm font-black text-[#486b5d] sm:grid-cols-4 sm:px-4 lg:flex lg:flex-wrap lg:gap-1 lg:py-2">
             <TopTab
               active={activePanel === "overview"}
               onClick={() => setActivePanel("overview")}
@@ -1480,7 +1480,7 @@ export default function EmployeeDashboardPage() {
 
         {activePanel === "overview" ? (
           <>
-        <section className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
+        <section className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
           <StatButton
             title="Artimiausia pamaina"
             value={formatShift(nextShift)}
@@ -1513,6 +1513,13 @@ export default function EmployeeDashboardPage() {
             icon={<GraduationCap className="h-5 w-5" />}
             onClick={() => openPanel("trainings")}
             tone={expiringTrainings.length ? "amber" : "green"}
+          />
+          <StatButton
+            title="Dokumentai"
+            value={`${documentProgress}%`}
+            icon={<FileCheck2 className="h-5 w-5" />}
+            onClick={() => openPanel("documents")}
+            tone={documentProgress === 100 ? "green" : "amber"}
           />
         </section>
 
@@ -1729,7 +1736,7 @@ function TopTab({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex shrink-0 items-center gap-2 rounded-[14px] px-3 py-2 transition ${active ? "bg-white text-[#486b5d] shadow-sm ring-1 ring-[#c9d8d0]" : "text-[#486b5d] hover:bg-white/80"}`}
+      className={`inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-[14px] px-3 py-2 transition lg:w-auto ${active ? "bg-white text-[#486b5d] shadow-sm ring-1 ring-[#c9d8d0]" : "text-[#486b5d] hover:bg-white/80"}`}
     >
       {icon}
       {label}
