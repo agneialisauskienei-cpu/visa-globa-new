@@ -31,6 +31,7 @@ import { getReadableError } from "@/lib/errors"
 import { formatDate, formatDateTime } from "@/lib/format"
 import { ROUTES } from "@/lib/routes"
 import { supabase } from "@/lib/supabase"
+import { getChangedFields, logAudit } from "@/lib/audit"
 
 type TaskRow = {
   id: string
@@ -61,6 +62,37 @@ type TaskAttachmentRow = {
   size_bytes: number | null
   created_at: string | null
   signed_url?: string | null
+}
+
+type TaskAttachmentInsert = {
+  organization_id: string
+  task_id: string
+  file_path: string
+  file_name: string | null
+  content_type: string | null
+  size_bytes: number
+  uploaded_by: string | null
+  created_at: string
+}
+
+async function writeTaskAudit(input: {
+  organizationId?: string | null
+  recordId?: string | null
+  action: "insert" | "update" | "delete"
+  before?: Record<string, unknown>
+  after?: Record<string, unknown>
+}) {
+  try {
+    await logAudit({
+      organizationId: input.organizationId || null,
+      tableName: "employee_tasks",
+      recordId: input.recordId || null,
+      action: input.action,
+      changes: getChangedFields(input.before || {}, input.after || {}),
+    })
+  } catch (error) {
+    console.warn("[tasks] audit skipped", error)
+  }
 }
 
 type ResidentRow = {
@@ -485,7 +517,9 @@ export default function TasksPage() {
   const [editTaskImages, setEditTaskImages] = useState<TaskImageDraft[]>([])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     void loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -502,6 +536,7 @@ export default function TasksPage() {
       canManageAllTasks(access) || isMaintenanceStaff(access?.staffType)
 
     if (activePageTab === "maintenance" && !canUseMaintenanceView) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActivePageTab("tasks")
       setViewFilter("all")
       setTypeFilter("")
@@ -896,7 +931,7 @@ export default function TasksPage() {
   async function uploadTaskImages(taskId: string, images: TaskImageDraft[] = taskImages) {
     if (!access?.organizationId || !currentUserId || images.length === 0) return
 
-    const uploadedRows = []
+    const uploadedRows: TaskAttachmentInsert[] = []
 
     for (const image of images) {
       const file = image.file
@@ -926,7 +961,7 @@ export default function TasksPage() {
     }
 
     if (uploadedRows.length > 0) {
-      const { error: metaError } = await supabase.from("task_attachments").insert(uploadedRows as any)
+      const { error: metaError } = await supabase.from("task_attachments").insert(uploadedRows)
 
       if (metaError) {
         console.warn("Task images uploaded, but attachment metadata was not saved:", metaError)
@@ -978,6 +1013,15 @@ export default function TasksPage() {
       if (error) throw error
 
       await uploadTaskImages(taskId)
+      await writeTaskAudit({
+        organizationId: access.organizationId,
+        recordId: taskId,
+        action: "insert",
+        after: {
+          ...payload,
+          attachments_count: taskImages.length,
+        },
+      })
 
       if (form.keep_open) {
         setForm((previous) => ({
@@ -1070,6 +1114,28 @@ export default function TasksPage() {
         clearEditTaskImages()
       }
 
+      await writeTaskAudit({
+        organizationId: editingTask.organization_id || access?.organizationId || null,
+        recordId: editingTask.id,
+        action: "update",
+        before: {
+          assigned_user_id: editingTask.assigned_user_id || null,
+          resident_id: editingTask.resident_id || null,
+          title: editingTask.title || null,
+          description: editingTask.description || null,
+          type: editingTask.type || null,
+          subtype: editingTask.subtype || null,
+          status: editingTask.status || null,
+          priority: editingTask.priority || null,
+          due_date: editingTask.due_date || null,
+          interval_days: editingTask.interval_days || null,
+        },
+        after: {
+          ...payload,
+          attachments_added: editTaskImages.length,
+        },
+      })
+
       setEditingTask(null)
       setMessage(editTaskImages.length > 0 ? "Užduotis atnaujinta su nuotraukomis." : "Užduotis atnaujinta.")
       await loadData()
@@ -1134,6 +1200,18 @@ export default function TasksPage() {
           if (recurringError) throw recurringError
         }
       }
+
+      await writeTaskAudit({
+        organizationId: task.organization_id || access?.organizationId || null,
+        recordId: task.id,
+        action: "update",
+        before: {
+          status: task.status || null,
+          completed_at: task.completed_at || null,
+          last_done_at: task.last_done_at || null,
+        },
+        after: payload,
+      })
 
       await loadData()
     } catch (error) {

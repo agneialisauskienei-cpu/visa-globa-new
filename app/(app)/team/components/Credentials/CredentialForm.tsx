@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { getChangedFields, logAudit } from "@/lib/audit"
 
 type EmployeeOption = {
   id: string
@@ -36,6 +37,21 @@ const CHECK_METHODS = [
   "Pateikta darbuotojo informacija",
   "Patikrinta pagal vidinę tvarką",
 ]
+
+const DOCUMENT_MANAGER_ROLES = new Set(["owner", "admin", "director", "hr"])
+
+function canManageDocuments(role?: string | null) {
+  return DOCUMENT_MANAGER_ROLES.has(String(role || "").trim().toLowerCase())
+}
+
+function errorDetails(error: unknown) {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === "object") {
+    const details = error as { message?: string; details?: string }
+    return details.message || details.details || String(error)
+  }
+  return String(error)
+}
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -78,6 +94,8 @@ export default function CredentialForm({
   const [checkedAt, setCheckedAt] = useState(todayIso())
   const [checkedByText, setCheckedByText] = useState("")
   const [confirmed, setConfirmed] = useState(false)
+  const [checkingAccess, setCheckingAccess] = useState(true)
+  const [canManage, setCanManage] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{
@@ -86,10 +104,13 @@ export default function CredentialForm({
     details?: string
   } | null>(null)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setEmployeeId(resolvedEmployeeId), [resolvedEmployeeId])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setType(resolvedType), [resolvedType])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNumber("")
     setIssuer("")
     setIssuedAt(todayIso())
@@ -102,6 +123,50 @@ export default function CredentialForm({
     setMessage(null)
   }, [resolvedEmployeeId, resolvedType])
 
+  useEffect(() => {
+    let mounted = true
+
+    async function checkAccess() {
+      setCheckingAccess(true)
+
+      try {
+        if (!organizationId || !currentUserId) {
+          if (!mounted) return
+          setCanManage(false)
+          return
+        }
+
+        const { data, error } = await supabase
+          .from("organization_members")
+          .select("role, is_active")
+          .eq("organization_id", organizationId)
+          .eq("user_id", currentUserId)
+          .maybeSingle()
+
+        if (error) throw error
+
+        if (!mounted) return
+        setCanManage(Boolean(data?.is_active) && canManageDocuments(data?.role))
+      } catch (error: unknown) {
+        if (!mounted) return
+        setCanManage(false)
+        setMessage({
+          type: "error",
+          text: "Nepavyko patikrinti dokumentų formos teisių.",
+          details: errorDetails(error),
+        })
+      } finally {
+        if (mounted) setCheckingAccess(false)
+      }
+    }
+
+    void checkAccess()
+
+    return () => {
+      mounted = false
+    }
+  }, [organizationId, currentUserId])
+
   const selectedEmployeeName = useMemo(() => {
     const employee = employees.find((item) => item.id === employeeId)
     return employee?.full_name || employee?.name || "Pasirinktas darbuotojas"
@@ -109,6 +174,11 @@ export default function CredentialForm({
 
   async function handleSave() {
     setMessage(null)
+
+    if (!canManage) {
+      setMessage({ type: "error", text: "Neturite teisės tvarkyti darbuotojų dokumentų." })
+      return
+    }
 
     if (!organizationId) {
       setMessage({ type: "error", text: "Nepavyko išsaugoti: nenustatyta organizacija." })
@@ -136,12 +206,32 @@ export default function CredentialForm({
     setSaving(true)
 
     try {
+      const normalizedType = normalizeCredentialType(type)
+      const { data: existingRows, error: existingError } = await supabase
+        .from("personnel_credentials")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("employee_id", employeeId)
+        .eq("type", normalizedType)
+        .eq("status", "active")
+        .limit(1)
+
+      if (existingError) throw existingError
+
+      if ((existingRows || []).length > 0) {
+        setMessage({
+          type: "error",
+          text: "Šis darbuotojas jau turi aktyvų tokio tipo dokumentą.",
+        })
+        return
+      }
+
       const { data: credential, error: credentialError } = await supabase
         .from("personnel_credentials")
         .insert({
           organization_id: organizationId,
           employee_id: employeeId,
-          type: type.trim(),
+          type: normalizedType,
           number: number.trim() || null,
           issuer: issuer.trim() || null,
           issued_at: issuedAt || null,
@@ -150,7 +240,7 @@ export default function CredentialForm({
           note: note.trim() || null,
         })
         .select("id")
-        .single()
+        .maybeSingle()
 
       if (credentialError) {
         setMessage({
@@ -161,13 +251,21 @@ export default function CredentialForm({
         return
       }
 
+      if (!credential?.id) {
+        setMessage({
+          type: "error",
+          text: "Pažyma išsaugota, bet DB negrąžino įrašo ID. Patikrink RLS.",
+        })
+        return
+      }
+
       const { error: verificationError } = await supabase
         .from("document_verifications")
         .insert({
           organization_id: organizationId,
           employee_id: employeeId,
-          credential_id: credential?.id || null,
-          type: type.trim(),
+          credential_id: credential.id,
+          type: normalizedType,
           method: checkMethod,
           checked_at: checkedAt || todayIso(),
           checked_by: currentUserId || null,
@@ -177,13 +275,47 @@ export default function CredentialForm({
         })
 
       if (verificationError) {
+        await supabase
+          .from("personnel_credentials")
+          .delete()
+          .eq("id", credential.id)
+          .eq("organization_id", organizationId)
+
         setMessage({
           type: "error",
-          text: "Pažyma išsaugota, bet nepavyko išsaugoti patikrinimo fakto.",
+          text: "Patikrinimo fakto išsaugoti nepavyko, todėl pažymos įrašas atšauktas.",
           details: verificationError.message,
         })
         await onSaved?.()
         return
+      }
+
+      try {
+        await logAudit({
+          organizationId: organizationId || null,
+          tableName: "personnel_credentials",
+          recordId: credential.id,
+          action: "insert",
+          changes: getChangedFields(
+            {},
+            {
+              employee_id: employeeId,
+              type: normalizedType,
+              number: number.trim() || null,
+              issuer: issuer.trim() || null,
+              issued_at: issuedAt || null,
+              expires_at: expiresAt || null,
+              status: "active",
+              check_method: checkMethod,
+              checked_at: checkedAt || todayIso(),
+              checked_by: currentUserId || null,
+              checked_by_text: checkedByText.trim() || null,
+              note: note.trim() || null,
+            },
+          ),
+        })
+      } catch (auditError) {
+        console.warn("[CredentialForm] audit skipped", auditError)
       }
 
       setMessage({
@@ -226,6 +358,17 @@ export default function CredentialForm({
           Failų kelti nereikia – įvedamas dokumento faktas ir privalomas patikrinimo įrašas.
         </p>
       </div>
+
+      {checkingAccess ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-black text-slate-600">
+          Tikrinamos dokumentų formos teisės...
+        </div>
+      ) : !canManage ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-black text-amber-900">
+          Dokumentų formą gali valdyti tik savininkas, administratorius, direktorius arba HR.
+        </div>
+      ) : (
+        <>
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-2">
@@ -333,6 +476,8 @@ export default function CredentialForm({
           {saving ? "Saugoma..." : "+ Išsaugoti su patikrinimu"}
         </button>
       </div>
+        </>
+      )}
     </section>
   )
 }

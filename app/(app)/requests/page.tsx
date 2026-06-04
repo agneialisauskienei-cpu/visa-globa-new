@@ -185,6 +185,26 @@ function isTemporaryKind(kind?: string | null) {
   return requestKindMeta(kind).kind === "temporary_leave";
 }
 
+function dateRangesOverlap(
+  firstStart: string,
+  firstEnd: string,
+  secondStart: string,
+  secondEnd: string,
+) {
+  return firstStart <= secondEnd && secondStart <= firstEnd;
+}
+
+function requestStatusMatchesFilter(
+  requestStatus: RequestStatus,
+  filterStatus: "all" | RequestStatus,
+) {
+  if (filterStatus === "all") return true;
+  if (filterStatus === "submitted") {
+    return requestStatus === "submitted" || requestStatus === "pending";
+  }
+  return requestStatus === filterStatus;
+}
+
 
 function lithuanianEasterDate(year: number) {
   const a = year % 19;
@@ -624,7 +644,7 @@ export default function RequestsPage() {
 
       return (
         (!q || haystack.includes(q)) &&
-        (status === "all" || request.status === status) &&
+        requestStatusMatchesFilter(request.status, status) &&
         (type === "all" || request.kind === type)
       );
     });
@@ -789,8 +809,27 @@ export default function RequestsPage() {
   const rejected = visibleRequests.filter((request) => request.status === "rejected").length;
   const total = visibleRequests.length;
 
-  const history = visibleRequests
-    .filter((request) => request.status === "approved" || request.status === "rejected" || request.status === "canceled")
+  const historySource = useMemo(() => {
+    const historical = visibleRequests.filter(
+      (request) =>
+        request.status === "approved" ||
+        request.status === "rejected" ||
+        request.status === "canceled",
+    );
+
+    if (embedded) return visibleRequests;
+
+    if (status === "submitted" || status === "pending") {
+      return visibleRequests.filter(
+        (request) =>
+          request.status === "submitted" || request.status === "pending",
+      );
+    }
+
+    return historical;
+  }, [embedded, status, visibleRequests]);
+
+  const history = historySource
     .slice()
     .sort((a, b) => String(b.createdAt || b.start).localeCompare(String(a.createdAt || a.start)));
 
@@ -811,7 +850,7 @@ export default function RequestsPage() {
 
       return (
         (!q || haystack.includes(q)) &&
-        (status === "all" || request.status === status) &&
+        requestStatusMatchesFilter(request.status, status) &&
         (type === "all" || request.kind === type)
       );
     });
@@ -909,7 +948,6 @@ export default function RequestsPage() {
       return;
     }
 
-    const meta = requestKindMeta(form.kind);
     const normalizedStartTime = normalizeTimeInput(form.startTime);
     const normalizedEndTime = normalizeTimeInput(form.endTime);
     const requestedDays = await countRequestDays(employeeId, form.kind, startDate, endDate);
@@ -922,6 +960,21 @@ export default function RequestsPage() {
     if (isAnnualKind(form.kind) && requestedDays <= 0) {
       setMessage(
         "Pasirinktame laikotarpyje nėra darbo dienų. Patikrink, ar pasirinktos datos nepatenka tik į savaitgalį arba šventines dienas.",
+      );
+      return;
+    }
+
+    const normalizedEndDate = isTemporaryKind(form.kind) ? startDate : endDate;
+    const conflictingRequest = requests.find((request) => {
+      if (request.employeeId !== employeeId) return false;
+      if (editingRequestId && request.id === editingRequestId) return false;
+      if (!["submitted", "pending", "approved"].includes(request.status)) return false;
+      return dateRangesOverlap(startDate, normalizedEndDate, request.start, request.end);
+    });
+
+    if (conflictingRequest) {
+      setMessage(
+        `Šiam darbuotojui tuo pačiu laikotarpiu jau yra prašymas: ${conflictingRequest.kindLabel}, ${conflictingRequest.start}–${conflictingRequest.end}, ${statusLabel(conflictingRequest.status)}.`,
       );
       return;
     }
@@ -945,7 +998,7 @@ export default function RequestsPage() {
         employee_id: employeeId,
         type: form.kind,
         start_date: startDate,
-        end_date: isTemporaryKind(form.kind) ? startDate : endDate,
+        end_date: normalizedEndDate,
         requested_days: requestedDays,
         note: noteParts.length ? noteParts.join(" · ") : null,
         status: "submitted",

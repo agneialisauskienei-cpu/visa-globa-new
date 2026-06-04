@@ -199,6 +199,10 @@ function errorText(error: unknown) {
   return String(error);
 }
 
+function createInviteToken() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export default function CandidatesModule({
   organizationId,
   candidates,
@@ -349,13 +353,21 @@ export default function CandidatesModule({
         .from("candidates")
         .insert(candidatePayload)
         .select("id")
-        .single();
+        .maybeSingle();
 
       if (candidateError) {
         setMessage({
           type: "error",
           text: "Nepavyko išsaugoti kandidato į `candidates`.",
           details: errorText(candidateError),
+        });
+        return null;
+      }
+
+      if (!candidate?.id) {
+        setMessage({
+          type: "error",
+          text: "Kandidatas išsaugotas, bet DB negrąžino įrašo ID. Patikrink RLS.",
         });
         return null;
       }
@@ -374,9 +386,15 @@ export default function CandidatesModule({
         .insert(questionnairePayload);
 
       if (questionnaireError) {
+        await supabase
+          .from("candidates")
+          .delete()
+          .eq("id", candidate.id)
+          .eq("organization_id", organizationId);
+
         setMessage({
           type: "warning",
-          text: "Kandidatas išsaugotas, bet klausimyno įrašas neišsaugotas.",
+          text: "Klausimyno įrašas neišsaugotas, todėl kandidato įrašas atšauktas.",
           details: errorText(questionnaireError),
         });
         await onRefresh?.();
@@ -492,9 +510,7 @@ export default function CandidatesModule({
     setAcceptingCandidateId(candidate.id);
 
     try {
-      const inviteToken =
-        globalThis.crypto?.randomUUID?.() ||
-        `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const inviteToken = createInviteToken();
 
       const invitePayload = {
         organization_id: organizationId,
