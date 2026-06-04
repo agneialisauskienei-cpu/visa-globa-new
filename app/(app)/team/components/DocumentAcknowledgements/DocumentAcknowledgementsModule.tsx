@@ -413,7 +413,7 @@ export default function DocumentsModule({
       if (duplicate) {
         setMessage({
           type: "error",
-          text: "Šis darbuotojas jau turi aktyvų tokio tipo dokumentą. Naudokite atnaujinimą vietoje naujo įrašo.",
+          text: "Šis darbuotojas jau turi aktyvų tokio tipo dokumentą. Jei reikia pratęsti galiojimą, pridėkite naują versiją tik pasibaigus arba archyvavus seną įrašą.",
         })
         return
       }
@@ -841,7 +841,7 @@ export default function DocumentsModule({
                             onClick={() => fillFromMissing({ employee_id: row.employee_id, type: row.type })}
                             className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
                           >
-                            Atnaujinti
+                            Pridėti naują versiją
                           </button>
                         )}
                       </td>
