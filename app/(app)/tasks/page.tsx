@@ -932,6 +932,7 @@ export default function TasksPage() {
     if (!access?.organizationId || !currentUserId || images.length === 0) return
 
     const uploadedRows: TaskAttachmentInsert[] = []
+    const uploadedPaths: string[] = []
 
     for (const image of images) {
       const file = image.file
@@ -947,6 +948,7 @@ export default function TasksPage() {
         })
 
       if (uploadError) throw uploadError
+      uploadedPaths.push(filePath)
 
       uploadedRows.push({
         organization_id: access.organizationId,
@@ -964,8 +966,17 @@ export default function TasksPage() {
       const { error: metaError } = await supabase.from("task_attachments").insert(uploadedRows)
 
       if (metaError) {
-        console.warn("Task images uploaded, but attachment metadata was not saved:", metaError)
-        // Do not block task creation: images can still be shown by Storage folder fallback.
+        if (uploadedPaths.length > 0) {
+          const { error: cleanupError } = await supabase.storage
+            .from(TASK_IMAGE_BUCKET)
+            .remove(uploadedPaths)
+
+          if (cleanupError) {
+            console.warn("Task images metadata failed and uploaded files cleanup failed:", cleanupError)
+          }
+        }
+
+        throw metaError
       }
     }
   }
@@ -1105,6 +1116,7 @@ export default function TasksPage() {
         .from("employee_tasks")
         .update(payload)
         .eq("id", editingTask.id)
+        .eq("organization_id", access?.organizationId || editingTask.organization_id || "")
 
       if (error) throw error
 
@@ -1163,11 +1175,13 @@ export default function TasksPage() {
         .from("employee_tasks")
         .update(payload)
         .eq("id", task.id)
+        .eq("organization_id", access?.organizationId || task.organization_id || "")
 
       if (error) throw error
 
       if (
         status === "done" &&
+        task.status !== "done" &&
         task.interval_days &&
         task.interval_days > 0 &&
         task.due_date &&
@@ -1178,26 +1192,50 @@ export default function TasksPage() {
         if (!Number.isNaN(currentDue.getTime())) {
           const nextDue = new Date(currentDue)
           nextDue.setDate(nextDue.getDate() + task.interval_days)
+          const nextDueIso = nextDue.toISOString()
 
-          const { error: recurringError } = await supabase.from("employee_tasks").insert({
-            organization_id: access.organizationId,
-            assigned_user_id: task.assigned_user_id,
-            created_by_user_id: task.created_by_user_id || currentUserId,
-            resident_id: task.resident_id,
-            title: task.title,
-            description: task.description,
-            type: task.type,
-            subtype: task.subtype,
-            status: "new",
-            priority: task.priority,
-            due_date: nextDue.toISOString(),
-            interval_days: task.interval_days,
-            viewed_at: null,
-            completed_at: null,
-            last_done_at: null,
-          })
+          let recurringQuery = supabase
+            .from("employee_tasks")
+            .select("id")
+            .eq("organization_id", access.organizationId)
+            .eq("title", task.title)
+            .eq("due_date", nextDueIso)
+            .eq("interval_days", task.interval_days)
+            .eq("type", task.type || "")
 
-          if (recurringError) throw recurringError
+          recurringQuery = task.assigned_user_id
+            ? recurringQuery.eq("assigned_user_id", task.assigned_user_id)
+            : recurringQuery.is("assigned_user_id", null)
+
+          recurringQuery = task.resident_id
+            ? recurringQuery.eq("resident_id", task.resident_id)
+            : recurringQuery.is("resident_id", null)
+
+          const { data: existingRecurring, error: recurringCheckError } = await recurringQuery.limit(1)
+
+          if (recurringCheckError) throw recurringCheckError
+
+          if (!existingRecurring?.length) {
+            const { error: recurringError } = await supabase.from("employee_tasks").insert({
+              organization_id: access.organizationId,
+              assigned_user_id: task.assigned_user_id,
+              created_by_user_id: task.created_by_user_id || currentUserId,
+              resident_id: task.resident_id,
+              title: task.title,
+              description: task.description,
+              type: task.type,
+              subtype: task.subtype,
+              status: "new",
+              priority: task.priority,
+              due_date: nextDueIso,
+              interval_days: task.interval_days,
+              viewed_at: null,
+              completed_at: null,
+              last_done_at: null,
+            })
+
+            if (recurringError) throw recurringError
+          }
         }
       }
 
@@ -1234,6 +1272,7 @@ export default function TasksPage() {
         .from("employee_tasks")
         .update({ viewed_at: viewedAt })
         .eq("id", task.id)
+        .eq("organization_id", access?.organizationId || task.organization_id || "")
 
       if (error) throw error
 
