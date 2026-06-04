@@ -1373,83 +1373,18 @@ export default function EmployeeDashboardPage() {
           </section>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-3">
-          <Panel
-            title="Mano prašymai"
-            kicker="Prašymai"
-            actionLabel="Tvarkyti"
-            onAction={() => openPanel("requests")}
-          >
-            <div className="space-y-3">
-              <ActionRow
-                icon={<CalendarX className="h-5 w-5" />}
-                title={
-                  pendingRequestCount
-                    ? `${pendingRequestCount} laukia sprendimo`
-                    : "Laukiančių prašymų nėra"
-                }
-                desc="Atostogos ir išvykimai"
-                onClick={() => openPanel("requests")}
-              />
-            </div>
-          </Panel>
-
-          <Panel
-            title="Dokumentai"
-            kicker="Dokumentai"
-            actionLabel="Pildyti"
-            onAction={() => openPanel("documents")}
-          >
-            <div className="space-y-2">
-              <DocumentLine
-                title="Sveikatos pažyma"
-                value={fmtDate(documentForm.healthCertificateUntil)}
-                ok={Boolean(documentForm.healthCertificateUntil)}
-              />
-              <DocumentLine
-                title="Licencija"
-                value={
-                  documentForm.licenseNumber
-                    ? `${documentForm.licenseNumber} · ${fmtDate(
-                        documentForm.licenseUntil,
-                      )}`
-                    : fmtDate(documentForm.licenseUntil)
-                }
-                ok={Boolean(documentForm.licenseUntil)}
-              />
-            </div>
-          </Panel>
-
-          <Panel
-            title="Mokymai"
-            kicker="Mokymai"
-            actionLabel="Peržiūrėti"
-            onAction={() => openPanel("trainings")}
-          >
-            <div className="space-y-3">
-              <ActionRow
-                icon={<GraduationCap className="h-5 w-5" />}
-                title={
-                  expiringTrainings.length
-                    ? `${expiringTrainings.length} artėja prie termino`
-                    : "Terminų rizikų nėra"
-                }
-                desc={`${trainings.length} mokymų įrašai`}
-                onClick={() => openPanel("trainings")}
-              />
-            </div>
-          </Panel>
-        </section>
-
         <section className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
-                Greiti veiksmai
+                Mano informacija
               </p>
               <h2 className="mt-1 text-2xl font-black tracking-tight text-[#10251f]">
-                Dažniausi langai
+                Prašymai, dokumentai ir mokymai
               </h2>
+              <p className="mt-1 text-sm font-bold text-[#526174]">
+                Tik svarbiausi statusai vienoje vietoje.
+              </p>
             </div>
             <button
               type="button"
@@ -1465,30 +1400,42 @@ export default function EmployeeDashboardPage() {
             </button>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
             <ActionRow
-              icon={<Users className="h-5 w-5" />}
-              title="Mano gyventojai"
-              desc={`${assignedResidents.length} priskirta`}
-              onClick={() => openPanel("residents")}
+              icon={<CalendarX className="h-5 w-5" />}
+              title={
+                pendingRequestCount
+                  ? `${pendingRequestCount} prašymai laukia`
+                  : "Prašymų patvirtinimui nėra"
+              }
+              desc="Atostogos ir išvykimai"
+              onClick={() => openPanel("requests")}
             />
             <ActionRow
               icon={<FileCheck2 className="h-5 w-5" />}
               title="Dokumentai"
-              desc={`${documentProgress}% užpildyta`}
+              desc={
+                documentProgress === 100
+                  ? "Pagrindiniai duomenys užpildyti"
+                  : `${documentProgress}% užpildyta`
+              }
               onClick={() => openPanel("documents")}
             />
             <ActionRow
-              icon={<Bell className="h-5 w-5" />}
-              title="Pranešimai"
-              desc={`${unreadNotifications.length} nauji`}
-              onClick={() => openPanel("notifications")}
+              icon={<GraduationCap className="h-5 w-5" />}
+              title={
+                expiringTrainings.length
+                  ? `${expiringTrainings.length} mokymai baigiasi`
+                  : "Mokymų rizikų nėra"
+              }
+              desc={`${trainings.length} mokymų įrašai`}
+              onClick={() => openPanel("trainings")}
             />
             <ActionRow
-              icon={<UserRound className="h-5 w-5" />}
-              title="Mano profilis"
-              desc="Kontaktai ir asmeniniai duomenys"
-              onClick={() => openPanel("profile")}
+              icon={<Users className="h-5 w-5" />}
+              title="Gyventojai"
+              desc={`${assignedResidents.length} priskirta`}
+              onClick={() => openPanel("residents")}
             />
           </div>
         </section>
