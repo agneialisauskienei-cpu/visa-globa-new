@@ -1157,6 +1157,19 @@ export default function EmployeeDashboardPage() {
   function renderActivePanel() {
     if (activePanel === "overview") return null;
 
+    const twoColumnLayout = (
+      main: ReactNode,
+      aside: ReactNode,
+      wideMain = false,
+    ) => (
+      <div
+        className={`grid gap-4 ${wideMain ? "xl:grid-cols-[minmax(0,1fr)_320px]" : "lg:grid-cols-[minmax(0,1fr)_320px]"}`}
+      >
+        <div className="min-w-0">{main}</div>
+        <div className="min-w-0">{aside}</div>
+      </div>
+    );
+
     return (
       <Panel
         title={modalTitle(activePanel)}
@@ -1165,200 +1178,338 @@ export default function EmployeeDashboardPage() {
         onAction={() => setActivePanel("overview")}
       >
         {activePanel === "schedule" ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {schedule.map((shift) => (
-              <ShiftCard key={shift.id} shift={shift} />
-            ))}
-            {!schedule.length ? (
+          twoColumnLayout(
+            schedule.length ? (
+              <div className="overflow-hidden rounded-[18px] border border-[#dbe6e0] bg-white">
+                <div className="hidden grid-cols-[1fr_150px_1fr] gap-4 bg-[#eef4f1] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
+                  <span>Data</span>
+                  <span>Laikas</span>
+                  <span>Informacija</span>
+                </div>
+                {schedule.map((shift) => (
+                  <ShiftRow key={shift.id} shift={shift} />
+                ))}
+              </div>
+            ) : (
               <EmptyState
                 icon={<CalendarX className="h-7 w-7" />}
                 title="Pamainų nerasta"
                 desc="Kai grafikas bus paskelbtas, pamainos atsiras čia."
               />
-            ) : null}
-          </div>
+            ),
+            <SideBox kicker="Santrauka" title="Grafiko būsena">
+              <MiniMetric
+                label="Rodoma pamainų"
+                value={`${schedule.length}`}
+                desc="Paskutiniai paskelbti įrašai"
+              />
+              <MiniMetric
+                label="Artimiausia"
+                value={nextShift ? fmtDate(getScheduleDate(nextShift)) : "—"}
+                desc={
+                  nextShift
+                    ? `${timeOnly(getScheduleStart(nextShift)) || "—"}–${timeOnly(getScheduleEnd(nextShift)) || "—"}`
+                    : "Pamainų nėra"
+                }
+              />
+            </SideBox>,
+          )
         ) : null}
 
         {activePanel === "tasks" ? (
-          <div className="space-y-3">
-            {tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onOpen={() => setSelectedTask(task)}
-                onComplete={() => void completeTask(task.id)}
-              />
-            ))}
-            {!tasks.length ? (
+          twoColumnLayout(
+            tasks.length ? (
+              <div className="space-y-3">
+                {tasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onOpen={() => setSelectedTask(task)}
+                    onComplete={() => void completeTask(task.id)}
+                  />
+                ))}
+              </div>
+            ) : (
               <EmptyState
                 icon={<ClipboardList className="h-7 w-7" />}
                 title="Užduočių nėra"
                 desc="Atviros užduotys atsiras čia."
               />
-            ) : null}
-          </div>
+            ),
+            <SideBox kicker="Santrauka" title="Užduočių būsena">
+              <MiniMetric
+                label="Atviros"
+                value={`${openTaskCount}`}
+                desc="Reikia atlikti arba peržiūrėti"
+              />
+              <MiniMetric
+                label="Artimiausias terminas"
+                value={tasks[0]?.due_date ? fmtDate(tasks[0].due_date) : "—"}
+                desc={tasks[0] ? taskTitle(tasks[0]) : "Užduočių nėra"}
+              />
+            </SideBox>,
+          )
         ) : null}
 
         {activePanel === "requests" ? (
-          <iframe
-            title="Prašymai"
-            src="/requests?embedded=1"
-            className="h-[calc(100vh-260px)] min-h-[520px] w-full rounded-[18px] border-0 bg-[#f3f6f4] sm:h-[78vh]"
-          />
+          twoColumnLayout(
+            <iframe
+              title="Prašymai"
+              src="/requests?embedded=1"
+              className="h-[calc(100vh-260px)] min-h-[560px] w-full rounded-[18px] border-0 bg-[#f3f6f4] sm:h-[78vh]"
+            />,
+            <SideBox kicker="Santrauka" title="Prašymų būsena">
+              <MiniMetric
+                label="Laukia"
+                value={`${pendingRequestCount}`}
+                desc="Prašymai, kuriuos dar galima tvarkyti"
+              />
+              <MiniMetric
+                label="Iš viso"
+                value={`${vacationRequests.length}`}
+                desc="Tavo atostogų ir išvykimų įrašai"
+              />
+            </SideBox>,
+            true,
+          )
         ) : null}
 
         {activePanel === "notifications" ? (
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => void markNotificationsRead()}
-              className="rounded-[14px] bg-[#047857] px-4 py-3 text-sm font-black text-white"
-            >
-              Pažymėti visus kaip skaitytus
-            </button>
-            {notifications.map((item) => (
-              <NotificationMini key={item.id} item={item} />
-            ))}
-            {!notifications.length ? (
+          twoColumnLayout(
+            notifications.length ? (
+              <div className="space-y-3">
+                {notifications.map((item) => (
+                  <NotificationMini key={item.id} item={item} />
+                ))}
+              </div>
+            ) : (
               <EmptyState
                 icon={<Bell className="h-7 w-7" />}
                 title="Pranešimų nėra"
                 desc="Nauji pranešimai atsiras čia."
               />
-            ) : null}
-          </div>
+            ),
+            <SideBox kicker="Veiksmai" title="Pranešimų valdymas">
+              <MiniMetric
+                label="Neskaityti"
+                value={`${unreadNotifications.length}`}
+                desc="Svarbūs pranešimai šiandien"
+              />
+              <button
+                type="button"
+                onClick={() => void markNotificationsRead()}
+                className="rounded-[14px] bg-[#047857] px-4 py-3 text-sm font-black text-white"
+              >
+                Pažymėti visus kaip skaitytus
+              </button>
+            </SideBox>,
+          )
         ) : null}
 
         {activePanel === "residents" ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {assignedResidents.map((row) => (
-              <Link
-                key={row.id}
-                href={`/residents/${row.id}`}
-                className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-[#10251f] no-underline transition hover:bg-[#eef4f1]"
-              >
-                <div className="font-black">{residentName(row)}</div>
-                <div className="mt-1 text-sm font-bold text-[#526174]">
-                  {row.resident_code || "Be kodo"}
-                </div>
-              </Link>
-            ))}
-            {!assignedResidents.length ? (
+          twoColumnLayout(
+            assignedResidents.length ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {assignedResidents.map((row) => (
+                  <Link
+                    key={row.id}
+                    href={`/residents/${row.id}`}
+                    className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-[#10251f] no-underline transition hover:bg-[#eef4f1]"
+                  >
+                    <div className="font-black">{residentName(row)}</div>
+                    <div className="mt-1 text-sm font-bold text-[#526174]">
+                      {row.resident_code || "Be kodo"}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
               <EmptyState
                 icon={<Users className="h-7 w-7" />}
                 title="Priskirtų gyventojų nėra"
                 desc="Kai būsi priskirtas gyventojui, jis atsiras čia."
               />
-            ) : null}
-          </div>
+            ),
+            <SideBox kicker="Santrauka" title="Gyventojų priskyrimai">
+              <MiniMetric
+                label="Priskirta"
+                value={`${assignedResidents.length}`}
+                desc="Gyventojai tavo darbo lange"
+              />
+              <MiniMetric
+                label="Būsena"
+                value={assignedResidents.length ? "Aktyvu" : "Nėra"}
+                desc="Sąrašas atnaujinamas pagal priskyrimus"
+              />
+            </SideBox>,
+          )
         ) : null}
 
         {activePanel === "documents" ? (
-          <div className="grid gap-4">
-            {employeeCredentials.some(
-              (credential) =>
-                String(credential.status || "").toLowerCase() === "pending",
-            ) ? (
-              <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black leading-6 text-amber-900">
-                Dokumentų informacija pateikta ir laukia administratoriaus
-                patvirtinimo.
+          twoColumnLayout(
+            <div className="grid gap-4">
+              {employeeCredentials.some(
+                (credential) =>
+                  String(credential.status || "").toLowerCase() === "pending",
+              ) ? (
+                <div className="rounded-[18px] border border-[#ead8a4] bg-[#fff8e8] px-4 py-3 text-sm font-black leading-6 text-[#7a4300]">
+                  Dokumentų informacija pateikta ir laukia administratoriaus
+                  patvirtinimo.
+                </div>
+              ) : null}
+              <ModalField
+                label="Sveikatos pažyma galioja iki"
+                type="date"
+                value={documentForm.healthCertificateUntil}
+                onChange={(value) =>
+                  setDocumentForm((prev) => ({
+                    ...prev,
+                    healthCertificateUntil: value,
+                  }))
+                }
+              />
+              <ModalField
+                label="Licencija galioja iki"
+                type="date"
+                value={documentForm.licenseUntil}
+                onChange={(value) =>
+                  setDocumentForm((prev) => ({ ...prev, licenseUntil: value }))
+                }
+              />
+              <ModalField
+                label="Licencijos numeris"
+                value={documentForm.licenseNumber}
+                onChange={(value) =>
+                  setDocumentForm((prev) => ({
+                    ...prev,
+                    licenseNumber: value,
+                  }))
+                }
+              />
+              <ModalActions
+                onCancel={() => setActivePanel("overview")}
+                onSubmit={() => void submitDocuments()}
+                saving={saving}
+                submitLabel="Pateikti patvirtinimui"
+              />
+            </div>,
+            <SideBox kicker="Santrauka" title="Dokumentų būsena">
+              <MiniMetric
+                label="Užpildyta"
+                value={`${documentProgress}%`}
+                desc="Pagal tavo pateiktus laukus"
+              />
+              <div className="grid gap-2">
+                <DocumentLine
+                  title="Sveikatos pažyma"
+                  value={fmtDate(documentForm.healthCertificateUntil)}
+                  status={
+                    documentForm.healthCertificateUntil ? "OK" : "Trūksta"
+                  }
+                />
+                <DocumentLine
+                  title="Licencija"
+                  value={[
+                    documentForm.licenseNumber,
+                    fmtDate(documentForm.licenseUntil),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  status={documentForm.licenseUntil ? "OK" : "Trūksta"}
+                />
               </div>
-            ) : null}
-            <ModalField
-              label="Sveikatos pažyma galioja iki"
-              type="date"
-              value={documentForm.healthCertificateUntil}
-              onChange={(value) =>
-                setDocumentForm((prev) => ({
-                  ...prev,
-                  healthCertificateUntil: value,
-                }))
-              }
-            />
-            <ModalField
-              label="Licencija galioja iki"
-              type="date"
-              value={documentForm.licenseUntil}
-              onChange={(value) =>
-                setDocumentForm((prev) => ({ ...prev, licenseUntil: value }))
-              }
-            />
-            <ModalField
-              label="Licencijos numeris"
-              value={documentForm.licenseNumber}
-              onChange={(value) =>
-                setDocumentForm((prev) => ({ ...prev, licenseNumber: value }))
-              }
-            />
-            <ModalActions
-              onCancel={() => setActivePanel("overview")}
-              onSubmit={() => void submitDocuments()}
-              saving={saving}
-              submitLabel="Pateikti patvirtinimui"
-            />
-          </div>
+            </SideBox>,
+          )
         ) : null}
 
         {activePanel === "trainings" ? (
-          <div className="space-y-3">
-            {trainings.map((training) => (
-              <div
-                key={training.id}
-                className="rounded-[18px] border border-[#dbe6e0] bg-white p-4"
-              >
-                <div className="font-black">
-                  {training.title ||
-                    training.training_name ||
-                    training.name ||
-                    "Mokymas"}
-                </div>
-                <div className="mt-1 text-sm font-bold text-[#526174]">
-                  Galioja iki:{" "}
-                  {fmtDate(training.valid_until || training.expires_at)} ·{" "}
-                  {training.hours || 0} val.
-                </div>
+          twoColumnLayout(
+            trainings.length ? (
+              <div className="space-y-3">
+                {trainings.map((training) => (
+                  <div
+                    key={training.id}
+                    className="rounded-[18px] border border-[#dbe6e0] bg-white p-4"
+                  >
+                    <div className="font-black">
+                      {training.title ||
+                        training.training_name ||
+                        training.name ||
+                        "Mokymas"}
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-[#526174]">
+                      Galioja iki:{" "}
+                      {fmtDate(training.valid_until || training.expires_at)} ·{" "}
+                      {training.hours || 0} val.
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-            {!trainings.length ? (
+            ) : (
               <EmptyState
                 icon={<GraduationCap className="h-7 w-7" />}
                 title="Mokymų nėra"
                 desc="Mokymų įrašai atsiras čia."
               />
-            ) : null}
-          </div>
+            ),
+            <SideBox kicker="Santrauka" title="Mokymų būsena">
+              <MiniMetric
+                label="Iš viso"
+                value={`${trainings.length}`}
+                desc="Aktyvūs mokymų įrašai"
+              />
+              <MiniMetric
+                label="Baigiasi"
+                value={`${expiringTrainings.length}`}
+                desc="Reikia atkreipti dėmesį"
+              />
+            </SideBox>,
+          )
         ) : null}
 
         {activePanel === "profile" ? (
-          <div className="grid gap-4">
-            <ModalField
-              label="Telefonas"
-              value={contactForm.phone}
-              onChange={(value) =>
-                setContactForm((prev) => ({ ...prev, phone: value }))
-              }
-            />
-            <ModalField
-              label="El. paštas"
-              value={contactForm.email}
-              onChange={(value) =>
-                setContactForm((prev) => ({ ...prev, email: value }))
-              }
-            />
-            <ModalField
-              label="Adresas"
-              value={contactForm.address}
-              onChange={(value) =>
-                setContactForm((prev) => ({ ...prev, address: value }))
-              }
-            />
-            <ModalActions
-              onCancel={() => setActivePanel("overview")}
-              onSubmit={() => void submitProfileChanges()}
-              saving={saving}
-              submitLabel="Pateikti patvirtinimui"
-            />
-          </div>
+          twoColumnLayout(
+            <div className="grid gap-4">
+              <ModalField
+                label="Telefonas"
+                value={contactForm.phone}
+                onChange={(value) =>
+                  setContactForm((prev) => ({ ...prev, phone: value }))
+                }
+              />
+              <ModalField
+                label="El. paštas"
+                value={contactForm.email}
+                onChange={(value) =>
+                  setContactForm((prev) => ({ ...prev, email: value }))
+                }
+              />
+              <ModalField
+                label="Adresas"
+                value={contactForm.address}
+                onChange={(value) =>
+                  setContactForm((prev) => ({ ...prev, address: value }))
+                }
+              />
+              <ModalActions
+                onCancel={() => setActivePanel("overview")}
+                onSubmit={() => void submitProfileChanges()}
+                saving={saving}
+                submitLabel="Pateikti patvirtinimui"
+              />
+            </div>,
+            <SideBox kicker="Santrauka" title="Profilio duomenys">
+              <InfoLine
+                label="Pareigos"
+                value={employee?.position || "Nenurodyta"}
+              />
+              <InfoLine
+                label="Skyrius"
+                value={employee?.department || "Nenurodyta"}
+              />
+              <InfoLine label="El. paštas" value={contactForm.email || "—"} />
+            </SideBox>,
+          )
         ) : null}
       </Panel>
     );
@@ -1893,6 +2044,84 @@ function ShiftCard({ shift }: { shift: EmployeeSchedule }) {
       </p>
       <p className="mt-2 text-sm font-bold text-[#526174]">
         {shift.position || shift.department || "Paskelbta pamaina"}
+      </p>
+    </div>
+  );
+}
+
+function ShiftRow({ shift }: { shift: EmployeeSchedule }) {
+  const start = timeOnly(getScheduleStart(shift)) || "—";
+  const end = timeOnly(getScheduleEnd(shift)) || "—";
+
+  return (
+    <div className="grid gap-2 border-t border-[#dbe6e0] px-4 py-4 text-[#10251f] md:grid-cols-[1fr_150px_1fr] md:items-center md:gap-4">
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6a7e75] md:hidden">
+          Data
+        </p>
+        <p className="break-words font-black">{fmtDate(getScheduleDate(shift))}</p>
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6a7e75] md:hidden">
+          Laikas
+        </p>
+        <p className="font-black">
+          {start}–{end}
+        </p>
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6a7e75] md:hidden">
+          Informacija
+        </p>
+        <p className="break-words text-sm font-bold text-[#526174]">
+          {shift.position || shift.department || "Paskelbta pamaina"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function SideBox({
+  kicker,
+  title,
+  children,
+}: {
+  kicker: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <aside className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#047857]">
+        {kicker}
+      </p>
+      <h3 className="mt-1 break-words text-xl font-black leading-tight text-[#10251f]">
+        {title}
+      </h3>
+      <div className="mt-4 grid gap-3">{children}</div>
+    </aside>
+  );
+}
+
+function MiniMetric({
+  label,
+  value,
+  desc,
+}: {
+  label: string;
+  value: string;
+  desc: string;
+}) {
+  return (
+    <div className="rounded-[16px] border border-[#dbe6e0] bg-white p-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6a7e75]">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-2xl font-black leading-tight text-[#10251f]">
+        {value}
+      </p>
+      <p className="mt-1 break-words text-sm font-bold leading-5 text-[#526174]">
+        {desc}
       </p>
     </div>
   );
