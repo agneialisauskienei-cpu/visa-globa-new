@@ -300,9 +300,6 @@ export default function MySchedulePage() {
                 <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-white sm:text-4xl lg:text-5xl">
                   Artimiausios pamainos
                 </h1>
-                <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-white/85">
-                  Čia rodomas tik administratoriaus paskelbtas grafikas. Juodraščiai darbuotojams nerodomi.
-                </p>
               </div>
             </div>
 
@@ -333,25 +330,6 @@ export default function MySchedulePage() {
               desc={membership?.department || "paskelbtas grafikas"}
               tone="slate"
             />
-          </div>
-
-          <div className="border-t border-emerald-900/10 bg-white p-5">
-            <div className="rounded-[22px] border border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">Kita pamaina</p>
-              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xl font-black text-[#10251f]">
-                    {nextShift ? formatDate(getScheduleDate(nextShift)) : "Nėra suplanuota"}
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-[#526174]">
-                    {nextShift ? `${timeText(nextShift)} · ${shiftLabel(nextShift)}` : "Kai administratorius paskelbs grafiką, pamaina atsiras čia."}
-                  </p>
-                </div>
-                <span className="w-fit rounded-full bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-800">
-                  {nextShift ? shiftLabel(nextShift) : "—"}
-                </span>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -514,33 +492,35 @@ function DesktopShiftRow({ shift, muted = false }: { shift: ScheduleRow; muted?:
 
 function ShiftCard({ shift, muted = false }: { shift: ScheduleRow; muted?: boolean }) {
   const date = getScheduleDate(shift);
-  const tone = muted ? "border-slate-200 bg-slate-50 text-slate-700" : shiftTone(shift);
   const hours = durationHours(shift);
   const cleanNote = technicalNoteHidden(shift.notes || shift.note || "");
 
   return (
-    <article className={`rounded-3xl border p-5 ${tone}`}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] opacity-70">
-            <CalendarDays className="h-4 w-4" />
-            {shortDate(date)}
-          </div>
-          <h3 className="mt-2 text-xl font-black tracking-tight sm:text-2xl">{formatDate(date)}</h3>
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-base font-extrabold">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2">
-              <Clock className="h-4 w-4" />
-              {timeText(shift)}
-            </span>
-            <span className="rounded-full bg-white/80 px-4 py-2">{shiftLabel(shift)}</span>
-            {hours !== null ? <span className="rounded-full bg-white/80 px-4 py-2">{hours.toFixed(hours % 1 === 0 ? 0 : 1)} val.</span> : null}
-          </div>
-          {(shift.location || shift.department || shift.position || cleanNote) && (
-            <p className="mt-3 text-sm font-bold opacity-75">
-              {[shift.location, shift.department, shift.position, cleanNote].filter(Boolean).join(" · ")}
-            </p>
-          )}
+    <article className={`rounded-[22px] border bg-white p-4 shadow-sm ${muted ? "border-slate-200" : "border-[#dbe6e0]"}`}>
+      <div className="grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)_auto] sm:items-center">
+        <div>
+          <p className="text-base font-black text-[#10251f]">{shortDate(date)}</p>
+          <p className="mt-1 text-sm font-extrabold capitalize text-[#526174]">{weekday(date)}</p>
         </div>
+
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-sm font-black text-slate-800">
+            <Clock className="h-4 w-4" />
+            {timeText(shift)}
+          </span>
+          <span className={`inline-flex rounded-full border px-3 py-2 text-sm font-black ${shiftTone(shift)}`}>
+            {shiftLabel(shift)}
+          </span>
+          {hours !== null ? (
+            <span className="rounded-full bg-slate-50 px-3 py-2 text-sm font-black text-slate-700">
+              {hours.toFixed(hours % 1 === 0 ? 0 : 1)} val.
+            </span>
+          ) : null}
+        </div>
+
+        <p className="min-w-0 text-sm font-semibold text-slate-500 sm:text-right">
+          {cleanNote || (isContinuation(shift) ? "Tęsinys iš ankstesnės dienos" : "—")}
+        </p>
       </div>
     </article>
   );
@@ -559,3 +539,5 @@ function EmptySchedule() {
     </div>
   );
 }
+
+

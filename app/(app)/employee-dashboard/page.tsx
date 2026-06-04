@@ -330,14 +330,6 @@ function isSchedulePublished(shift: EmployeeSchedule) {
   );
 }
 
-function formatShift(shift?: EmployeeSchedule | null) {
-  if (!shift) return "Pamainų nerasta";
-  const date = fmtDate(getScheduleDate(shift));
-  const start = timeOnly(getScheduleStart(shift));
-  const end = timeOnly(getScheduleEnd(shift));
-  return `${date}${start || end ? ` · ${start || "—"}–${end || "—"}` : ""}`;
-}
-
 function taskTitle(task: EmployeeTask) {
   return task.title || task.name || "Užduotis";
 }
@@ -1219,7 +1211,12 @@ export default function EmployeeDashboardPage() {
     const status = normalizeRequestStatus(request.status);
     return status === "submitted" || status === "pending";
   }).length;
-  const nextShift = schedule[0];
+  const todayIso = toDateInput(new Date());
+  const upcomingSchedule = schedule.filter((shift) => {
+    const date = getScheduleDate(shift).slice(0, 10);
+    return date && date >= todayIso;
+  });
+  const nextShift = upcomingSchedule[0] || null;
   const openTaskCount = tasks.length;
 
   const panelOptions: Array<{
@@ -1680,10 +1677,6 @@ export default function EmployeeDashboardPage() {
                     ? "Sveiki"
                     : `Sveiki, ${displayName}`}
                 </h1>
-                <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-white/80">
-                  Pamainos, užduotys, prašymai, gyventojai, mokymai ir
-                  dokumentai viename darbo lange.
-                </p>
               </div>
             </div>
 
@@ -1789,8 +1782,12 @@ export default function EmployeeDashboardPage() {
           <>
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
           <StatButton
-            title="Artimiausia pamaina"
-            value={formatShift(nextShift)}
+            title="Kita pamaina"
+            value={
+              nextShift
+                ? `${shortDate(getScheduleDate(nextShift))} · ${timeText(nextShift)}`
+                : "—"
+            }
             icon={<CalendarDays className="h-5 w-5" />}
             onClick={() => openPanel("schedule")}
           />
