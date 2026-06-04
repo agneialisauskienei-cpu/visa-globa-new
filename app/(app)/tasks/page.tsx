@@ -812,6 +812,7 @@ export default function TasksPage() {
       .from("task_attachments")
       .select("id, task_id, file_path, file_name, content_type, size_bytes, created_at")
       .eq("task_id", taskId)
+      .eq("organization_id", access.organizationId)
 
     if (!attachmentError && attachmentRows?.length) {
       for (const row of attachmentRows as TaskAttachmentRow[]) {
@@ -2272,21 +2273,65 @@ export default function TasksPage() {
                 </p>
               </div>
             ) : (
-              <div className="mt-6 grid gap-4">
-                {visibleTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    resident={task.resident_id ? residentsMap[task.resident_id] : undefined}
-                    assignedEmployee={task.assigned_user_id ? employeesMap[task.assigned_user_id] : undefined}
-                    saving={savingId === task.id}
-                    attachmentCount={taskAttachmentsMap[task.id]?.length || 0}
-                    onClick={() => void openTaskDetails(task)}
-                    onEdit={() => openEditTask(task)}
-                    onStatusChange={(status) => void updateTaskStatus(task, status)}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="mt-6 hidden overflow-hidden rounded-[22px] border border-slate-200 xl:block">
+                  <table className="w-full border-collapse bg-white text-left">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Užduotis
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Gyventojas
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Terminas
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Statusas
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Prioritetas
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          Veiksmai
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleTasks.map((task) => (
+                        <TaskTableRow
+                          key={task.id}
+                          task={task}
+                          resident={task.resident_id ? residentsMap[task.resident_id] : undefined}
+                          assignedEmployee={task.assigned_user_id ? employeesMap[task.assigned_user_id] : undefined}
+                          saving={savingId === task.id}
+                          attachmentCount={taskAttachmentsMap[task.id]?.length || 0}
+                          onOpen={() => void openTaskDetails(task)}
+                          onEdit={() => openEditTask(task)}
+                          onStatusChange={(status) => void updateTaskStatus(task, status)}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-6 grid gap-4 xl:hidden">
+                  {visibleTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      resident={task.resident_id ? residentsMap[task.resident_id] : undefined}
+                      assignedEmployee={task.assigned_user_id ? employeesMap[task.assigned_user_id] : undefined}
+                      saving={savingId === task.id}
+                      attachmentCount={taskAttachmentsMap[task.id]?.length || 0}
+                      onClick={() => void openTaskDetails(task)}
+                      onEdit={() => openEditTask(task)}
+                      onStatusChange={(status) => void updateTaskStatus(task, status)}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </article>
 
@@ -3858,6 +3903,126 @@ function StatCard({
         </div>
       </div>
     </article>
+  )
+}
+
+function TaskTableRow({
+  task,
+  resident,
+  assignedEmployee,
+  saving,
+  attachmentCount,
+  onOpen,
+  onEdit,
+  onStatusChange,
+}: {
+  task: TaskRow
+  resident?: ResidentRow
+  assignedEmployee?: EmployeeOption
+  saving: boolean
+  attachmentCount?: number
+  onOpen: () => void
+  onEdit: () => void
+  onStatusChange: (status: string) => void
+}) {
+  const late = isTaskLate(task)
+  const done = task.status === "done"
+  const description = task.description?.trim()
+
+  return (
+    <tr className={`border-t border-slate-100 ${late ? "bg-rose-50/25" : done ? "bg-emerald-50/20" : ""}`}>
+      <td className="max-w-[360px] px-5 py-4 align-top">
+        <button type="button" onClick={onOpen} className="block min-w-0 text-left">
+          <span className="block break-words text-base font-black text-slate-950">
+            {task.title}
+          </span>
+          <span className="mt-1 flex flex-wrap items-center gap-2 text-xs font-black text-[#526174]">
+            <span>{getTypeLabel(task.type)}</span>
+            {task.interval_days ? (
+              <span className="rounded-full bg-slate-50 px-2 py-1">
+                Kas {task.interval_days} d.
+              </span>
+            ) : null}
+            {attachmentCount ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[#047857]">
+                <Camera className="h-3.5 w-3.5" />
+                {attachmentCount} foto
+              </span>
+            ) : null}
+            {!task.viewed_at ? (
+              <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                Nepamatyta
+              </span>
+            ) : null}
+          </span>
+          {description ? (
+            <span className="mt-2 line-clamp-2 block text-sm font-semibold leading-5 text-[#526174]">
+              {description}
+            </span>
+          ) : null}
+        </button>
+      </td>
+      <td className="px-5 py-4 align-top">
+        <div className="font-black text-[#10251f]">{residentName(resident)}</div>
+        <div className="mt-1 text-sm font-bold text-[#526174]">
+          Kamb. {residentRoom(resident)}
+        </div>
+        <div className="mt-1 text-xs font-bold text-[#526174]">
+          {assignedEmployee ? employeeName(assignedEmployee) : "Nepriskirta"}
+        </div>
+      </td>
+      <td className="px-5 py-4 align-top text-sm font-black text-slate-700">
+        {formatDateTime(task.due_date)}
+      </td>
+      <td className="px-5 py-4 align-top">
+        <span
+          className={`inline-flex rounded-full px-4 py-2 text-sm font-black ${
+            late
+              ? "bg-rose-50 text-rose-700"
+              : done
+                ? "bg-emerald-50 text-[#047857]"
+                : "bg-[#eef4f1] text-[#486b5d]"
+          }`}
+        >
+          {late ? "Vėluoja" : getTaskStatusLabel(task.status)}
+        </span>
+      </td>
+      <td className="px-5 py-4 align-top">
+        <span className={`inline-flex rounded-full border px-3 py-1.5 text-xs font-black ${getPriorityOption(task.priority).className}`}>
+          {getPriorityLabel(task.priority)}
+        </span>
+      </td>
+      <td className="px-5 py-4 align-top">
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-[12px] border border-[#dbe6e0] bg-white px-3 py-2 text-sm font-black text-[#486b5d] transition hover:bg-slate-100"
+          >
+            Redaguoti
+          </button>
+          {task.status !== "done" ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => onStatusChange("done")}
+              className="rounded-[12px] bg-slate-950 px-3 py-2 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
+            >
+              Atlikta
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => onStatusChange("in_progress")}
+              className="rounded-[12px] border border-[#dbe6e0] bg-white px-3 py-2 text-sm font-black text-[#486b5d] transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              Grąžinti
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
   )
 }
 
