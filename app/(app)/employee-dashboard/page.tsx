@@ -140,6 +140,7 @@ type ProfileRow = {
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
+  avatar_url?: string | null;
   phone?: string | null;
   address?: string | null;
   position?: string | null;
@@ -719,68 +720,23 @@ export default function EmployeeDashboardPage() {
 
   async function loadAssignedResidents(
     currentUserId: string,
-    memberId?: string | null,
+    _memberId?: string | null,
   ) {
-    const candidates: Array<{ column: string; value: string }> = [
-      { column: "assigned_user_id", value: currentUserId },
-      { column: "user_id", value: currentUserId },
-      { column: "employee_id", value: currentUserId },
-      { column: "staff_user_id", value: currentUserId },
-    ];
+    const { data, error } = await supabase
+      .from("resident_assignments")
+      .select("*, residents(*)")
+      .eq("user_id", currentUserId)
+      .limit(30);
 
-    if (memberId) {
-      candidates.push({ column: "organization_member_id", value: memberId });
-      candidates.push({ column: "member_id", value: memberId });
-      candidates.push({ column: "employee_id", value: memberId });
-    }
-
-    for (const candidate of candidates) {
-      const { data, error } = await supabase
-        .from("resident_assignments")
-        .select("*, residents(*)")
-        .eq(candidate.column, candidate.value)
-        .limit(30);
-
-      if (error) {
-        console.warn(
-          `[employee-dashboard] resident assignments skipped ${candidate.column}:`,
-          error.message,
-        );
-        continue;
-      }
-
-      const rows = ((data || []) as AssignedResident[]).map(
-        normalizeAssignedResident,
+    if (error) {
+      console.warn(
+        "[employee-dashboard] resident assignments skipped:",
+        error.message,
       );
-      if (rows.length) return rows;
+      return [] as AssignedResident[];
     }
 
-    for (const column of [
-      "assigned_user_id",
-      "responsible_user_id",
-      "employee_id",
-      "social_worker_id",
-      "nurse_user_id",
-    ]) {
-      const { data, error } = await supabase
-        .from("residents")
-        .select("*")
-        .eq(column, currentUserId)
-        .limit(30);
-      if (error) {
-        console.warn(
-          `[employee-dashboard] residents skipped ${column}:`,
-          error.message,
-        );
-        continue;
-      }
-      const rows = ((data || []) as AssignedResident[]).map(
-        normalizeAssignedResident,
-      );
-      if (rows.length) return rows;
-    }
-
-    return [] as AssignedResident[];
+    return ((data || []) as AssignedResident[]).map(normalizeAssignedResident);
   }
 
   async function loadSubmittedCredentials(accessToken?: string | null) {
@@ -831,7 +787,7 @@ export default function EmployeeDashboardPage() {
         supabase
           .from("profiles")
           .select(
-            "full_name, first_name, last_name, email, phone, address, license_number, license_until, health_certificate_until",
+            "full_name, first_name, last_name, email, phone, avatar_url, license_number, license_until, health_certificate_until",
           )
           .eq("id", user.id)
           .maybeSingle(),
@@ -872,10 +828,12 @@ export default function EmployeeDashboardPage() {
         ),
         safeSelect<TrainingRow>(
           supabase
-            .from("training_records")
-            .select("*")
+            .from("personnel_trainings")
+            .select(
+              "id, title, category, provider, completed_at, expires_at, valid_until, hours, status",
+            )
             .eq("employee_id", user.id)
-            .order("valid_until", { ascending: true, nullsFirst: false })
+            .order("expires_at", { ascending: true, nullsFirst: false })
             .limit(10),
         ),
       ]);
@@ -1232,10 +1190,24 @@ export default function EmployeeDashboardPage() {
         .filter(Boolean)
         .join(" ")
         .trim() ||
-      profile?.email ||
       "Darbuotojau"
     );
   }, [profile]);
+
+  const profileInitials = useMemo(() => {
+    const source =
+      displayName !== "Darbuotojau"
+        ? displayName
+        : profile?.email?.split("@")[0] || "D";
+    const initials = source
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase();
+    return initials || "D";
+  }, [displayName, profile?.email]);
 
   const unreadNotifications = notifications.filter(
     (item) => !item.is_read && !item.read_at,
@@ -1249,6 +1221,25 @@ export default function EmployeeDashboardPage() {
   }).length;
   const nextShift = schedule[0];
   const openTaskCount = tasks.length;
+
+  const panelOptions: Array<{
+    key: PanelKey;
+    label: string;
+    count?: number;
+  }> = [
+    { key: "overview", label: "Apžvalga" },
+    { key: "schedule", label: "Grafikas" },
+    { key: "requests", label: "Prašymai", count: pendingRequestCount },
+    { key: "tasks", label: "Užduotys", count: openTaskCount },
+    {
+      key: "notifications",
+      label: "Pranešimai",
+      count: unreadNotifications.length,
+    },
+    { key: "residents", label: "Gyventojai", count: assignedResidents.length },
+    { key: "documents", label: "Dokumentai" },
+    { key: "trainings", label: "Mokymai", count: expiringTrainings.length },
+  ];
 
   const documentProgress = useMemo(() => {
     const total = 3;
@@ -1635,11 +1626,11 @@ export default function EmployeeDashboardPage() {
             <SideBox kicker="Santrauka" title="Profilio duomenys">
               <InfoLine
                 label="Pareigos"
-                value={employee?.position || "Nenurodyta"}
+                value={profile?.position || "Nenurodyta"}
               />
               <InfoLine
                 label="Skyrius"
-                value={employee?.department || "Nenurodyta"}
+                value={profile?.department || "Nenurodyta"}
               />
               <InfoLine label="El. paštas" value={contactForm.email || "—"} />
             </SideBox>,
@@ -1668,16 +1659,26 @@ export default function EmployeeDashboardPage() {
       <div className="mx-auto max-w-[1500px] space-y-3 sm:space-y-4">
         <section className="overflow-hidden rounded-[22px] border border-[#c9d8d0] bg-white shadow-sm sm:rounded-[24px]">
           <div className="flex flex-col items-center gap-4 bg-[#486b5d] px-4 py-4 text-center text-white sm:items-stretch sm:px-5 sm:py-5 sm:text-left lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start sm:gap-4">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[16px] bg-[#e8f7ef] text-[#486b5d] sm:h-14 sm:w-14 sm:rounded-[18px]">
-                <UserRound className="h-6 w-6 sm:h-7 sm:w-7" />
+            <div className="flex min-w-0 flex-col items-center gap-3 sm:flex-row sm:items-start sm:gap-4">
+              <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-[18px] bg-[#e8f7ef] text-lg font-black text-[#486b5d] sm:h-16 sm:w-16 sm:rounded-[20px]">
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={displayName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span>{profileInitials}</span>
+                )}
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 sm:text-[11px]">
                   Darbuotojo paskyra
                 </p>
-                <h1 className="mt-1 break-words text-[26px] font-black leading-tight tracking-tight sm:text-3xl">
-                  Sveiki, {displayName}
+                <h1 className="mt-1 max-w-full overflow-hidden text-ellipsis text-[26px] font-black leading-tight tracking-tight sm:text-3xl lg:text-4xl">
+                  {displayName === "Darbuotojau"
+                    ? "Sveiki"
+                    : `Sveiki, ${displayName}`}
                 </h1>
                 <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-white/80">
                   Pamainos, užduotys, prašymai, gyventojai, mokymai ir
@@ -1700,60 +1701,81 @@ export default function EmployeeDashboardPage() {
             </div>
           </div>
 
-          <nav className="grid grid-cols-2 gap-2 border-t border-[#dbe6e0] bg-[#eef4f1] px-3 py-3 text-sm font-black text-[#486b5d] sm:grid-cols-4 sm:px-4 lg:flex lg:flex-wrap lg:gap-1 lg:py-2">
-            <TopTab
-              active={activePanel === "overview"}
-              onClick={() => setActivePanel("overview")}
-              icon={<ShieldCheck className="h-4 w-4" />}
-              label="Apžvalga"
-            />
-            <TopTab
-              active={activePanel === "schedule"}
-              onClick={() => openPanel("schedule")}
-              icon={<CalendarDays className="h-4 w-4" />}
-              label="Grafikas"
-            />
-            <TopTab
-              active={activePanel === "requests"}
-              onClick={() => openPanel("requests")}
-              icon={<CalendarX className="h-4 w-4" />}
-              label="Prašymai"
-              count={pendingRequestCount}
-            />
-            <TopTab
-              active={activePanel === "tasks"}
-              onClick={() => openPanel("tasks")}
-              icon={<ClipboardList className="h-4 w-4" />}
-              label="Užduotys"
-              count={openTaskCount}
-            />
-            <TopTab
-              active={activePanel === "notifications"}
-              onClick={() => openPanel("notifications")}
-              icon={<Bell className="h-4 w-4" />}
-              label="Pranešimai"
-              count={unreadNotifications.length}
-            />
-            <TopTab
-              active={activePanel === "residents"}
-              onClick={() => openPanel("residents")}
-              icon={<Users className="h-4 w-4" />}
-              label="Gyventojai"
-              count={assignedResidents.length}
-            />
-            <TopTab
-              active={activePanel === "documents"}
-              onClick={() => openPanel("documents")}
-              icon={<FileCheck2 className="h-4 w-4" />}
-              label="Dokumentai"
-            />
-            <TopTab
-              active={activePanel === "trainings"}
-              onClick={() => openPanel("trainings")}
-              icon={<GraduationCap className="h-4 w-4" />}
-              label="Mokymai"
-              count={expiringTrainings.length}
-            />
+          <nav className="border-t border-[#dbe6e0] bg-[#eef4f1] px-3 py-3 text-sm font-black text-[#486b5d] sm:px-4 lg:py-2">
+            <label className="block lg:hidden">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7e75]">
+                Skiltis
+              </span>
+              <select
+                value={activePanel}
+                onChange={(event) => openPanel(event.target.value as PanelKey)}
+                className="w-full rounded-[16px] border border-[#c9d8d0] bg-white px-4 py-3 text-base font-black text-[#486b5d] shadow-sm outline-none focus:ring-2 focus:ring-[#047857]/25"
+              >
+                {panelOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.count
+                      ? `${option.label} · ${option.count}`
+                      : option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="hidden flex-wrap gap-1 lg:flex">
+              <TopTab
+                active={activePanel === "overview"}
+                onClick={() => setActivePanel("overview")}
+                icon={<ShieldCheck className="h-4 w-4" />}
+                label="Apžvalga"
+              />
+              <TopTab
+                active={activePanel === "schedule"}
+                onClick={() => openPanel("schedule")}
+                icon={<CalendarDays className="h-4 w-4" />}
+                label="Grafikas"
+              />
+              <TopTab
+                active={activePanel === "requests"}
+                onClick={() => openPanel("requests")}
+                icon={<CalendarX className="h-4 w-4" />}
+                label="Prašymai"
+                count={pendingRequestCount}
+              />
+              <TopTab
+                active={activePanel === "tasks"}
+                onClick={() => openPanel("tasks")}
+                icon={<ClipboardList className="h-4 w-4" />}
+                label="Užduotys"
+                count={openTaskCount}
+              />
+              <TopTab
+                active={activePanel === "notifications"}
+                onClick={() => openPanel("notifications")}
+                icon={<Bell className="h-4 w-4" />}
+                label="Pranešimai"
+                count={unreadNotifications.length}
+              />
+              <TopTab
+                active={activePanel === "residents"}
+                onClick={() => openPanel("residents")}
+                icon={<Users className="h-4 w-4" />}
+                label="Gyventojai"
+                count={assignedResidents.length}
+              />
+              <TopTab
+                active={activePanel === "documents"}
+                onClick={() => openPanel("documents")}
+                icon={<FileCheck2 className="h-4 w-4" />}
+                label="Dokumentai"
+              />
+              <TopTab
+                active={activePanel === "trainings"}
+                onClick={() => openPanel("trainings")}
+                icon={<GraduationCap className="h-4 w-4" />}
+                label="Mokymai"
+                count={expiringTrainings.length}
+              />
+            </div>
           </nav>
         </section>
 
