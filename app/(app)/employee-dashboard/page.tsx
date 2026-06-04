@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowRight,
@@ -25,6 +24,7 @@ import { supabase } from "@/lib/supabase";
 
 type PanelKey =
   | "overview"
+  | "schedule"
   | "requests"
   | "tasks"
   | "notifications"
@@ -456,9 +456,7 @@ async function safeSelect<T>(
 }
 
 export default function EmployeeDashboardPage() {
-  const router = useRouter();
   const [activePanel, setActivePanel] = useState<PanelKey>("overview");
-  const [modal, setModal] = useState<PanelKey | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -840,7 +838,6 @@ export default function EmployeeDashboardPage() {
 
   function openPanel(panel: PanelKey) {
     setActivePanel(panel);
-    if (panel !== "overview") setModal(panel);
   }
 
   async function markNotificationsRead() {
@@ -910,7 +907,7 @@ export default function EmployeeDashboardPage() {
         "Kontaktai pateikti",
         "Pakeitimai perduoti administratoriui patvirtinti.",
       );
-      setModal(null);
+      setActivePanel("overview");
     } finally {
       setSaving(false);
     }
@@ -968,7 +965,7 @@ export default function EmployeeDashboardPage() {
         "Dokumentai pateikti",
         "Pakeitimai perduoti administratoriui patvirtinti.",
       );
-      setModal(null);
+      setActivePanel("overview");
       await loadDashboard(false);
     } catch (error) {
       showToast("Dokumentų pateikti nepavyko", readableError(error));
@@ -1157,6 +1154,216 @@ export default function EmployeeDashboardPage() {
     return Math.round((filled / total) * 100);
   }, [documentForm]);
 
+  function renderActivePanel() {
+    if (activePanel === "overview") return null;
+
+    return (
+      <Panel
+        title={modalTitle(activePanel)}
+        kicker="Darbuotojo paskyra"
+        actionLabel="Grįžti į apžvalgą"
+        onAction={() => setActivePanel("overview")}
+      >
+        {activePanel === "schedule" ? (
+          <div className="space-y-3">
+            {schedule.map((shift) => (
+              <ShiftCard key={shift.id} shift={shift} />
+            ))}
+            {!schedule.length ? (
+              <EmptyState
+                icon={<CalendarX className="h-7 w-7" />}
+                title="Pamainų nerasta"
+                desc="Kai grafikas bus paskelbtas, pamainos atsiras čia."
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {activePanel === "tasks" ? (
+          <div className="space-y-3">
+            {tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onOpen={() => setSelectedTask(task)}
+                onComplete={() => void completeTask(task.id)}
+              />
+            ))}
+            {!tasks.length ? (
+              <EmptyState
+                icon={<ClipboardList className="h-7 w-7" />}
+                title="Užduočių nėra"
+                desc="Atviros užduotys atsiras čia."
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {activePanel === "requests" ? (
+          <iframe
+            title="Prašymai"
+            src="/requests?embedded=1"
+            className="h-[78vh] w-full rounded-[18px] border-0 bg-[#f3f6f4]"
+          />
+        ) : null}
+
+        {activePanel === "notifications" ? (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => void markNotificationsRead()}
+              className="rounded-[14px] bg-[#047857] px-4 py-3 text-sm font-black text-white"
+            >
+              Pažymėti visus kaip skaitytus
+            </button>
+            {notifications.map((item) => (
+              <NotificationMini key={item.id} item={item} />
+            ))}
+            {!notifications.length ? (
+              <EmptyState
+                icon={<Bell className="h-7 w-7" />}
+                title="Pranešimų nėra"
+                desc="Nauji pranešimai atsiras čia."
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {activePanel === "residents" ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {assignedResidents.map((row) => (
+              <Link
+                key={row.id}
+                href={`/residents/${row.id}`}
+                className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-[#10251f] no-underline transition hover:bg-[#eef4f1]"
+              >
+                <div className="font-black">{residentName(row)}</div>
+                <div className="mt-1 text-sm font-bold text-[#526174]">
+                  {row.resident_code || "Be kodo"}
+                </div>
+              </Link>
+            ))}
+            {!assignedResidents.length ? (
+              <EmptyState
+                icon={<Users className="h-7 w-7" />}
+                title="Priskirtų gyventojų nėra"
+                desc="Kai būsi priskirtas gyventojui, jis atsiras čia."
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {activePanel === "documents" ? (
+          <div className="grid gap-4">
+            {employeeCredentials.some(
+              (credential) =>
+                String(credential.status || "").toLowerCase() === "pending",
+            ) ? (
+              <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black leading-6 text-amber-900">
+                Dokumentų informacija pateikta ir laukia administratoriaus
+                patvirtinimo.
+              </div>
+            ) : null}
+            <ModalField
+              label="Sveikatos pažyma galioja iki"
+              type="date"
+              value={documentForm.healthCertificateUntil}
+              onChange={(value) =>
+                setDocumentForm((prev) => ({
+                  ...prev,
+                  healthCertificateUntil: value,
+                }))
+              }
+            />
+            <ModalField
+              label="Licencija galioja iki"
+              type="date"
+              value={documentForm.licenseUntil}
+              onChange={(value) =>
+                setDocumentForm((prev) => ({ ...prev, licenseUntil: value }))
+              }
+            />
+            <ModalField
+              label="Licencijos numeris"
+              value={documentForm.licenseNumber}
+              onChange={(value) =>
+                setDocumentForm((prev) => ({ ...prev, licenseNumber: value }))
+              }
+            />
+            <ModalActions
+              onCancel={() => setActivePanel("overview")}
+              onSubmit={() => void submitDocuments()}
+              saving={saving}
+              submitLabel="Pateikti patvirtinimui"
+            />
+          </div>
+        ) : null}
+
+        {activePanel === "trainings" ? (
+          <div className="space-y-3">
+            {trainings.map((training) => (
+              <div
+                key={training.id}
+                className="rounded-[18px] border border-[#dbe6e0] bg-white p-4"
+              >
+                <div className="font-black">
+                  {training.title ||
+                    training.training_name ||
+                    training.name ||
+                    "Mokymas"}
+                </div>
+                <div className="mt-1 text-sm font-bold text-[#526174]">
+                  Galioja iki:{" "}
+                  {fmtDate(training.valid_until || training.expires_at)} ·{" "}
+                  {training.hours || 0} val.
+                </div>
+              </div>
+            ))}
+            {!trainings.length ? (
+              <EmptyState
+                icon={<GraduationCap className="h-7 w-7" />}
+                title="Mokymų nėra"
+                desc="Mokymų įrašai atsiras čia."
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {activePanel === "profile" ? (
+          <div className="grid gap-4">
+            <ModalField
+              label="Telefonas"
+              value={contactForm.phone}
+              onChange={(value) =>
+                setContactForm((prev) => ({ ...prev, phone: value }))
+              }
+            />
+            <ModalField
+              label="El. paštas"
+              value={contactForm.email}
+              onChange={(value) =>
+                setContactForm((prev) => ({ ...prev, email: value }))
+              }
+            />
+            <ModalField
+              label="Adresas"
+              value={contactForm.address}
+              onChange={(value) =>
+                setContactForm((prev) => ({ ...prev, address: value }))
+              }
+            />
+            <ModalActions
+              onCancel={() => setActivePanel("overview")}
+              onSubmit={() => void submitProfileChanges()}
+              saving={saving}
+              submitLabel="Pateikti patvirtinimui"
+            />
+          </div>
+        ) : null}
+      </Panel>
+    );
+  }
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f3f6f4] p-6 text-[#10251f]">
@@ -1216,8 +1423,8 @@ export default function EmployeeDashboardPage() {
               label="Apžvalga"
             />
             <TopTab
-              active={false}
-              onClick={() => router.push("/my-schedule")}
+              active={activePanel === "schedule"}
+              onClick={() => openPanel("schedule")}
               icon={<CalendarDays className="h-4 w-4" />}
               label="Grafikas"
             />
@@ -1271,12 +1478,14 @@ export default function EmployeeDashboardPage() {
           </div>
         ) : null}
 
+        {activePanel === "overview" ? (
+          <>
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <StatButton
             title="Artimiausia pamaina"
             value={formatShift(nextShift)}
             icon={<CalendarDays className="h-5 w-5" />}
-            onClick={() => router.push("/my-schedule")}
+            onClick={() => openPanel("schedule")}
           />
           <StatButton
             title="Atviros užduotys"
@@ -1337,7 +1546,7 @@ export default function EmployeeDashboardPage() {
             <Panel
               title="Kita pamaina"
               kicker="Grafikas"
-              actionHref="/my-schedule"
+              onAction={() => openPanel("schedule")}
               actionLabel="Grafikas"
             >
               {nextShift ? (
@@ -1439,199 +1648,12 @@ export default function EmployeeDashboardPage() {
             />
           </div>
         </section>
+          </>
+        ) : (
+          renderActivePanel()
+        )}
 
       </div>
-
-      {modal ? (
-        <DashboardModal
-          title={modalTitle(modal)}
-          onClose={() => setModal(null)}
-          wide={false}
-          compactBody={modal === "requests"}
-        >
-          {modal === "profile" ? (
-            <div className="grid gap-4">
-              <ModalField
-                label="Telefonas"
-                value={contactForm.phone}
-                onChange={(value) =>
-                  setContactForm((prev) => ({ ...prev, phone: value }))
-                }
-              />
-              <ModalField
-                label="El. paštas"
-                value={contactForm.email}
-                onChange={(value) =>
-                  setContactForm((prev) => ({ ...prev, email: value }))
-                }
-              />
-              <ModalField
-                label="Adresas"
-                value={contactForm.address}
-                onChange={(value) =>
-                  setContactForm((prev) => ({ ...prev, address: value }))
-                }
-              />
-              <ModalActions
-                onCancel={() => setModal(null)}
-                onSubmit={() => void submitProfileChanges()}
-                saving={saving}
-                submitLabel="Pateikti patvirtinimui"
-              />
-            </div>
-          ) : null}
-
-          {modal === "tasks" ? (
-            <div className="space-y-3">
-              {tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onOpen={() => setSelectedTask(task)}
-                  onComplete={() => void completeTask(task.id)}
-                />
-              ))}
-              {!tasks.length ? (
-                <EmptyState
-                  icon={<ClipboardList className="h-7 w-7" />}
-                  title="Užduočių nėra"
-                  desc="Atviros užduotys atsiras čia."
-                />
-              ) : null}
-            </div>
-          ) : null}
-
-          {modal === "requests" ? (
-            <iframe
-              title="Prašymai"
-              src="/requests?embedded=1"
-              className="h-[78vh] w-full border-0 bg-[#f3f6f4]"
-            />
-          ) : null}
-
-          {modal === "notifications" ? (
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => void markNotificationsRead()}
-                className="rounded-[14px] bg-[#047857] px-4 py-3 text-sm font-black text-white"
-              >
-                Pažymėti visus kaip skaitytus
-              </button>
-              {notifications.map((item) => (
-                <NotificationMini key={item.id} item={item} />
-              ))}
-              {!notifications.length ? (
-                <EmptyState
-                  icon={<Bell className="h-7 w-7" />}
-                  title="Pranešimų nėra"
-                  desc="Nauji pranešimai atsiras čia."
-                />
-              ) : null}
-            </div>
-          ) : null}
-
-          {modal === "residents" ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {assignedResidents.map((row) => (
-                <Link
-                  key={row.id}
-                  href={`/residents/${row.id}`}
-                  className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-[#10251f] no-underline transition hover:bg-[#eef4f1]"
-                >
-                  <div className="font-black">{residentName(row)}</div>
-                  <div className="mt-1 text-sm font-bold text-[#526174]">
-                    {row.resident_code || "Be kodo"}
-                  </div>
-                </Link>
-              ))}
-              {!assignedResidents.length ? (
-                <EmptyState
-                  icon={<Users className="h-7 w-7" />}
-                  title="Priskirtų gyventojų nėra"
-                  desc="Kai būsi priskirtas gyventojui, jis atsiras čia."
-                />
-              ) : null}
-            </div>
-          ) : null}
-
-          {modal === "documents" ? (
-            <div className="grid gap-4">
-              {employeeCredentials.some(
-                (credential) =>
-                  String(credential.status || "").toLowerCase() === "pending",
-              ) ? (
-                <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black leading-6 text-amber-900">
-                  Dokumentų informacija pateikta ir laukia administratoriaus
-                  patvirtinimo.
-                </div>
-              ) : null}
-              <ModalField
-                label="Sveikatos pažyma galioja iki"
-                type="date"
-                value={documentForm.healthCertificateUntil}
-                onChange={(value) =>
-                  setDocumentForm((prev) => ({
-                    ...prev,
-                    healthCertificateUntil: value,
-                  }))
-                }
-              />
-              <ModalField
-                label="Licencija galioja iki"
-                type="date"
-                value={documentForm.licenseUntil}
-                onChange={(value) =>
-                  setDocumentForm((prev) => ({ ...prev, licenseUntil: value }))
-                }
-              />
-              <ModalField
-                label="Licencijos numeris"
-                value={documentForm.licenseNumber}
-                onChange={(value) =>
-                  setDocumentForm((prev) => ({ ...prev, licenseNumber: value }))
-                }
-              />
-              <ModalActions
-                onCancel={() => setModal(null)}
-                onSubmit={() => void submitDocuments()}
-                saving={saving}
-                submitLabel="Pateikti patvirtinimui"
-              />
-            </div>
-          ) : null}
-
-          {modal === "trainings" ? (
-            <div className="space-y-3">
-              {trainings.map((training) => (
-                <div
-                  key={training.id}
-                  className="rounded-[18px] border border-[#dbe6e0] bg-white p-4"
-                >
-                  <div className="font-black">
-                    {training.title ||
-                      training.training_name ||
-                      training.name ||
-                      "Mokymas"}
-                  </div>
-                  <div className="mt-1 text-sm font-bold text-[#526174]">
-                    Galioja iki:{" "}
-                    {fmtDate(training.valid_until || training.expires_at)} ·{" "}
-                    {training.hours || 0} val.
-                  </div>
-                </div>
-              ))}
-              {!trainings.length ? (
-                <EmptyState
-                  icon={<GraduationCap className="h-7 w-7" />}
-                  title="Mokymų nėra"
-                  desc="Mokymų įrašai atsiras čia."
-                />
-              ) : null}
-            </div>
-          ) : null}
-        </DashboardModal>
-      ) : null}
 
       {selectedTask ? (
         <DashboardModal
@@ -1677,6 +1699,7 @@ export default function EmployeeDashboardPage() {
 function modalTitle(panel: PanelKey) {
   const labels: Record<PanelKey, string> = {
     overview: "Apžvalga",
+    schedule: "Grafikas",
     requests: "Prašymai",
     profile: "Mano profilis",
     tasks: "Mano užduotys",
