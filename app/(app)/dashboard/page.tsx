@@ -104,6 +104,14 @@ export default function AdminDashboardPage() {
   const [embeddedFormRoute, setEmbeddedFormRoute] = useState<string | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
 
+  function openTeamModule(module: string) {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("team-active-module", module);
+    }
+
+    router.push(`/team?module=${encodeURIComponent(module)}`);
+  }
+
   async function bootstrapDashboard() {
     const currentAccess = await getCurrentAccess();
     const currentRole = String(currentAccess?.role || "").toLowerCase();
@@ -251,14 +259,14 @@ export default function AdminDashboardPage() {
         : "Laukiančių kvietimų nėra.",
       badge: stats.pendingInvites ? "Peržiūrėti" : "Gerai",
       color: stats.pendingInvites ? "blue" as const : "emerald" as const,
-      onClick: () => router.push("/team?module=invites"),
+      onClick: () => openTeamModule("invites"),
     },
     {
       title: "Atostogų prašymai",
       desc: `${stats.pendingLeaves} praš. laukia sprendimo.`,
       badge: stats.pendingLeaves ? "Peržiūrėti" : "Nėra",
       color: stats.pendingLeaves ? "amber" as const : "emerald" as const,
-      onClick: () => router.push("/team?module=vacations"),
+      onClick: () => openTeamModule("vacations"),
     },
     {
       title: "Baigiasi pažymos",
@@ -278,14 +286,14 @@ export default function AdminDashboardPage() {
           : stats.expiringCertificates
             ? "red" as const
             : "emerald" as const,
-      onClick: () => router.push("/team?module=docs"),
+      onClick: () => openTeamModule("docs"),
     },
     {
       title: "Mokymų neatitikimai",
       desc: `Mokymų užbaigimas: ${computed.trainingCompletion}%.`,
       badge: computed.trainingCompletion < 70 ? "Sekti" : "Gerai",
       color: computed.trainingCompletion < 70 ? "blue" as const : "emerald" as const,
-      onClick: () => router.push("/team?module=trainings"),
+      onClick: () => openTeamModule("trainings"),
     },
     {
       title: "Užduotys",
@@ -411,11 +419,11 @@ export default function AdminDashboardPage() {
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
           <TopMetric title="Gyventojai" value={loading ? "…" : String(stats.activeResidents)} meta="aktyvūs" onClick={() => router.push("/residents")} />
           <TopMetric title="Užimtumas" value={loading ? "…" : `${computed.occupancy}%`} meta="vietos" accent="emerald" onClick={() => router.push("/rooms")} />
-          <TopMetric title="Darbuotojai" value={loading ? "…" : String(stats.activeEmployees)} meta="aktyvūs" onClick={() => router.push("/team?module=employees")} />
-          <TopMetric title="Kvietimai" value={loading ? "…" : String(stats.pendingInvites)} meta={stats.pendingInvites ? "laukia" : `${stats.totalInvites} iš viso`} accent={stats.pendingInvites ? "amber" : "emerald"} onClick={() => router.push("/team?module=invites")} />
-          <TopMetric title="Etatai" value={loading ? "…" : formatFte(stats.freeFte)} meta={`laisva iš ${formatFte(stats.plannedFte)} et.`} accent={stats.freeFte > 0 ? "red" : "emerald"} onClick={() => router.push("/team?module=fte")} />
+          <TopMetric title="Darbuotojai" value={loading ? "…" : String(stats.activeEmployees)} meta="aktyvūs" onClick={() => openTeamModule("employees")} />
+          <TopMetric title="Kvietimai" value={loading ? "…" : String(stats.pendingInvites)} meta={stats.pendingInvites ? "laukia" : `${stats.totalInvites} iš viso`} accent={stats.pendingInvites ? "amber" : "emerald"} onClick={() => openTeamModule("invites")} />
+          <TopMetric title="Etatai" value={loading ? "…" : formatFte(stats.freeFte)} meta={`laisva iš ${formatFte(stats.plannedFte)} et.`} accent={stats.freeFte > 0 ? "red" : "emerald"} onClick={() => openTeamModule("fte")} />
           <TopMetric title="Užduotys" value={loading ? "…" : String(stats.pendingTasks)} meta={stats.pendingTasks ? "laukia" : "nėra"} accent={stats.pendingTasks ? "amber" : "emerald"} onClick={() => router.push("/tasks")} />
-          <TopMetric title="Mokymai" value={loading ? "…" : `${computed.trainingCompletion}%`} meta="sutvarkyta" accent={computed.trainingCompletion < 70 ? "amber" : "emerald"} onClick={() => router.push("/team?module=trainings")} />
+          <TopMetric title="Mokymai" value={loading ? "…" : `${computed.trainingCompletion}%`} meta="sutvarkyta" accent={computed.trainingCompletion < 70 ? "amber" : "emerald"} onClick={() => openTeamModule("trainings")} />
           <TopMetric
             title="Dokumentai"
             value={loading ? "…" : String(stats.pendingDocumentApprovals + stats.expiringCertificates)}
@@ -514,7 +522,7 @@ export default function AdminDashboardPage() {
 
                 <button
                   type="button"
-                  onClick={() => router.push("/team?module=fte")}
+                  onClick={() => openTeamModule("fte")}
                   className="rounded-xl bg-[#047857] px-4 py-2 text-sm font-black text-white transition hover:bg-[#065f46]"
                 >
                   Atidaryti Team
@@ -547,7 +555,7 @@ export default function AdminDashboardPage() {
                   }
                   badge={stats.replacementNeededFte > 0 ? "Svarbu" : "Gerai"}
                   tone={stats.replacementNeededFte > 0 ? "amber" : "emerald"}
-                  onClick={() => router.push("/team?module=schedule")}
+                  onClick={() => openTeamModule("schedule")}
                 />
 
                 <RiskAttentionCard
@@ -559,7 +567,7 @@ export default function AdminDashboardPage() {
                   }
                   badge={stats.todayAbsences > 0 ? "Tikrinti" : "Gerai"}
                   tone={stats.todayAbsences > 0 ? "amber" : "emerald"}
-                  onClick={() => router.push("/team?module=schedule")}
+                  onClick={() => openTeamModule("schedule")}
                 />
               </div>
             </section>
@@ -584,7 +592,7 @@ export default function AdminDashboardPage() {
                   }
                   badge={stats.pendingLeaves > 0 ? "Patvirtinti" : "Gerai"}
                   tone={stats.pendingLeaves > 0 ? "amber" : "emerald"}
-                  onClick={() => router.push("/team?module=vacations")}
+                  onClick={() => openTeamModule("vacations")}
                 />
 
                 <RiskAttentionCard
@@ -609,7 +617,7 @@ export default function AdminDashboardPage() {
                       ? "amber"
                       : "emerald"
                   }
-                  onClick={() => router.push("/team?module=docs")}
+                  onClick={() => openTeamModule("docs")}
                 />
 
                 {riskItems.map((risk) => (
@@ -632,10 +640,10 @@ export default function AdminDashboardPage() {
               <h2 className="mt-1 text-2xl font-black">Kur eiti toliau?</h2>
 
               <div className="mt-5 grid gap-3">
-                <QuickLink title="Atostogų / išvykimų patvirtinimai" onClick={() => router.push("/team?module=vacations")} />
-                <QuickLink title="Darbuotojų dokumentai" onClick={() => router.push("/team?module=docs")} />
-                <QuickLink title="Grafiko patikra" onClick={() => router.push("/team?module=schedule")} />
-                <QuickLink title="Kvietimų valdymas" onClick={() => router.push("/team?module=invites")} />
+                <QuickLink title="Atostogų / išvykimų patvirtinimai" onClick={() => openTeamModule("vacations")} />
+                <QuickLink title="Darbuotojų dokumentai" onClick={() => openTeamModule("docs")} />
+                <QuickLink title="Grafiko patikra" onClick={() => openTeamModule("schedule")} />
+                <QuickLink title="Kvietimų valdymas" onClick={() => openTeamModule("invites")} />
                 <QuickLink title="Audit žurnalas" onClick={() => router.push("/audit")} />
               </div>
             </section>
@@ -672,7 +680,7 @@ export default function AdminDashboardPage() {
               <div className="mt-5 grid gap-3">
                 <QuickLink title="Gyventojai" onClick={() => router.push("/residents")} />
                 <QuickLink title="Užduotys" onClick={() => router.push("/tasks")} />
-                <QuickLink title="Mokymai" onClick={() => router.push("/team?module=trainings")} />
+                <QuickLink title="Mokymai" onClick={() => openTeamModule("trainings")} />
                 <QuickLink title="Perdavimo žurnalai" onClick={() => router.push("/handover-logs")} />
               </div>
             </section>
@@ -701,18 +709,24 @@ export default function AdminDashboardPage() {
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
                 Veiksmai
               </p>
-              <h2 className="mt-1 text-2xl font-black">Patvirtinimas</h2>
+              <h2 className="mt-1 text-2xl font-black">
+                {stats.pendingDocumentApprovals > 0 ? "Patvirtinimas" : "Dokumentų peržiūra"}
+              </h2>
 
               <div className="mt-5 grid gap-3">
                 <button
                   type="button"
-                  onClick={() => router.push("/team?module=docs")}
+                  onClick={() => openTeamModule("docs")}
                   className="min-h-14 rounded-xl bg-[#047857] px-5 text-left text-base font-black text-white transition hover:bg-[#065f46]"
                 >
-                  Atidaryti dokumentų patvirtinimą
+                  {stats.pendingDocumentApprovals > 0
+                    ? "Atidaryti dokumentų patvirtinimą"
+                    : "Atidaryti darbuotojų dokumentus"}
                 </button>
                 <p className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-sm font-bold text-[#486b5d]">
-                  Atsidariusiame sąraše prie laukiančių įrašų spauskite „Patvirtinti“.
+                  {stats.pendingDocumentApprovals > 0
+                    ? "Atsidariusiame sąraše prie laukiančių įrašų spauskite „Patvirtinti“."
+                    : "Laukiančių dokumentų patvirtinimų nėra. Atsidarys dokumentų sąrašas ir terminai."}
                 </p>
               </div>
             </section>
