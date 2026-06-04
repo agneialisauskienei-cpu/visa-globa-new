@@ -1271,7 +1271,7 @@ export default function EmployeeDashboardPage() {
           </div>
         ) : null}
 
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <StatButton
             title="Artimiausia pamaina"
             value={formatShift(nextShift)}
@@ -1307,89 +1307,12 @@ export default function EmployeeDashboardPage() {
           />
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
-          <section className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-sm">
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
-                  Šiandien
-                </p>
-                <h2 className="mt-1 text-2xl font-black tracking-tight text-[#10251f]">
-                  Darbo eiga
-                </h2>
-                <p className="mt-1 text-sm font-bold text-[#526174]">
-                  Čia lieka ne meniu, o aiški darbuotojo dienos seka.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void loadDashboard()}
-                className="grid h-11 w-11 place-items-center rounded-[16px] bg-[#eef4f1] text-[#486b5d] transition hover:bg-[#dbe6e0]"
-                aria-label="Atnaujinti"
-              >
-                {loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-5 w-5" />
-                )}
-              </button>
-            </div>
-
-            <div className="grid gap-3">
-              <WorkStep
-                number="1"
-                title="Patikrink artimiausią pamainą"
-                desc={nextShift ? formatShift(nextShift) : "Paskelbtų pamainų nerasta"}
-                actionLabel="Grafikas"
-                onClick={() => router.push("/my-schedule")}
-              />
-              <WorkStep
-                number="2"
-                title="Užbaik atviras užduotis"
-                desc={openTaskCount ? `${openTaskCount} aktyvios užduotys` : "Atvirų užduočių nėra"}
-                tone={openTaskCount ? "warning" : "default"}
-                actionLabel="Užduotys"
-                onClick={() => openPanel("tasks")}
-              />
-              <WorkStep
-                number="3"
-                title="Peržiūrėk pranešimus ir mokymus"
-                desc={unreadNotifications.length || expiringTrainings.length ? `${unreadNotifications.length} pranešimai · ${expiringTrainings.length} mokymai` : "Naujų įspėjimų nėra"}
-                actionLabel="Peržiūrėti"
-                onClick={() => openPanel(unreadNotifications.length ? "notifications" : "trainings")}
-              />
-            </div>
-          </section>
-
-          <Panel
-            title="Kita pamaina"
-            kicker="Pamaina"
-            actionHref="/my-schedule"
-            actionLabel="Grafikas"
-          >
-            {nextShift ? (
-              <ShiftCard shift={nextShift} />
-            ) : (
-              <EmptyState
-                icon={<CalendarX className="h-7 w-7" />}
-                title="Pamainų nerasta"
-                desc="Kai grafikas bus paskelbtas, artimiausia pamaina atsiras čia."
-              />
-            )}
-            <div className="mt-3 space-y-2">
-              {schedule.slice(1, 4).map((shift) => (
-                <ShiftMini key={shift.id} shift={shift} />
-              ))}
-            </div>
-          </Panel>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-2">
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
           <Panel
             title="Mano užduotys"
-            kicker="Užduotys"
-            actionHref="/tasks"
-            actionLabel="Atidaryti"
+            kicker="Darbai"
+            actionLabel="Visos užduotys"
+            onAction={() => openPanel("tasks")}
           >
             <div className="space-y-3">
               {tasks.slice(0, 4).map((task) => (
@@ -1410,34 +1333,164 @@ export default function EmployeeDashboardPage() {
             </div>
           </Panel>
 
+          <section className="grid gap-4">
+            <Panel
+              title="Kita pamaina"
+              kicker="Grafikas"
+              actionHref="/my-schedule"
+              actionLabel="Grafikas"
+            >
+              {nextShift ? (
+                <ShiftCard shift={nextShift} />
+              ) : (
+                <EmptyState
+                  icon={<CalendarX className="h-7 w-7" />}
+                  title="Pamainų nerasta"
+                  desc="Kai grafikas bus paskelbtas, artimiausia pamaina atsiras čia."
+                />
+              )}
+            </Panel>
+
+            <Panel
+              title="Svarbu šiandien"
+              kicker="Pranešimai"
+              actionLabel="Atidaryti"
+              onAction={() => openPanel("notifications")}
+            >
+              <div className="space-y-3">
+                {unreadNotifications.slice(0, 2).map((item) => (
+                  <NotificationMini key={item.id} item={item} />
+                ))}
+                {!unreadNotifications.length ? (
+                  <EmptyState
+                    icon={<Bell className="h-7 w-7" />}
+                    title="Naujų pranešimų nėra"
+                    desc="Svarbūs pranešimai atsiras čia."
+                  />
+                ) : null}
+              </div>
+            </Panel>
+          </section>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-3">
           <Panel
-            title="Pranešimai ir mokymai"
-            kicker="Svarbu"
-            actionLabel="Pranešimai"
-            onAction={() => openPanel("notifications")}
+            title="Mano prašymai"
+            kicker="Prašymai"
+            actionLabel="Tvarkyti"
+            onAction={() => openPanel("requests")}
           >
             <div className="space-y-3">
-              {unreadNotifications.slice(0, 3).map((item) => (
-                <NotificationMini key={item.id} item={item} />
-              ))}
-              {!unreadNotifications.length ? (
-                <EmptyState
-                  icon={<Bell className="h-7 w-7" />}
-                  title="Naujų pranešimų nėra"
-                  desc="Mokymai, pranešimai ir dokumentų terminai bus rodomi čia."
-                />
-              ) : null}
-              {expiringTrainings.length ? (
-                <button
-                  type="button"
-                  onClick={() => openPanel("trainings")}
-                  className="w-full rounded-[18px] border border-amber-200 bg-amber-50 p-4 text-left text-sm font-bold text-amber-900 transition hover:bg-amber-100"
-                >
-                  {expiringTrainings.length} mokymų ar pažymėjimų artėja prie termino.
-                </button>
-              ) : null}
+              <ActionRow
+                icon={<CalendarX className="h-5 w-5" />}
+                title={
+                  pendingRequestCount
+                    ? `${pendingRequestCount} laukia sprendimo`
+                    : "Laukiančių prašymų nėra"
+                }
+                desc="Atostogos ir išvykimai"
+                onClick={() => openPanel("requests")}
+              />
             </div>
           </Panel>
+
+          <Panel
+            title="Dokumentai"
+            kicker="Dokumentai"
+            actionLabel="Pildyti"
+            onAction={() => openPanel("documents")}
+          >
+            <div className="space-y-2">
+              <DocumentLine
+                title="Sveikatos pažyma"
+                value={fmtDate(documentForm.healthCertificateUntil)}
+                ok={Boolean(documentForm.healthCertificateUntil)}
+              />
+              <DocumentLine
+                title="Licencija"
+                value={
+                  documentForm.licenseNumber
+                    ? `${documentForm.licenseNumber} · ${fmtDate(
+                        documentForm.licenseUntil,
+                      )}`
+                    : fmtDate(documentForm.licenseUntil)
+                }
+                ok={Boolean(documentForm.licenseUntil)}
+              />
+            </div>
+          </Panel>
+
+          <Panel
+            title="Mokymai"
+            kicker="Mokymai"
+            actionLabel="Peržiūrėti"
+            onAction={() => openPanel("trainings")}
+          >
+            <div className="space-y-3">
+              <ActionRow
+                icon={<GraduationCap className="h-5 w-5" />}
+                title={
+                  expiringTrainings.length
+                    ? `${expiringTrainings.length} artėja prie termino`
+                    : "Terminų rizikų nėra"
+                }
+                desc={`${trainings.length} mokymų įrašai`}
+                onClick={() => openPanel("trainings")}
+              />
+            </div>
+          </Panel>
+        </section>
+
+        <section className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                Greiti veiksmai
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-[#10251f]">
+                Dažniausi langai
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadDashboard()}
+              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-[#c9d8d0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Atnaujinti
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <ActionRow
+              icon={<Users className="h-5 w-5" />}
+              title="Mano gyventojai"
+              desc={`${assignedResidents.length} priskirta`}
+              onClick={() => openPanel("residents")}
+            />
+            <ActionRow
+              icon={<FileCheck2 className="h-5 w-5" />}
+              title="Dokumentai"
+              desc={`${documentProgress}% užpildyta`}
+              onClick={() => openPanel("documents")}
+            />
+            <ActionRow
+              icon={<Bell className="h-5 w-5" />}
+              title="Pranešimai"
+              desc={`${unreadNotifications.length} nauji`}
+              onClick={() => openPanel("notifications")}
+            />
+            <ActionRow
+              icon={<UserRound className="h-5 w-5" />}
+              title="Mano profilis"
+              desc="Kontaktai ir asmeniniai duomenys"
+              onClick={() => openPanel("profile")}
+            />
+          </div>
         </section>
 
       </div>
@@ -1689,48 +1742,6 @@ function modalTitle(panel: PanelKey) {
 }
 
 
-function WorkStep({
-  number,
-  title,
-  desc,
-  actionLabel,
-  onClick,
-  tone = "default",
-}: {
-  number: string;
-  title: string;
-  desc: string;
-  actionLabel: string;
-  onClick: () => void;
-  tone?: "default" | "warning";
-}) {
-  return (
-    <article
-      className={`grid grid-cols-[44px_1fr_auto] items-center gap-3 rounded-[18px] border p-4 transition ${
-        tone === "warning"
-          ? "border-amber-200 bg-amber-50"
-          : "border-[#dbe6e0] bg-[#f8faf8] hover:bg-[#eef4f1]"
-      }`}
-    >
-      <span className="grid h-11 w-11 place-items-center rounded-[16px] bg-white text-sm font-black text-[#047857] shadow-sm">
-        {number}
-      </span>
-      <div className="min-w-0">
-        <div className="truncate text-base font-black text-[#10251f]">{title}</div>
-        <div className="mt-1 truncate text-sm font-bold text-[#526174]">{desc}</div>
-      </div>
-      <button
-        type="button"
-        onClick={onClick}
-        className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#eef4f1]"
-      >
-        {actionLabel}
-        <ArrowRight className="h-4 w-4" />
-      </button>
-    </article>
-  );
-}
-
 function TopTab({
   active,
   onClick,
@@ -1906,20 +1917,6 @@ function ShiftCard({ shift }: { shift: EmployeeSchedule }) {
       <p className="mt-2 text-sm font-bold text-[#526174]">
         {shift.position || shift.department || "Paskelbta pamaina"}
       </p>
-    </div>
-  );
-}
-
-function ShiftMini({ shift }: { shift: EmployeeSchedule }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-[16px] border border-[#dbe6e0] bg-white p-3">
-      <span className="font-black text-[#10251f]">
-        {fmtDate(getScheduleDate(shift))}
-      </span>
-      <span className="text-sm font-bold text-[#526174]">
-        {timeOnly(getScheduleStart(shift)) || "—"}–
-        {timeOnly(getScheduleEnd(shift)) || "—"}
-      </span>
     </div>
   );
 }
