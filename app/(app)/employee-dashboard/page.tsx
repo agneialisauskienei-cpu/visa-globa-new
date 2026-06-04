@@ -1165,7 +1165,7 @@ export default function EmployeeDashboardPage() {
         onAction={() => setActivePanel("overview")}
       >
         {activePanel === "schedule" ? (
-          <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {schedule.map((shift) => (
               <ShiftCard key={shift.id} shift={shift} />
             ))}
@@ -1203,7 +1203,7 @@ export default function EmployeeDashboardPage() {
           <iframe
             title="Prašymai"
             src="/requests?embedded=1"
-            className="h-[78vh] w-full rounded-[18px] border-0 bg-[#f3f6f4]"
+            className="h-[calc(100vh-260px)] min-h-[520px] w-full rounded-[18px] border-0 bg-[#f3f6f4] sm:h-[78vh]"
           />
         ) : null}
 
@@ -1230,7 +1230,7 @@ export default function EmployeeDashboardPage() {
         ) : null}
 
         {activePanel === "residents" ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {assignedResidents.map((row) => (
               <Link
                 key={row.id}
@@ -1379,19 +1379,19 @@ export default function EmployeeDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f3f6f4] p-4 text-[#10251f] sm:p-5 lg:p-6">
-      <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="overflow-hidden rounded-[24px] border border-[#c9d8d0] bg-white shadow-sm">
-          <div className="flex flex-col gap-5 bg-[#486b5d] px-5 py-5 text-white lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[18px] bg-[#e8f7ef] text-[#486b5d]">
-                <UserRound className="h-7 w-7" />
+    <main className="min-h-screen bg-[#f3f6f4] px-3 pb-24 pt-3 text-[#10251f] sm:p-5 sm:pb-24 lg:p-6 lg:pb-6">
+      <div className="mx-auto max-w-[1500px] space-y-3 sm:space-y-4">
+        <section className="overflow-hidden rounded-[22px] border border-[#c9d8d0] bg-white shadow-sm sm:rounded-[24px]">
+          <div className="flex flex-col gap-4 bg-[#486b5d] px-4 py-4 text-white sm:px-5 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[16px] bg-[#e8f7ef] text-[#486b5d] sm:h-14 sm:w-14 sm:rounded-[18px]">
+                <UserRound className="h-6 w-6 sm:h-7 sm:w-7" />
               </div>
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/70">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 sm:text-[11px]">
                   Darbuotojo paskyra
                 </p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+                <h1 className="mt-1 break-words text-[26px] font-black leading-tight tracking-tight sm:text-3xl">
                   Sveiki, {displayName}
                 </h1>
                 <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-white/80">
@@ -1401,7 +1401,7 @@ export default function EmployeeDashboardPage() {
               </div>
             </div>
 
-            <div className="grid gap-2 rounded-[18px] border border-white/15 bg-white/10 p-4 text-sm backdrop-blur lg:min-w-[320px]">
+            <div className="grid gap-2 rounded-[18px] border border-white/15 bg-white/10 p-3 text-sm backdrop-blur sm:p-4 lg:min-w-[320px]">
               <InfoLine
                 label="Pareigos"
                 value={profile?.position || "Darbuotojas"}
@@ -1415,7 +1415,7 @@ export default function EmployeeDashboardPage() {
             </div>
           </div>
 
-          <nav className="flex flex-wrap gap-1 border-t border-[#dbe6e0] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d]">
+          <nav className="flex gap-1 overflow-x-auto border-t border-[#dbe6e0] bg-[#eef4f1] px-2 py-2 text-sm font-black text-[#486b5d] sm:flex-wrap sm:px-4">
             <TopTab
               active={activePanel === "overview"}
               onClick={() => setActivePanel("overview")}
@@ -1480,7 +1480,7 @@ export default function EmployeeDashboardPage() {
 
         {activePanel === "overview" ? (
           <>
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <section className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
           <StatButton
             title="Artimiausia pamaina"
             value={formatShift(nextShift)}
@@ -1516,7 +1516,7 @@ export default function EmployeeDashboardPage() {
           />
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <section className="grid gap-3 md:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_390px]">
           <Panel
             title="Mano užduotys"
             kicker="Darbai"
@@ -1542,7 +1542,7 @@ export default function EmployeeDashboardPage() {
             </div>
           </Panel>
 
-          <section className="grid gap-4">
+          <section className="grid gap-3 sm:gap-4">
             <Panel
               title="Kita pamaina"
               kicker="Grafikas"
@@ -1582,7 +1582,7 @@ export default function EmployeeDashboardPage() {
           </section>
         </section>
 
-        <section className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-sm">
+        <section className="rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-sm sm:rounded-[22px] sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
@@ -1609,7 +1609,7 @@ export default function EmployeeDashboardPage() {
             </button>
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <ActionRow
               icon={<CalendarX className="h-5 w-5" />}
               title={
@@ -1680,7 +1680,7 @@ export default function EmployeeDashboardPage() {
       ) : null}
 
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-[120] max-w-sm rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-2xl">
+        <div className="fixed bottom-20 left-3 right-3 z-[120] rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-2xl sm:bottom-5 sm:left-auto sm:max-w-sm">
           <div className="flex items-start gap-3">
             <CheckCircle2 className="mt-0.5 h-5 w-5 text-[#047857]" />
             <div>
@@ -1729,7 +1729,7 @@ function TopTab({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 transition ${active ? "bg-white text-[#486b5d] shadow-sm ring-1 ring-[#c9d8d0]" : "text-[#486b5d] hover:bg-white/80"}`}
+      className={`inline-flex shrink-0 items-center gap-2 rounded-[14px] px-3 py-2 transition ${active ? "bg-white text-[#486b5d] shadow-sm ring-1 ring-[#c9d8d0]" : "text-[#486b5d] hover:bg-white/80"}`}
     >
       {icon}
       {label}
@@ -1767,17 +1767,17 @@ function StatButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[18px] border p-4 text-left shadow-sm transition hover:bg-[#f8faf8] ${toneClass}`}
+      className={`min-w-0 rounded-[18px] border p-3 text-left shadow-sm transition hover:bg-[#f8faf8] sm:p-4 ${toneClass}`}
     >
-      <div className="flex items-center gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-white/80 text-[#486b5d]">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-white/80 text-[#486b5d] sm:h-10 sm:w-10 sm:rounded-[14px]">
           {icon}
         </span>
         <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
+          <p className="line-clamp-2 text-[10px] font-black uppercase tracking-wide text-[#6a7e75] sm:text-[11px]">
             {title}
           </p>
-          <p className="mt-1 truncate text-lg font-black text-[#10251f]">
+          <p className="mt-1 break-words text-base font-black leading-tight text-[#10251f] sm:text-lg">
             {value}
           </p>
         </div>
@@ -1801,17 +1801,17 @@ function ActionRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center justify-between gap-3 rounded-[16px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left transition hover:bg-[#eef4f1]"
+      className="flex min-w-0 items-center justify-between gap-3 rounded-[16px] border border-[#dbe6e0] bg-[#f8faf8] p-3 text-left transition hover:bg-[#eef4f1] sm:p-4"
     >
       <span className="flex min-w-0 items-center gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-white text-[#486b5d] shadow-sm">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-white text-[#486b5d] shadow-sm sm:h-10 sm:w-10 sm:rounded-[14px]">
           {icon}
         </span>
         <span className="min-w-0">
-          <span className="block truncate font-black text-[#10251f]">
+          <span className="block break-words font-black leading-tight text-[#10251f]">
             {title}
           </span>
-          <span className="mt-0.5 block truncate text-sm font-bold text-[#526174]">
+          <span className="mt-0.5 block break-words text-sm font-bold leading-5 text-[#526174]">
             {desc}
           </span>
         </span>
@@ -1839,7 +1839,7 @@ function Panel({
   const action = actionHref ? (
     <Link
       href={actionHref}
-      className="rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] no-underline transition hover:bg-[#dbe6e0]"
+      className="inline-flex w-full justify-center rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] no-underline transition hover:bg-[#dbe6e0] sm:w-auto"
     >
       {actionLabel || "Atidaryti"}
     </Link>
@@ -1847,20 +1847,20 @@ function Panel({
     <button
       type="button"
       onClick={onAction}
-      className="rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#dbe6e0]"
+      className="inline-flex w-full justify-center rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#dbe6e0] sm:w-auto"
     >
       {actionLabel || "Atidaryti"}
     </button>
   ) : null;
 
   return (
-    <section className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-sm">
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
+    <section className="rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-sm sm:rounded-[22px] sm:p-5">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
             {kicker}
           </p>
-          <h2 className="mt-1 text-2xl font-black tracking-tight text-[#10251f]">
+          <h2 className="mt-1 break-words text-[26px] font-black leading-tight tracking-tight text-[#10251f] sm:text-2xl">
             {title}
           </h2>
         </div>
@@ -1877,10 +1877,10 @@ function ShiftCard({ shift }: { shift: EmployeeSchedule }) {
       <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#047857]">
         Kita pamaina
       </p>
-      <h3 className="mt-2 text-xl font-black text-[#10251f]">
+      <h3 className="mt-2 text-xl font-black leading-tight text-[#10251f]">
         {fmtDate(getScheduleDate(shift))}
       </h3>
-      <p className="mt-1 text-lg font-black text-[#10251f]">
+      <p className="mt-1 text-lg font-black leading-tight text-[#10251f]">
         {timeOnly(getScheduleStart(shift)) || "—"}–
         {timeOnly(getScheduleEnd(shift)) || "—"}
       </p>
@@ -1911,9 +1911,9 @@ function TaskCard({
     <div
       className={`rounded-[18px] border p-4 ${urgent ? "border-amber-200 bg-amber-50" : "border-[#dbe6e0] bg-white"}`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <div className="truncate font-black text-[#10251f]">
+          <div className="break-words font-black leading-tight text-[#10251f]">
             {taskTitle(task)}
           </div>
           <div className="mt-1 text-sm font-bold text-[#526174]">
@@ -1923,7 +1923,7 @@ function TaskCard({
         <button
           type="button"
           onClick={onComplete}
-          className="rounded-[12px] bg-[#047857] px-3 py-2 text-xs font-black text-white"
+          className="w-full rounded-[12px] bg-[#047857] px-3 py-2 text-xs font-black text-white sm:w-auto"
         >
           Atlikta
         </button>
@@ -1936,7 +1936,7 @@ function TaskCard({
       <button
         type="button"
         onClick={onOpen}
-        className="mt-3 text-sm font-black text-[#047857]"
+        className="mt-3 w-full rounded-[14px] bg-[#eef4f1] px-4 py-3 text-sm font-black text-[#047857] sm:w-auto sm:bg-transparent sm:px-0 sm:py-0"
       >
         Peržiūrėti
       </button>
@@ -2059,8 +2059,8 @@ function EmptyState({
   desc: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-6 text-center">
-      <div className="mx-auto grid h-12 w-12 place-items-center rounded-[16px] bg-white text-[#486b5d] shadow-sm">
+    <div className="rounded-[18px] border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-4 text-center sm:p-6">
+      <div className="mx-auto grid h-11 w-11 place-items-center rounded-[16px] bg-white text-[#486b5d] shadow-sm sm:h-12 sm:w-12">
         {icon}
       </div>
       <div className="mt-3 font-black text-[#10251f]">{title}</div>
@@ -2109,26 +2109,26 @@ function DashboardModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 px-3 pb-20 pt-3 backdrop-blur-sm sm:p-4"
       onClick={onClose}
     >
       <section
-        className={`max-h-[92vh] w-full overflow-hidden rounded-[28px] bg-white shadow-2xl ${
+        className={`max-h-[calc(100vh-6.5rem)] w-full overflow-hidden rounded-[24px] bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-[28px] ${
           wide ? "max-w-[1250px]" : "max-w-3xl"
         }`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 bg-[#486b5d] p-6 text-white">
-          <div>
+        <div className="flex items-start justify-between gap-4 bg-[#486b5d] p-4 text-white sm:p-6">
+          <div className="min-w-0">
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/70">
               Darbuotojo paskyra
             </p>
-            <h2 className="mt-1 text-3xl font-black tracking-tight">{title}</h2>
+            <h2 className="mt-1 break-words text-2xl font-black leading-tight tracking-tight sm:text-3xl">{title}</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="grid h-12 w-12 place-items-center rounded-[18px] bg-white/12 text-white hover:bg-white/20"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-[16px] bg-white/12 text-white hover:bg-white/20 sm:h-12 sm:w-12 sm:rounded-[18px]"
             aria-label="Uždaryti"
           >
             <X className="h-6 w-6" />
@@ -2136,7 +2136,7 @@ function DashboardModal({
         </div>
         <div
           className={`overflow-y-auto bg-[#f8faf8] ${
-            compactBody ? "max-h-[78vh] p-0" : "max-h-[70vh] p-5"
+            compactBody ? "max-h-[68vh] p-0 sm:max-h-[78vh]" : "max-h-[58vh] p-4 sm:max-h-[70vh] sm:p-5"
           }`}
         >
           {children}
