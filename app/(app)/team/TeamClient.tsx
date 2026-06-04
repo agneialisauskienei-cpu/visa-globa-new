@@ -167,15 +167,16 @@ type FtePlanRow = {
   id: string;
   department: string;
   title: string;
-  planned: number;
+  planned: number | null;
   filled: number;
-  free: number;
+  free: number | null;
   coefficient: string;
   minimumDayShift: number;
   minimumNightShift: number;
-  percent: number;
-  status: "Užpildyta" | "Stebėti" | "Trūksta";
+  percent: number | null;
+  status: "Užpildyta" | "Stebėti" | "Trūksta" | "Planas nenustatytas";
   tone: "emerald" | "amber" | "red";
+  hasPlan: boolean;
 };
 
 type VacationForm = {
@@ -529,18 +530,23 @@ function makeFtePlanRow({
   minimumDayShift: number;
   minimumNightShift: number;
 }): FtePlanRow {
-  const plannedFte = roundFte(planned);
+  const hasPlan = planned > 0;
+  const plannedFte = hasPlan ? roundFte(planned) : null;
   const filledFte = roundFte(filled);
-  const free = roundFte(Math.max(0, plannedFte - filledFte));
+  const free = hasPlan && plannedFte !== null ? roundFte(Math.max(0, plannedFte - filledFte)) : null;
   const percent =
-    plannedFte > 0
+    plannedFte !== null && plannedFte > 0
       ? Math.round((filledFte / plannedFte) * 100)
-      : filledFte > 0
-        ? 100
-        : 0;
-  const tone = percent >= 90 ? "emerald" : percent >= 70 ? "amber" : "red";
+      : null;
+  const tone = !hasPlan ? "amber" : percent !== null && percent >= 90 ? "emerald" : percent !== null && percent >= 70 ? "amber" : "red";
   const status =
-    percent >= 90 ? "Užpildyta" : percent >= 70 ? "Stebėti" : "Trūksta";
+    !hasPlan
+      ? "Planas nenustatytas"
+      : percent !== null && percent >= 90
+        ? "Užpildyta"
+        : percent !== null && percent >= 70
+          ? "Stebėti"
+          : "Trūksta";
 
   return {
     id,
@@ -555,6 +561,7 @@ function makeFtePlanRow({
     percent,
     status,
     tone,
+    hasPlan,
   };
 }
 
@@ -602,7 +609,7 @@ function buildFtePlanRows(
       id: key,
       department: row.title,
       title: row.title,
-      planned: Math.ceil(row.filled),
+      planned: 0,
       filled: row.filled,
       coefficient: "—",
       minimumDayShift: 0,
@@ -2118,13 +2125,17 @@ export default function TeamPage() {
   );
 
   const fteTotals = useMemo(() => {
+    const plannedRows = ftePlanRows.filter((row) => row.hasPlan);
     const planned = roundFte(
-      ftePlanRows.reduce((sum, row) => sum + row.planned, 0),
+      plannedRows.reduce((sum, row) => sum + (row.planned || 0), 0),
     );
     const filled = roundFte(
       ftePlanRows.reduce((sum, row) => sum + row.filled, 0),
     );
-    const free = roundFte(Math.max(0, planned - filled));
+    const filledInPlannedRows = roundFte(
+      plannedRows.reduce((sum, row) => sum + row.filled, 0),
+    );
+    const free = plannedRows.length ? roundFte(Math.max(0, planned - filledInPlannedRows)) : 0;
     const temporaryUnavailable = roundFte(
       vacations
         .filter((request) => request.status === "approved")
@@ -2147,6 +2158,7 @@ export default function TeamPage() {
       temporaryUnavailable,
       replacementNeeded: temporaryUnavailable,
       percent: planned > 0 ? Math.round((filled / planned) * 100) : 0,
+      hasPlan: plannedRows.length > 0,
     };
   }, [ftePlanRows, vacations, employees]);
 
@@ -3295,10 +3307,12 @@ export default function TeamPage() {
               Etatai
             </p>
             <p className="mt-1 text-2xl font-black text-[#8a5a13]">
-              {formatFte(fteTotals.free)}
+              {fteTotals.hasPlan ? formatFte(fteTotals.free) : "—"}
             </p>
             <p className="mt-1 text-xs font-bold text-slate-500">
-              laisva iš {formatFte(fteTotals.planned)} et.
+              {fteTotals.hasPlan
+                ? `laisva iš ${formatFte(fteTotals.planned)} et.`
+                : "planas nenustatytas"}
             </p>
           </button>
 
@@ -4203,6 +4217,7 @@ function FtePlanModule({
     temporaryUnavailable: number;
     replacementNeeded: number;
     percent: number;
+    hasPlan: boolean;
   };
   form: PositionPlanForm;
   saving: boolean;
@@ -4244,12 +4259,12 @@ function FtePlanModule({
       <div className="mt-5 grid gap-3 md:grid-cols-4">
         <FteSmallStat
           label="Planuota etatų"
-          value={formatFte(totals.planned)}
+          value={totals.hasPlan ? formatFte(totals.planned) : "—"}
         />
         <FteSmallStat label="Užimta" value={formatFte(totals.filled)} />
         <FteSmallStat
           label="Laisvi etatai"
-          value={formatFte(totals.free)}
+          value={totals.hasPlan ? formatFte(totals.free) : "—"}
           tone={totals.free > 0 ? "red" : "emerald"}
         />
         <FteSmallStat
@@ -4430,35 +4445,43 @@ function FtePlanModule({
                     <div className="mt-1 text-xs font-bold text-[#6a7e75]">
                       {row.department || "Padalinys nenurodytas"}
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
-                      <div
-                        className={`h-full rounded-full ${
-                          row.tone === "emerald"
-                            ? "bg-[#047857]"
-                            : row.tone === "red"
-                              ? "bg-red-700"
-                              : "bg-[#ca8a04]"
-                        }`}
-                        style={{
-                          width: `${Math.max(0, Math.min(100, row.percent))}%`,
-                        }}
-                      />
-                    </div>
+                    {row.hasPlan ? (
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
+                        <div
+                          className={`h-full rounded-full ${
+                            row.tone === "emerald"
+                              ? "bg-[#047857]"
+                              : row.tone === "red"
+                                ? "bg-red-700"
+                                : "bg-[#ca8a04]"
+                          }`}
+                          style={{
+                            width: `${Math.max(0, Math.min(100, row.percent || 0))}%`,
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="mt-2 h-2 rounded-full bg-[#e2e8f0]" />
+                    )}
                   </div>
 
                   <div className="font-black">
-                    {formatFte(row.filled)} / {formatFte(row.planned)} et.
+                    {row.hasPlan
+                      ? `${formatFte(row.filled)} / ${formatFte(row.planned || 0)} et.`
+                      : `${formatFte(row.filled)} et. · planas nenustatytas`}
                   </div>
 
                   <div>
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-black ${
-                        row.free > 0
+                        row.free !== null && row.free > 0
                           ? "bg-red-50 text-red-700"
-                          : "bg-emerald-50 text-emerald-700"
+                          : row.hasPlan
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-[#eef4f1] text-[#486b5d]"
                       }`}
                     >
-                      {formatFte(row.free)} et.
+                      {row.free === null ? "—" : `${formatFte(row.free)} et.`}
                     </span>
                   </div>
 
