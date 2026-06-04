@@ -870,10 +870,12 @@ export default function TasksPage() {
 
   function handleEditTaskImageFiles(files: FileList | null) {
     if (!files || files.length === 0) return
+    if (!editingTask) return
 
     const incoming = Array.from(files)
     const valid: TaskImageDraft[] = []
     const rejected: string[] = []
+    const existingCount = taskAttachmentsMap[editingTask.id]?.length || 0
 
     for (const file of incoming) {
       if (!ALLOWED_TASK_IMAGE_TYPES.includes(file.type)) {
@@ -894,14 +896,18 @@ export default function TasksPage() {
     }
 
     setEditTaskImages((previous) => {
-      const availableSlots = Math.max(0, MAX_TASK_IMAGE_COUNT - previous.length)
+      const availableSlots = Math.max(0, MAX_TASK_IMAGE_COUNT - existingCount - previous.length)
       const accepted = valid.slice(0, availableSlots)
       const notAccepted = valid.slice(availableSlots)
 
       notAccepted.forEach(revokeTaskImagePreview)
 
       if (notAccepted.length > 0) {
-        setMessage(`Galima pridėti iki ${MAX_TASK_IMAGE_COUNT} nuotraukų.`)
+        setMessage(
+          existingCount > 0
+            ? `Galima turėti iki ${MAX_TASK_IMAGE_COUNT} nuotraukų. Ši užduotis jau turi ${existingCount}.`
+            : `Galima pridėti iki ${MAX_TASK_IMAGE_COUNT} nuotraukų.`
+        )
       }
 
       return [...previous, ...accepted]
@@ -947,7 +953,20 @@ export default function TasksPage() {
           upsert: false,
         })
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        if (uploadedPaths.length > 0) {
+          const { error: cleanupError } = await supabase.storage
+            .from(TASK_IMAGE_BUCKET)
+            .remove(uploadedPaths)
+
+          if (cleanupError) {
+            console.warn("Task image upload failed and partial upload cleanup failed:", cleanupError)
+          }
+        }
+
+        throw uploadError
+      }
+
       uploadedPaths.push(filePath)
 
       uploadedRows.push({
@@ -1023,14 +1042,26 @@ export default function TasksPage() {
 
       if (error) throw error
 
-      await uploadTaskImages(taskId)
+      let uploadedTaskImages = false
+
+      try {
+        await uploadTaskImages(taskId)
+        uploadedTaskImages = taskImages.length > 0
+      } catch (uploadError) {
+        console.warn("Task was created, but images were not uploaded:", uploadError)
+        setMessage(
+          `Užduotis sukurta, bet nuotraukų įkelti nepavyko: ${getReadableError(uploadError)}`
+        )
+      }
+
       await writeTaskAudit({
         organizationId: access.organizationId,
         recordId: taskId,
         action: "insert",
         after: {
           ...payload,
-          attachments_count: taskImages.length,
+          attachments_count: uploadedTaskImages ? taskImages.length : 0,
+          attachments_upload_failed: taskImages.length > 0 && !uploadedTaskImages,
         },
       })
 
@@ -1040,12 +1071,20 @@ export default function TasksPage() {
           keep_open: previous.keep_open,
         }))
         clearTaskImages()
-        setMessage(taskImages.length > 0 ? "Užduotis sukurta su nuotraukomis. Forma palikta atidaryta kitai užduočiai." : "Užduotis sukurta. Forma palikta atidaryta kitai užduočiai.")
+        if (uploadedTaskImages) {
+          setMessage("Užduotis sukurta su nuotraukomis. Forma palikta atidaryta kitai užduočiai.")
+        } else if (taskImages.length === 0) {
+          setMessage("Užduotis sukurta. Forma palikta atidaryta kitai užduočiai.")
+        }
       } else {
         setShowCreateModal(false)
         setForm(initialForm)
         clearTaskImages()
-        setMessage(taskImages.length > 0 ? "Užduotis sukurta su nuotraukomis." : "Užduotis sukurta.")
+        if (uploadedTaskImages) {
+          setMessage("Užduotis sukurta su nuotraukomis.")
+        } else if (taskImages.length === 0) {
+          setMessage("Užduotis sukurta.")
+        }
       }
 
       await loadData()
