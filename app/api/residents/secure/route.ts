@@ -8,15 +8,20 @@ import {
   normalizeSearchValue,
 } from "@/lib/server/resident-crypto"
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || "",
-  {
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Trūksta Supabase aplinkos kintamųjų.")
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
     },
-  }
-)
+  })
+}
 
 type ResidentPayload = {
   id?: string
@@ -36,6 +41,7 @@ type ResidentPayload = {
 }
 
 async function getUserAccess(request: Request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const authHeader = request.headers.get("authorization")
 
   if (!authHeader) {
@@ -150,6 +156,8 @@ async function writeAuditLog(input: {
   residentId: string | null
   details: string
 }) {
+  const supabaseAdmin = getSupabaseAdmin()
+
   await supabaseAdmin.from("audit_log").insert({
     organization_id: input.organizationId,
     actor: input.actorId,
@@ -161,6 +169,7 @@ async function writeAuditLog(input: {
 }
 
 export async function GET(request: Request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const access = await getUserAccess(request)
 
   if (!access) {
@@ -211,6 +220,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const access = await getUserAccess(request)
 
   if (!access) {
@@ -272,6 +282,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const supabaseAdmin = getSupabaseAdmin()
   const access = await getUserAccess(request)
 
   if (!access) {
