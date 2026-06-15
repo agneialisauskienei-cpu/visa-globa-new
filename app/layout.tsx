@@ -1,19 +1,17 @@
 import type { Metadata } from 'next'
-import { Arsenal, Geist_Mono, Radley } from 'next/font/google'
+import { Geist_Mono, Inter, Playfair_Display } from 'next/font/google'
 import './globals.css'
 import MobileBottomNav from '@/components/mobile/MobileBottomNav'
 
-const arsenal = Arsenal({
-  variable: '--font-arsenal',
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
-  weight: ['400', '700'],
-  style: ['normal', 'italic'],
 })
 
-const radley = Radley({
-  variable: '--font-radley',
+const playfair = Playfair_Display({
+  variable: '--font-playfair',
   subsets: ['latin'],
-  weight: '400',
+  weight: ['400', '600', '700'],
   style: ['normal', 'italic'],
 })
 
@@ -35,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="lt"
-      className={`${arsenal.variable} ${radley.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${playfair.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
         {children}
