@@ -4574,30 +4574,30 @@ function FtePlanModule({
         </div>
       </div>
 
-      <section className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-5">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">
+      <section className="mt-5 rounded-2xl border border-[#486b5d] bg-white p-5">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
           Pamainų rizikos
         </p>
 
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-blue-200 bg-white p-4">
+          <div className="rounded-xl border border-[#c9d8d0] bg-white p-4">
             <div className="font-black text-[#10251f]">
               {totals.replacementNeeded > 0
                 ? `Reikia pavaduoti ${formatFte(totals.replacementNeeded)} et.`
                 : "Pavadavimo poreikio nerasta"}
             </div>
-            <div className="mt-1 text-sm font-bold text-blue-700/70">
+            <div className="mt-1 text-sm font-bold text-[#6a7e75]">
               Skaičiuojama pagal šiandien patvirtintus neatvykimus.
             </div>
           </div>
 
-          <div className="rounded-xl border border-blue-200 bg-white p-4">
+          <div className="rounded-xl border border-[#c9d8d0] bg-white p-4">
             <div className="font-black text-[#10251f]">
               Minimalios pamainos:{" "}
               {rows.reduce((sum, row) => sum + row.minimumDayShift, 0)} d. /{" "}
               {rows.reduce((sum, row) => sum + row.minimumNightShift, 0)} n.
             </div>
-            <div className="mt-1 text-sm font-bold text-blue-700/70">
+            <div className="mt-1 text-sm font-bold text-[#6a7e75]">
               Kitas žingsnis — lyginti grafiką su minimaliu pareigybių poreikiu.
             </div>
           </div>

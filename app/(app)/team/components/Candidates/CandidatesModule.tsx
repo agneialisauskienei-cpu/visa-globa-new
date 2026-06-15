@@ -282,6 +282,17 @@ export default function CandidatesModule({
     setQuestions((prev) => prev.filter((question) => question.id !== id));
   }
 
+  function updateQuestion(
+    id: string,
+    changes: Partial<Pick<CandidateQuestion, "label" | "required" | "includeInContract">>,
+  ) {
+    setQuestions((prev) =>
+      prev.map((question) =>
+        question.id === id ? { ...question, ...changes } : question,
+      ),
+    );
+  }
+
   async function copyEmailText(candidateId?: string | null) {
     const questionnaireLink = buildQuestionnaireLink(candidateId);
     const body = buildShortEmailBody(candidateName || "kandidate", questionnaireLink);
@@ -782,22 +793,40 @@ export default function CandidatesModule({
                   {index + 1}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-black text-[#10251f]">{question.label}</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {question.required ? (
-                      <span className="rounded-full bg-[#fff1f0] px-3 py-1 text-xs font-black text-[#8a2f27]">
-                        Privalomas
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-[#6a7e75]">
-                        Neprivalomas
-                      </span>
-                    )}
-                    {question.includeInContract ? (
-                      <span className="rounded-full bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#486b5d]">
-                        Gali būti naudojama sutarčiai
-                      </span>
-                    ) : null}
+                  <textarea
+                    value={question.label}
+                    onChange={(event) =>
+                      updateQuestion(question.id, { label: event.target.value })
+                    }
+                    rows={2}
+                    aria-label={`Redaguoti ${index + 1} klausimą`}
+                    className="w-full resize-y rounded-lg border border-[#c2d3ca] bg-white px-3 py-2 text-sm font-black text-[#10251f] outline-none transition focus:border-[#486b5d] focus:ring-2 focus:ring-[#dce7e2]"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 text-xs font-black text-[#486b5d]">
+                      <input
+                        type="checkbox"
+                        checked={question.required}
+                        onChange={(event) =>
+                          updateQuestion(question.id, {
+                            required: event.target.checked,
+                          })
+                        }
+                      />
+                      Privalomas
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-black text-[#486b5d]">
+                      <input
+                        type="checkbox"
+                        checked={question.includeInContract}
+                        onChange={(event) =>
+                          updateQuestion(question.id, {
+                            includeInContract: event.target.checked,
+                          })
+                        }
+                      />
+                      Naudoti sutarčiai
+                    </label>
                   </div>
                 </div>
                 <button
@@ -844,6 +873,7 @@ export default function CandidatesModule({
                 type="button"
                 onClick={addQuestion}
                 className="ml-auto inline-flex items-center gap-2 rounded-lg bg-[#486b5d] px-4 py-2 text-sm font-black text-white hover:bg-[#39594c]"
+                style={{ backgroundColor: "#486b5d", color: "#ffffff" }}
               >
                 <Plus size={16} />
                 Pridėti klausimą
