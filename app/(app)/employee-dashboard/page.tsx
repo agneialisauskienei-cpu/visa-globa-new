@@ -732,10 +732,13 @@ export default function EmployeeDashboardPage() {
   }
 
   async function loadSubmittedCredentials(accessToken?: string | null) {
-    if (!accessToken) return [] as EmployeeCredentialRow[];
+    if (!accessToken || !organizationId) return [] as EmployeeCredentialRow[];
 
     const response = await fetch("/api/personnel/credentials", {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "x-organization-id": organizationId,
+      },
     });
 
     if (!response.ok) {
@@ -1002,6 +1005,9 @@ export default function EmployeeDashboardPage() {
         headers: {
           "Content-Type": "application/json",
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...(organizationId
+            ? { "x-organization-id": organizationId }
+            : {}),
         },
         body: JSON.stringify({
           organization_id: organizationId,

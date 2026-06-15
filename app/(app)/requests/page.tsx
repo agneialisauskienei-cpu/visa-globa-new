@@ -1016,6 +1016,7 @@ export default function RequestsPage() {
           headers: {
             "Content-Type": "application/json",
             ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+            "x-organization-id": organizationId,
           },
           body: JSON.stringify({
             type: payload.type,
@@ -1212,6 +1213,9 @@ export default function RequestsPage() {
           "Content-Type": "application/json",
           ...(session?.access_token
             ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+          ...(organizationId
+            ? { "x-organization-id": organizationId }
             : {}),
         },
       });

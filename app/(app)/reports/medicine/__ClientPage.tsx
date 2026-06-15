@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { getCurrentOrganizationId } from "@/lib/current-organization"
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -199,8 +200,9 @@ export default function ReportPage() {
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
+      const organizationId = await getCurrentOrganizationId()
 
-      if (!token) {
+      if (!token || !organizationId) {
         setData(null)
         setError("Prisijunkite, kad matytumėte medicinos ataskaitą.")
         return
@@ -211,6 +213,7 @@ export default function ReportPage() {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "x-organization-id": organizationId,
         },
         cache: "no-store",
       })

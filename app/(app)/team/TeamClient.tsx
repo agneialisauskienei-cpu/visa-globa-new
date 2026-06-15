@@ -2806,6 +2806,9 @@ export default function TeamPage() {
             ...(session?.access_token
               ? { Authorization: `Bearer ${session.access_token}` }
               : {}),
+            ...(organizationId
+              ? { "x-organization-id": organizationId }
+              : {}),
           },
           body: JSON.stringify(options || {}),
         });

@@ -74,6 +74,8 @@ function matchesRoute(pathname: string, route: string) {
 }
 
 export function moduleForPath(pathname: string): ModuleKey | null {
+  if (pathname === "/api/invitations/approve") return null
+
   const routes = pathname.startsWith("/api/")
     ? API_MODULE_ROUTES
     : PAGE_MODULE_ROUTES

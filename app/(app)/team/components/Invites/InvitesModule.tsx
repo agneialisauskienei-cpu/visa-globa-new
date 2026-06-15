@@ -319,6 +319,7 @@ export default function InvitesModule() {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
+        "x-organization-id": orgId,
       },
       body: JSON.stringify({
         email,
@@ -403,6 +404,7 @@ export default function InvitesModule() {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
+          "x-organization-id": organizationId,
         },
         body: JSON.stringify({
           email: invite.email,
