@@ -20,7 +20,7 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: '100vh',
     display: 'grid',
     gridTemplateColumns: '270px 1fr',
-    background: '#f8fafc',
+    background: '#ffffff',
   },
   main: {
     minWidth: 0,

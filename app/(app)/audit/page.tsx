@@ -1585,7 +1585,7 @@ const styles: Record<string, CSSProperties> = {
     padding: 24,
     display: "grid",
     gap: 18,
-    background: "#f3f6f4",
+    background: "#ffffff",
     color: "#10251f",
   },
   headerTop: {
@@ -1691,9 +1691,9 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 110,
   },
   message: {
-    background: "#fff7ed",
+    background: "#fff1f2",
     color: "#9a3412",
-    border: "1px solid #fed7aa",
+    border: "1px solid #fecdd3",
     borderRadius: 18,
     padding: 14,
     fontSize: 14,
@@ -1803,7 +1803,7 @@ const styles: Record<string, CSSProperties> = {
   },
   clearButton: {
     border: "none",
-    background: "#eef4f1",
+    background: "#f7fcf9",
     color: "#486b5d",
     borderRadius: 15,
     minHeight: 44,
@@ -1869,7 +1869,7 @@ const styles: Record<string, CSSProperties> = {
   groupHeading: {
     width: "max-content",
     borderRadius: 999,
-    background: "#eef4f1",
+    background: "#f7fcf9",
     color: "#486b5d",
     padding: "7px 12px",
     fontSize: 12,
@@ -1957,7 +1957,7 @@ const styles: Record<string, CSSProperties> = {
   badgeInfo: { background: "#dbeafe", color: "#1d4ed8" },
   badgeDanger: { background: "#fee2e2", color: "#b91c1c" },
   badgeNeutral: { background: "#f1f5f9", color: "#475569" },
-  badgeMuted: { background: "#eef4f1", color: "#486b5d" },
+  badgeMuted: { background: "#f7fcf9", color: "#486b5d" },
   badgeComment: { background: "#ede9fe", color: "#6d28d9" },
   riskBadge: {
     display: "inline-flex",

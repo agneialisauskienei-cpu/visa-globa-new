@@ -281,7 +281,7 @@ export default function Schedule() {
         }
 
         .schedule-table .schedule-night .schedule-pill {
-          background: linear-gradient(180deg, #fed7aa, #fdba74);
+          background: linear-gradient(180deg, #fecdd3, #fdba74);
           color: #9a3412;
           border: 1px solid #fdba74;
         }

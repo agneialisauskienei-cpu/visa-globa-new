@@ -169,7 +169,7 @@ export default function ResidentActivityAttendanceAuto({ residentId }: Props) {
         </a>
       </div>
 
-      <div className="mb-4 rounded-2xl border border-[#e4ebe5] bg-[#f8faf8] p-3 text-xs font-bold text-[#617268]">
+      <div className="mb-4 rounded-2xl border border-[#e4ebe5] bg-[#ffffff] p-3 text-xs font-bold text-[#617268]">
         Naudojamas resident_id:{" "}
         <span className="break-all text-[#17251f]">
           {resolvedResidentId || "nerastas"}
@@ -207,7 +207,7 @@ export default function ResidentActivityAttendanceAuto({ residentId }: Props) {
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-dashed border-[#dfe7df] bg-[#f8faf8] p-4 text-sm font-bold text-[#617268]">
+        <div className="rounded-2xl border border-dashed border-[#dfe7df] bg-[#ffffff] p-4 text-sm font-bold text-[#617268]">
           Kraunamas veiklų lankomumas...
         </div>
       ) : errorMessage ? (
@@ -215,7 +215,7 @@ export default function ResidentActivityAttendanceAuto({ residentId }: Props) {
           Nepavyko užkrauti veiklų lankomumo: {errorMessage}
         </div>
       ) : rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#dfe7df] bg-[#f8faf8] p-4 text-sm font-bold text-[#617268]">
+        <div className="rounded-2xl border border-dashed border-[#dfe7df] bg-[#ffffff] p-4 text-sm font-bold text-[#617268]">
           Šiam gyventojui veiklų lankomumo įrašų nerasta.
         </div>
       ) : (

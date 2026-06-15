@@ -2607,7 +2607,7 @@ function VitalsStepper({
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: "100vh", background: "#f3f6f4", padding: 20, color: "#10251f", maxWidth: 1500, margin: "0 auto", fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" },
+  page: { minHeight: "100vh", background: "#ffffff", padding: 20, color: "#10251f", maxWidth: 1500, margin: "0 auto", fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" },
   topShell: { overflow: "hidden", border: "1px solid #c9d8d0", borderRadius: 16, background: "#ffffff", boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)" },
   dashboardStatsGrid: { marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 },
   dashboardStatCard: { background: "#ffffff", border: "1px solid #c9d8d0", borderRadius: 12, padding: 16, display: "grid", gridTemplateColumns: "1fr", gap: 4, alignItems: "center", boxShadow: "0 1px 2px rgba(15,23,42,.05)" },
@@ -2636,18 +2636,18 @@ const styles: Record<string, React.CSSProperties> = {
   heroActions: { display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" },
   headerButton: { display: "inline-flex", alignItems: "center", gap: 8, border: "none", borderRadius: 8, background: "#ffffff", color: "#486b5d", padding: "9px 12px", fontSize: 14, fontWeight: 950, cursor: "pointer", boxShadow: "0 1px 2px rgba(15,23,42,.06)" },
   headerGhostButton: { display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid rgba(255,255,255,.2)", borderRadius: 8, background: "rgba(255,255,255,.12)", color: "rgba(255,255,255,.92)", padding: "9px 12px", fontSize: 14, fontWeight: 950, cursor: "pointer" },
-  topNav: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, borderBottom: "1px solid #dbe6e0", background: "#eef4f1", padding: "8px 16px" },
+  topNav: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, borderBottom: "1px solid #dbe6e0", background: "#f7fcf9", padding: "8px 16px" },
   topTabs: { display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" },
   topTab: { display: "inline-flex", alignItems: "center", gap: 8, border: "none", borderRadius: 8, background: "transparent", color: "#486b5d", padding: "8px 12px", fontSize: 14, fontWeight: 950, cursor: "pointer" },
   topTabActive: { display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid #c9d8d0", borderRadius: 8, background: "#ffffff", color: "#486b5d", padding: "8px 12px", fontSize: 14, fontWeight: 950, cursor: "pointer", boxShadow: "0 1px 2px rgba(15,23,42,.06)" },
   compactButton: { marginLeft: "auto", border: "1px solid #c2d3ca", borderRadius: 8, background: "#ffffff", color: "#486b5d", padding: "8px 12px", fontSize: 12, fontWeight: 950, cursor: "pointer" },
-  actionToolbar: { marginTop: 14, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, border: "1px solid #dbe6e0", background: "#f8faf8", borderRadius: 12, padding: "12px 16px", boxShadow: "0 1px 2px rgba(15,23,42,.04)" },
+  actionToolbar: { marginTop: 14, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, border: "1px solid #dbe6e0", background: "#ffffff", borderRadius: 12, padding: "12px 16px", boxShadow: "0 1px 2px rgba(15,23,42,.04)" },
   toolbarGroupLabel: { color: "#6a7e75", fontSize: 11, fontWeight: 950, letterSpacing: "0.18em", textTransform: "uppercase" },
   toolbarButton: { border: "1px solid #dbe6e0", borderRadius: 8, background: "#ffffff", color: "#486b5d", padding: "8px 12px", fontSize: 13, fontWeight: 950, cursor: "pointer" },
   toolbarDivider: { width: 1, height: 24, background: "#dbe6e0" },
   toolbarSearch: { display: "flex", alignItems: "center", gap: 8, border: "1px solid #dbe6e0", borderRadius: 8, background: "#ffffff", padding: "0 10px", height: 38, minWidth: 260, color: "#94a3b8" },
   toolbarSearchInput: { border: "none", outline: "none", background: "transparent", width: "100%", fontSize: 13, fontWeight: 700, color: "#10251f" },
-  warningPill: { marginLeft: "auto", border: "1px solid #f1d38c", background: "#fff8e7", color: "#8a5a13", borderRadius: 10, padding: "9px 12px", fontSize: 13, fontWeight: 950 },
+  warningPill: { marginLeft: "auto", border: "1px solid #fecdd3", background: "#fff1f2", color: "#be123c", borderRadius: 10, padding: "9px 12px", fontSize: 13, fontWeight: 950 },
   hero: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, background: "#486b5d", border: "none", borderRadius: 0, padding: "16px 20px", boxShadow: "none", color: "#ffffff" },
   heroIcon: {
     width: 72,
@@ -2881,7 +2881,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   badgeAmber: {
     background: "#fff8ef",
-    color: "#a15c07",
+    color: "#be123c",
     borderRadius: 999,
     padding: "6px 9px",
     fontSize: 12,
@@ -2921,7 +2921,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   warningBox: {
     background: "#fff8ef",
-    color: "#a15c07",
+    color: "#be123c",
     border: "1px solid #ffe0b2",
     borderRadius: 18,
     padding: 12,
@@ -3315,7 +3315,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
     padding: "14px 16px",
     borderRadius: 16,
-    background: "#f8faf8",
+    background: "#ffffff",
     border: "1px solid #dbe6e0",
   },
 
@@ -3342,8 +3342,8 @@ const styles: Record<string, React.CSSProperties> = {
   doubleCheckBadge: {
     flexShrink: 0,
     borderRadius: 999,
-    background: "#fff7ed",
-    border: "1px solid #fed7aa",
+    background: "#fff1f2",
+    border: "1px solid #fecdd3",
     color: "#9a3412",
     padding: "6px 10px",
     fontSize: 11,
@@ -3407,7 +3407,7 @@ const styles: Record<string, React.CSSProperties> = {
   confirmCheckDanger: {
     background: "#fff8ef",
     borderColor: "#ffe0b2",
-    color: "#a15c07",
+    color: "#be123c",
   },
   shortConfirmText: {
     background: "#f7f8f7",
@@ -3615,7 +3615,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: 40,
     borderRadius: 14,
     background: "#ffe0a3",
-    color: "#a15c07",
+    color: "#be123c",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -3634,7 +3634,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 15,
     fontWeight: 700,
     lineHeight: 1.65,
-    color: "#a15c07",
+    color: "#be123c",
   },
   instructionFooter: {
     borderTop: "1px solid #e5e7eb",

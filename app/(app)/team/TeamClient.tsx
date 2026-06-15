@@ -3205,7 +3205,7 @@ export default function TeamPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f3f6f4] p-5 text-[#10251f]">
+    <main className="min-h-screen bg-[#ffffff] p-5 text-[#10251f]">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <section className="mb-4 overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
           <div className="bg-[#486b5d] px-5 py-4 text-white">
@@ -3227,7 +3227,7 @@ export default function TeamPage() {
                 <button
                   type="button"
                   onClick={() => void loadAll()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#ffffff] active:scale-[0.98]"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Atnaujinti
@@ -3248,7 +3248,7 @@ export default function TeamPage() {
             </div>
           </div>
 
-          <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d]">
+          <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d]">
             {tabs.map((item) => {
               const Icon = item.icon;
               const active = tab === item.key;
@@ -3280,7 +3280,7 @@ export default function TeamPage() {
         </section>
 
         {message ? (
-          <div className="rounded-2xl border border-[#c9d8d0] bg-[#eef4f1] p-4 text-sm font-black text-[#486b5d]">
+          <div className="rounded-2xl border border-[#c9d8d0] bg-[#f7fcf9] p-4 text-sm font-black text-[#486b5d]">
             {message}
           </div>
         ) : null}
@@ -3289,7 +3289,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("employees")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Darbuotojai
@@ -3305,12 +3305,12 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("fte")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Etatai
             </p>
-            <p className="mt-1 text-2xl font-black text-[#8a5a13]">
+            <p className="mt-1 text-2xl font-black text-[#be123c]">
               {fteTotals.hasPlan ? formatFte(fteTotals.free) : "—"}
             </p>
             <p className="mt-1 text-xs font-bold text-slate-500">
@@ -3323,12 +3323,12 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("vacations")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Atostogos
             </p>
-            <p className="mt-1 text-2xl font-black text-[#8a5a13]">
+            <p className="mt-1 text-2xl font-black text-[#be123c]">
               {pendingVacations.length}
             </p>
             <p className="mt-1 text-xs font-bold text-slate-500">
@@ -3339,12 +3339,12 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("schedule")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Grafikas
             </p>
-            <p className="mt-1 text-2xl font-black text-[#8a5a13]">
+            <p className="mt-1 text-2xl font-black text-[#be123c]">
               {scheduleComplianceRows.length}
             </p>
             <p className="mt-1 text-xs font-bold text-slate-500">įspėjimai</p>
@@ -3353,7 +3353,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("trainings")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Mokymai
@@ -3369,7 +3369,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("docs")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Dokumentai
@@ -3385,7 +3385,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("candidates")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Kandidatai
@@ -3399,7 +3399,7 @@ export default function TeamPage() {
 
         {tab !== "overview" ? (
           <section className="mb-4 rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
-            <div className="flex flex-wrap items-center gap-2 border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2 border-b border-[#dbe6e0] bg-[#ffffff] px-4 py-3">
               <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
                 Veiksmai
               </span>
@@ -3409,21 +3409,21 @@ export default function TeamPage() {
                   setCreateModalMessage("");
                   setShowCreateModal(true);
                 }}
-                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
               >
                 + Darbuotojas
               </button>
               <button
                 type="button"
                 onClick={() => changeTab("vacations")}
-                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
               >
                 + Prašymas
               </button>
               <button
                 type="button"
                 onClick={() => void loadAll()}
-                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
               >
                 Atnaujinti
               </button>
@@ -3442,7 +3442,7 @@ export default function TeamPage() {
               <button
                 type="button"
                 onClick={() => changeTab("schedule")}
-                className="ml-auto rounded-lg bg-[#fff9e8] px-3 py-2 text-xs font-black text-[#8a5a13] ring-1 ring-[#ead8a7]"
+                className="ml-auto rounded-lg bg-[#fff1f2] px-3 py-2 text-xs font-black text-[#be123c] ring-1 ring-[#fecdd3]"
               >
                 Grafiko įspėjimai: {scheduleComplianceRows.length}
               </button>
@@ -3533,12 +3533,12 @@ export default function TeamPage() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Ieškoti pagal vardą, pareigas, skyrių..."
-                  className="h-12 w-full rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] pl-12 pr-4 text-sm font-bold outline-none placeholder:text-[#8aa0b8] transition focus:border-emerald-500 focus:bg-white"
+                  className="h-12 w-full rounded-2xl border border-[#dbe6e0] bg-[#ffffff] pl-12 pr-4 text-sm font-bold outline-none placeholder:text-[#8aa0b8] transition focus:border-emerald-500 focus:bg-white"
                 />
               </label>
             </div>
 
-            <nav className="mt-5 flex flex-wrap gap-1 rounded-2xl border border-[#dbe6e0] bg-[#eef4f1] p-2 text-sm font-black text-[#486b5d]">
+            <nav className="mt-5 flex flex-wrap gap-1 rounded-2xl border border-[#dbe6e0] bg-[#f7fcf9] p-2 text-sm font-black text-[#486b5d]">
               <button
                 type="button"
                 onClick={() => {
@@ -3605,7 +3605,7 @@ export default function TeamPage() {
               )}
             </nav>
 
-            <section className="mt-4 border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+            <section className="mt-4 border-b border-[#dbe6e0] bg-[#ffffff] px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
                   Filtrai
@@ -4147,7 +4147,7 @@ export default function TeamPage() {
                   />
                 </Field>
 
-                <label className="flex items-center gap-3 rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 font-black text-[#486b5d]">
+                <label className="flex items-center gap-3 rounded-[18px] border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 font-black text-[#486b5d]">
                   <input
                     type="checkbox"
                     checked={positionPlanForm.active}
@@ -4279,14 +4279,14 @@ function FtePlanModule({
       </div>
 
       {planIsMissing ? (
-        <div className="mt-5 rounded-2xl border border-[#ead8a7] bg-[#fff9e8] p-4 text-sm font-bold text-[#8a5a13]">
+        <div className="mt-5 rounded-2xl border border-[#fecdd3] bg-[#fff1f2] p-4 text-sm font-bold text-[#be123c]">
           Etatų planas dar nesuvestas. Žemiau matomi preliminarūs skaičiai pagal
           esamus darbuotojus. Įrašyk planuojamas pareigybes, kad sistema galėtų
           tiksliai skaičiuoti trūkumus.
         </div>
       ) : null}
 
-      <section className="mt-5 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+      <section className="mt-5 rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <Field label="Padalinys">
             <input
@@ -4367,7 +4367,7 @@ function FtePlanModule({
               <button
                 type="button"
                 onClick={onNew}
-                className="h-[50px] rounded-[14px] border border-[#dbe6e0] bg-white px-4 font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
+                className="h-[50px] rounded-[14px] border border-[#dbe6e0] bg-white px-4 font-black text-[#486b5d] transition hover:bg-[#ffffff]"
               >
                 Naujas
               </button>
@@ -4421,7 +4421,7 @@ function FtePlanModule({
       </section>
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-[#dbe6e0]">
-        <div className="hidden grid-cols-[1.2fr_0.65fr_0.65fr_0.65fr_0.85fr_0.7fr] bg-[#f8faf8] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] lg:grid">
+        <div className="hidden grid-cols-[1.2fr_0.65fr_0.65fr_0.65fr_0.85fr_0.7fr] bg-[#ffffff] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] lg:grid">
           <div>Pareigybė</div>
           <div>Užpildyta</div>
           <div>Laisva</div>
@@ -4430,7 +4430,7 @@ function FtePlanModule({
           <div>Veiksmai</div>
         </div>
 
-        <div className="divide-y divide-[#eef4f1] bg-white">
+        <div className="divide-y divide-[#f7fcf9] bg-white">
           {rows.length === 0 ? (
             <EmptyState text="Etatų plano eilučių dar nėra." />
           ) : (
@@ -4482,7 +4482,7 @@ function FtePlanModule({
                           ? "bg-red-50 text-red-700"
                           : row.hasPlan
                             ? "bg-emerald-50 text-emerald-700"
-                            : "bg-[#eef4f1] text-[#486b5d]"
+                            : "bg-[#f7fcf9] text-[#486b5d]"
                       }`}
                     >
                       {row.free === null ? "—" : `${formatFte(row.free)} et.`}
@@ -4503,7 +4503,7 @@ function FtePlanModule({
                             ? "bg-emerald-50 text-emerald-700"
                             : row.tone === "red"
                               ? "bg-red-50 text-red-700"
-                              : "bg-[#fff9e8] text-[#8a5a13]"
+                              : "bg-[#fff1f2] text-[#be123c]"
                         }`}
                       >
                         {row.status}
@@ -4584,10 +4584,10 @@ function FteSmallStat({
     tone === "red"
       ? "border-red-100 bg-red-50 text-red-700"
       : tone === "amber"
-        ? "border-[#fff0c2] bg-[#fff9e8] text-[#8a5a13]"
+        ? "border-[#fff0c2] bg-[#fff1f2] text-[#be123c]"
         : tone === "emerald"
           ? "border-emerald-100 bg-emerald-50 text-emerald-700"
-          : "border-[#dbe6e0] bg-[#f8faf8] text-[#10251f]";
+          : "border-[#dbe6e0] bg-[#ffffff] text-[#10251f]";
 
   return (
     <article className={`rounded-2xl border p-4 ${classes}`}>
@@ -4820,7 +4820,7 @@ function EmployeeTabbedEditor({
         </div>
       </header>
 
-      <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d]">
+      <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d]">
         {[
           ["profile", "Duomenys"],
           ["contract", "Sutartis"],
@@ -5122,7 +5122,7 @@ function EmployeeTabbedEditor({
                     className={`rounded-xl border px-3 py-2 text-left text-sm font-black transition ${
                       checked
                         ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : "border-[#dbe6e0] bg-[#f8faf8] text-[#486b5d] hover:border-emerald-200 hover:bg-emerald-50"
+                        : "border-[#dbe6e0] bg-[#ffffff] text-[#486b5d] hover:border-emerald-200 hover:bg-emerald-50"
                     }`}
                   >
                     {permission.label}
@@ -5197,7 +5197,7 @@ function EmployeeTabbedEditor({
               />
             </Field>
 
-            <div className="md:col-span-3 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+            <div className="md:col-span-3 rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
               {credentials.some(
                 (credential) =>
                   String(credential.status || "").toLowerCase() === "pending",
@@ -5233,7 +5233,7 @@ function EmployeeTabbedEditor({
         ) : null}
 
         {activeTab === "trainings" ? (
-          <section className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+          <section className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
             <p className="text-sm font-black text-[#10251f]">
               Darbuotojo mokymai
             </p>
@@ -5287,7 +5287,7 @@ function EmployeeRowCard({
       className={`grid w-full gap-3 rounded-2xl border p-4 text-left shadow-sm transition md:grid-cols-[56px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center ${
         selected
           ? "border-emerald-300 bg-emerald-50"
-          : "border-[#dbe6e0] bg-[#f8faf8] hover:border-emerald-200 hover:bg-emerald-50/40"
+          : "border-[#dbe6e0] bg-[#ffffff] hover:border-emerald-200 hover:bg-emerald-50/40"
       }`}
     >
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-black text-emerald-700 shadow-sm">
@@ -5470,7 +5470,7 @@ function Modal({
           </button>
         </div>
 
-        <div className="max-h-[calc(100vh-178px)] overflow-y-auto bg-[#f3f6f4] p-5 md:p-6">
+        <div className="max-h-[calc(100vh-178px)] overflow-y-auto bg-[#ffffff] p-5 md:p-6">
           {children}
         </div>
       </section>
@@ -5513,7 +5513,7 @@ function ModalFooter({
       <button
         type="button"
         onClick={onCancel}
-        className="rounded-[14px] border border-[#dbe6e0] bg-white px-5 py-3 font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
+        className="rounded-[14px] border border-[#dbe6e0] bg-white px-5 py-3 font-black text-[#486b5d] transition hover:bg-[#ffffff]"
       >
         Atšaukti
       </button>

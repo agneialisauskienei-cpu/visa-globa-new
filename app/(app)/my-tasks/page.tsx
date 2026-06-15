@@ -492,7 +492,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: '100vh',
-    background: '#f8faf8',
+    background: '#ffffff',
     display: 'flex',
     flexDirection: 'column',
   },
@@ -510,7 +510,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f8faf8',
+    background: '#ffffff',
   },
   loadingText: {
     color: '#475569',
@@ -553,7 +553,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 10,
   },
   smallStat: {
-    background: '#f8faf8',
+    background: '#ffffff',
     border: '1px solid #dbe6e0',
     borderRadius: 16,
     padding: 12,

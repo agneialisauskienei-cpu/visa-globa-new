@@ -150,7 +150,7 @@ const TASK_TYPES = [
 
 
 const PRIORITY_OPTIONS = [
-  { value: "low", label: "Žemas", className: "border-[#dbe6e0] bg-[#f8faf8] text-[#526174]" },
+  { value: "low", label: "Žemas", className: "border-[#dbe6e0] bg-[#ffffff] text-[#526174]" },
   { value: "medium", label: "Vidutinis", className: "border-blue-200 bg-blue-50 text-blue-700" },
   { value: "high", label: "Aukštas", className: "border-orange-200 bg-orange-50 text-orange-700" },
   { value: "urgent", label: "Kritinis", className: "border-rose-200 bg-rose-50 text-rose-700" },
@@ -1496,7 +1496,7 @@ export default function TasksPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f8faf8] p-6 text-[#10251f]">
+      <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#10251f]">
         <div className="rounded-[22px] border border-[#dbe6e0] bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-emerald-600" />
           <p className="mt-4 text-lg font-black text-[#486b5d]">Kraunama...</p>
@@ -1513,7 +1513,7 @@ export default function TasksPage() {
 
   if (isMobile) {
     return (
-      <main className="min-h-screen bg-[#f7faf8] pb-28 text-[#10251f]">
+      <main className="min-h-screen bg-[#ffffff] pb-28 text-[#10251f]">
         <section className="overflow-hidden rounded-b-[34px] bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-600 px-5 pb-8 pt-7 text-white shadow-lg">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -1830,7 +1830,7 @@ export default function TasksPage() {
                   event.preventDefault()
                   handleEditTaskImageFiles(event.dataTransfer.files)
                 }}
-                className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#f8faf8] px-4 py-3 transition hover:bg-emerald-50/60"
+                className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#ffffff] px-4 py-3 transition hover:bg-emerald-50/60"
               >
                 <span className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#047857]">
@@ -1911,7 +1911,7 @@ export default function TasksPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f3f6f4] p-4 pb-28 text-[#10251f] sm:p-6">
+    <main className="min-h-screen bg-[#ffffff] p-4 pb-28 text-[#10251f] sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
           <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
@@ -1945,7 +1945,7 @@ export default function TasksPage() {
             ) : null}
           </div>
 
-          <div className="border-t border-emerald-900/10 bg-[#eef4f1] p-3">
+          <div className="border-t border-emerald-900/10 bg-[#f7fcf9] p-3">
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -2238,7 +2238,7 @@ export default function TasksPage() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Ieškoti užduoties..."
-                  className="w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] py-3 pl-12 pr-4 font-bold text-[#10251f] outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
+                  className="w-full rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] py-3 pl-12 pr-4 font-bold text-[#10251f] outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
                 />
               </label>
             </div>
@@ -2256,14 +2256,14 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => void loadData()}
-                className="rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-5 py-3 font-black text-[#486b5d] transition hover:bg-slate-100 active:scale-[0.99]"
+                className="rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] px-5 py-3 font-black text-[#486b5d] transition hover:bg-slate-100 active:scale-[0.99]"
               >
                 Atnaujinti
               </button>
             </div>
 
             {visibleTasks.length === 0 ? (
-              <div className="mt-6 rounded-[22px] border border-dashed border-slate-300 bg-[#f8faf8] p-10 text-center">
+              <div className="mt-6 rounded-[22px] border border-dashed border-slate-300 bg-[#ffffff] p-10 text-center">
                 <ClipboardList className="mx-auto h-10 w-10 text-slate-400" />
                 <p className="mt-4 text-lg font-black text-[#486b5d]">
                   Užduočių nėra
@@ -2373,7 +2373,7 @@ export default function TasksPage() {
                       })
                       setShowCreateModal(true)
                     }}
-                    className="group flex items-center justify-between rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
+                    className="group flex items-center justify-between rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
                   >
                     <span>
                       <b>{item.title}</b>
@@ -2642,7 +2642,7 @@ export default function TasksPage() {
                     className={`rounded-[14px] border p-4 text-left transition active:scale-[0.98] ${
                       form.interval_days === option.value
                         ? "border-emerald-200 bg-emerald-50 ring-4 ring-emerald-50"
-                        : "border-[#dbe6e0] bg-[#f8faf8] hover:bg-white"
+                        : "border-[#dbe6e0] bg-[#ffffff] hover:bg-white"
                     }`}
                   >
                     <b className="block text-sm">{option.label}</b>
@@ -2664,7 +2664,7 @@ export default function TasksPage() {
                   {getVisibilityText(form.type, form.assigned_user_id).map((viewer) => (
                     <div
                       key={viewer}
-                      className="flex items-center gap-2 rounded-[14px] bg-[#f8faf8] px-4 py-3 text-sm font-black text-[#486b5d]"
+                      className="flex items-center gap-2 rounded-[14px] bg-[#ffffff] px-4 py-3 text-sm font-black text-[#486b5d]"
                     >
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       {viewer}
@@ -2695,7 +2695,7 @@ export default function TasksPage() {
                     event.preventDefault()
                     handleTaskImageFiles(event.dataTransfer.files)
                   }}
-                  className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#f8faf8] px-4 py-3 transition hover:bg-emerald-50/60"
+                  className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#ffffff] px-4 py-3 transition hover:bg-emerald-50/60"
                 >
                   <span className="flex items-center gap-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#047857]">
@@ -2765,7 +2765,7 @@ export default function TasksPage() {
                 className="input min-h-36 resize-none"
                 placeholder="Trumpai aprašyk problemą arba užduotį..."
               />
-              <div className="mt-3 rounded-[14px] bg-[#f8faf8] p-4 text-sm font-semibold text-[#526174]">
+              <div className="mt-3 rounded-[14px] bg-[#ffffff] p-4 text-sm font-semibold text-[#526174]">
                 <b className="text-[#486b5d]">Padeda kokybiškam aprašymui:</b>
                 <br />
                 • Kas neveikia?
@@ -2836,7 +2836,7 @@ export default function TasksPage() {
                 <span className={`rounded-full border px-3 py-1 text-xs font-black ${getPriorityOption(selectedTask.priority).className}`}>
                   {getPriorityLabel(selectedTask.priority)}
                 </span>
-                <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-xs font-black text-[#486b5d]">
+                <span className="rounded-full bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#486b5d]">
                   {getTypeLabel(selectedTask.type)}
                 </span>
                 <span className={`rounded-full px-3 py-1 text-xs font-black ${
@@ -3130,7 +3130,7 @@ export default function TasksPage() {
                   event.preventDefault()
                   handleEditTaskImageFiles(event.dataTransfer.files)
                 }}
-                className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#f8faf8] px-4 py-3 transition hover:bg-emerald-50/60"
+                className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#ffffff] px-4 py-3 transition hover:bg-emerald-50/60"
               >
                 <span className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#047857]">
@@ -3414,7 +3414,7 @@ function MobileTaskCard({
         </p>
       ) : null}
 
-      <div className="mt-4 grid gap-2 rounded-[20px] bg-[#f8faf8] p-3">
+      <div className="mt-4 grid gap-2 rounded-[20px] bg-[#ffffff] p-3">
         <div className="flex items-center justify-between gap-3 text-xs font-black text-[#526174]">
           <span className="inline-flex items-center gap-1">
             <Clock className="h-4 w-4" />
@@ -3477,7 +3477,7 @@ function MobileCreateTaskSheet({
         </div>
 
         <form
-          className="max-h-[calc(100vh-178px)] space-y-4 overflow-y-auto bg-[#f3f6f4] p-6"
+          className="max-h-[calc(100vh-178px)] space-y-4 overflow-y-auto bg-[#ffffff] p-6"
           onSubmit={(event) => {
             event.preventDefault()
             onSubmit()
@@ -3492,7 +3492,7 @@ function MobileCreateTaskSheet({
               onChange={(event) =>
                 setForm((previous) => ({ ...previous, title: event.target.value }))
               }
-              className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
+              className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] px-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
               placeholder="Pvz., sulūžo lova 203 kambaryje"
             />
           </label>
@@ -3507,7 +3507,7 @@ function MobileCreateTaskSheet({
                 onChange={(event) =>
                   setForm((previous) => ({ ...previous, type: event.target.value }))
                 }
-                className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-3 text-sm font-bold outline-none"
+                className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] px-3 text-sm font-bold outline-none"
               >
                 {TASK_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
@@ -3526,7 +3526,7 @@ function MobileCreateTaskSheet({
                 onChange={(event) =>
                   setForm((previous) => ({ ...previous, priority: event.target.value }))
                 }
-                className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-3 text-sm font-bold outline-none"
+                className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] px-3 text-sm font-bold outline-none"
               >
                 {PRIORITY_OPTIONS.map((priority) => (
                   <option key={priority.value} value={priority.value}>
@@ -3546,7 +3546,7 @@ function MobileCreateTaskSheet({
               onChange={(event) =>
                 setForm((previous) => ({ ...previous, resident_id: event.target.value }))
               }
-              className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-4 font-bold outline-none"
+              className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] px-4 font-bold outline-none"
             >
               <option value="">Nepriskirta gyventojui</option>
               {allResidents.map((resident) => (
@@ -3569,7 +3569,7 @@ function MobileCreateTaskSheet({
                   assigned_user_id: event.target.value,
                 }))
               }
-              className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-4 font-bold outline-none"
+              className="h-14 w-full rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] px-4 font-bold outline-none"
             >
               <option value="">Nepriskirta</option>
               {employees.map((employee) => (
@@ -3592,7 +3592,7 @@ function MobileCreateTaskSheet({
                   description: event.target.value,
                 }))
               }
-              className="min-h-28 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
+              className="min-h-28 w-full rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] p-4 font-bold outline-none focus:border-emerald-300 focus:bg-white"
               placeholder="Trumpai aprašyk problemą..."
             />
           </label>
@@ -3663,7 +3663,7 @@ function MobileTaskDetailsSheet({
         </div>
 
         {task.description ? (
-          <div className="mt-4 rounded-[24px] border border-[#dbe6e0] bg-[#f8faf8] p-4">
+          <div className="mt-4 rounded-[24px] border border-[#dbe6e0] bg-[#ffffff] p-4">
             <p className="text-xs font-black uppercase tracking-widest text-slate-400">
               Aprašymas
             </p>
@@ -3849,7 +3849,7 @@ function Select({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 font-black text-[#486b5d] outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
+      className="rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 font-black text-[#486b5d] outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-50"
     >
       {children}
     </select>
@@ -3874,7 +3874,7 @@ function StatCard({
     amber: "bg-amber-50 text-amber-700",
     blue: "bg-blue-50 text-blue-700",
     rose: "bg-rose-50 text-rose-700",
-    slate: "bg-[#f8faf8] text-[#486b5d]",
+    slate: "bg-[#ffffff] text-[#486b5d]",
   }[tone]
 
   const textClass = {
@@ -3981,7 +3981,7 @@ function TaskTableRow({
               ? "bg-rose-50 text-rose-700"
               : done
                 ? "bg-emerald-50 text-[#047857]"
-                : "bg-[#eef4f1] text-[#486b5d]"
+                : "bg-[#f7fcf9] text-[#486b5d]"
           }`}
         >
           {late ? "Vėluoja" : getTaskStatusLabel(task.status)}
@@ -4101,7 +4101,7 @@ function TaskCard({
                   ? "bg-rose-50 text-rose-700"
                   : done
                     ? "bg-emerald-50 text-[#047857]"
-                    : "bg-[#eef4f1] text-[#486b5d]"
+                    : "bg-[#f7fcf9] text-[#486b5d]"
               }`}
             >
               {late ? "Vėluoja" : getTaskStatusLabel(task.status)}
@@ -4206,7 +4206,7 @@ function CompactDetail({
   wide?: boolean
 }) {
   return (
-    <div className={`rounded-[16px] border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 ${wide ? "md:col-span-2" : ""}`}>
+    <div className={`rounded-[16px] border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 ${wide ? "md:col-span-2" : ""}`}>
       <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#8ea0b5]">{label}</p>
       <p className="mt-1 break-words text-sm font-black leading-5 text-[#10251f]">{value || "—"}</p>
     </div>
@@ -4239,7 +4239,7 @@ function TaskAttachmentGallery({
             href={attachment.signed_url || undefined}
             target={attachment.signed_url ? "_blank" : undefined}
             rel={attachment.signed_url ? "noreferrer" : undefined}
-            className="group overflow-hidden rounded-[16px] border border-[#dbe6e0] bg-[#f8faf8] transition hover:border-emerald-200 hover:bg-emerald-50/50"
+            className="group overflow-hidden rounded-[16px] border border-[#dbe6e0] bg-[#ffffff] transition hover:border-emerald-200 hover:bg-emerald-50/50"
           >
             {attachment.signed_url ? (
               <img
@@ -4303,7 +4303,7 @@ function Modal({
           </button>
         </div>
 
-        <div className="max-h-[calc(100vh-178px)] overflow-y-auto bg-[#f3f6f4] p-6 sm:p-7">{children}</div>
+        <div className="max-h-[calc(100vh-178px)] overflow-y-auto bg-[#ffffff] p-6 sm:p-7">{children}</div>
       </section>
     </div>
   )

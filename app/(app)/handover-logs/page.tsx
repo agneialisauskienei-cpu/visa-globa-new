@@ -608,7 +608,7 @@ export default function HandoverLogsPage() {
 
   if (isMobile) {
     return (
-      <main className="min-h-screen bg-[#f8faf8] pb-32 text-[#10251f]">
+      <main className="min-h-screen bg-[#ffffff] pb-32 text-[#10251f]">
         <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-emerald-900/10 bg-[#486b5d] px-5 pb-7 pt-7 text-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -706,7 +706,7 @@ export default function HandoverLogsPage() {
                     key={item.resident.id}
                     type="button"
                     onClick={() => setResidentFilter(item.resident.id)}
-                    className="min-w-[190px] rounded-[22px] border border-[#dbe6e0] bg-[#f8faf8] p-3 text-left transition active:scale-[0.98]"
+                    className="min-w-[190px] rounded-[22px] border border-[#dbe6e0] bg-[#ffffff] p-3 text-left transition active:scale-[0.98]"
                   >
                     <p className="line-clamp-1 text-sm font-black text-[#10251f]">{residentName(item.resident, roomsById)}</p>
                     <p className="mt-1 text-xs font-bold text-[#526174]">{item.count} įrašai · {item.critical} krit.</p>
@@ -756,7 +756,7 @@ export default function HandoverLogsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-[11px] font-black text-[#486b5d]">
+                          <span className="rounded-full bg-[#f7fcf9] px-3 py-1 text-[11px] font-black text-[#486b5d]">
                             {shiftLabel(log.shift_type)}
                           </span>
                           <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700">
@@ -788,13 +788,13 @@ export default function HandoverLogsPage() {
                           <CheckCircle2 className="h-6 w-6" />
                         </button>
                       ) : (
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#f8faf8] text-[#8ea0b5]">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#ffffff] text-[#8ea0b5]">
                           <CheckCircle2 className="h-6 w-6" />
                         </div>
                       )}
                     </div>
 
-                    <div className="mt-4 rounded-[22px] bg-[#f8faf8] p-3">
+                    <div className="mt-4 rounded-[22px] bg-[#ffffff] p-3">
                       <p className="line-clamp-1 text-sm font-black text-[#486b5d]">{residentName(resident, roomsById)}</p>
                       <p className="mt-1 text-xs font-bold text-[#526174]">
                         {formatShortDate(log.shift_date)} · {profileName(author)}
@@ -853,7 +853,7 @@ export default function HandoverLogsPage() {
                 </button>
               </div>
 
-              <div className="max-h-[calc(100vh-178px)] space-y-4 overflow-y-auto bg-[#f3f6f4] p-6">
+              <div className="max-h-[calc(100vh-178px)] space-y-4 overflow-y-auto bg-[#ffffff] p-6">
                 <Field label="Gyventojas">
                   <select value={form.resident_id} onChange={(event) => setForm((prev) => ({ ...prev, resident_id: event.target.value }))} className="input">
                     <option value="">Bendra įstaigos informacija</option>
@@ -885,11 +885,11 @@ export default function HandoverLogsPage() {
                 </Field>
 
                 <div className="grid gap-2">
-                  <label className="flex items-center gap-3 rounded-[20px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-black text-[#486b5d]">
+                  <label className="flex items-center gap-3 rounded-[20px] border border-[#dbe6e0] bg-[#ffffff] p-4 text-sm font-black text-[#486b5d]">
                     <input type="checkbox" checked={form.is_important} onChange={(event) => setForm((prev) => ({ ...prev, is_important: event.target.checked }))} />
                     Pažymėti kaip svarbų
                   </label>
-                  <label className="flex items-center gap-3 rounded-[20px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-black text-[#486b5d]">
+                  <label className="flex items-center gap-3 rounded-[20px] border border-[#dbe6e0] bg-[#ffffff] p-4 text-sm font-black text-[#486b5d]">
                     <input type="checkbox" checked={form.needs_follow_up} onChange={(event) => setForm((prev) => ({ ...prev, needs_follow_up: event.target.checked }))} />
                     Reikia sekti kitai pamainai
                   </label>
@@ -949,7 +949,7 @@ export default function HandoverLogsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f8faf8] p-6 text-[#10251f]">
+      <main className="min-h-screen bg-[#ffffff] p-6 text-[#10251f]">
         <div className="mx-auto w-full max-w-[1700px] rounded-[22px] border border-[#dbe6e0] bg-white p-8 text-center font-black shadow-sm">
           Kraunama perdavimo žurnalus...
         </div>
@@ -958,7 +958,7 @@ export default function HandoverLogsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f8faf8] p-6 text-[#10251f]">
+    <main className="min-h-screen bg-[#ffffff] p-6 text-[#10251f]">
       <div className="mx-auto w-full max-w-[1700px] space-y-6">
         <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]">
           <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
@@ -984,7 +984,7 @@ export default function HandoverLogsPage() {
             </div>
           </div>
 
-          <div className="border-t border-emerald-900/10 bg-[#eef4f1] p-3">
+          <div className="border-t border-emerald-900/10 bg-[#f7fcf9] p-3">
             <div className="flex flex-wrap gap-2">
               <HandoverTab active={!includeArchived && !unreadOnly && !importantOnly} icon={<ClipboardList className="h-4 w-4" />} label="Visi aktyvūs" count={stats.all} onClick={() => { setIncludeArchived(false); setUnreadOnly(false); setImportantOnly(false); }} />
               <HandoverTab active={unreadOnly} icon={<CheckCircle2 className="h-4 w-4" />} label="Nepatvirtinti" count={stats.unread} onClick={() => { setIncludeArchived(false); setUnreadOnly((v) => !v); }} />
@@ -1033,7 +1033,7 @@ export default function HandoverLogsPage() {
                           "min-h-12 rounded-[14px] border px-3 py-2 text-sm font-black transition",
                           isActive
                             ? "border-emerald-300 bg-emerald-700 text-white shadow-sm"
-                            : "border-[#dbe6e0] bg-[#f8faf8] text-[#486b5d] hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800",
+                            : "border-[#dbe6e0] bg-[#ffffff] text-[#486b5d] hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800",
                         ].join(" ")}
                       >
                         {topic.label}
@@ -1079,17 +1079,17 @@ export default function HandoverLogsPage() {
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {QUICK_TEMPLATES.map((template) => (
-                  <button key={template} type="button" onClick={() => setForm((prev) => ({ ...prev, title: prev.title || template, note: prev.note ? `${prev.note}\n${template}` : template }))} className="rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] px-3 py-2 text-left text-xs font-black text-[#526174] hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700">
+                  <button key={template} type="button" onClick={() => setForm((prev) => ({ ...prev, title: prev.title || template, note: prev.note ? `${prev.note}\n${template}` : template }))} className="rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] px-3 py-2 text-left text-xs font-black text-[#526174] hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700">
                     + {template}
                   </button>
                 ))}
               </div>
 
-              <label className="flex items-center gap-3 rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-black text-[#486b5d]">
+              <label className="flex items-center gap-3 rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] p-4 text-sm font-black text-[#486b5d]">
                 <input type="checkbox" checked={form.is_important} onChange={(event) => setForm((prev) => ({ ...prev, is_important: event.target.checked }))} />
                 Pažymėti kaip svarbų
               </label>
-              <label className="flex items-center gap-3 rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-sm font-black text-[#486b5d]">
+              <label className="flex items-center gap-3 rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] p-4 text-sm font-black text-[#486b5d]">
                 <input type="checkbox" checked={form.needs_follow_up} onChange={(event) => setForm((prev) => ({ ...prev, needs_follow_up: event.target.checked }))} />
                 Reikia sekti / perduoti kitai pamainai
               </label>
@@ -1110,7 +1110,7 @@ export default function HandoverLogsPage() {
                 </div>
                 <label className="relative block w-full xl:max-w-md">
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8ea0b5]" />
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ieškoti pagal tekstą, gyventoją..." className="h-12 w-full rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] py-3 pl-12 pr-4 font-bold text-[#10251f] outline-none focus:border-emerald-300 focus:bg-white" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ieškoti pagal tekstą, gyventoją..." className="h-12 w-full rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] py-3 pl-12 pr-4 font-bold text-[#10251f] outline-none focus:border-emerald-300 focus:bg-white" />
                 </label>
               </div>
 
@@ -1170,7 +1170,7 @@ export default function HandoverLogsPage() {
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Dažniausiai minimi</p>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {hotResidents.map((item) => (
-                    <button key={item.resident.id} type="button" onClick={() => setResidentFilter(item.resident.id)} className="rounded-[14px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left hover:border-emerald-200 hover:bg-emerald-50">
+                    <button key={item.resident.id} type="button" onClick={() => setResidentFilter(item.resident.id)} className="rounded-[14px] border border-[#dbe6e0] bg-[#ffffff] p-4 text-left hover:border-emerald-200 hover:bg-emerald-50">
                       <p className="font-black text-[#10251f]">{residentName(item.resident, roomsById)}</p>
                       <p className="mt-1 text-sm font-bold text-[#526174]">{item.count} įrašai · {item.critical} krit.</p>
                     </button>
@@ -1204,9 +1204,9 @@ export default function HandoverLogsPage() {
                           <p className="mt-3 text-sm font-bold text-[#526174]">{residentName(resident, roomsById)} · {formatShortDate(log.shift_date)} · Sukūrė: {profileName(author)} · {formatDate(log.created_at)}</p>
                         </div>
                         <div className="flex flex-wrap gap-2 lg:justify-end">
-                          <button type="button" onClick={() => setSelectedLog(log)} className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm hover:bg-[#f8faf8]"><MessageSquare className="h-4 w-4" /> Komentarai</button>
+                          <button type="button" onClick={() => setSelectedLog(log)} className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm hover:bg-[#ffffff]"><MessageSquare className="h-4 w-4" /> Komentarai</button>
                           {!read ? <button type="button" onClick={() => void markRead(log)} className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-2 text-sm font-black text-emerald-700 shadow-sm hover:bg-emerald-50"><CheckCircle2 className="h-4 w-4" /> Patvirtinti, kad mačiau</button> : null}
-                          {!log.archived ? <button type="button" onClick={() => void archiveLog(log)} className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm hover:bg-[#f8faf8]"><Archive className="h-4 w-4" /> Archyvas</button> : null}
+                          {!log.archived ? <button type="button" onClick={() => void archiveLog(log)} className="inline-flex items-center gap-2 rounded-[14px] bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm hover:bg-[#ffffff]"><Archive className="h-4 w-4" /> Archyvas</button> : null}
                         </div>
                       </div>
                     </article>
@@ -1253,7 +1253,7 @@ export default function HandoverLogsPage() {
               <button
                 type="button"
                 onClick={() => setHelpOpen(false)}
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-[#eef4f1] text-[#526174] transition hover:bg-[#dbe6e0]"
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-[#f7fcf9] text-[#526174] transition hover:bg-[#dbe6e0]"
                 aria-label="Uždaryti"
               >
                 <X size={28} strokeWidth={2.1} />
@@ -1381,7 +1381,7 @@ function MobileFilterChip({ active, onClick, children }: { active: boolean; onCl
 function Stat({ title, value, tone = "slate" }: { title: string; value: number; tone?: "slate" | "blue" | "amber" | "rose" | "emerald" }) {
   const toneClass = {
     slate: "bg-white text-[#486b5d]",
-    blue: "bg-[#eef4f1] text-[#047857]",
+    blue: "bg-[#f7fcf9] text-[#047857]",
     amber: "bg-amber-50 text-amber-800",
     rose: "bg-rose-50 text-rose-800",
     emerald: "bg-emerald-50 text-[#047857]",
@@ -1398,7 +1398,7 @@ function Stat({ title, value, tone = "slate" }: { title: string; value: number; 
 
 function HelpRuleCard({ title, text }: { title: string; text: string }) {
   return (
-    <article className="rounded-[22px] border border-[#dbe6e0] bg-[#f8faf8] p-5">
+    <article className="rounded-[22px] border border-[#dbe6e0] bg-[#ffffff] p-5">
       <h3 className="text-lg font-black text-[#10251f]">{title}</h3>
       <p className="mt-2 text-sm font-semibold leading-6 text-[#526174]">{text}</p>
     </article>
@@ -1416,7 +1416,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function FilterToggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className={`inline-flex h-12 items-center justify-center rounded-[14px] border px-4 text-sm font-black transition ${active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-[#dbe6e0] bg-white text-[#526174] hover:border-slate-300 hover:bg-[#f8faf8]"}`}>
+    <button type="button" onClick={onClick} className={`inline-flex h-12 items-center justify-center rounded-[14px] border px-4 text-sm font-black transition ${active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-[#dbe6e0] bg-white text-[#526174] hover:border-slate-300 hover:bg-[#ffffff]"}`}>
       {children}
     </button>
   );
@@ -1456,7 +1456,7 @@ function LogModal({
             <h2 className="mt-1 text-4xl font-black tracking-tight">{log.title}</h2>
             <p className="mt-2 font-semibold text-[#526174]">{residentName(resident, roomsById)} · {profileName(author)} · {formatDate(log.created_at)}</p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-[#eef4f1] text-[#526174]"><X size={28} strokeWidth={2.1} /></button>
+          <button type="button" onClick={onClose} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-[#f7fcf9] text-[#526174]"><X size={28} strokeWidth={2.1} /></button>
         </div>
 
         <div className="space-y-5 p-5">
@@ -1469,7 +1469,7 @@ function LogModal({
             <p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#486b5d]">{log.note}</p>
           </div>
 
-          <div className="rounded-[22px] border border-[#dbe6e0] bg-[#f8faf8] p-5">
+          <div className="rounded-[22px] border border-[#dbe6e0] bg-[#ffffff] p-5">
             <h3 className="text-xl font-black">Komentarai</h3>
             <div className="mt-4 space-y-3">
               {comments.length ? comments.map((comment) => {

@@ -344,7 +344,7 @@ export default function MyResidentsPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f3f6f4] p-6 text-[#10251f]">
+      <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#10251f]">
         <div className="rounded-3xl border border-[#dbe6e0] bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-emerald-600" />
           <p className="mt-4 text-lg font-black text-[#486b5d]">Kraunama...</p>
@@ -357,7 +357,7 @@ export default function MyResidentsPage() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f3f6f4] pb-28 text-[#10251f]">
+    <main className="min-h-screen overflow-x-hidden bg-[#ffffff] pb-28 text-[#10251f]">
       <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.14)]">
         <div className="bg-[#486b5d] px-5 pb-6 pt-5 text-white">
           <div className="flex items-start justify-between gap-4">
@@ -388,7 +388,7 @@ export default function MyResidentsPage() {
           </div>
         </div>
 
-        <div className="border-t border-emerald-900/10 bg-[#eef4f1] p-3">
+        <div className="border-t border-emerald-900/10 bg-[#f7fcf9] p-3">
           <div className="flex gap-2 overflow-x-auto pb-1">
             <ResidentTab active icon={<Users className="h-4 w-4" />} label="Gyventojai" count={items.length} />
             <ResidentTab icon={<ClipboardList className="h-4 w-4" />} label="Užduotys" count={openTasks.length} onClick={() => setShowTasksModal(true)} />
@@ -486,7 +486,7 @@ export default function MyResidentsPage() {
                 </p>
                 <h3 className="mt-1 text-xl font-black">Be gyventojo</h3>
               </div>
-              <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-sm font-black text-[#486b5d]">
+              <span className="rounded-full bg-[#f7fcf9] px-3 py-1 text-sm font-black text-[#486b5d]">
                 {filteredUnassignedTasks.length}
               </span>
             </div>
@@ -553,7 +553,7 @@ function ResidentTab({
 
 function MobileHeroStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[18px] bg-[#eef4f1] px-4 py-3">
+    <div className="rounded-[18px] bg-[#f7fcf9] px-4 py-3">
       <div className="text-2xl font-black text-[#10251f]">{value}</div>
       <div className="mt-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#526174]">
         {label}
@@ -651,7 +651,7 @@ function MobileResidentCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-xs font-black text-[#486b5d]">
+        <span className="rounded-full bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#486b5d]">
           {openTasks.length} aktyvios
         </span>
         {lateCount > 0 ? (
@@ -661,7 +661,7 @@ function MobileResidentCard({
         ) : null}
       </div>
 
-      <div className="mt-4 rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+      <div className="mt-4 rounded-[18px] border border-[#dbe6e0] bg-[#ffffff] px-4 py-3">
         <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#8ea0b5]">
           Artimiausia užduotis
         </p>
@@ -692,7 +692,7 @@ function TaskRow({ task }: { task: ResidentTask }) {
 
         <span
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
-            late ? "bg-rose-50 text-rose-700" : "bg-[#eef4f1] text-[#486b5d]"
+            late ? "bg-rose-50 text-rose-700" : "bg-[#f7fcf9] text-[#486b5d]"
           }`}
         >
           {late ? "Vėluoja" : normalizeTaskStatus(task.status)}
@@ -778,7 +778,7 @@ function ResidentModal({
             </div>
 
             {tasks.length === 0 ? (
-              <div className="mt-4 rounded-2xl bg-[#f8faf8] p-5 text-center">
+              <div className="mt-4 rounded-2xl bg-[#ffffff] p-5 text-center">
                 <p className="font-black text-[#486b5d]">Užduočių nėra</p>
                 <p className="mt-1 text-sm font-semibold text-white/80">
                   Kai atsiras susijusių užduočių, jos bus rodomos čia.
@@ -845,7 +845,7 @@ function TasksModal({
 
 function DetailBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-[#f8faf8] p-4">
+    <div className="rounded-2xl bg-[#ffffff] p-4">
       <p className="text-xs font-extrabold uppercase tracking-widest text-[#8ea0b5]">
         {label}
       </p>

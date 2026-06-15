@@ -628,12 +628,12 @@ export default function CandidatesModule({
         </div>
       </header>
 
-      <div className="border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-2 text-sm font-bold text-[#486b5d]">
+      <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-2 text-sm font-bold text-[#486b5d]">
         BDAR saugi atranka: neklausiama asmens kodo, dokumentų kopijų, diagnozių ar kitų perteklinių jautrių duomenų.
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+        <div className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
           <h3 className="text-xl font-black text-[#10251f]">Kandidato duomenys</h3>
           <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
             Įvesk tik būtinus atrankos kontaktinius duomenis.
@@ -720,7 +720,7 @@ export default function CandidatesModule({
               type="button"
               disabled={saving}
               onClick={() => void saveCandidate("new")}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8] disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:bg-[#ffffff] disabled:opacity-60"
             >
               <Plus size={16} />
               {saving ? "Saugoma..." : "Išsaugoti kandidatą"}
@@ -739,7 +739,7 @@ export default function CandidatesModule({
             <button
               type="button"
               onClick={() => void copyEmailText()}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:bg-[#ffffff]"
             >
               <Copy size={16} />
               Kopijuoti trumpą laišką
@@ -751,9 +751,9 @@ export default function CandidatesModule({
               className={[
                 "mt-4 whitespace-pre-wrap rounded-lg border px-4 py-2 text-sm font-bold",
                 message.type === "success"
-                  ? "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]"
+                  ? "border-[#c9d8d0] bg-[#f7fcf9] text-[#486b5d]"
                   : message.type === "warning"
-                    ? "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]"
+                    ? "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]"
                     : "border-[#efc0bd] bg-[#fff1f0] text-red-800",
               ].join(" ")}
             >
@@ -777,7 +777,7 @@ export default function CandidatesModule({
             {questions.map((question, index) => (
               <div
                 key={question.id}
-                className="flex items-start gap-3 rounded-lg border border-[#dbe6e0] bg-[#f8faf8] px-4 py-2"
+                className="flex items-start gap-3 rounded-lg border border-[#dbe6e0] bg-[#ffffff] px-4 py-2"
               >
                 <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-[#6a7e75]">
                   {index + 1}
@@ -795,7 +795,7 @@ export default function CandidatesModule({
                       </span>
                     )}
                     {question.includeInContract ? (
-                      <span className="rounded-full bg-[#eef4f1] px-3 py-1 text-xs font-black text-[#486b5d]">
+                      <span className="rounded-full bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#486b5d]">
                         Gali būti naudojama sutarčiai
                       </span>
                     ) : null}
@@ -804,7 +804,7 @@ export default function CandidatesModule({
                 <button
                   type="button"
                   onClick={() => removeQuestion(question.id)}
-                  className="rounded-xl border border-[#dbe6e0] bg-white p-2 text-[#6a7e75] hover:bg-[#f8faf8]"
+                  className="rounded-xl border border-[#dbe6e0] bg-white p-2 text-[#6a7e75] hover:bg-[#ffffff]"
                   aria-label="Pašalinti klausimą"
                 >
                   <Trash2 size={16} />
@@ -813,7 +813,7 @@ export default function CandidatesModule({
             ))}
           </div>
 
-          <div className="mt-5 rounded-lg border border-[#dbe6e0] bg-[#f8faf8] p-4">
+          <div className="mt-5 rounded-lg border border-[#dbe6e0] bg-[#ffffff] p-4">
             <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#6a7e75]">
               Pridėti savo klausimą
             </h4>
@@ -865,14 +865,14 @@ export default function CandidatesModule({
               <button
                 type="button"
                 onClick={() => void copyQuestionnaireLink()}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f8faf8]"
+                className="inline-flex items-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#ffffff]"
               >
                 <Link2 size={14} />
                 Kopijuoti nuorodą
               </button>
             </div>
 
-            <div className="mt-4 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+            <div className="mt-4 rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
               <div className="flex items-center gap-2 text-sm font-black text-[#10251f]">
                 <ExternalLink size={16} className="text-[#486b5d]" />
                 Vieša kandidato anketa
@@ -916,7 +916,7 @@ export default function CandidatesModule({
         <h3 className="text-xl font-black text-[#10251f]">Kandidatų sąrašas</h3>
         <div className="mt-4 overflow-hidden rounded-lg border border-[#dbe6e0]">
           <table className="w-full text-left text-sm">
-            <thead className="bg-[#f8faf8] text-[#6a7e75]">
+            <thead className="bg-[#ffffff] text-[#6a7e75]">
               <tr>
                 <th className="px-4 py-2 font-black">Kandidatas</th>
                 <th className="px-4 py-2 font-black">Kontaktai</th>
@@ -945,7 +945,7 @@ export default function CandidatesModule({
                     <td className="px-4 py-2">{candidate.experience || "—"}</td>
                     <td className="px-4 py-2 text-right">
                       {(candidate.status || "new") === "invited" || (candidate.status || "new") === "hired" ? (
-                        <span className="inline-flex items-center gap-2 rounded-full bg-[#eef4f1] px-3 py-1 text-xs font-black text-[#486b5d]">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#486b5d]">
                           <CheckCircle2 size={14} />
                           Perduota komandai
                         </span>

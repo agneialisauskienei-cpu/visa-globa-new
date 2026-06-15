@@ -727,9 +727,9 @@ const EXPORT_STYLE = `
   .vacation .shiftbox { background: #f4b6b6; border-color: #de8f8f; color: #7f1d1d; }
   .sick .shiftbox { background: #9bb7f5; border-color: #7395dc; color: #1e3a8a; }
   .reserved .shiftbox { background: #edf0ef; border-color: #cfd8d4; color: #43534c; }
-  .total { background: #eef4f1; font-weight: 800; text-align: center; white-space: nowrap; padding: 7px 6px; }
+  .total { background: #f7fcf9; font-weight: 800; text-align: center; white-space: nowrap; padding: 7px 6px; }
   .bad { background: #fff1f0; color: #8a2f27; font-weight: 800; padding: 6px 7px; }
-  .warn { background: #fff8df; color: #8a5a13; font-weight: 800; padding: 6px 7px; }
+  .warn { background: #fff1f2; color: #be123c; font-weight: 800; padding: 6px 7px; }
   .ok { background: #eef7f1; color: #166534; font-weight: 800; padding: 6px 7px; }
   .issues-table th, .issues-table td { padding: 6px 7px; font-size: 11px; }
   .legend td { padding: 6px 8px; font-size: 11px; }
@@ -4414,7 +4414,7 @@ export default function ScheduleBlock({
           flex-wrap: wrap;
           align-items: stretch;
           gap: 0;
-          background: #f7faf8;
+          background: #ffffff;
           border-inline: 1px solid var(--vg-border-strong);
           border-bottom: 1px solid var(--vg-border);
           box-shadow: 0 8px 18px rgba(20, 37, 31, 0.06);
@@ -4560,7 +4560,7 @@ export default function ScheduleBlock({
           border-radius: 0;
           border-top: 0;
           border-inline-color: var(--vg-border-strong);
-          background: linear-gradient(180deg, #ffffff 0%, #f7faf8 100%);
+          background: linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
         }
 
         .controls-panel,
@@ -4623,7 +4623,7 @@ export default function ScheduleBlock({
           border-radius: 999px;
           padding: 0 10px;
           border: 1px solid var(--vg-border);
-          background: #f7faf8;
+          background: #ffffff;
           color: #315446;
           font-size: 12px;
           font-weight: 800;
@@ -4699,7 +4699,7 @@ export default function ScheduleBlock({
           gap: 8px;
           align-items: center;
           padding: 8px 10px;
-          background: #f7faf8;
+          background: #ffffff;
           border-inline: 1px solid var(--vg-border-strong);
           border-bottom: 1px solid var(--vg-border-strong);
           box-shadow: none;
@@ -4735,7 +4735,7 @@ export default function ScheduleBlock({
           padding: 8px 10px;
           border: 1px solid var(--border);
           border-top: 0;
-          background: #f7faf8;
+          background: #ffffff;
           min-width: 0;
           overflow-x: auto;
         }
@@ -5228,7 +5228,7 @@ export default function ScheduleBlock({
 
         .status.warn {
           background: var(--vg-amber-soft);
-          color: #8a5a13;
+          color: #be123c;
         }
 
         .status.bad {
@@ -5292,7 +5292,7 @@ export default function ScheduleBlock({
 
         .issue.warn {
           background: var(--vg-amber-soft);
-          border-color: #ead8a7;
+          border-color: #fecdd3;
         }
 
         .summary-grid {
@@ -5351,7 +5351,7 @@ export default function ScheduleBlock({
           align-items: center;
           border-inline: 1px solid var(--vg-border-strong);
           border-bottom: 1px solid var(--vg-border-strong);
-          background: #f7faf8;
+          background: #ffffff;
           padding: 8px 10px;
           color: var(--vg-muted);
           font-size: 12px;
@@ -5522,7 +5522,7 @@ export default function ScheduleBlock({
           border-left: 0;
           border-right: 0;
           border-bottom: 1px solid var(--vg-border);
-          background: #f7faf8;
+          background: #ffffff;
         }
         .kpi {
           min-height: 48px;
@@ -5530,7 +5530,7 @@ export default function ScheduleBlock({
           border-right: 1px solid var(--vg-border);
           border-radius: 0;
           padding: 8px 12px;
-          background: #f7faf8;
+          background: #ffffff;
           box-shadow: none;
           display: grid;
           grid-template-columns: 18px auto;
@@ -5638,7 +5638,7 @@ export default function ScheduleBlock({
           border-bottom: 1px solid var(--vg-border);
           border-radius: 0;
           padding: 7px 12px;
-          background: #f7faf8;
+          background: #ffffff;
         }
         .schedule-view-bar .btn {
           height: 27px;
@@ -5699,7 +5699,7 @@ export default function ScheduleBlock({
           height: 92px;
           border-right: 1px solid #c6d6ce;
           border-bottom: 1px solid var(--vg-border-strong);
-          background: linear-gradient(to bottom, #dce7e2, #f7faf8);
+          background: linear-gradient(to bottom, #dce7e2, #ffffff);
           overflow: hidden;
         }
         .coverage-cell.weekend {
@@ -5912,7 +5912,7 @@ export default function ScheduleBlock({
           border-bottom: 1px solid var(--vg-border);
           border-radius: 0;
           padding: 6px;
-          background: #f7faf8;
+          background: #ffffff;
           box-shadow: none;
         }
         .total-cell b {
@@ -6024,7 +6024,7 @@ export default function ScheduleBlock({
           border-inline: 1px solid var(--vg-border-strong);
           border-bottom: 1px solid var(--vg-border-strong);
           padding: 7px 10px;
-          background: #f7faf8;
+          background: #ffffff;
         }
         .quick-entry-strip .quick-hint {
           display: none;

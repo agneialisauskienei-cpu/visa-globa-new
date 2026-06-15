@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -1384,7 +1384,7 @@ export default function EmployeeDashboardPage() {
             <iframe
               title="Prašymai"
               src="/requests?embedded=1"
-              className="h-[calc(100vh-260px)] min-h-[560px] w-full rounded-[18px] border-0 bg-[#f3f6f4] sm:h-[78vh]"
+              className="h-[calc(100vh-260px)] min-h-[560px] w-full rounded-[18px] border-0 bg-[#ffffff] sm:h-[78vh]"
             />,
             <SideBox kicker="Santrauka" title="Prašymų būsena">
               <MiniMetric
@@ -1442,7 +1442,7 @@ export default function EmployeeDashboardPage() {
                   <Link
                     key={row.id}
                     href={`/residents/${row.id}`}
-                    className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4 text-[#10251f] no-underline transition hover:bg-[#eef4f1]"
+                    className="rounded-[18px] border border-[#dbe6e0] bg-[#ffffff] p-4 text-[#10251f] no-underline transition hover:bg-[#f7fcf9]"
                   >
                     <div className="font-black">{residentName(row)}</div>
                     <div className="mt-1 text-sm font-bold text-[#526174]">
@@ -1643,7 +1643,7 @@ export default function EmployeeDashboardPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f3f6f4] p-6 text-[#10251f]">
+      <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#10251f]">
         <div className="rounded-[28px] border border-[#dbe6e0] bg-white p-8 text-center shadow-sm">
           <Loader2 className="mx-auto h-9 w-9 animate-spin text-[#047857]" />
           <p className="mt-4 text-lg font-black text-[#10251f]">Kraunama...</p>
@@ -1656,7 +1656,7 @@ export default function EmployeeDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f3f6f4] px-3 pb-24 pt-3 text-[#10251f] sm:p-5 sm:pb-24 lg:p-6 lg:pb-6">
+    <main className="min-h-screen bg-[#ffffff] px-3 pb-24 pt-3 text-[#10251f] sm:p-5 sm:pb-24 lg:p-6 lg:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-3 sm:space-y-4">
         <section className="overflow-hidden rounded-[22px] border border-[#c9d8d0] bg-white shadow-sm sm:rounded-[24px]">
           <div className="flex flex-col items-center gap-4 bg-[#486b5d] px-4 py-4 text-center text-white sm:items-stretch sm:px-5 sm:py-5 sm:text-left lg:flex-row lg:items-center lg:justify-between">
@@ -1698,7 +1698,7 @@ export default function EmployeeDashboardPage() {
             </div>
           </div>
 
-          <nav className="border-t border-[#dbe6e0] bg-[#eef4f1] px-3 py-3 text-sm font-black text-[#486b5d] sm:px-4 lg:py-2">
+          <nav className="border-t border-[#dbe6e0] bg-[#f7fcf9] px-3 py-3 text-sm font-black text-[#486b5d] sm:px-4 lg:py-2">
             <label className="block lg:hidden">
               <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                 Skiltis
@@ -1913,7 +1913,7 @@ export default function EmployeeDashboardPage() {
             <button
               type="button"
               onClick={() => void loadDashboard()}
-              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-[#c9d8d0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
+              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-[#c9d8d0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f7fcf9]"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -2082,7 +2082,7 @@ function StatButton({
     <button
       type="button"
       onClick={onClick}
-      className={`min-w-0 rounded-[18px] border p-3 text-left shadow-sm transition hover:bg-[#f8faf8] sm:p-4 ${toneClass}`}
+      className={`min-w-0 rounded-[18px] border p-3 text-left shadow-sm transition hover:bg-[#ffffff] sm:p-4 ${toneClass}`}
     >
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-white/80 text-[#486b5d] sm:h-10 sm:w-10 sm:rounded-[14px]">
@@ -2116,7 +2116,7 @@ function ActionRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-w-0 items-center justify-between gap-3 rounded-[16px] border border-[#dbe6e0] bg-[#f8faf8] p-3 text-left transition hover:bg-[#eef4f1] sm:p-4"
+      className="flex min-w-0 items-center justify-between gap-3 rounded-[16px] border border-[#dbe6e0] bg-[#ffffff] p-3 text-left transition hover:bg-[#f7fcf9] sm:p-4"
     >
       <span className="flex min-w-0 items-center gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-white text-[#486b5d] shadow-sm sm:h-10 sm:w-10 sm:rounded-[14px]">
@@ -2154,7 +2154,7 @@ function Panel({
   const action = actionHref ? (
     <Link
       href={actionHref}
-      className="inline-flex w-full justify-center rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] no-underline transition hover:bg-[#dbe6e0] sm:w-auto"
+      className="inline-flex w-full justify-center rounded-[14px] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d] no-underline transition hover:bg-[#dbe6e0] sm:w-auto"
     >
       {actionLabel || "Atidaryti"}
     </Link>
@@ -2162,7 +2162,7 @@ function Panel({
     <button
       type="button"
       onClick={onAction}
-      className="inline-flex w-full justify-center rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#dbe6e0] sm:w-auto"
+      className="inline-flex w-full justify-center rounded-[14px] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#dbe6e0] sm:w-auto"
     >
       {actionLabel || "Atidaryti"}
     </button>
@@ -2302,7 +2302,7 @@ function SideBox({
   children: ReactNode;
 }) {
   return (
-    <aside className="rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] p-4">
+    <aside className="rounded-[18px] border border-[#dbe6e0] bg-[#ffffff] p-4">
       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#047857]">
         {kicker}
       </p>
@@ -2383,7 +2383,7 @@ function TaskCard({
       <button
         type="button"
         onClick={onOpen}
-        className="mt-3 w-full rounded-[14px] bg-[#eef4f1] px-4 py-3 text-sm font-black text-[#047857] sm:w-auto sm:bg-transparent sm:px-0 sm:py-0"
+        className="mt-3 w-full rounded-[14px] bg-[#f7fcf9] px-4 py-3 text-sm font-black text-[#047857] sm:w-auto sm:bg-transparent sm:px-0 sm:py-0"
       >
         Peržiūrėti
       </button>
@@ -2468,7 +2468,7 @@ function VacationRequestCard({
       </div>
 
       {request.note ? (
-        <p className="mt-3 rounded-[14px] bg-[#f8faf8] px-3 py-2 text-sm font-bold leading-6 text-[#526174]">
+        <p className="mt-3 rounded-[14px] bg-[#ffffff] px-3 py-2 text-sm font-bold leading-6 text-[#526174]">
           {request.note}
         </p>
       ) : null}
@@ -2487,7 +2487,7 @@ function VacationRequestCard({
         <button
           type="button"
           onClick={onEdit}
-          className="mt-3 rounded-[14px] border border-[#c9d8d0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
+          className="mt-3 rounded-[14px] border border-[#c9d8d0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f7fcf9]"
         >
           Redaguoti
         </button>
@@ -2506,7 +2506,7 @@ function EmptyState({
   desc: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-4 text-center sm:p-6">
+    <div className="rounded-[18px] border border-dashed border-[#c9d8d0] bg-[#ffffff] p-4 text-center sm:p-6">
       <div className="mx-auto grid h-11 w-11 place-items-center rounded-[16px] bg-white text-[#486b5d] shadow-sm sm:h-12 sm:w-12">
         {icon}
       </div>
@@ -2582,7 +2582,7 @@ function DashboardModal({
           </button>
         </div>
         <div
-          className={`overflow-y-auto bg-[#f8faf8] ${
+          className={`overflow-y-auto bg-[#ffffff] ${
             compactBody ? "max-h-[68vh] p-0 sm:max-h-[78vh]" : "max-h-[58vh] p-4 sm:max-h-[70vh] sm:p-5"
           }`}
         >

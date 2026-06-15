@@ -101,7 +101,7 @@ function getDocumentStatus(record?: CredentialRecord | null) {
     return {
       key: "missing" as const,
       label: "Trūksta",
-      className: "bg-[#eef4f1] text-[#40594f]",
+      className: "bg-[#f7fcf9] text-[#40594f]",
     };
   }
 
@@ -873,7 +873,7 @@ export default function DocumentsModule({
           </p>
         </div>
 
-        <div className="rounded-xl border border-[#dce7e2] bg-[#eef4f1] px-6 py-4 text-center">
+        <div className="rounded-xl border border-[#dce7e2] bg-[#f7fcf9] px-6 py-4 text-center">
           <div className="text-2xl font-black text-[#486b5d]">
             {compliancePercent}%
           </div>
@@ -884,7 +884,7 @@ export default function DocumentsModule({
       </div>
 
       {checkingAccess ? (
-        <div className="rounded-lg border border-[#dbe6e0] bg-[#f8faf8] px-5 py-4 text-sm font-black text-[#40594f]">
+        <div className="rounded-lg border border-[#dbe6e0] bg-[#ffffff] px-5 py-4 text-sm font-black text-[#40594f]">
           Tikrinamos dokumentų modulio teisės...
         </div>
       ) : !canManage ? (
@@ -907,7 +907,7 @@ export default function DocumentsModule({
           žymėti įspėjimu.
         </div>
       ) : (
-        <div className="mb-5 rounded-lg border border-[#c9d8d0] bg-[#eef4f1] px-5 py-4 text-sm font-black text-[#10251f]">
+        <div className="mb-5 rounded-lg border border-[#c9d8d0] bg-[#f7fcf9] px-5 py-4 text-sm font-black text-[#10251f]">
           Dokumentų rizikų nėra.
         </div>
       )}
@@ -929,7 +929,7 @@ export default function DocumentsModule({
               "rounded-lg border px-4 py-2 text-sm font-black transition",
               filter === key
                 ? "border-slate-900 bg-[#486b5d] text-white"
-                : "border-[#dbe6e0] bg-white text-[#40594f] hover:bg-[#f8faf8]",
+                : "border-[#dbe6e0] bg-white text-[#40594f] hover:bg-[#ffffff]",
             ].join(" ")}
           >
             {label} · {count}
@@ -940,7 +940,7 @@ export default function DocumentsModule({
       <div className="grid gap-5 xl:grid-cols-[0.85fr_1.35fr]">
         <div
           id="documents-form"
-          className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8]/70 p-5"
+          className="rounded-xl border border-[#dbe6e0] bg-[#ffffff]/70 p-5"
         >
           <h3 className="text-2xl font-black text-[#10251f]">
             {editingCredentialId ? "Redaguoti dokumentą" : "Pridėti dokumentą"}
@@ -958,7 +958,7 @@ export default function DocumentsModule({
               <select
                 value={employeeId}
                 onChange={(event) => setEmployeeId(event.target.value)}
-                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#f7fcf9]"
               >
                 <option value="">Pasirinkti darbuotoją</option>
                 {employees.map((employee) => (
@@ -976,7 +976,7 @@ export default function DocumentsModule({
               <select
                 value={type}
                 onChange={(event) => setType(event.target.value)}
-                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#f7fcf9]"
               >
                 {Array.from(
                   new Set(
@@ -998,7 +998,7 @@ export default function DocumentsModule({
                 value={number}
                 onChange={(event) => setNumber(event.target.value)}
                 placeholder="Dokumento nr."
-                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#f7fcf9]"
               />
             </label>
 
@@ -1010,7 +1010,7 @@ export default function DocumentsModule({
                 value={issuer}
                 onChange={(event) => setIssuer(event.target.value)}
                 placeholder="Įstaiga / institucija / registras"
-                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#f7fcf9]"
               />
             </label>
 
@@ -1022,7 +1022,7 @@ export default function DocumentsModule({
                 type="date"
                 value={issuedAt}
                 onChange={(event) => setIssuedAt(event.target.value)}
-                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#f7fcf9]"
               />
             </label>
 
@@ -1034,7 +1034,7 @@ export default function DocumentsModule({
                 type="date"
                 value={expiresAt}
                 onChange={(event) => setExpiresAt(event.target.value)}
-                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
+                className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#f7fcf9]"
               />
             </label>
           </div>
@@ -1097,7 +1097,7 @@ export default function DocumentsModule({
               onChange={(event) => setNote(event.target.value)}
               placeholder="Neprivaloma pastaba"
               rows={3}
-              className="w-full resize-none rounded-lg border border-[#c2d3ca] bg-white px-4 py-3 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#eef4f1]"
+              className="w-full resize-none rounded-lg border border-[#c2d3ca] bg-white px-4 py-3 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#f7fcf9]"
             />
           </label>
 
@@ -1119,7 +1119,7 @@ export default function DocumentsModule({
               className={[
                 "mt-4 rounded-lg border px-4 py-3 text-sm font-bold",
                 message.type === "success"
-                  ? "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]"
+                  ? "border-[#c9d8d0] bg-[#f7fcf9] text-[#486b5d]"
                   : "border-red-200 bg-red-50 text-red-800",
               ].join(" ")}
             >
@@ -1137,7 +1137,7 @@ export default function DocumentsModule({
               <button
                 type="button"
                 onClick={resetForm}
-                className="mr-3 inline-flex min-h-10 items-center justify-center rounded-lg border border-[#dbe6e0] px-5 text-base font-black text-[#40594f] transition hover:bg-[#f8faf8]"
+                className="mr-3 inline-flex min-h-10 items-center justify-center rounded-lg border border-[#dbe6e0] px-5 text-base font-black text-[#40594f] transition hover:bg-[#ffffff]"
               >
                 Atšaukti redagavimą
               </button>
@@ -1178,7 +1178,7 @@ export default function DocumentsModule({
             <button
               type="button"
               onClick={() => setFilter("all")}
-              className="rounded-lg border border-[#dbe6e0] px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#f8faf8]"
+              className="rounded-lg border border-[#dbe6e0] px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#ffffff]"
             >
               Rodyti visus
             </button>
@@ -1186,7 +1186,7 @@ export default function DocumentsModule({
 
           <div className="overflow-hidden rounded-lg border border-[#dbe6e0]">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[#f8faf8] text-[#40594f]">
+              <thead className="bg-[#ffffff] text-[#40594f]">
                 <tr>
                   <th className="px-4 py-3 font-black">Darbuotojas</th>
                   <th className="px-4 py-3 font-black">Tipas</th>
@@ -1224,7 +1224,7 @@ export default function DocumentsModule({
                                 type: row.type,
                               })
                             }
-                            className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
+                            className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#ffffff]"
                           >
                             Pridėti dokumentą
                           </button>
@@ -1241,7 +1241,7 @@ export default function DocumentsModule({
                             <button
                               type="button"
                               onClick={() => row.record && fillFromCredential(row.record)}
-                              className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
+                              className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#ffffff]"
                             >
                               Redaguoti
                             </button>
@@ -1266,7 +1266,7 @@ export default function DocumentsModule({
                                 type: row.type,
                               })
                             }
-                            className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#f8faf8]"
+                            className="rounded-xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#40594f] hover:bg-[#ffffff]"
                           >
                             Atnaujinti
                           </button>
@@ -1298,7 +1298,7 @@ export default function DocumentsModule({
                                   setRejectingCredentialId(null);
                                   setRejectReason("");
                                 }}
-                                className="rounded-xl border border-[#dbe6e0] px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#f8faf8]"
+                                className="rounded-xl border border-[#dbe6e0] px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#ffffff]"
                               >
                                 Atšaukti
                               </button>

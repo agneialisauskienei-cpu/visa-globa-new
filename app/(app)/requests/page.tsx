@@ -1248,7 +1248,7 @@ export default function RequestsPage() {
           value={isAdmin ? form.employeeId : currentUserId || form.employeeId}
           disabled={!isAdmin || isEditMode}
           onChange={(event) => setForm((previous) => ({ ...previous, employeeId: event.target.value }))}
-          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1] disabled:text-[#486b5d]"
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9] disabled:text-[#486b5d]"
         >
           {isAdmin ? (
             <>
@@ -1305,7 +1305,7 @@ export default function RequestsPage() {
           value={form.end}
           onChange={(event) => setForm((previous) => ({ ...previous, end: event.target.value }))}
           disabled={form.kind === "temporary_leave"}
-          className="h-12 min-w-0 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+          className="h-12 min-w-0 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
         />
         <input
           type="text"
@@ -1314,7 +1314,7 @@ export default function RequestsPage() {
           onChange={(event) => setForm((previous) => ({ ...previous, startTime: event.target.value }))}
           onBlur={(event) => setForm((previous) => ({ ...previous, startTime: normalizeTimeInput(event.target.value) }))}
           disabled={form.kind !== "temporary_leave"}
-          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
         />
         <input
           type="text"
@@ -1323,7 +1323,7 @@ export default function RequestsPage() {
           onChange={(event) => setForm((previous) => ({ ...previous, endTime: event.target.value }))}
           onBlur={(event) => setForm((previous) => ({ ...previous, endTime: normalizeTimeInput(event.target.value) }))}
           disabled={form.kind !== "temporary_leave"}
-          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+          className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
         />
         <input
           value={form.note}
@@ -1347,7 +1347,7 @@ export default function RequestsPage() {
           <button
             type="button"
             onClick={cancelEditRequest}
-            className="inline-flex h-12 items-center justify-center rounded-[16px] bg-[#eef4f1] px-5 text-sm font-black text-[#486b5d]"
+            className="inline-flex h-12 items-center justify-center rounded-[16px] bg-[#f7fcf9] px-5 text-sm font-black text-[#486b5d]"
           >
             Atšaukti
           </button>
@@ -1358,7 +1358,7 @@ export default function RequestsPage() {
 
   return (
     <main
-      className={`min-h-screen bg-[#f3f6f4] text-[#10251f] ${
+      className={`min-h-screen bg-[#ffffff] text-[#10251f] ${
         embedded
           ? "px-3 pb-6 pt-3 sm:px-4"
           : "px-4 pb-24 pt-4 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8"
@@ -1397,7 +1397,7 @@ export default function RequestsPage() {
             </button>
           </div>
 
-          <div className="grid gap-3 bg-[#eef4f1] p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 bg-[#f7fcf9] p-4 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard title="Laukia" value={submitted} desc="Reikia sprendimo" tone="amber" />
             <SummaryCard title="Patvirtinta" value={approved} desc="Aktyvūs / istoriniai" tone="emerald" />
             <SummaryCard title="Atmesta" value={rejected} desc="Neaktyvūs prašymai" tone="rose" />
@@ -1434,7 +1434,7 @@ export default function RequestsPage() {
             ) : null}
 
             {isAdmin ? (
-              <div className="mt-3 rounded-[18px] border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+              <div className="mt-3 rounded-[18px] border border-[#dbe6e0] bg-[#ffffff] px-4 py-3">
                 {employeeSearch.trim() && !selectedBalance ? (
                   <p className="text-sm font-black text-rose-700">Darbuotojo pagal paiešką nerasta.</p>
                 ) : (
@@ -1446,7 +1446,7 @@ export default function RequestsPage() {
               </div>
             ) : null}
 
-            <div className="mt-5 rounded-[24px] bg-[#eef4f1] p-5">
+            <div className="mt-5 rounded-[24px] bg-[#f7fcf9] p-5">
               <p className="text-sm font-black text-[#486b5d]">{selectedBalance?.employee || "Darbuotojas"}</p>
               <div className="mt-2 flex items-end justify-between gap-4">
                 <div>
@@ -1519,7 +1519,7 @@ export default function RequestsPage() {
 
               <div className="mt-5 overflow-x-auto rounded-[22px] border border-[#dbe6e0]">
               <table className="w-full border-collapse bg-white text-left">
-                <thead className="bg-[#f8faf8]">
+                <thead className="bg-[#ffffff]">
                   <tr>
                     <TableHead>Darbuotojas</TableHead>
                     <TableHead>Data</TableHead>
@@ -1564,7 +1564,7 @@ export default function RequestsPage() {
                                 type="button"
                                 disabled={saving}
                                 onClick={() => void updateRequestStatus(request.id, "canceled")}
-                                className="rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] disabled:opacity-60"
+                                className="rounded-[14px] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d] disabled:opacity-60"
                               >
                                 Atšaukti
                               </button>
@@ -1616,7 +1616,7 @@ export default function RequestsPage() {
               value={isAdmin ? form.employeeId : currentUserId || form.employeeId}
               disabled={!isAdmin}
               onChange={(event) => setForm((previous) => ({ ...previous, employeeId: event.target.value }))}
-              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1] disabled:text-[#486b5d]"
+              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9] disabled:text-[#486b5d]"
             >
               {isAdmin ? (
                 <>
@@ -1673,7 +1673,7 @@ export default function RequestsPage() {
               value={form.end}
               onChange={(event) => setForm((previous) => ({ ...previous, end: event.target.value }))}
               disabled={form.kind === "temporary_leave"}
-              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
             />
             <input
               type="text"
@@ -1682,7 +1682,7 @@ export default function RequestsPage() {
               onChange={(event) => setForm((previous) => ({ ...previous, startTime: event.target.value }))}
               onBlur={(event) => setForm((previous) => ({ ...previous, startTime: normalizeTimeInput(event.target.value) }))}
               disabled={form.kind !== "temporary_leave"}
-              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
             />
             <input
               type="text"
@@ -1691,7 +1691,7 @@ export default function RequestsPage() {
               onChange={(event) => setForm((previous) => ({ ...previous, endTime: event.target.value }))}
               onBlur={(event) => setForm((previous) => ({ ...previous, endTime: normalizeTimeInput(event.target.value) }))}
               disabled={form.kind !== "temporary_leave"}
-              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#eef4f1]"
+              className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
             />
             <input
               value={form.note}
@@ -1715,7 +1715,7 @@ export default function RequestsPage() {
               <button
                 type="button"
                 onClick={cancelEditRequest}
-                className="inline-flex h-12 items-center justify-center rounded-[16px] bg-[#eef4f1] px-5 text-sm font-black text-[#486b5d]"
+                className="inline-flex h-12 items-center justify-center rounded-[16px] bg-[#f7fcf9] px-5 text-sm font-black text-[#486b5d]"
               >
                 Atšaukti redagavimą
               </button>
@@ -1791,7 +1791,7 @@ export default function RequestsPage() {
               <h2 className="mt-2 text-2xl font-black tracking-tight lg:text-3xl">Istorija</h2>
               <p className="mt-1 font-semibold text-[#526174]">Patvirtinti, atmesti ir atšaukti įrašai.</p>
             </div>
-            <div className="rounded-[18px] bg-[#eef4f1] px-4 py-3 text-sm font-black text-[#486b5d]">
+            <div className="rounded-[18px] bg-[#f7fcf9] px-4 py-3 text-sm font-black text-[#486b5d]">
               {loading ? "Kraunama..." : `${historyFiltered.length} rodoma`}
             </div>
           </div>
@@ -1837,7 +1837,7 @@ export default function RequestsPage() {
                 setStatus("submitted");
                 setType("all");
               }}
-              className="h-12 rounded-[16px] bg-[#eef4f1] px-5 text-sm font-black text-[#486b5d]"
+              className="h-12 rounded-[16px] bg-[#f7fcf9] px-5 text-sm font-black text-[#486b5d]"
             >
               Valyti
             </button>
@@ -1847,7 +1847,7 @@ export default function RequestsPage() {
             <>
               <div className="mt-6 hidden overflow-hidden rounded-[24px] border border-[#dbe6e0] lg:block">
                 <table className="w-full border-collapse bg-white text-left">
-                  <thead className="bg-[#f8faf8]">
+                  <thead className="bg-[#ffffff]">
                     <tr>
                       <TableHead>Darbuotojas</TableHead>
                       <TableHead>Tipas</TableHead>
@@ -1882,7 +1882,7 @@ export default function RequestsPage() {
               </div>
             </>
           ) : (
-            <div className="mt-6 rounded-[22px] border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-8 text-center">
+            <div className="mt-6 rounded-[22px] border border-dashed border-[#c9d8d0] bg-[#ffffff] p-8 text-center">
               <p className="text-lg font-black text-[#10251f]">
                 Istorijos įrašų pagal filtrą nėra
               </p>
@@ -1908,7 +1908,7 @@ function BalanceLine({ label, value }: { label: string; value: string }) {
 
 function CalendarMiniIcon() {
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[#eef4f1] text-[#486b5d]">
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[#f7fcf9] text-[#486b5d]">
       <History className="h-4 w-4" />
     </div>
   );
@@ -1994,7 +1994,7 @@ function RequestTableRow({
         {(request.status === "submitted" || request.status === "pending") ? (
           <div className="flex flex-col gap-2">
             <span className="text-sm font-black text-[#526174]">Laukia vadovo sprendimo</span>
-            <button disabled={saving} type="button" onClick={onCancel} className="w-fit rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] disabled:opacity-60">
+            <button disabled={saving} type="button" onClick={onCancel} className="w-fit rounded-[14px] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d] disabled:opacity-60">
               Atšaukti
             </button>
           </div>
@@ -2026,9 +2026,9 @@ function RequestCard({
         </span>
       </div>
       <div className="mt-4 flex flex-wrap gap-2 text-sm font-bold text-[#526174]">
-        <span className="rounded-full bg-[#f8faf8] px-3 py-1.5">{request.kindLabel} · {request.code}</span>
-        <span className="rounded-full bg-[#f8faf8] px-3 py-1.5">{request.start} – {request.end}</span>
-        <span className="rounded-full bg-[#f8faf8] px-3 py-1.5">{request.amount}</span>
+        <span className="rounded-full bg-[#ffffff] px-3 py-1.5">{request.kindLabel} · {request.code}</span>
+        <span className="rounded-full bg-[#ffffff] px-3 py-1.5">{request.start} – {request.end}</span>
+        <span className="rounded-full bg-[#ffffff] px-3 py-1.5">{request.amount}</span>
       </div>
       <p className="mt-4 text-sm font-semibold text-[#526174]">{request.note}</p>
       {request.status === "rejected" && request.rejectionReason ? (
@@ -2042,7 +2042,7 @@ function RequestCard({
             Laukia vadovo sprendimo
           </span>
           {onCancel ? (
-            <button type="button" onClick={onCancel} className="rounded-[14px] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d]">
+            <button type="button" onClick={onCancel} className="rounded-[14px] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d]">
               Atšaukti
             </button>
           ) : null}

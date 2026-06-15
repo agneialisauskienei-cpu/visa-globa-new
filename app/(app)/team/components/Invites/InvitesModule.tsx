@@ -455,7 +455,7 @@ export default function InvitesModule() {
               type="button"
               onClick={() => void load()}
               disabled={loading}
-              className="inline-flex w-fit items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] disabled:opacity-60"
+              className="inline-flex w-fit items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#ffffff] disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Atnaujinti
@@ -463,7 +463,7 @@ export default function InvitesModule() {
           </div>
         </div>
 
-        <div className="grid gap-3 border-b border-[#dbe6e0] bg-[#eef4f1] p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 border-b border-[#dbe6e0] bg-[#f7fcf9] p-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Laukia" value={loading ? "…" : String(stats.pending)} tone={stats.pending > 0 ? "amber" : "emerald"} />
           <StatCard label="Priimti" value={loading ? "…" : String(stats.accepted)} tone="emerald" />
           <StatCard label="Atšaukti" value={loading ? "…" : String(stats.cancelled)} tone={stats.cancelled > 0 ? "red" : "muted"} />
@@ -471,7 +471,7 @@ export default function InvitesModule() {
         </div>
 
         <div className="grid gap-5 p-5 xl:grid-cols-[0.82fr_1.18fr]">
-          <div className="rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+          <div className="rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-5">
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#047857]">
               Naujas kvietimas
             </p>
@@ -554,14 +554,14 @@ export default function InvitesModule() {
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Ieškoti..."
-                      className="w-full rounded-xl border border-[#c9d8d0] bg-[#f8faf8] py-2 pl-9 pr-3 text-sm font-bold outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100 sm:w-56"
+                      className="w-full rounded-xl border border-[#c9d8d0] bg-[#ffffff] py-2 pl-9 pr-3 text-sm font-bold outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100 sm:w-56"
                     />
                   </div>
 
                   <select
                     value={filter}
                     onChange={(event) => setFilter(event.target.value as typeof filter)}
-                    className="rounded-xl border border-[#c9d8d0] bg-[#f8faf8] px-3 py-2 text-sm font-black text-[#486b5d] outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
+                    className="rounded-xl border border-[#c9d8d0] bg-[#ffffff] px-3 py-2 text-sm font-black text-[#486b5d] outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
                   >
                     <option value="active">Aktyvūs</option>
                     <option value="pending">Laukia</option>
@@ -581,7 +581,7 @@ export default function InvitesModule() {
                   filteredInvites.map((invite) => (
                     <article
                       key={invite.id}
-                      className="rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4 transition hover:bg-white hover:shadow-sm"
+                      className="rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-4 transition hover:bg-white hover:shadow-sm"
                     >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0">
@@ -700,7 +700,7 @@ function EmptyState({
   text: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-8 text-center">
+    <div className="rounded-2xl border border-dashed border-[#c9d8d0] bg-[#ffffff] p-8 text-center">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#486b5d] shadow-sm">
         {icon}
       </div>

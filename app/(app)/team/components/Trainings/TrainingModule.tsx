@@ -312,7 +312,7 @@ function statusForTraining(record?: TrainingRecord | null) {
     return {
       key: "missing" as const,
       label: "Trūksta",
-      cls: "bg-[#fff6df] text-[#8a5a13] ring-[#ead8a7]",
+      cls: "bg-[#fff1f2] text-[#be123c] ring-[#fecdd3]",
     };
   }
 
@@ -320,7 +320,7 @@ function statusForTraining(record?: TrainingRecord | null) {
     return {
       key: "pending" as const,
       label: "Laukia patvirtinimo",
-      cls: "bg-[#fff6df] text-[#8a5a13] ring-[#ead8a7]",
+      cls: "bg-[#fff1f2] text-[#be123c] ring-[#fecdd3]",
     };
   }
 
@@ -360,7 +360,7 @@ function statusForTraining(record?: TrainingRecord | null) {
     return {
       key: "expiring" as const,
       label: "Baigiasi",
-      cls: "bg-[#fff6df] text-[#8a5a13] ring-[#ead8a7]",
+      cls: "bg-[#fff1f2] text-[#be123c] ring-[#fecdd3]",
     };
   }
 
@@ -841,7 +841,7 @@ export default function TrainingModule({
             ? {
                 key: "pending",
                 label: "Laukia patvirtinimo",
-                cls: "bg-[#fff6df] text-[#8a5a13] ring-[#ead8a7]",
+                cls: "bg-[#fff1f2] text-[#be123c] ring-[#fecdd3]",
               }
             : statusForTraining(training),
           record: training,
@@ -1315,7 +1315,7 @@ export default function TrainingModule({
               onClick={() => setFilter("pending")}
               className={
                 filter === "pending"
-                  ? "rounded-lg bg-[#fff6df] px-3 py-2 text-[#8a5a13]"
+                  ? "rounded-lg bg-[#fff1f2] px-3 py-2 text-[#be123c]"
                   : "rounded-lg bg-white/12 px-3 py-2"
               }
             >
@@ -1337,7 +1337,7 @@ export default function TrainingModule({
               onClick={() => setFilter("missing")}
               className={
                 filter === "missing"
-                  ? "rounded-lg bg-[#fff6df] px-3 py-2 text-[#8a5a13]"
+                  ? "rounded-lg bg-[#fff1f2] px-3 py-2 text-[#be123c]"
                   : "rounded-lg bg-white/12 px-3 py-2"
               }
             >
@@ -1348,7 +1348,7 @@ export default function TrainingModule({
               onClick={() => setFilter("expiring")}
               className={
                 filter === "expiring"
-                  ? "rounded-lg bg-[#fff6df] px-3 py-2 text-[#8a5a13]"
+                  ? "rounded-lg bg-[#fff1f2] px-3 py-2 text-[#be123c]"
                   : "rounded-lg bg-white/12 px-3 py-2"
               }
             >
@@ -1369,7 +1369,7 @@ export default function TrainingModule({
         </div>
       </header>
 
-      <section className="border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+      <section className="border-b border-[#dbe6e0] bg-[#ffffff] px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
             Veiksmai
@@ -1380,7 +1380,7 @@ export default function TrainingModule({
               onClick={() => {
                 setShowNewForm(true);
               }}
-              className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+              className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
             >
               <Plus className="mr-1 inline h-3 w-3" />
               Naujas mokymas
@@ -1389,7 +1389,7 @@ export default function TrainingModule({
           <button
             type="button"
             onClick={() => setShowLibrary(true)}
-            className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+            className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
           >
             Mokymų biblioteka
           </button>
@@ -1397,7 +1397,7 @@ export default function TrainingModule({
             type="button"
             onClick={() => void refreshAll()}
             disabled={loadingRealData}
-            className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1] disabled:opacity-60"
+            className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9] disabled:opacity-60"
           >
             {loadingRealData ? "Kraunama..." : "Atnaujinti"}
           </button>
@@ -1434,7 +1434,7 @@ export default function TrainingModule({
 
       {message ? (
         <div
-          className={`mx-4 mt-4 rounded-lg border px-4 py-3 text-sm font-bold ${message.type === "success" ? "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]" : "border-red-200 bg-red-50 text-red-800"}`}
+          className={`mx-4 mt-4 rounded-lg border px-4 py-3 text-sm font-bold ${message.type === "success" ? "border-[#c9d8d0] bg-[#f7fcf9] text-[#486b5d]" : "border-red-200 bg-red-50 text-red-800"}`}
         >
           {message.text}
         </div>
@@ -1444,7 +1444,7 @@ export default function TrainingModule({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
           <section
             id="training-new-form"
-            className="w-full max-w-5xl rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4 shadow-2xl"
+            className="w-full max-w-5xl rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-4 shadow-2xl"
           >
             <div className="mb-3 flex items-center justify-between gap-4">
               <div>
@@ -1649,7 +1649,7 @@ export default function TrainingModule({
                 className={
                   departmentFilter === department.key
                     ? "rounded-lg bg-[#047857] px-4 py-2 text-sm font-black text-white"
-                    : "rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#eef4f1]"
+                    : "rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#f7fcf9]"
                 }
               >
                 {department.label}
@@ -1669,7 +1669,7 @@ export default function TrainingModule({
                 className={
                   selectedRequirement.key === requirement.key
                     ? "rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#047857]"
-                    : "rounded-full border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#eef4f1]"
+                    : "rounded-full border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#f7fcf9]"
                 }
               >
                 {requirement.title} · {requirement.annualHours} val.
@@ -1720,7 +1720,7 @@ export default function TrainingModule({
             </div>
           </div>
 
-          <div className="mt-5 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+          <div className="mt-5 rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h4 className="text-xl font-black">Privalomi mokymai</h4>
@@ -1909,8 +1909,8 @@ export default function TrainingModule({
                 onClick={() => setFilter("pending")}
                 className={
                   filter === "pending"
-                    ? "rounded-xl bg-[#8a5a13] px-4 py-3 text-sm font-black text-white"
-                    : "rounded-xl border border-[#ead9b2] bg-white px-4 py-3 text-sm font-black text-[#8a5a13]"
+                    ? "rounded-xl bg-[#be123c] px-4 py-3 text-sm font-black text-white"
+                    : "rounded-xl border border-[#fecdd3] bg-white px-4 py-3 text-sm font-black text-[#be123c]"
                 }
               >
                 Laukia patvirtinimo
@@ -1942,7 +1942,7 @@ export default function TrainingModule({
                 onClick={() => setFilter("expiring")}
                 className={
                   filter === "expiring"
-                    ? "rounded-xl bg-[#fff6df] px-4 py-3 text-sm font-black text-[#8a5a13]"
+                    ? "rounded-xl bg-[#fff1f2] px-4 py-3 text-sm font-black text-[#be123c]"
                     : "rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#40594f]"
                 }
               >
@@ -1952,21 +1952,21 @@ export default function TrainingModule({
           </div>
 
           {canApproveTrainings && pendingTrainings.length > 0 ? (
-            <div className="mt-5 rounded-xl border border-[#ead9b2] bg-[#fffdf8] p-4">
+            <div className="mt-5 rounded-xl border border-[#fecdd3] bg-[#fffdf8] p-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#8a5a13]">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#be123c]">
                     Patvirtinimai
                   </div>
                   <h4 className="mt-1 text-xl font-black">
                     Darbuotojų pateikti mokymai
                   </h4>
-                  <p className="mt-1 max-w-2xl text-sm font-bold text-[#7a6a4f]">
+                  <p className="mt-1 max-w-2xl text-sm font-bold text-[#9f1239]">
                     Darbuotojų įvesti mokymai įskaitomi tik administracijai
                     patvirtinus, kad pažymėjimas buvo peržiūrėtas.
                   </p>
                 </div>
-                <span className="rounded-xl bg-[#8a5a13] px-4 py-3 text-sm font-black text-white">
+                <span className="rounded-xl bg-[#be123c] px-4 py-3 text-sm font-black text-white">
                   Laukia patvirtinimo · {pendingTrainings.length}
                 </span>
               </div>
@@ -1975,7 +1975,7 @@ export default function TrainingModule({
                 {pendingTrainings.map((training) => (
                   <div
                     key={training.id}
-                    className="grid gap-3 rounded-xl border border-[#ead9b2] bg-white p-3 md:grid-cols-[1.2fr_1.4fr_0.7fr_auto] md:items-center"
+                    className="grid gap-3 rounded-xl border border-[#fecdd3] bg-white p-3 md:grid-cols-[1.2fr_1.4fr_0.7fr_auto] md:items-center"
                   >
                     <div className="font-black">
                       {employeeName(employees, training.employee_id)}
@@ -2021,7 +2021,7 @@ export default function TrainingModule({
 
           <div className="mt-5 overflow-x-auto rounded-xl border border-[#dbe6e0]">
             <table className="w-full min-w-[900px] text-left text-sm">
-              <thead className="bg-[#eef4f1] text-[#40594f]">
+              <thead className="bg-[#f7fcf9] text-[#40594f]">
                 <tr>
                   <th className="px-4 py-3 font-black">Darbuotojas</th>
                   <th className="px-4 py-3 font-black">Pareigos</th>
@@ -2031,7 +2031,7 @@ export default function TrainingModule({
                   <th className="px-4 py-3 font-black">Veiksmas</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#eef4f1]">
+              <tbody className="divide-y divide-[#f7fcf9]">
                 {filteredEmployeeSummary.length ? (
                   filteredEmployeeSummary.map((row) => {
                     const expanded = expandedEmployeeId === row.employee.id;
@@ -2077,7 +2077,7 @@ export default function TrainingModule({
       {selectedTraining ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
           <div className="w-full max-w-2xl rounded-2xl border border-[#c9d8d0] bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-[#dbe6e0] bg-[#f8faf8] px-5 py-4">
+            <div className="flex items-start justify-between gap-4 border-b border-[#dbe6e0] bg-[#ffffff] px-5 py-4">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
                   Mokymo peržiūra
@@ -2175,7 +2175,7 @@ export default function TrainingModule({
 
 function InfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
+    <div className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-3">
       <div className="text-[11px] font-black uppercase tracking-[0.14em] text-[#6a7e75]">
         {label}
       </div>
@@ -2188,7 +2188,7 @@ function InfoLine({ label, value }: { label: string; value: string }) {
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
+    <div className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-3">
       <div className="text-[11px] font-black uppercase text-[#6a7e75]">
         {label}
       </div>
@@ -2282,7 +2282,7 @@ function FragmentRow({
 
   return (
     <>
-      <tr className="hover:bg-[#f8faf8]">
+      <tr className="hover:bg-[#ffffff]">
         <td className="px-4 py-3 font-black text-[#10251f]">
           {row.employee.full_name || row.employee.name || "Darbuotojas"}
         </td>
@@ -2293,17 +2293,17 @@ function FragmentRow({
           {hasProblems ? (
             <div className="flex flex-wrap gap-1">
               {row.pending.length ? (
-                <span className="rounded-full bg-[#fff6df] px-3 py-1 text-xs font-black text-[#8a5a13]">
+                <span className="rounded-full bg-[#fff1f2] px-3 py-1 text-xs font-black text-[#be123c]">
                   {row.pending.length} laukia
                 </span>
               ) : null}
               {row.missing.length ? (
-                <span className="rounded-full bg-[#fff6df] px-3 py-1 text-xs font-black text-[#8a5a13]">
+                <span className="rounded-full bg-[#fff1f2] px-3 py-1 text-xs font-black text-[#be123c]">
                   {row.missing.length} trūksta
                 </span>
               ) : null}
               {row.expiring.length ? (
-                <span className="rounded-full bg-[#fff6df] px-3 py-1 text-xs font-black text-[#8a5a13]">
+                <span className="rounded-full bg-[#fff1f2] px-3 py-1 text-xs font-black text-[#be123c]">
                   {row.expiring.length} baigiasi
                 </span>
               ) : null}
@@ -2324,11 +2324,11 @@ function FragmentRow({
             </span>
           )}
         </td>
-        <td className="px-4 py-3 font-black text-[#8a5a13]">
+        <td className="px-4 py-3 font-black text-[#be123c]">
           {row.missing.length}
         </td>
         <td className="px-4 py-3">
-          <div className="h-2 rounded-full bg-[#eef4f1]">
+          <div className="h-2 rounded-full bg-[#f7fcf9]">
             <div
               className="h-2 rounded-full bg-[#047857]"
               style={{ width: `${row.progress}%` }}
@@ -2342,7 +2342,7 @@ function FragmentRow({
           <button
             type="button"
             onClick={onToggle}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
           >
             {expanded ? (
               <ChevronUp className="h-4 w-4" />
@@ -2356,7 +2356,7 @@ function FragmentRow({
 
       {expanded ? (
         <tr>
-          <td colSpan={6} className="bg-[#f8faf8] px-4 py-4">
+          <td colSpan={6} className="bg-[#ffffff] px-4 py-4">
             <div className="grid gap-2">
               {details.map((detail) => (
                 <div
@@ -2417,7 +2417,7 @@ function FragmentRow({
                         <button
                           type="button"
                           onClick={() => onPreview(detail.record!)}
-                          className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+                          className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
                         >
                           Peržiūrėti
                         </button>
@@ -2436,7 +2436,7 @@ function FragmentRow({
                         onClick={() =>
                           onPrefill(detail.employee_id, detail.title)
                         }
-                        className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+                        className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
                       >
                         Pridėti
                       </button>

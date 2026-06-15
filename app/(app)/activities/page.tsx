@@ -964,7 +964,7 @@ export default function ActivitiesPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#f3f6f4] px-4 py-5 text-[#10251f] sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#ffffff] px-4 py-5 text-[#10251f] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <section className="overflow-hidden rounded-[22px] border border-[#c9d8d0] bg-white shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
           <div className="flex flex-col gap-5 bg-[#486b5d] p-6 text-white xl:flex-row xl:items-center xl:justify-between">
@@ -1005,7 +1005,7 @@ export default function ActivitiesPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-[#dbe6e0] bg-[#eef4f1] p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 border-t border-[#dbe6e0] bg-[#f7fcf9] p-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               {([
                 ["day", "Diena"],
@@ -1031,14 +1031,14 @@ export default function ActivitiesPage() {
             <button
               type="button"
               onClick={() => setCalendarHelpOpen(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-[14px] border border-[#c9d8d0] bg-white px-4 py-2.5 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8]"
+              className="inline-flex items-center justify-center gap-2 rounded-[14px] border border-[#c9d8d0] bg-white px-4 py-2.5 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#ffffff]"
             >
               <HelpCircle className="h-4 w-4" />
               Instrukcija
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 border-t border-[#dbe6e0] bg-[#eef4f1] p-4 md:grid-cols-4 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 border-t border-[#dbe6e0] bg-[#f7fcf9] p-4 md:grid-cols-4 xl:grid-cols-6">
             <StatCard label="Mėnuo" value={monthLabel(month)} />
             <StatCard label="Šiandien" value={`${todayActivities} veiklos`} />
             <StatCard label="Pasirinkta diena" value={`${selectedDateActivities.length} veiklos`} />
@@ -1073,7 +1073,7 @@ export default function ActivitiesPage() {
                   />
                 </label>
 
-                <div className="hidden rounded-2xl border border-[#dbe6e0] bg-[#eef4f1] p-1 text-sm font-black lg:flex">
+                <div className="hidden rounded-2xl border border-[#dbe6e0] bg-[#f7fcf9] p-1 text-sm font-black lg:flex">
                   {([
                     ["day", "Diena"],
                     ["week", "Savaitė"],
@@ -1151,7 +1151,7 @@ export default function ActivitiesPage() {
                   );
                 })
               ) : (
-                <div className="rounded-3xl border border-dashed border-[#dbe6e0] bg-[#f8faf8] p-8 text-center">
+                <div className="rounded-3xl border border-dashed border-[#dbe6e0] bg-[#ffffff] p-8 text-center">
                   <CalendarDays className="mx-auto h-8 w-8 text-[#8a9a91]" />
                   <p className="mt-3 font-black text-[#10251f]">Šią dieną veiklų nėra</p>
                   <button type="button" onClick={() => openActivityModal(selectedDate)} className="mt-4 rounded-2xl bg-[#047857] px-4 py-2 text-sm font-black text-white">
@@ -1202,14 +1202,14 @@ export default function ActivitiesPage() {
             </div>
 
             <div className="space-y-4 p-6">
-              <div className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+              <div className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5">
                 <h4 className="font-black text-[#10251f]">1. Veiklos kūrimas</h4>
                 <p className="mt-2 text-sm font-bold leading-6 text-[#526174]">
                   Spausk tuščią dieną kalendoriuje arba mygtuką „Nauja veikla“. Įvesk pavadinimą, datą, pradžią ir pabaigą.
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+              <div className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5">
                 <h4 className="font-black text-[#10251f]">2. Lankomumo žymėjimas</h4>
                 <p className="mt-2 text-sm font-bold leading-6 text-[#526174]">
                   Spausk veiklos kortelę kalendoriuje. Atsidariusiame lange žymėk D / N / A / T arba naudok mini matricą kelioms veikloms.
@@ -1327,7 +1327,7 @@ function CalendarGrid({
   return (
     <div>
       {viewMode !== "day" ? (
-        <div className="grid grid-cols-7 border-b border-[#dbe6e0] bg-[#f8faf8] text-center text-xs font-black uppercase tracking-wider text-[#526174]">
+        <div className="grid grid-cols-7 border-b border-[#dbe6e0] bg-[#ffffff] text-center text-xs font-black uppercase tracking-wider text-[#526174]">
           {WEEK_DAYS.map((day) => (
             <div key={day} className="py-3">{day}</div>
           ))}
@@ -1350,15 +1350,15 @@ function CalendarGrid({
                 onPickDate(key);
                 if (!dayActivities.length) onCreate(key);
               }}
-              className={`min-h-[156px] border-b border-r border-[#e4ece6] bg-white p-3 text-left transition hover:bg-[#f8faf8] ${
+              className={`min-h-[156px] border-b border-r border-[#e4ece6] bg-white p-3 text-left transition hover:bg-[#ffffff] ${
                 !isCurrentMonth && viewMode === "month" ? "opacity-45" : ""
               } ${isSelected ? "ring-2 ring-inset ring-[#047857]" : ""}`}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black ${isToday ? "bg-[#047857] text-white" : "bg-[#eef4f1] text-[#10251f]"}`}>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black ${isToday ? "bg-[#047857] text-white" : "bg-[#f7fcf9] text-[#10251f]"}`}>
                   {day.getDate()}
                 </div>
-                {dayActivities.length ? <span className="rounded-full bg-[#eef4f1] px-2 py-1 text-xs font-black text-[#486b5d]">{dayActivities.length}</span> : null}
+                {dayActivities.length ? <span className="rounded-full bg-[#f7fcf9] px-2 py-1 text-xs font-black text-[#486b5d]">{dayActivities.length}</span> : null}
               </div>
 
               <div className="mt-3 space-y-2">
@@ -1473,14 +1473,14 @@ function ActivityModal({
               </div>
 
               <div className="space-y-4 p-6">
-                <div className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+                <div className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5">
                   <h4 className="font-black text-[#10251f]">1. Pavadinimas</h4>
                   <p className="mt-2 text-sm font-bold leading-6 text-[#526174]">
                     Įrašyk aiškų veiklos pavadinimą, pvz. „Muzikos terapija“, „Mankšta“, „Teatras“.
                   </p>
                 </div>
 
-                <div className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+                <div className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5">
                   <h4 className="font-black text-[#10251f]">2. Data ir laikas</h4>
                   <p className="mt-2 text-sm font-bold leading-6 text-[#526174]">
                     Pasirink veiklos datą, pradžią ir pabaigą. Pabaigos laikas turi būti vėlesnis už pradžios laiką.
@@ -1494,7 +1494,7 @@ function ActivityModal({
                   </p>
                 </div>
 
-                <div className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+                <div className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5">
                   <h4 className="font-black text-[#10251f]">4. Po sukūrimo</h4>
                   <p className="mt-2 text-sm font-bold leading-6 text-[#526174]">
                     Sukūrus veiklą, ją spausk kalendoriuje ir žymėk gyventojų lankomumą.
@@ -1515,7 +1515,7 @@ function ActivityModal({
           </div>
         ) : null}
 
-        <div className="max-h-[calc(100vh-178px)] overflow-y-auto bg-[#f3f6f4] p-6">
+        <div className="max-h-[calc(100vh-178px)] overflow-y-auto bg-[#ffffff] p-6">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Veiklos pavadinimas" full>
               <input value={value.title} onChange={(event) => onChange((previous) => ({ ...previous, title: event.target.value }))} placeholder="Pvz. Muzikos terapija" className="input" />
@@ -1670,21 +1670,21 @@ function AttendanceModal({
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+                  <div className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5">
                     <h4 className="font-black text-[#10251f]">2. Kelių gyventojų žymėjimas</h4>
                     <p className="mt-2 text-sm font-bold leading-6 text-[#526174]">
                       Pažymėk gyventojus su „+“, tada spausk D / N / A / T — statusas iškart pritaikomas pažymėtiems.
                     </p>
                   </div>
 
-                  <div className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+                  <div className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5">
                     <h4 className="font-black text-[#10251f]">3. Kelių veiklų žymėjimas</h4>
                     <p className="mt-2 text-sm font-bold leading-6 text-[#526174]">
                       Bloke „Taikyti į kelias veiklas“ pasirink veiklas. Masiniai mygtukai žymės visose pasirinktose veiklose.
                     </p>
                   </div>
 
-                  <div className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+                  <div className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5">
                     <h4 className="font-black text-[#10251f]">4. Filtrai</h4>
                     <p className="mt-2 text-sm font-bold leading-6 text-[#526174]">
                       Statistikos kvadračiukai viršuje filtruoja sąrašą: dalyvavo, nedalyvavo, atsisakė, netaikoma.
@@ -1771,7 +1771,7 @@ function AttendanceModal({
                   Pasirink veiklas, kurioms bus taikomas masinis žymėjimas. One-click eilutėje žymi visas viršuje pasirinktas veiklas.
                 </p>
               </div>
-              <span className="rounded-full border border-[#dbe6e0] bg-[#eef4f1] px-3 py-1 text-xs font-black text-[#486b5d]">
+              <span className="rounded-full border border-[#dbe6e0] bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#486b5d]">
                 Pasirinkta: {selectedSessionIds.size || 1}
               </span>
             </div>
@@ -1788,7 +1788,7 @@ function AttendanceModal({
                     className={`shrink-0 rounded-2xl border px-4 py-3 text-left transition ${
                       selected
                         ? "border-[#2f4f3f] bg-[#047857] text-white"
-                        : "border-[#dbe6e0] bg-white text-[#486b5d] hover:bg-[#eef4f1]"
+                        : "border-[#dbe6e0] bg-white text-[#486b5d] hover:bg-[#f7fcf9]"
                     }`}
                   >
                     <div className="text-sm font-black">{item.title}</div>
@@ -1801,7 +1801,7 @@ function AttendanceModal({
             </div>
           </section>
 
-          <section className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+          <section className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-4">
             <div className="grid gap-3 xl:grid-cols-[1fr_220px_220px]">
               <label className="relative block">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a9a91]" />
@@ -1846,13 +1846,13 @@ function AttendanceModal({
               <button type="button" onClick={onApplySelected} disabled={bulkSaving} className="rounded-2xl bg-[#047857] px-4 py-2 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60">
                 <CheckCircle2 className="mr-2 inline h-4 w-4" /> Pritaikyti pažymėtiems ({selectedCells.size}) į pasirinktas veiklas
               </button>
-              <button type="button" onClick={() => onMarkAll("attended")} disabled={bulkSaving} className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1] disabled:opacity-60">
+              <button type="button" onClick={() => onMarkAll("attended")} disabled={bulkSaving} className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f7fcf9] disabled:opacity-60">
                 Matomus D į pasirinktas veiklas
               </button>
-              <button type="button" onClick={() => onMarkAll("absent")} disabled={bulkSaving} className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1] disabled:opacity-60">
+              <button type="button" onClick={() => onMarkAll("absent")} disabled={bulkSaving} className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f7fcf9] disabled:opacity-60">
                 Matomus N į pasirinktas veiklas
               </button>
-              <button type="button" onClick={onCopyPrevious} disabled={bulkSaving} className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1] disabled:opacity-60">
+              <button type="button" onClick={onCopyPrevious} disabled={bulkSaving} className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f7fcf9] disabled:opacity-60">
                 <Copy className="mr-2 inline h-4 w-4" /> Kopijuoti į pasirinktas
               </button>
             </div>
@@ -1860,13 +1860,13 @@ function AttendanceModal({
 
           {selectedSessionIds.size > 1 ? (
             <section className="overflow-hidden rounded-3xl border border-[#dbe6e0] bg-white">
-              <div className="border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+              <div className="border-b border-[#dbe6e0] bg-[#ffffff] px-4 py-3">
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-black uppercase tracking-widest text-[#486b5d]">Mini matrica</h3>
                   <button
                     type="button"
                     onClick={() => setHelpOpen(true)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#dbe6e0] bg-white text-[#486b5d] transition hover:bg-[#eef4f1]"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#dbe6e0] bg-white text-[#486b5d] transition hover:bg-[#f7fcf9]"
                     aria-label="Kaip naudoti mini matricą"
                   >
                     <HelpCircle className="h-4 w-4" />
@@ -1912,7 +1912,7 @@ function AttendanceModal({
                                         type="button"
                                         onClick={() => onSetMatrixStatus(item.id, resident.id, option.value)}
                                         className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-xs font-black transition hover:scale-105 ${
-                                          active ? option.cellClass : "border-[#dbe6e0] bg-white text-[#526174] hover:bg-[#eef4f1]"
+                                          active ? option.cellClass : "border-[#dbe6e0] bg-white text-[#526174] hover:bg-[#f7fcf9]"
                                         }`}
                                         title={`${residentName(resident)} · ${item.title} · ${option.label}`}
                                       >
@@ -1933,7 +1933,7 @@ function AttendanceModal({
           ) : null}
 
           <section className="overflow-hidden rounded-3xl border border-[#dbe6e0] bg-white">
-            <div className="grid grid-cols-[44px_minmax(230px,1.5fr)_130px_170px] bg-[#f8faf8] px-4 py-3 text-xs font-black uppercase tracking-widest text-[#526174]">
+            <div className="grid grid-cols-[44px_minmax(230px,1.5fr)_130px_170px] bg-[#ffffff] px-4 py-3 text-xs font-black uppercase tracking-widest text-[#526174]">
               <div></div>
               <div>Gyventojas</div>
               <div>Kambarys</div>
@@ -1948,7 +1948,7 @@ function AttendanceModal({
                   const selected = selectedCells.has(resident.id);
 
                   return (
-                    <div key={resident.id} className={`grid grid-cols-[44px_minmax(230px,1.5fr)_130px_170px] items-center gap-3 px-4 py-3 transition ${selected ? "bg-[#eef4f1]" : "hover:bg-[#f8faf8]"}`}>
+                    <div key={resident.id} className={`grid grid-cols-[44px_minmax(230px,1.5fr)_130px_170px] items-center gap-3 px-4 py-3 transition ${selected ? "bg-[#f7fcf9]" : "hover:bg-[#ffffff]"}`}>
                       <button
                         type="button"
                         onClick={() => onToggleSelection(resident.id)}
@@ -1968,7 +1968,7 @@ function AttendanceModal({
                         {meta ? (
                           <span className={`inline-flex min-w-[120px] justify-center rounded-full border px-3 py-1 text-sm font-black ${meta.cellClass}`}>{meta.short} · {meta.label}</span>
                         ) : (
-                          <span className="inline-flex min-w-[120px] justify-center rounded-full border border-[#dbe6e0] bg-[#f8faf8] px-3 py-1 text-sm font-black text-[#526174]">Nepažymėta</span>
+                          <span className="inline-flex min-w-[120px] justify-center rounded-full border border-[#dbe6e0] bg-[#ffffff] px-3 py-1 text-sm font-black text-[#526174]">Nepažymėta</span>
                         )}
                       </button>
                     </div>
@@ -1987,7 +1987,7 @@ function AttendanceModal({
 
 function StatCard({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
   return (
-    <article className={`rounded-2xl border p-3 ${warning ? "border-[#ead9a8] bg-[#fff8e6]" : "border-[#dbe6e0] bg-[#f8faf8]"}`}>
+    <article className={`rounded-2xl border p-3 ${warning ? "border-[#ead9a8] bg-[#fff8e6]" : "border-[#dbe6e0] bg-[#ffffff]"}`}>
       <div className={`text-xs font-bold ${warning ? "text-[#7b5f1b]" : "text-[#526174]"}`}>{label}</div>
       <div className={`mt-1 truncate text-lg font-black capitalize ${warning ? "text-[#6a4c12]" : "text-[#10251f]"}`}>{value}</div>
     </article>

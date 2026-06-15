@@ -315,7 +315,7 @@ function statusClass(status: string | null) {
   if (normalized === "sutartis_nutraukta")
     return "border-red-200 bg-red-50 text-red-700";
 
-  return "border-[#dbe6e0] bg-[#f8faf8] text-[#526174]";
+  return "border-[#dbe6e0] bg-[#ffffff] text-[#526174]";
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -1075,7 +1075,7 @@ export default function ResidentsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f3f6f4] p-6 text-[#10251f]">
+      <main className="min-h-screen bg-[#ffffff] p-6 text-[#10251f]">
         <div className="mx-auto max-w-7xl rounded-3xl border border-[#dbe6e0] bg-white p-8 shadow-sm">
           <p className="font-bold text-[#526174]">Kraunama...</p>
         </div>
@@ -1084,7 +1084,7 @@ export default function ResidentsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f3f6f4] p-6 text-[#10251f]">
+    <main className="min-h-screen bg-[#ffffff] p-6 text-[#10251f]">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-[#486b5d] shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
           <div className="flex flex-col gap-6 px-7 py-7 lg:flex-row lg:items-center lg:justify-between">
@@ -1129,7 +1129,7 @@ export default function ResidentsPage() {
           </div>
         </section>
 
-        <section className="rounded-[24px] border border-[#c9d8d0] bg-[#eef4f1] p-3 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+        <section className="rounded-[24px] border border-[#c9d8d0] bg-[#f7fcf9] p-3 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
           <div className="flex flex-wrap gap-2">
             {RESIDENT_LIST_TABS.map((item) => {
               const Icon = item.icon;
@@ -1233,7 +1233,7 @@ export default function ResidentsPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Ieškoti pagal vardą, telefoną, kambarį ar darbuotoją..."
-                className="w-full rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-[#047857] focus:bg-white focus:ring-4 focus:ring-[#047857]/10"
+                className="w-full rounded-2xl border border-[#dbe6e0] bg-[#ffffff] py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-[#047857] focus:bg-white focus:ring-4 focus:ring-[#047857]/10"
               />
             </label>
           </div>
@@ -1248,7 +1248,7 @@ export default function ResidentsPage() {
 
           <div className="mt-6 grid gap-4">
             {filteredResidents.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-8 text-center">
+              <div className="rounded-3xl border border-dashed border-[#c9d8d0] bg-[#ffffff] p-8 text-center">
                 <p className="text-xl font-black">Gyventojų nerasta</p>
                 <p className="mt-2 font-semibold text-[#66756c]">
                   Pridėk naują gyventoją arba pakeisk filtrą.
@@ -1261,11 +1261,11 @@ export default function ResidentsPage() {
                 return (
                   <article
                     key={resident.id}
-                    className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5 transition hover:border-[#a7f3d0] hover:bg-[#ecfdf5]/40"
+                    className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5 transition hover:border-[#a7f3d0] hover:bg-[#ecfdf5]/40"
                   >
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                       <div className="flex items-start gap-4">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#eef4f1] text-[#486b5d] shadow-sm">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#f7fcf9] text-[#486b5d] shadow-sm">
                           <User className="h-6 w-6" />
                         </div>
 
@@ -1328,7 +1328,7 @@ export default function ResidentsPage() {
                         <button
                           type="button"
                           onClick={() => openEditModal(resident)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 font-extrabold text-[#486b5d] transition hover:bg-[#eef4f1]"
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 font-extrabold text-[#486b5d] transition hover:bg-[#f7fcf9]"
                         >
                           <Edit3 className="h-4 w-4" />
                           Redaguoti
@@ -1517,7 +1517,7 @@ function StatCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[18px] border bg-white px-5 py-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.10)] transition ${active ? "border-[#047857] ring-2 ring-[#d1fae5]" : "border-[#c9d8d0] hover:border-[#a7f3d0] hover:bg-[#f8faf8]"}`}
+      className={`rounded-[18px] border bg-white px-5 py-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.10)] transition ${active ? "border-[#047857] ring-2 ring-[#d1fae5]" : "border-[#c9d8d0] hover:border-[#a7f3d0] hover:bg-[#ffffff]"}`}
     >
       <p className="font-extrabold text-[#66756c]">{title}</p>
       <p className="mt-2 text-4xl font-black tracking-[-0.04em] text-[#10251f]">{value}</p>
@@ -1647,7 +1647,7 @@ function ResidentModal({
           </button>
         </div>
 
-        <div className="border-b border-[#dbe6e0] bg-[#eef4f1] px-5 py-3 md:px-6">
+        <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-5 py-3 md:px-6">
           <div className="flex flex-wrap gap-2">
             {RESIDENT_POPUP_TABS.map((item) => {
               const Icon = item.icon;
@@ -1672,7 +1672,7 @@ function ResidentModal({
           </div>
         </div>
 
-        <div className="max-h-[calc(100vh-238px)] overflow-y-auto bg-[#f3f6f4] px-5 py-5 md:px-6">
+        <div className="max-h-[calc(100vh-238px)] overflow-y-auto bg-[#ffffff] px-5 py-5 md:px-6">
           <form onSubmit={onSubmit} className="space-y-5">
             <InfoBox
               title="Kaip pildyti šią formą"
@@ -2032,7 +2032,7 @@ function ResidentModal({
                 text="Pažymėti darbuotojai matys gyventoją pagal tavo teisių logiką. Pirmas pasirinktas darbuotojas laikomas pagrindiniu atsakingu, o kitus galima priskirti kaip papildomus."
               />
 
-              <div className="mt-4 rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+              <div className="mt-4 rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-4">
                 {staffMembers.length === 0 ? (
                   <p className="font-semibold text-[#66756c]">
                     Aktyvių darbuotojų nerasta. Pirmiausia pridėk darbuotojus
@@ -2107,7 +2107,7 @@ function ResidentModal({
                           return (
                             <div
                               key={member.user_id}
-                              className={`flex items-center justify-between gap-3 border-b border-[#eef4f1] p-3 last:border-b-0 ${
+                              className={`flex items-center justify-between gap-3 border-b border-[#f7fcf9] p-3 last:border-b-0 ${
                                 checked ? "bg-emerald-50" : "bg-white"
                               }`}
                             >
@@ -2186,7 +2186,7 @@ function ResidentModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-[14px] border border-[#dbe6e0] bg-white px-6 py-3 font-extrabold text-[#486b5d] transition hover:bg-[#f8faf8]"
+                className="rounded-[14px] border border-[#dbe6e0] bg-white px-6 py-3 font-extrabold text-[#486b5d] transition hover:bg-[#ffffff]"
               >
                 Atšaukti
               </button>
@@ -2209,7 +2209,7 @@ function ResidentModal({
 
 function HelpCard({ title, text }: { title: string; text: string }) {
   return (
-    <article className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8] p-5">
+    <article className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5">
       <h3 className="text-base font-black text-[#10251f]">{title}</h3>
       <p className="mt-2 text-sm font-semibold leading-6 text-[#526174]">
         {text}
@@ -2230,7 +2230,7 @@ function FormSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-[#dbe6e0] bg-[#f8faf8] p-5">
+    <section className="rounded-[28px] border border-[#dbe6e0] bg-[#ffffff] p-5">
       <div className="mb-5 flex items-start gap-3">
         {icon ? (
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#047857] shadow-sm">
@@ -2271,4 +2271,4 @@ function Field({
 }
 
 const inputClass =
-  "w-full rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 font-semibold outline-none transition focus:border-[#047857] focus:bg-white focus:ring-4 focus:ring-[#047857]/10";
+  "w-full rounded-2xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 font-semibold outline-none transition focus:border-[#047857] focus:bg-white focus:ring-4 focus:ring-[#047857]/10";

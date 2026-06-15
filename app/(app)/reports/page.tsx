@@ -72,7 +72,7 @@ const reports = [
 
 export default function ReportsPage() {
   return (
-    <div className="min-h-screen bg-[#f3f6f4] px-6 py-8 lg:px-10">
+    <div className="min-h-screen bg-[#ffffff] px-6 py-8 lg:px-10">
       <div className="mx-auto max-w-[1480px] space-y-6">
         <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-[#486b5d] p-8 text-white shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
           <div className="flex items-start gap-5">
@@ -112,7 +112,7 @@ export default function ReportsPage() {
                     <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-emerald-50 text-[#047857] shadow-sm">
                       <Icon className="h-7 w-7" />
                     </div>
-                    <span className="rounded-full bg-[#f8faf8] px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-[#526174]">
+                    <span className="rounded-full bg-[#ffffff] px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-[#526174]">
                       {item.tag}
                     </span>
                   </div>

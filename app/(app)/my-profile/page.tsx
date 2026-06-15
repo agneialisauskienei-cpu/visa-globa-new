@@ -783,7 +783,7 @@ export default function MyProfilePage() {
   }
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f8faf8]">
+      <div className="flex min-h-screen items-center justify-center bg-[#ffffff]">
         <div className="rounded-3xl bg-white px-6 py-4 text-lg font-black text-[#526174] shadow-sm">
           Kraunama...
         </div>
@@ -795,7 +795,7 @@ export default function MyProfilePage() {
   const photo = profile?.avatar_url;
 
   return (
-    <main className="min-h-screen bg-[#f3f6f4] px-4 py-5 pb-28 text-[#10251f] sm:p-6 sm:pb-24">
+    <main className="min-h-screen bg-[#ffffff] px-4 py-5 pb-28 text-[#10251f] sm:p-6 sm:pb-24">
       <div className="mx-auto max-w-7xl space-y-5 sm:space-y-6">
         <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
           <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
@@ -877,7 +877,7 @@ export default function MyProfilePage() {
             </div>
           </div>
 
-          <div className="border-t border-emerald-900/10 bg-[#eef4f1] p-3">
+          <div className="border-t border-emerald-900/10 bg-[#f7fcf9] p-3">
             <div className="flex flex-wrap gap-2">
               <ProfileTab active label="Apžvalga" icon={<UserRound className="h-4 w-4" />} />
               <ProfileTab label="Mokymai" count={trainings.length} icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setShowTrainingModal(true)} />
@@ -1030,7 +1030,7 @@ export default function MyProfilePage() {
                   </p>
                 </div>
 
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef4f1] text-emerald-700">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f7fcf9] text-emerald-700">
                   <Info className="h-6 w-6" />
                 </div>
               </div>
@@ -1110,7 +1110,7 @@ export default function MyProfilePage() {
                   />
                 ) : null}
                 {missingProfileCount === 0 && pendingVacations.length === 0 ? (
-                  <div className="rounded-2xl bg-[#eef4f1] p-4 font-black text-emerald-700">
+                  <div className="rounded-2xl bg-[#f7fcf9] p-4 font-black text-emerald-700">
                     Viskas tvarkoje.
                   </div>
                 ) : null}
@@ -1127,7 +1127,7 @@ export default function MyProfilePage() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="group relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl border border-[#dbe6e0] bg-[#eef4f1] text-2xl font-black text-[#10251f] shadow-sm transition hover:ring-4 hover:ring-emerald-100 disabled:opacity-60"
+                  className="group relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl border border-[#dbe6e0] bg-[#f7fcf9] text-2xl font-black text-[#10251f] shadow-sm transition hover:ring-4 hover:ring-emerald-100 disabled:opacity-60"
                   aria-label="Įkelti profilio nuotrauką"
                 >
                   {photo ? (
@@ -1185,7 +1185,7 @@ export default function MyProfilePage() {
                 <button
                   type="button"
                   onClick={() => setShowProfileModal(true)}
-                  className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
+                  className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#ffffff]"
                 >
                   <Edit3 className="h-4 w-4" />
                   Redaguoti kontaktus
@@ -1271,7 +1271,7 @@ export default function MyProfilePage() {
             <button
               type="button"
               onClick={() => setShowDocumentsModal(true)}
-              className="rounded-2xl bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-slate-200"
+              className="rounded-2xl bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-slate-200"
             >
               Redaguoti
             </button>
@@ -1375,7 +1375,7 @@ export default function MyProfilePage() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="group relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-[#eef4f1] text-2xl font-black text-[#10251f] transition hover:ring-4 hover:ring-emerald-100 disabled:opacity-60"
+                  className="group relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-[#f7fcf9] text-2xl font-black text-[#10251f] transition hover:ring-4 hover:ring-emerald-100 disabled:opacity-60"
                 >
                   {photo ? (
                     <img
@@ -1402,7 +1402,7 @@ export default function MyProfilePage() {
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
                     disabled={uploadingPhoto}
-                    className="mt-3 rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8] disabled:opacity-60"
+                    className="mt-3 rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#ffffff] disabled:opacity-60"
                   >
                     {uploadingPhoto ? "Keliama..." : "Įkelti nuotrauką"}
                   </button>
@@ -1457,7 +1457,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowProfileModal(false)}
-                className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
+                className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#ffffff]"
               >
                 Atšaukti
               </button>
@@ -1536,7 +1536,7 @@ export default function MyProfilePage() {
               </div>
             </ModalSection>
 
-            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-[#eef4f1]/70 p-4 text-sm font-semibold text-emerald-900">
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-[#f7fcf9]/70 p-4 text-sm font-semibold text-emerald-900">
               <Info className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
               <p>
                 Įrašas bus pateiktas administratoriui patvirtinti, kad
@@ -1548,7 +1548,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowDocumentsModal(false)}
-                className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
+                className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#ffffff]"
               >
                 Atšaukti
               </button>
@@ -1673,7 +1673,7 @@ export default function MyProfilePage() {
               </Field>
             </ModalSection>
 
-            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-[#eef4f1]/70 p-4 text-sm font-semibold text-emerald-900">
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-[#f7fcf9]/70 p-4 text-sm font-semibold text-emerald-900">
               <Info className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
               <p>
                 Įrašas bus pateiktas administratoriui patvirtinti, kad
@@ -1685,7 +1685,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowTrainingModal(false)}
-                className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f8faf8]"
+                className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#ffffff]"
               >
                 Atšaukti
               </button>
@@ -1831,7 +1831,7 @@ export default function MyProfilePage() {
               />
             </Field>
 
-            <p className="rounded-2xl bg-[#eef4f1] p-4 text-sm font-bold text-emerald-800">
+            <p className="rounded-2xl bg-[#f7fcf9] p-4 text-sm font-bold text-emerald-800">
               Prašymas bus pateiktas administratoriui patvirtinti.
             </p>
 
@@ -1903,7 +1903,7 @@ function HeroMetric({
   tone?: "normal" | "warning";
 }) {
   return (
-    <div className="rounded-[18px] bg-[#eef4f1] px-5 py-4">
+    <div className="rounded-[18px] bg-[#f7fcf9] px-5 py-4">
       <div className="text-2xl font-black text-[#10251f]">{value}</div>
       <div className={`mt-1 text-[11px] font-black uppercase tracking-[0.16em] ${
         tone === "warning" ? "text-amber-700" : "text-[#526174]"
@@ -1947,7 +1947,7 @@ function StatCard({
     <article className="rounded-[24px] border border-[#dbe6e0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6 transition hover:border-emerald-200 hover:shadow-md">
       <div className="flex items-center gap-4">
         <div
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl [&>svg]:h-6 [&>svg]:w-6 ${warning ? "bg-amber-50 text-amber-600" : "bg-[#eef4f1] text-emerald-700"}`}
+          className={`flex h-14 w-14 items-center justify-center rounded-2xl [&>svg]:h-6 [&>svg]:w-6 ${warning ? "bg-amber-50 text-amber-600" : "bg-[#f7fcf9] text-emerald-700"}`}
         >
           {icon}
         </div>
@@ -1982,7 +1982,7 @@ function ActionCard({
     <button
       type="button"
       onClick={onClick}
-      className="group flex items-center justify-between rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left transition hover:border-emerald-200 hover:bg-[#eef4f1]"
+      className="group flex items-center justify-between rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-4 text-left transition hover:border-emerald-200 hover:bg-[#f7fcf9]"
     >
       <span className="flex items-center gap-4">
         <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#526174] shadow-sm [&>svg]:h-5 [&>svg]:w-5">
@@ -2009,7 +2009,7 @@ function SummaryCard({
   muted?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-[#f8faf8] p-4">
+    <div className="rounded-2xl bg-[#ffffff] p-4">
       <p className="font-black text-[#10251f]">{title}</p>
       <p
         className={`mt-1 truncate text-sm font-black ${muted ? "text-[#526174]" : "text-emerald-700"}`}
@@ -2035,7 +2035,7 @@ function PriorityCard({
     amber: "border-amber-100 bg-amber-50 text-amber-700",
     red: "border-red-100 bg-red-50 text-red-700",
     blue: "border-blue-100 bg-blue-50 text-blue-700",
-    emerald: "border-emerald-100 bg-[#eef4f1] text-emerald-700",
+    emerald: "border-emerald-100 bg-[#f7fcf9] text-emerald-700",
   }[color];
 
   return (
@@ -2058,7 +2058,7 @@ function TrainingCard({ item }: { item: TrainingRow }) {
 
   return (
     <div
-      className={`group rounded-2xl border p-4 transition ${verified ? "border-emerald-100 bg-[#eef4f1] hover:border-emerald-200" : "border-amber-100 bg-amber-50 hover:border-amber-200"}`}
+      className={`group rounded-2xl border p-4 transition ${verified ? "border-emerald-100 bg-[#f7fcf9] hover:border-emerald-200" : "border-amber-100 bg-amber-50 hover:border-amber-200"}`}
     >
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -2093,7 +2093,7 @@ function VacationCard({ item }: { item: VacationRow }) {
 
   return (
     <div
-      className={`group rounded-2xl border p-4 transition ${approved ? "border-emerald-100 bg-[#eef4f1]" : rejected ? "border-rose-100 bg-rose-50" : "border-amber-100 bg-amber-50"}`}
+      className={`group rounded-2xl border p-4 transition ${approved ? "border-emerald-100 bg-[#f7fcf9]" : rejected ? "border-rose-100 bg-rose-50" : "border-amber-100 bg-amber-50"}`}
     >
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -2133,7 +2133,7 @@ function ProfileInfoRow({
   return (
     <div className="flex items-center gap-4 p-4">
       <div
-        className={`flex h-10 w-10 items-center justify-center rounded-2xl [&>svg]:h-5 [&>svg]:w-5 ${warning ? "bg-amber-50 text-amber-600" : "bg-[#f8faf8] text-[#526174]"}`}
+        className={`flex h-10 w-10 items-center justify-center rounded-2xl [&>svg]:h-5 [&>svg]:w-5 ${warning ? "bg-amber-50 text-amber-600" : "bg-[#ffffff] text-[#526174]"}`}
       >
         {icon}
       </div>
@@ -2162,7 +2162,7 @@ function InfoStat({
 }) {
   return (
     <div
-      className={`rounded-2xl p-4 ${tone === "green" ? "bg-[#eef4f1]" : "bg-amber-50"}`}
+      className={`rounded-2xl p-4 ${tone === "green" ? "bg-[#f7fcf9]" : "bg-amber-50"}`}
     >
       <p className="text-sm font-black text-[#526174]">{title}</p>
       <p
@@ -2186,7 +2186,7 @@ function DocumentItem({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-4 rounded-2xl border p-4 ${tone === "amber" ? "border-amber-100 bg-amber-50" : "border-[#dbe6e0] bg-[#f8faf8]"}`}
+      className={`flex items-center justify-between gap-4 rounded-2xl border p-4 ${tone === "amber" ? "border-amber-100 bg-amber-50" : "border-[#dbe6e0] bg-[#ffffff]"}`}
     >
       <div className="flex items-center gap-3">
         <div
@@ -2222,7 +2222,7 @@ function SettingsButton({
     <button
       type="button"
       onClick={onClick}
-      className="group flex items-center justify-between rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left transition hover:border-emerald-200 hover:bg-[#eef4f1]"
+      className="group flex items-center justify-between rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-4 text-left transition hover:border-emerald-200 hover:bg-[#f7fcf9]"
     >
       <span>
         <b>{title}</b>
@@ -2236,7 +2236,7 @@ function SettingsButton({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-[#f8faf8] p-5 text-center font-bold text-[#526174]">
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-[#ffffff] p-5 text-center font-bold text-[#526174]">
       {text}
     </div>
   );
@@ -2276,7 +2276,7 @@ function ModalSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-[#dbe6e0] bg-[#f8faf8]/80 p-4 sm:p-5">
+    <section className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff]/80 p-4 sm:p-5">
       <div className="mb-4 flex items-center gap-2 text-sm font-black text-[#10251f]">
         <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm">
           {icon}
@@ -2324,7 +2324,7 @@ function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eef4f1] text-[#526174] transition hover:bg-slate-200 hover:text-[#10251f]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f7fcf9] text-[#526174] transition hover:bg-slate-200 hover:text-[#10251f]"
             aria-label="Uždaryti"
           >
             <X className="h-5 w-5" />

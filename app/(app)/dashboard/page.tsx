@@ -370,7 +370,7 @@ export default function AdminDashboardPage() {
                   type="button"
                   onClick={loadStats}
                   disabled={loading}
-                  className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#ffffff] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                   Atnaujinti
@@ -388,7 +388,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-3 sm:px-5">
+          <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-3 sm:px-5">
             <nav className="flex flex-wrap items-center gap-2 text-sm font-black text-[#486b5d]">
               {dashboardTabs.map((item) => {
                 const Icon = item.icon;
@@ -408,7 +408,7 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setShowHelp(true)}
-                className="ml-auto inline-flex items-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 py-2 text-xs font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8]"
+                className="ml-auto inline-flex items-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 py-2 text-xs font-black text-[#486b5d] shadow-sm transition hover:bg-[#ffffff]"
               >
                 <Info className="h-4 w-4" />
                 Instrukcija
@@ -449,7 +449,7 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     onClick={() => router.push("/reports")}
-                    className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
+                    className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f7fcf9]"
                   >
                     Plačiau
                   </button>
@@ -661,7 +661,7 @@ export default function AdminDashboardPage() {
 
               <div className="mt-4 space-y-3">
                 <TimelineItem color="#047857" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
-                <TimelineItem color="#8a5a13" title="Atostogų / išvykimo užklausos" meta={`${stats.pendingLeaves} laukia sprendimo`} warm />
+                <TimelineItem color="#be123c" title="Atostogų / išvykimo užklausos" meta={`${stats.pendingLeaves} laukia sprendimo`} warm />
                 <TimelineItem
                   color="#b91c1c"
                   title="Dokumentų terminai"
@@ -701,7 +701,7 @@ export default function AdminDashboardPage() {
                 <FteSummaryCard label="Baigiasi dokumentai" value={String(stats.expiringCertificates)} tone={stats.expiringCertificates > 0 ? "red" : "emerald"} />
               </div>
 
-              <p className="mt-5 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-sm font-bold text-[#486b5d]">
+              <p className="mt-5 rounded-xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 text-sm font-bold text-[#486b5d]">
                 Čia rodoma tik dokumentų būsena: darbuotojo pateikti pakeitimai ir artėjantys terminai.
               </p>
             </section>
@@ -724,7 +724,7 @@ export default function AdminDashboardPage() {
                     ? "Atidaryti dokumentų patvirtinimą"
                     : "Atidaryti darbuotojų dokumentus"}
                 </button>
-                <p className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-sm font-bold text-[#486b5d]">
+                <p className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 text-sm font-bold text-[#486b5d]">
                   {stats.pendingDocumentApprovals > 0
                     ? "Atsidariusiame sąraše prie laukiančių įrašų spauskite „Patvirtinti“."
                     : "Laukiančių dokumentų patvirtinimų nėra. Atsidarys dokumentų sąrašas ir terminai."}
@@ -1418,7 +1418,7 @@ function DashboardSidePanel({
         <div className="mt-4 space-y-3">
           <TimelineItem color="#047857" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
           <TimelineItem color="#2563eb" title="Darbuotojų kvietimai" meta={`${pendingInvites} laukia atsakymo`} blue />
-          <TimelineItem color="#8a5a13" title="Atostogų / išvykimo užklausos" meta={`${pendingLeaves} laukia sprendimo`} warm />
+          <TimelineItem color="#be123c" title="Atostogų / išvykimo užklausos" meta={`${pendingLeaves} laukia sprendimo`} warm />
           <TimelineItem
             color="#b91c1c"
             title="Dokumentų terminai"
@@ -1455,14 +1455,14 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
 
   return (
     <div className="mt-5 overflow-hidden rounded-2xl border border-[#dbe6e0]">
-      <div className="hidden grid-cols-[1fr_0.7fr_0.7fr_0.7fr] bg-[#f8faf8] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
+      <div className="hidden grid-cols-[1fr_0.7fr_0.7fr_0.7fr] bg-[#ffffff] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
         <div>Pareigybė</div>
         <div>Užimta</div>
         <div>Laisva</div>
         <div>Būsena</div>
       </div>
 
-      <div className="divide-y divide-[#eef4f1] bg-white">
+      <div className="divide-y divide-[#f7fcf9] bg-white">
         {visibleRows.map((row) => (
           <div
             key={row.key}
@@ -1476,7 +1476,7 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
                     row.color === "emerald"
                       ? "bg-[#047857]"
                       : row.color === "red"
-                        ? "bg-[#8a5a13]"
+                        ? "bg-[#be123c]"
                         : "bg-[#ca8a04]"
                   }`}
                   style={{ width: `${clamp(row.percent, 0, 100)}%` }}
@@ -1495,7 +1495,7 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
                     ? "bg-emerald-50 text-emerald-700"
                     : row.color === "red"
                       ? "bg-red-50 text-[#047857]"
-                      : "bg-[#fff9e8] text-[#8a5a13]"
+                      : "bg-[#fff1f2] text-[#be123c]"
                 }`}
               >
                 {row.status}
@@ -1527,7 +1527,7 @@ function RoundMetric({
 }) {
   return (
     <article className={`rounded-2xl border p-5 ${
-      warm ? "border-[#ead8a7] bg-[#fff9e8]" : "border-[#dbe6e0] bg-[#f8faf8]"
+      warm ? "border-[#fecdd3] bg-[#fff1f2]" : "border-[#dbe6e0] bg-[#ffffff]"
     }`}>
       <div className="mx-auto flex justify-center">
         <div className="relative flex h-[132px] w-[132px] items-center justify-center">
@@ -1542,7 +1542,7 @@ function RoundMetric({
 
       <div className="mt-4 text-center">
         <p className="text-lg font-black text-[#10251f]">{title}</p>
-        <p className={`mt-1 text-sm font-bold ${warm ? "text-[#8a5a13]" : "text-[#6a7e75]"}`}>{label}</p>
+        <p className={`mt-1 text-sm font-bold ${warm ? "text-[#be123c]" : "text-[#6a7e75]"}`}>{label}</p>
       </div>
     </article>
   );
@@ -1565,11 +1565,11 @@ function RiskAttentionCard({
 }) {
   const classes =
     tone === "red"
-      ? "border-[#ead8a7] bg-[#fff9e8] text-[#047857]"
+      ? "border-[#fecdd3] bg-[#fff1f2] text-[#047857]"
       : tone === "amber"
-        ? "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]"
+        ? "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]"
         : tone === "blue"
-          ? "border-[#c9d8d0] bg-[#eef4f1] text-[#047857]"
+          ? "border-[#c9d8d0] bg-[#f7fcf9] text-[#047857]"
           : "border-emerald-100 bg-emerald-50 text-emerald-700";
 
   return (
@@ -1648,7 +1648,7 @@ function FtePlanningSection({
           <button
             type="button"
             onClick={onOpenPlan}
-            className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#eef4f1]"
+            className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f7fcf9]"
           >
             Personalo planas
           </button>
@@ -1670,7 +1670,7 @@ function FtePlanningSection({
       </div>
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-[#dbe6e0]">
-        <div className="hidden grid-cols-[1.25fr_0.8fr_0.55fr_0.8fr_0.65fr] bg-[#f8faf8] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
+        <div className="hidden grid-cols-[1.25fr_0.8fr_0.55fr_0.8fr_0.65fr] bg-[#ffffff] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
           <div>Pareigybė / grupė</div>
           <div>Užpildyta</div>
           <div>Laisva</div>
@@ -1678,7 +1678,7 @@ function FtePlanningSection({
           <div>Statusas</div>
         </div>
 
-        <div className="divide-y divide-[#eef4f1] bg-white">
+        <div className="divide-y divide-[#f7fcf9] bg-white">
           {visibleRows.map((row) => (
             <div
               key={row.key}
@@ -1692,7 +1692,7 @@ function FtePlanningSection({
                       row.color === "emerald"
                         ? "bg-[#047857]"
                         : row.color === "red"
-                          ? "bg-[#8a5a13]"
+                          ? "bg-[#be123c]"
                           : "bg-[#ca8a04]"
                     }`}
                     style={{ width: `${clamp(row.percent, 0, 100)}%` }}
@@ -1725,7 +1725,7 @@ function FtePlanningSection({
                       ? "bg-emerald-50 text-emerald-700"
                       : row.color === "red"
                         ? "bg-red-50 text-[#047857]"
-                        : "bg-[#fff9e8] text-[#8a5a13]"
+                        : "bg-[#fff1f2] text-[#be123c]"
                   }`}
                 >
                   {row.status}
@@ -1736,7 +1736,7 @@ function FtePlanningSection({
         </div>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-[#c9d8d0] bg-[#eef4f1] p-5">
+      <div className="mt-5 rounded-2xl border border-[#c9d8d0] bg-[#f7fcf9] p-5">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
           Pamainų rizikos
         </p>
@@ -1777,10 +1777,10 @@ function FteSummaryCard({
 }) {
   const classes =
     tone === "red"
-      ? "border-[#ead8a7] bg-[#fff9e8] text-[#047857]"
+      ? "border-[#fecdd3] bg-[#fff1f2] text-[#047857]"
       : tone === "amber"
-        ? "border-[#fff0c2] bg-[#fff9e8] text-[#8a5a13]"
-        : "border-[#dbe6e0] bg-[#f8faf8] text-[#10251f]";
+        ? "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]"
+        : "border-[#dbe6e0] bg-[#ffffff] text-[#10251f]";
 
   return (
     <article className={`rounded-2xl border p-4 ${classes}`}>
@@ -1809,7 +1809,7 @@ function TopMetric({
   const valueClass = accent === "red"
     ? "text-[#b91c1c]"
     : accent === "amber"
-      ? "text-[#8a5a13]"
+      ? "text-[#be123c]"
       : accent === "emerald"
         ? "text-[#047857]"
         : "text-[#10251f]";
@@ -1818,7 +1818,7 @@ function TopMetric({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-[#f8faf8]"
+      className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-[#ffffff]"
     >
       <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">{title}</p>
       <p className={`mt-1 text-2xl font-black ${valueClass}`}>{value}</p>
@@ -1841,9 +1841,9 @@ function CriticalStrip({
   onClick: () => void;
 }) {
   const styles = {
-    red: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
-    amber: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
-    blue: "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]",
+    red: "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]",
+    amber: "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]",
+    blue: "border-[#c9d8d0] bg-[#f7fcf9] text-[#486b5d]",
   }[color];
 
   return (
@@ -1877,15 +1877,15 @@ function PriorityActionCard({
   onClick: () => void;
 }) {
   const styles = {
-    amber: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
-    red: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
-    blue: "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]",
+    amber: "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]",
+    red: "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]",
+    blue: "border-[#c9d8d0] bg-[#f7fcf9] text-[#486b5d]",
     emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
   }[color];
 
   const buttonStyles = {
-    amber: "bg-[#8a5a13]",
-    red: "bg-[#8a5a13]",
+    amber: "bg-[#be123c]",
+    red: "bg-[#be123c]",
     blue: "bg-[#486b5d]",
     emerald: "bg-[#047857]",
   }[color];
@@ -1970,21 +1970,21 @@ function MiniCircularCard({
   return (
     <article className={`rounded-2xl border p-4 ${
       danger
-        ? "border-[#ead8a7] bg-[#fff9e8]"
+        ? "border-[#fecdd3] bg-[#fff1f2]"
         : warm
-          ? "border-[#ead8a7] bg-[#fff9e8]"
-          : "border-[#dbe6e0] bg-[#f8faf8]"
+          ? "border-[#fecdd3] bg-[#fff1f2]"
+          : "border-[#dbe6e0] bg-[#ffffff]"
     }`}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className={`text-xs font-black uppercase tracking-[0.14em] ${
-            danger ? "text-[#047857]" : warm ? "text-[#8a5a13]" : "text-[#6a7e75]"
+            danger ? "text-[#047857]" : warm ? "text-[#be123c]" : "text-[#6a7e75]"
           }`}>
             {eyebrow}
           </p>
           <h3 className="mt-1 text-lg font-black">{title}</h3>
           <p className={`mt-1 text-sm font-bold ${
-            danger ? "text-[#047857]/75" : warm ? "text-[#7a6a4f]" : "text-[#6a7e75]"
+            danger ? "text-[#047857]/75" : warm ? "text-[#9f1239]" : "text-[#6a7e75]"
           }`}>
             {meta}
           </p>
@@ -1998,7 +1998,7 @@ function MiniCircularCard({
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-4 rounded-xl bg-[#f8faf8] px-4 py-3 text-sm font-black">
+    <div className="flex justify-between gap-4 rounded-xl bg-[#ffffff] px-4 py-3 text-sm font-black">
       <span>{label}</span>
       <span>{value}</span>
     </div>
@@ -2007,7 +2007,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function ShiftBox({ label, value, warn }: { label: string; value: string | number; warn?: boolean }) {
   return (
-    <div className={`rounded-xl p-4 ${warn ? "bg-[#fff9e8] text-[#8a5a13]" : "bg-[#f8faf8] text-[#10251f]"}`}>
+    <div className={`rounded-xl p-4 ${warn ? "bg-[#fff1f2] text-[#be123c]" : "bg-[#ffffff] text-[#10251f]"}`}>
       <p className="text-xs font-black uppercase tracking-[0.12em] opacity-70">{label}</p>
       <p className="mt-1 text-2xl font-black">{value}</p>
     </div>
@@ -2019,7 +2019,7 @@ function QuickLink({ title, onClick }: { title: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center justify-between rounded-xl border border-[#dbe6e0] bg-[#f8faf8] px-4 py-3 text-left font-black transition hover:bg-[#eef4f1]"
+      className="flex items-center justify-between rounded-xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 text-left font-black transition hover:bg-[#f7fcf9]"
     >
       <span>+ {title}</span>
       <ArrowRight className="h-5 w-5 text-[#6a7e75]" />
@@ -2041,16 +2041,16 @@ function RiskRow({
   onClick: () => void;
 }) {
   const styles = {
-    red: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
-    amber: "border-[#ead8a7] bg-[#fff9e8] text-[#8a5a13]",
-    blue: "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]",
+    red: "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]",
+    amber: "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]",
+    blue: "border-[#c9d8d0] bg-[#f7fcf9] text-[#486b5d]",
   }[color];
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center justify-between gap-4 rounded-xl border p-3 text-left transition hover:shadow-sm ${value > 0 ? styles : "border-[#dbe6e0] bg-[#f8faf8] text-[#486b5d]"}`}
+      className={`flex items-center justify-between gap-4 rounded-xl border p-3 text-left transition hover:shadow-sm ${value > 0 ? styles : "border-[#dbe6e0] bg-[#ffffff] text-[#486b5d]"}`}
     >
       <span>
         <b className="block text-[#10251f]">{label}</b>
@@ -2079,17 +2079,17 @@ function TimelineItem({
   return (
     <div className={`flex gap-3 rounded-xl border p-3 ${
       danger
-        ? "border-[#ead8a7] bg-[#fff9e8]"
+        ? "border-[#fecdd3] bg-[#fff1f2]"
         : warm
-          ? "border-[#ead8a7] bg-[#fff9e8]"
+          ? "border-[#fecdd3] bg-[#fff1f2]"
           : blue
-            ? "border-[#c9d8d0] bg-[#eef4f1]"
-            : "border-[#dbe6e0] bg-[#f8faf8]"
+            ? "border-[#c9d8d0] bg-[#f7fcf9]"
+            : "border-[#dbe6e0] bg-[#ffffff]"
     }`}>
       <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
       <div>
         <b>{title}</b>
-        <p className={`text-sm font-bold ${danger ? "text-[#047857]/75" : warm ? "text-[#7a6a4f]" : blue ? "text-[#047857]/75" : "text-[#6a7e75]"}`}>
+        <p className={`text-sm font-bold ${danger ? "text-[#047857]/75" : warm ? "text-[#9f1239]" : blue ? "text-[#047857]/75" : "text-[#6a7e75]"}`}>
           {meta}
         </p>
       </div>
@@ -2101,7 +2101,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
       <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-[#c9d8d0] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] bg-[#eef4f1] px-5 py-4">
+        <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] bg-[#f7fcf9] px-5 py-4">
           <div>
             <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#6a7e75]">
               Trumpa instrukcija
@@ -2118,7 +2118,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#dbe6e0] bg-white text-2xl leading-none text-[#486b5d] transition hover:bg-[#eef4f1]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#dbe6e0] bg-white text-2xl leading-none text-[#486b5d] transition hover:bg-[#f7fcf9]"
             aria-label="Uždaryti instrukciją"
           >
             ×
@@ -2133,7 +2133,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
               ["3", "Rodiklių apžvalga", "Vizualiai parodo kambarių užimtumą, mokymų būklę, užduotis ir rizikas."],
               ["4", "Greiti veiksmai", "Leidžia iškart kurti gyventoją, darbuotoją, užduotį arba atsidaryti auditą."],
             ].map(([number, title, desc]) => (
-              <div key={number} className="rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+              <div key={number} className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
                 <div className="mb-3 flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f7ef] text-lg font-black text-[#047857]">
                     {number}
@@ -2146,7 +2146,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-[#dbe6e0] bg-[#eef4f1] px-5 py-4">
+        <div className="flex justify-end border-t border-[#dbe6e0] bg-[#f7fcf9] px-5 py-4">
           <button
             type="button"
             onClick={onClose}

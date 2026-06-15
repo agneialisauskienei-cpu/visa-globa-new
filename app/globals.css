@@ -134,7 +134,7 @@ h3 {
 
 /* VisaGloba Team schedule matrix */
 .ht-theme-classic .vg-team-person-cell {
-  background: #f8fafc !important;
+  background: #ffffff !important;
   color: #0f172a !important;
   font-weight: 900 !important;
   white-space: pre-line !important;
@@ -176,10 +176,10 @@ h3 {
 
 /* VisaGloba shared design system */
 :root {
-  --vg-bg: #f3f6f4;
+  --vg-bg: #ffffff;
   --vg-surface: #ffffff;
-  --vg-soft: #eef4f1;
-  --vg-soft-2: #f8faf8;
+  --vg-soft: #f7fcf9;
+  --vg-soft-2: #ffffff;
   --vg-border: #c9d8d0;
   --vg-border-soft: #dbe6e0;
   --vg-text: #10251f;
@@ -187,10 +187,10 @@ h3 {
   --vg-primary: #486b5d;
   --vg-primary-dark: #39594c;
   --vg-primary-soft: #e7f2ed;
-  --vg-warning-bg: #fff6df;
-  --vg-warning-text: #8a5a13;
-  --vg-danger-bg: #fff0ee;
-  --vg-danger-text: #963a3a;
+  --vg-warning-bg: #fff1f2;
+  --vg-warning-text: #be123c;
+  --vg-danger-bg: #fff1f2;
+  --vg-danger-text: #be123c;
   --vg-radius: 18px;
 }
 
@@ -223,7 +223,7 @@ h3 {
 .vg-btn-primary { border-color: var(--vg-primary); background: var(--vg-primary); color: #fff; }
 .vg-btn-primary:hover { background: var(--vg-primary-dark); }
 .vg-btn-danger { border-color: #e5b9b2; color: var(--vg-danger-text); }
-.vg-btn-warning { border-color: #ead8a7; background: var(--vg-warning-bg); color: var(--vg-warning-text); }
+.vg-btn-warning { border-color: #fecdd3; background: var(--vg-warning-bg); color: var(--vg-warning-text); }
 .vg-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; background: var(--vg-soft); color: var(--vg-primary); padding: 6px 10px; font-size: 12px; font-weight: 900; }
 .vg-chip-good { background: #e7f5ee; color: #087a55; }
 .vg-chip-warn { background: var(--vg-warning-bg); color: var(--vg-warning-text); }

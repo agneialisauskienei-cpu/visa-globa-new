@@ -1236,7 +1236,7 @@ export default function InventoryPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f3f6f4] p-6 text-[#10251f]">
+      <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#10251f]">
         <div className="rounded-3xl border border-[#c9d8d0] bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-[#047857]" />
           <p className="mt-4 text-lg font-black text-[#486b5d]">
@@ -1248,7 +1248,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f3f6f4] p-5 text-[#10251f]">
+    <main className="min-h-screen bg-[#ffffff] p-5 text-[#10251f]">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <section className="overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
           <div className="bg-[#486b5d] px-5 py-4 text-white">
@@ -1270,7 +1270,7 @@ export default function InventoryPage() {
                 <button
                   type="button"
                   onClick={() => void loadInventory()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f8faf8] active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#ffffff] active:scale-[0.98]"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Atnaujinti
@@ -1287,7 +1287,7 @@ export default function InventoryPage() {
             </div>
           </div>
 
-          <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#eef4f1] px-4 py-2 text-sm font-black text-[#486b5d]">
+          <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d]">
             {tabs.map((item) => {
               const Icon = item.icon;
               const active = tab === item.key;
@@ -1317,7 +1317,7 @@ export default function InventoryPage() {
         </section>
 
         {message ? (
-          <div className="rounded-2xl border border-[#c9d8d0] bg-[#eef4f1] p-4 text-sm font-black text-[#486b5d]">
+          <div className="rounded-2xl border border-[#c9d8d0] bg-[#f7fcf9] p-4 text-sm font-black text-[#486b5d]">
             {message}
           </div>
         ) : null}
@@ -1425,7 +1425,7 @@ export default function InventoryPage() {
               />
             </div>
 
-            <div className="mt-4 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-3">
+            <div className="mt-4 rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-3">
               <label className="text-[11px] font-black uppercase tracking-[0.12em] text-[#6a7e75]">
                 Paieška
               </label>
@@ -1703,7 +1703,7 @@ function StatButton({
     tone === "green"
       ? "text-[#047857]"
       : tone === "amber"
-        ? "text-[#8a5a13]"
+        ? "text-[#be123c]"
         : tone === "red"
           ? "text-red-700"
           : "text-[#10251f]";
@@ -1711,7 +1711,7 @@ function StatButton({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#f8faf8]"
+      className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
     >
       <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
         {label}
@@ -1742,7 +1742,7 @@ function QuickAction({
       className={`group flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition active:scale-[0.99] ${
         danger
           ? "border-red-100 bg-red-50 hover:bg-red-100"
-          : "border-[#dbe6e0] bg-[#f8faf8] hover:bg-[#eef4f1]"
+          : "border-[#dbe6e0] bg-[#ffffff] hover:bg-[#f7fcf9]"
       }`}
     >
       <span className="flex min-w-0 items-center gap-3">
@@ -1797,7 +1797,7 @@ function OverviewPanel({
               key={category.code}
               type="button"
               onClick={() => onCategory(category.code)}
-              className="rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4 text-left transition hover:border-[#c9d8d0] hover:bg-white"
+              className="rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-4 text-left transition hover:border-[#c9d8d0] hover:bg-white"
             >
               <div className="flex items-start justify-between gap-3">
                 <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-[#486b5d] shadow-sm">
@@ -1871,7 +1871,7 @@ function InventoryTable({
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-left">
-            <thead className="bg-[#f8faf8] text-[11px] uppercase tracking-[0.12em] text-[#6a7e75]">
+            <thead className="bg-[#ffffff] text-[11px] uppercase tracking-[0.12em] text-[#6a7e75]">
               <tr>
                 <th className="px-4 py-3 font-black">Prekė</th>
                 <th className="px-4 py-3 font-black">Kategorija</th>
@@ -1886,7 +1886,7 @@ function InventoryTable({
               {rows.map((item) => {
                 const status = getStockStatus(item.quantity, item.min_quantity);
                 return (
-                  <tr key={item.id} className="align-top hover:bg-[#f8faf8]">
+                  <tr key={item.id} className="align-top hover:bg-[#ffffff]">
                     <td className="px-4 py-4 font-black text-[#10251f]">
                       {item.name || "—"}
                     </td>
@@ -2018,7 +2018,7 @@ function LaundryStat({
 }) {
   return (
     <div
-      className={`rounded-2xl border p-4 ${warning ? "border-amber-100 bg-amber-50" : "border-[#dbe6e0] bg-[#f8faf8]"}`}
+      className={`rounded-2xl border p-4 ${warning ? "border-amber-100 bg-amber-50" : "border-[#dbe6e0] bg-[#ffffff]"}`}
     >
       <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[#6a7e75]">
         {label}
@@ -2063,7 +2063,7 @@ function MovementsPanel({
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] border-collapse text-left">
-            <thead className="bg-[#f8faf8] text-[11px] uppercase tracking-[0.12em] text-[#6a7e75]">
+            <thead className="bg-[#ffffff] text-[11px] uppercase tracking-[0.12em] text-[#6a7e75]">
               <tr>
                 <th className="px-4 py-3 font-black">Data</th>
                 <th className="px-4 py-3 font-black">Prekė</th>
@@ -2075,7 +2075,7 @@ function MovementsPanel({
             </thead>
             <tbody className="divide-y divide-[#edf2ef] text-sm">
               {logs.map((log) => (
-                <tr key={log.id} className="hover:bg-[#f8faf8]">
+                <tr key={log.id} className="hover:bg-[#ffffff]">
                   <td className="px-4 py-4 font-bold text-[#66756c]">
                     {formatDate(log.created_at)}
                   </td>
@@ -2172,7 +2172,7 @@ function SmallButton({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="m-4 rounded-2xl border border-dashed border-[#c9d8d0] bg-[#f8faf8] p-8 text-center text-sm font-black text-[#66756c]">
+    <div className="m-4 rounded-2xl border border-dashed border-[#c9d8d0] bg-[#ffffff] p-8 text-center text-sm font-black text-[#66756c]">
       {text}
     </div>
   );
@@ -2213,7 +2213,7 @@ function Modal({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[calc(100vh-140px)] overflow-y-auto bg-[#f3f6f4] p-5">
+        <div className="max-h-[calc(100vh-140px)] overflow-y-auto bg-[#ffffff] p-5">
           {children}
         </div>
       </section>

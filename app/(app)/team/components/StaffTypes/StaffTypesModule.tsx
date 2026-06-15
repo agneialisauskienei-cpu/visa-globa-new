@@ -999,7 +999,7 @@ export default function StaffTypesModulePage() {
               type="button"
               onClick={() => setActiveFilter(stat.key)}
               className={cn(
-                "rounded-xl border p-4 text-left shadow-sm transition hover:bg-[#f8faf8]",
+                "rounded-xl border p-4 text-left shadow-sm transition hover:bg-[#ffffff]",
                 activeFilter === stat.key
                   ? "border-[#a8d8bd] bg-[#e9f7ef] text-[#047857]"
                   : "border-[#dbe6e0] bg-white text-[#10251f]",
@@ -1013,7 +1013,7 @@ export default function StaffTypesModulePage() {
           ))}
         </section>
 
-        <section className="border-b border-[#dbe6e0] bg-[#f8faf8] px-4 py-3">
+        <section className="border-b border-[#dbe6e0] bg-[#ffffff] px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
               Veiksmai
@@ -1021,7 +1021,7 @@ export default function StaffTypesModulePage() {
             <button
               type="button"
               onClick={loadEmployees}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1]"
+              className="inline-flex items-center gap-2 rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
             >
               <RefreshCw className="h-3.5 w-3.5" /> Atnaujinti
             </button>
@@ -1054,7 +1054,7 @@ export default function StaffTypesModulePage() {
               />
             </label>
 
-            <span className="ml-auto rounded-lg bg-[#eef4f1] px-3 py-2 text-xs font-black text-[#486b5d] ring-1 ring-[#c2d3ca]">
+            <span className="ml-auto rounded-lg bg-[#f7fcf9] px-3 py-2 text-xs font-black text-[#486b5d] ring-1 ring-[#c2d3ca]">
               Pakeitimai saugomi automatiškai
             </span>
           </div>
@@ -1075,7 +1075,7 @@ export default function StaffTypesModulePage() {
         ) : null}
 
         <section className="grid gap-0 xl:grid-cols-[330px_minmax(0,1fr)]">
-          <aside className="border-b border-[#dbe6e0] bg-[#f8faf8] p-4 xl:border-b-0 xl:border-r">
+          <aside className="border-b border-[#dbe6e0] bg-[#ffffff] p-4 xl:border-b-0 xl:border-r">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
@@ -1118,7 +1118,7 @@ export default function StaffTypesModulePage() {
                         "grid grid-cols-[42px_1fr_auto] items-center gap-3 rounded-xl border p-3 text-left transition",
                         active
                           ? "border-[#a8d8bd] bg-[#e9f7ef] shadow-sm"
-                          : "border-[#dbe6e0] bg-white hover:bg-[#eef4f1]",
+                          : "border-[#dbe6e0] bg-white hover:bg-[#f7fcf9]",
                       )}
                     >
                       <div className="grid h-10 w-10 place-items-center rounded-lg bg-white text-sm font-black text-[#007a5a] shadow-sm">
@@ -1189,7 +1189,7 @@ export default function StaffTypesModulePage() {
                 updateEmployeeAccess={updateEmployeeAccess}
               />
             ) : (
-              <div className="grid min-h-[260px] place-items-center rounded-xl border border-dashed border-[#c2d3ca] bg-[#f8faf8] p-6 text-center">
+              <div className="grid min-h-[260px] place-items-center rounded-xl border border-dashed border-[#c2d3ca] bg-[#ffffff] p-6 text-center">
                 <div>
                   <UserRound className="mx-auto h-9 w-9 text-[#8aa096]" />
                   <p className="mt-3 font-black text-[#10251f]">
@@ -1254,7 +1254,7 @@ function EmployeeAccessEditor({
 
   return (
     <div className="grid gap-3">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
         <div className="flex min-w-0 items-center gap-3">
           <div className="grid h-14 w-14 place-items-center rounded-xl bg-[#e9f7ef] text-xl font-black text-[#007a5a]">
             {employeeInitials(employee)}
@@ -1389,7 +1389,7 @@ function EmployeeAccessEditor({
           </div>
 
           <div className="mt-4 overflow-hidden rounded-xl border border-[#dbe6e0]">
-            <div className="grid grid-cols-2 border-b border-[#dbe6e0] bg-[#eef4f1]">
+            <div className="grid grid-cols-2 border-b border-[#dbe6e0] bg-[#f7fcf9]">
               <SummaryItem label="Šablonas" value={baseTemplate.shortLabel} />
               <SummaryItem
                 label="Etatas"
@@ -1467,7 +1467,7 @@ function EmployeeAccessEditor({
                 type="button"
                 disabled={saving}
                 onClick={() => addTemplateExtras(employee, template)}
-                className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#eef4f1] disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9] disabled:opacity-50"
                 title={template.description}
               >
                 <Plus className="h-3.5 w-3.5" /> {template.shortLabel}
@@ -1500,7 +1500,7 @@ function EmployeeAccessEditor({
                   "rounded-lg border p-3 text-left text-xs font-bold transition disabled:opacity-60",
                   checked
                     ? "border-blue-200 bg-blue-50 text-blue-900"
-                    : "border-[#dbe6e0] bg-[#f8faf8] text-[#40594f] hover:bg-[#eef4f1]",
+                    : "border-[#dbe6e0] bg-[#ffffff] text-[#40594f] hover:bg-[#f7fcf9]",
                 )}
               >
                 <div className="flex items-start justify-between gap-2">

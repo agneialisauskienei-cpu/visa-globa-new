@@ -344,7 +344,7 @@ export default function CandidateQuestionnairePage() {
             </div>
           </header>
 
-          <div className="border-b border-[#dbe6e0] bg-[#eef4f1] px-5 py-4 sm:px-8">
+          <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-5 py-4 sm:px-8">
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#486b5d]" />
               <div>
@@ -363,7 +363,7 @@ export default function CandidateQuestionnairePage() {
               className={[
                 "mx-5 mt-5 whitespace-pre-wrap rounded-2xl border px-4 py-3 text-sm font-bold sm:mx-8",
                 message.type === "success"
-                  ? "border-[#c9d8d0] bg-[#eef4f1] text-[#486b5d]"
+                  ? "border-[#c9d8d0] bg-[#f7fcf9] text-[#486b5d]"
                   : "border-[#efc0bd] bg-[#fff1f0] text-red-800",
               ].join(" ")}
             >
@@ -398,7 +398,7 @@ export default function CandidateQuestionnairePage() {
           {questionnaire ? (
             <div className="px-5 py-6 sm:px-8">
               {submitted ? (
-                <div className="rounded-2xl border border-[#c9d8d0] bg-[#eef4f1] p-6 text-center">
+                <div className="rounded-2xl border border-[#c9d8d0] bg-[#f7fcf9] p-6 text-center">
                   <CheckCircle2 className="mx-auto h-10 w-10 text-[#486b5d]" />
                   <h2 className="mt-4 text-xl font-black text-[#10251f]">Ačiū, atsakymai gauti</h2>
                   <p className="mt-2 text-sm font-semibold leading-6 text-[#52685f]">
@@ -407,7 +407,7 @@ export default function CandidateQuestionnairePage() {
                 </div>
               ) : (
                 <>
-                  <div className="mb-5 rounded-2xl border border-[#dbe6e0] bg-[#f8faf8] p-4">
+                  <div className="mb-5 rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#486b5d] shadow-sm">
@@ -443,10 +443,10 @@ export default function CandidateQuestionnairePage() {
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#eef4f1] text-xs font-black text-[#486b5d]">
+                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f7fcf9] text-xs font-black text-[#486b5d]">
                                 {index + 1}
                               </span>
-                              <span className="rounded-full bg-[#f8faf8] px-3 py-1 text-xs font-black text-[#6a7e75]">
+                              <span className="rounded-full bg-[#ffffff] px-3 py-1 text-xs font-black text-[#6a7e75]">
                                 {categoryLabel(question.category)}
                               </span>
                               {question.required ? (
@@ -466,7 +466,7 @@ export default function CandidateQuestionnairePage() {
                           onChange={(event) => updateAnswer(question.id, event.target.value)}
                           rows={question.label.length > 90 ? 4 : 3}
                           placeholder="Įrašykite atsakymą..."
-                          className="mt-4 w-full resize-none rounded-xl border border-[#c2d3ca] bg-[#f8faf8] px-4 py-3 text-sm font-semibold leading-6 text-[#10251f] outline-none transition focus:border-[#486b5d] focus:bg-white focus:ring-2 focus:ring-[#dce7e2]"
+                          className="mt-4 w-full resize-none rounded-xl border border-[#c2d3ca] bg-[#ffffff] px-4 py-3 text-sm font-semibold leading-6 text-[#10251f] outline-none transition focus:border-[#486b5d] focus:bg-white focus:ring-2 focus:ring-[#dce7e2]"
                         />
                       </label>
                     ))}
