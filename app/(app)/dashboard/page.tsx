@@ -339,7 +339,7 @@ export default function AdminDashboardPage() {
 
   if (!accessChecked) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f4f7f5] p-6 text-[#10251f]">
+      <main className="flex min-h-screen items-center justify-center bg-white p-6 text-[#10251f]">
         <div className="rounded-[24px] border border-[#c9d8d0] bg-white px-6 py-5 text-sm font-black text-[#486b5d] shadow-sm">
           Kraunama...
         </div>
@@ -348,7 +348,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f7f5] p-4 text-[#10251f] sm:p-6">
+    <main className="min-h-screen bg-white p-4 text-[#10251f] sm:p-6">
       <div className="mx-auto max-w-[1540px] space-y-4">
         <section className="overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-white shadow-[0_1px_6px_rgba(16,37,31,0.08)]">
           <div className="bg-[#486b5d] px-5 py-4 text-white sm:px-6">
@@ -1876,42 +1876,36 @@ function PriorityActionCard({
   color: "amber" | "red" | "blue" | "emerald";
   onClick: () => void;
 }) {
-  const styles = {
-    amber: "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]",
-    red: "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]",
-    blue: "border-[#c9d8d0] bg-[#f7fcf9] text-[#486b5d]",
-    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
-  }[color];
-
-  const buttonStyles = {
-    amber: "bg-[#be123c]",
-    red: "bg-[#be123c]",
-    blue: "bg-[#486b5d]",
-    emerald: "bg-[#047857]",
+  const accentStyles = {
+    amber: "text-[#8f5f55]",
+    red: "text-[#9b514d]",
+    blue: "text-[#486b5d]",
+    emerald: "text-[#047857]",
   }[color];
 
   return (
-    <article className={`rounded-2xl border p-4 ${styles}`}>
+    <article className="rounded-2xl border border-[#dbe6e0] bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.14em] opacity-90">Dėmesio</p>
+          <p className={`text-xs font-black uppercase tracking-[0.14em] ${accentStyles}`}>Dėmesio</p>
           <h3 className="mt-1 text-lg font-black text-[#10251f]">{title}</h3>
-          <p className="mt-1 text-sm font-bold opacity-80">{desc}</p>
+          <p className={`mt-1 text-sm font-bold ${accentStyles}`}>{desc}</p>
         </div>
-        <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black">{badge}</span>
+        <span className={`shrink-0 rounded-full border border-[#dbe6e0] bg-white px-3 py-1 text-xs font-black ${accentStyles}`}>
+          {badge}
+        </span>
       </div>
 
       <button
         type="button"
         onClick={onClick}
-        className={`mt-4 rounded-lg px-4 py-2 text-sm font-black text-white ${buttonStyles}`}
+        className="mt-4 rounded-lg bg-[#486b5d] px-4 py-2 text-sm font-black text-white transition hover:bg-[#39594c]"
       >
         Atidaryti
       </button>
     </article>
   );
 }
-
 function CircularChart({
   value,
   label,
