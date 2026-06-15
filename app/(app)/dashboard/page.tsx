@@ -397,7 +397,10 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-3 sm:px-5">
-            <nav className="flex flex-wrap items-center gap-2 text-sm font-black text-[#486b5d]">
+            <nav
+              data-instruction-row
+              className="flex flex-wrap items-center gap-2 text-sm font-black text-[#486b5d]"
+            >
               {dashboardTabs.map((item) => {
                 const Icon = item.icon;
 

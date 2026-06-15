@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Info, X } from "lucide-react"
 import { usePathname } from "next/navigation"
+import { createPortal } from "react-dom"
 
 const PAGE_NAMES: Record<string, string> = {
   activities: "Veiklos",
@@ -51,6 +52,7 @@ function getPageName(pathname: string) {
 export default function PageInstructions() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [instructionRow, setInstructionRow] = useState<Element | null>(null)
   const pageName = getPageName(pathname)
   const pageSegment = pathname.split("/").filter(Boolean)[0] ?? "dashboard"
 
@@ -65,13 +67,26 @@ export default function PageInstructions() {
     return () => window.removeEventListener("keydown", closeOnEscape)
   }, [open])
 
+  useEffect(() => {
+    function findInstructionRow() {
+      setInstructionRow(
+        document.querySelector("[data-instruction-row]") ??
+          document.querySelector("main nav"),
+      )
+    }
+
+    findInstructionRow()
+    const observer = new MutationObserver(findInstructionRow)
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [pathname])
+
   if (PAGES_WITH_OWN_INSTRUCTIONS.has(pageSegment)) {
     return null
   }
 
-  return (
-    <>
-      <button
+  const trigger = (
+    <button
         type="button"
         className="vg-instruction-trigger"
         onClick={() => setOpen(true)}
@@ -79,8 +94,12 @@ export default function PageInstructions() {
       >
         <Info aria-hidden="true" />
         Instrukcija
-      </button>
+    </button>
+  )
 
+  return (
+    <>
+      {instructionRow ? createPortal(trigger, instructionRow) : trigger}
       {open ? (
         <div
           className="vg-instruction-backdrop"

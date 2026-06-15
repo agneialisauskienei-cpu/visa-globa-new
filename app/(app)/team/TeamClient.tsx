@@ -3260,7 +3260,10 @@ export default function TeamPage() {
             </div>
           </div>
 
-          <nav className="flex flex-wrap gap-1 border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d]">
+          <nav
+            data-instruction-row
+            className="flex flex-wrap items-center gap-1 border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d]"
+          >
             {tabs.map((item) => {
               const Icon = item.icon;
               const active = tab === item.key;

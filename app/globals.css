@@ -65,6 +65,11 @@ h3 {
   margin: 0 0 12px;
 }
 
+.vg-page-toolbar:empty {
+  display: none;
+  margin: 0;
+}
+
 .vg-instruction-trigger {
   display: inline-flex;
   align-items: center;
@@ -78,6 +83,8 @@ h3 {
   box-shadow: 0 2px 8px rgba(16, 37, 31, .10);
   font-weight: 800;
   cursor: pointer;
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .vg-instruction-trigger:hover {
