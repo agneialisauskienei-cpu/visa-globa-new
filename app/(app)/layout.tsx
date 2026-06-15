@@ -98,7 +98,7 @@ function AppLayoutShell({
 }) {
   return (
     <NotificationProvider>
-      <div style={styles.shell}>
+      <div className="vg-app-shell" style={styles.shell}>
         {showSidebar ? <AppSidebar /> : null}
 
         <main style={embedded ? styles.embeddedMain : styles.main}>

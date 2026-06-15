@@ -194,6 +194,51 @@ a[class*="bg-[#486b5d]"]:hover {
   background: #39594c;
 }
 
+/* Unified application surfaces. Status pills, charts and icon-only controls keep
+   their semantic colors; content cards stay white and actions share one size. */
+.vg-app-shell article[class*="rounded"][class*="border"]:not([class*="rounded-full"]),
+.vg-app-shell section[class*="rounded"][class*="border"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="border"][class*="bg-emerald-"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="border"][class*="bg-green-"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="border"][class*="bg-red-"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="border"][class*="bg-rose-"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="border"][class*="bg-amber-"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="border"][class*="bg-yellow-"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="border"][class*="bg-blue-"]:not([class*="rounded-full"]) {
+  background-color: #ffffff !important;
+}
+
+.vg-app-shell article[class*="rounded"][class*="border"],
+.vg-app-shell section[class*="rounded"][class*="border"] {
+  border-color: #c9d8d0 !important;
+}
+
+.vg-app-shell button:not([aria-label]):not([class*="rounded-full"]):not([class*="aspect-square"]):not(:has(> svg:only-child)) {
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 0 16px !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+
+.vg-app-shell button[class*="bg-slate-900"]:not([aria-label]):not(:has(> svg:only-child)),
+.vg-app-shell button[class*="bg-slate-950"]:not([aria-label]):not(:has(> svg:only-child)),
+.vg-app-shell button[class*="bg-emerald-700"]:not([aria-label]):not(:has(> svg:only-child)),
+.vg-app-shell button[class*="bg-emerald-800"]:not([aria-label]):not(:has(> svg:only-child)),
+.vg-app-shell button[class*="bg-emerald-900"]:not([aria-label]):not(:has(> svg:only-child)) {
+  background-color: #486b5d !important;
+  color: #ffffff !important;
+}
+
+.vg-app-shell button[class*="bg-slate-900"]:not([aria-label]):not(:has(> svg:only-child)):hover,
+.vg-app-shell button[class*="bg-slate-950"]:not([aria-label]):not(:has(> svg:only-child)):hover,
+.vg-app-shell button[class*="bg-emerald-700"]:not([aria-label]):not(:has(> svg:only-child)):hover,
+.vg-app-shell button[class*="bg-emerald-800"]:not([aria-label]):not(:has(> svg:only-child)):hover,
+.vg-app-shell button[class*="bg-emerald-900"]:not([aria-label]):not(:has(> svg:only-child)):hover {
+  background-color: #39594c !important;
+}
+
 .vg-instruction-content h3 {
   margin: 0;
   color: #10251f;
