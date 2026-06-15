@@ -1876,8 +1876,8 @@ export default function TeamPage() {
     const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
     if (!firstName || !lastName) {
-      setCreateModalMessage("Įvesk kandidato vardą ir pavardę.");
-      setMessage("Įvesk kandidato vardą ir pavardę.");
+      setCreateModalMessage("Įveskite darbuotojo vardą ir pavardę.");
+      setMessage("Įveskite darbuotojo vardą ir pavardę.");
       return;
     }
 
@@ -1979,7 +1979,7 @@ export default function TeamPage() {
       setShowCreateModal(false);
       setCreateModalMessage("");
       setMessage(
-        `Kandidato / kvietimo įrašas ${fullName} išsaugotas kandidatų sąraše${newEmployeeForm.send_invite ? " ir sukurtas kvietimas" : ""}.`,
+        `Darbuotojo ${fullName} duomenys išsaugoti${newEmployeeForm.send_invite ? " ir sukurtas kvietimas prisijungti" : ""}.`,
       );
 
       await loadAll();
@@ -3254,7 +3254,7 @@ export default function TeamPage() {
                   className="inline-flex items-center gap-2 rounded-lg bg-white/12 px-3 py-2 text-sm font-black text-white/90 ring-1 ring-white/20 transition hover:bg-white/18 active:scale-[0.98]"
                 >
                   <Plus className="h-4 w-4" />
-                  Naujas kandidatas / kvietimas
+                  Naujas darbuotojas
                 </button>
               </div>
             </div>
@@ -3840,8 +3840,8 @@ export default function TeamPage() {
 
       {showCreateModal && (
         <Modal
-          title="Naujas kandidatas / kvietimas"
-          desc="Įveskite pagrindinius duomenis, pareigas ir, jei reikia, išsiųskite kvietimą prisijungti."
+          title="Naujas darbuotojas"
+          desc="Įveskite darbuotojo duomenis, pareigas ir pasirinkite, ar siųsti kvietimą prisijungti."
           onClose={() => setShowCreateModal(false)}
         >
           <form
@@ -3851,12 +3851,13 @@ export default function TeamPage() {
               void createEmployee();
             }}
           >
-            <div className="rounded-[22px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
-              <h3 className="text-xl font-black">1. Kandidato / kvietimo duomenys</h3>
-              <p className="mt-1 text-sm font-semibold text-[#526174]">
-                Čia redaguojami pagrindiniai darbuotojo duomenys. Pavyzdžiai
-                laukeliuose yra tik pagalba — jų trinti nereikia, tiesiog
-                įrašykite tikrą reikšmę.
+            <div className="border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
+              <h3 className="text-xl font-black text-[#486b5d]">
+                Darbuotojo duomenys
+              </h3>
+              <p className="mt-1 text-sm font-semibold text-black">
+                Užpildykite pagrindinę informaciją. Prisijungimo kvietimą galima
+                išsiųsti iš karto arba vėliau.
               </p>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -3994,14 +3995,15 @@ export default function TeamPage() {
                       }))
                     }
                     className="input min-h-28 resize-none"
-                    placeholder="Pastabos apie darbuotoją, kandidatą ar priėmimą..."
+                    placeholder="Pastabos apie darbuotoją ar jo priėmimą..."
                   />
                 </Field>
               </div>
 
-              <label className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 font-extrabold text-emerald-800">
+              <label className="mt-4 flex items-center gap-3 border border-[#c9d8d0] bg-white p-4 font-extrabold text-[#486b5d]">
                 <input
                   type="checkbox"
+                  className="accent-[#486b5d]"
                   checked={newEmployeeForm.send_invite}
                   onChange={(event) =>
                     setNewEmployeeForm((prev) => ({
@@ -4014,11 +4016,10 @@ export default function TeamPage() {
                 paštas
               </label>
 
-              <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-bold leading-6 text-blue-800">
-                Šis veiksmas sukuria kvietimą prisijungti. Darbuotojas į
-                darbuotojų registrą patenka tada, kai priima kvietimą ir
-                susikuria paskyrą. Taip nekuriamas netikras `user_id`
-                organization_members lentelėje.
+              <div className="mt-4 border border-[#c9d8d0] bg-white p-4 text-sm font-bold leading-6 text-black">
+                <strong className="text-[#486b5d]">Kaip tai veikia?</strong>{" "}
+                Išsiuntus kvietimą darbuotojas el. paštu gaus saugią nuorodą,
+                susikurs paskyrą ir bus prijungtas prie įstaigos.
               </div>
             </div>
 
@@ -4031,7 +4032,11 @@ export default function TeamPage() {
             <ModalFooter
               saving={saving}
               onCancel={() => setShowCreateModal(false)}
-              submitText="Sukurti kvietimą"
+              submitText={
+                newEmployeeForm.send_invite
+                  ? "Išsaugoti ir siųsti kvietimą"
+                  : "Išsaugoti darbuotoją"
+              }
             />
           </form>
         </Modal>
@@ -5500,7 +5505,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950/50 p-4 backdrop-blur-sm md:p-6">
-      <section className="max-h-[calc(100vh-48px)] w-full max-w-[1180px] overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+      <section className="max-h-[calc(100vh-48px)] w-full max-w-[1180px] overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
         <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100/80">
@@ -5517,10 +5522,10 @@ function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20 active:scale-[0.98]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition hover:bg-white/20 active:scale-[0.98]"
             aria-label="Uždaryti"
           >
-            <X size={28} strokeWidth={2.1} />
+            <X size={22} strokeWidth={2.1} />
           </button>
         </div>
 
