@@ -526,7 +526,7 @@ export default function AdminDashboardPage() {
                   onClick={() => openTeamModule("fte")}
                   className="rounded-xl bg-[#047857] px-4 py-2 text-sm font-black text-white transition hover:bg-[#065f46]"
                 >
-                  Atidaryti Team
+                  Atidaryti etatų valdymą
                 </button>
               </div>
 
@@ -736,7 +736,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {showHelp && (
-        <HelpModal onClose={() => setShowHelp(false)} />
+        <HelpModal activeTab={activeTab} onClose={() => setShowHelp(false)} />
       )}
     </main>
   );
@@ -2091,22 +2091,76 @@ function TimelineItem({
   );
 }
 
-function HelpModal({ onClose }: { onClose: () => void }) {
+const DASHBOARD_HELP: Record<DashboardTab, {
+  title: string;
+  intro: string;
+  steps: Array<[string, string, string]>;
+}> = {
+  overview: {
+    title: "Kaip naudotis rodiklių apžvalga?",
+    intro: "Čia matysite svarbiausią įstaigos dienos informaciją ir darbus, kuriems reikia dėmesio.",
+    steps: [
+      ["1", "Rodiklių kortelės", "Viršuje pateikiama gyventojų, užimtumo, darbuotojų, kvietimų, etatų, užduočių, mokymų ir dokumentų santrauka."],
+      ["2", "Bendra situacija", "Apskritiminiai rodikliai parodo kambarių užimtumą, užpildytus etatus ir bendrą slaugos pajėgumą."],
+      ["3", "Veiksmų centras", "Baltose kortelėse rodomi klausimai, kuriuos verta peržiūrėti arba išspręsti šiandien."],
+      ["4", "Atidaryti", "Mygtukas nuveda tiesiai į atitinkamą valdymo langą."],
+    ],
+  },
+  capacity: {
+    title: "Kaip suprasti etatus ir pajėgumą?",
+    intro: "Šiame lange matysite, kiek etatų suplanuota, užimta, laisva ir kiek darbuotojų laikinai nedirba.",
+    steps: [
+      ["1", "Planuota ir užimta", "Planuota rodo įstaigai nustatytą etatų poreikį, o užimta – kiek etatų šiuo metu padengta darbuotojais."],
+      ["2", "Laisva", "Laisvų etatų skaičius parodo trūkstamą pajėgumą. Nulis reiškia, kad planas šiuo metu užpildytas."],
+      ["3", "Pareigybių lentelė", "Kiekvienoje eilutėje matysite pareigybę, užimtų ir laisvų etatų santykį bei būseną."],
+      ["4", "Pamainų rizikos", "Dešinėje rodoma, ar reikia pavadavimo ir ar šiandien yra neatvykusių darbuotojų. Spustelėkite kortelę išsamesnei peržiūrai."],
+    ],
+  },
+  risks: {
+    title: "Kaip peržiūrėti rizikas?",
+    intro: "Rizikų lange surinkti įrašai, kuriems gali reikėti sprendimo, patvirtinimo arba papildomos patikros.",
+    steps: [
+      ["1", "Atostogų prašymai", "Matysite, kiek prašymų laukia sprendimo. Atidarykite kortelę, kad juos patvirtintumėte arba atmestumėte."],
+      ["2", "Dokumentų terminai", "Rodomi nepatvirtinti dokumentų pakeitimai ir artėjantys galiojimo terminai."],
+      ["3", "Kitos rizikos", "Kortelės parodo incidentus, vaistų įspėjimus ir kitus neatitikimus."],
+      ["4", "Greiti veiksmai", "Dešinėje esančios nuorodos nuveda tiesiai į pasirinktą tikrinimo ar valdymo langą."],
+    ],
+  },
+  activity: {
+    title: "Kaip stebėti veiklą?",
+    intro: "Čia pateikiama naujausia dienos eiga, užduočių būsena ir veiklų informacija.",
+    steps: [
+      ["1", "Dienos eiga", "Peržiūrėkite naujausius įvykius ir jų laiką."],
+      ["2", "Užduotys", "Rodoma, kiek užduočių laukia atlikimo arba vėluoja."],
+      ["3", "Veiklos", "Atidarykite veiklų modulį detalesnei gyventojų užimtumo peržiūrai."],
+      ["4", "Atnaujinimas", "Naudokite viršuje esantį mygtuką „Atnaujinti“, kad gautumėte naujausius duomenis."],
+    ],
+  },
+  documents: {
+    title: "Kaip valdyti dokumentus?",
+    intro: "Dokumentų lange matysite laukiančius pakeitimus, terminus ir darbuotojų patvirtinimus.",
+    steps: [
+      ["1", "Laukiantys pakeitimai", "Patikrinkite darbuotojų pateiktus dokumentų pakeitimus prieš juos patvirtindami."],
+      ["2", "Galiojimo terminai", "Stebėkite, kurių dokumentų galiojimas artėja prie pabaigos."],
+      ["3", "Patvirtinimai", "Atidarytame dokumentų sąraše prie laukiančio įrašo pasirinkite tinkamą veiksmą."],
+      ["4", "Ataskaitos", "Dokumentų būseną galima peržiūrėti ir bendrose ataskaitose."],
+    ],
+  },
+};
+
+function HelpModal({ activeTab, onClose }: { activeTab: DashboardTab; onClose: () => void }) {
+  const help = DASHBOARD_HELP[activeTab];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
       <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-[#c9d8d0] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] bg-[#f7fcf9] px-5 py-4">
+        <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] bg-white px-5 py-4">
           <div>
             <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#6a7e75]">
               Trumpa instrukcija
             </p>
-            <h1 className="text-3xl font-black text-[#10251f] sm:text-4xl">
-              Kaip naudotis pagrindiniu skydeliu?
-            </h1>
-            <p className="mt-3 max-w-3xl text-sm font-bold leading-6 text-[#6a7e75]">
-              Čia matysi svarbiausią įstaigos dienos informaciją: užimtumą,
-              gyventojus, darbuotojus, užduotis ir įspėjimus.
-            </p>
+            <h1 className="text-3xl font-black text-[#10251f] sm:text-4xl">{help.title}</h1>
+            <p className="mt-3 max-w-3xl text-sm font-bold leading-6 text-[#6a7e75]">{help.intro}</p>
           </div>
 
           <button
@@ -2121,13 +2175,8 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 
         <div className="max-h-[72vh] overflow-y-auto bg-white p-5">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {[
-              ["1", "Rodiklių kortelės", "Viršuje matai gyventojų, darbuotojų, užduočių, atostogų ir dokumentų santrauką."],
-              ["2", "Veiksmų centras", "Čia rodomi darbai, kuriems reikia sprendimo arba greitos reakcijos."],
-              ["3", "Rodiklių apžvalga", "Vizualiai parodo kambarių užimtumą, mokymų būklę, užduotis ir rizikas."],
-              ["4", "Greiti veiksmai", "Leidžia iškart kurti gyventoją, darbuotoją, užduotį arba atsidaryti auditą."],
-            ].map(([number, title, desc]) => (
-              <div key={number} className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
+            {help.steps.map(([number, title, desc]) => (
+              <div key={number} className="rounded-xl border border-[#dbe6e0] bg-white p-4">
                 <div className="mb-3 flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f7ef] text-lg font-black text-[#047857]">
                     {number}
@@ -2140,7 +2189,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-[#dbe6e0] bg-[#f7fcf9] px-5 py-4">
+        <div className="flex justify-end border-t border-[#dbe6e0] bg-white px-5 py-4">
           <button
             type="button"
             onClick={onClose}
@@ -2153,7 +2202,6 @@ function HelpModal({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
-
 function percentage(value: number, total: number) {
   if (!total || total <= 0) return 0;
   return clamp(Math.round((value / total) * 100), 0, 100);
