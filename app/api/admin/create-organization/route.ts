@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireSystemAdmin } from '@/lib/server/service-auth'
+import { syncOrganizationPlan } from '@/lib/server/plan-access'
 
 type CreateOrganizationBody = {
   name?: string
@@ -135,18 +136,7 @@ export async function POST(request: NextRequest) {
       return jsonError('Nepavyko sukurti įstaigos.', 500)
     }
 
-    const { error: subscriptionError } = await supabase
-      .from('subscriptions')
-      .insert({
-        organization_id: organization.id,
-        plan_code: plan,
-        status: 'active',
-        starts_at: new Date().toISOString(),
-      })
-
-    if (subscriptionError) {
-      return jsonError(subscriptionError.message, 500)
-    }
+    await syncOrganizationPlan(supabase, organization.id, plan)
 
     const { error: auditError } = await supabase.rpc('log_audit_event', {
       p_organization_id: organization.id,

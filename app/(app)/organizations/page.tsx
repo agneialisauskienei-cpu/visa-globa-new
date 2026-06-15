@@ -190,6 +190,21 @@ function getToastStyle(type: ToastType): React.CSSProperties {
   }
 }
 
+async function getAdminRequestHeaders() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    throw new Error('Prisijungimo sesija nebegalioja.')
+  }
+
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${session.access_token}`,
+  }
+}
+
 export default function OrganizationsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -367,19 +382,14 @@ export default function OrganizationsPage() {
 
       setSaving(true)
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
       const response = await fetch('/api/admin/create-organization', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminRequestHeaders(),
         body: JSON.stringify({
           name: cleanName,
           code: cleanCode,
           address: cleanAddress,
           plan: cleanPlan,
-          actorUserId: user?.id || null,
         }),
       })
 
@@ -492,17 +502,12 @@ export default function OrganizationsPage() {
     try {
       setSaving(true)
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
       const response = await fetch('/api/admin/assign-admin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminRequestHeaders(),
         body: JSON.stringify({
           organizationId: orgId,
           email,
-          actorUserId: user?.id || null,
         }),
       })
 
@@ -535,16 +540,11 @@ export default function OrganizationsPage() {
     try {
       setSaving(true)
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
       const response = await fetch('/api/admin/archive-organization', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminRequestHeaders(),
         body: JSON.stringify({
           organizationId: org.id,
-          actorUserId: user?.id || null,
         }),
       })
 
@@ -571,16 +571,11 @@ export default function OrganizationsPage() {
     try {
       setSaving(true)
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
       const response = await fetch('/api/admin/restore-organization', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminRequestHeaders(),
         body: JSON.stringify({
           organizationId: org.id,
-          actorUserId: user?.id || null,
         }),
       })
 

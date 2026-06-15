@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
+import type { ModuleKey } from "@/lib/plans"
 
 export type MembershipRole =
   | "super_admin"
@@ -56,6 +57,7 @@ export type CurrentAccess = {
   substitutionPermissions?: Permission[]
   substitutedForUserIds?: string[]
   email?: string | null
+  enabledModules?: ModuleKey[]
 }
 
 const MEDICAL_STAFF_TYPES = [
@@ -356,6 +358,16 @@ export function hasPermission(
   return access.permissions.includes(permission)
 }
 
+export function hasModuleAccess(
+  access: CurrentAccess | null,
+  moduleKey?: ModuleKey,
+) {
+  if (!moduleKey) return true
+  if (!access) return false
+  if (access.role === "super_admin") return true
+  return access.enabledModules?.includes(moduleKey) === true
+}
+
 export function roleLabel(role?: MembershipRole | null) {
   if (role === "super_admin") return "Super administratorius"
   if (role === "owner") return "Savininkas"
@@ -449,28 +461,44 @@ export async function getCurrentAccess(): Promise<CurrentAccess> {
     }
   }
 
-  const role = (membership.role as MembershipRole) ?? "employee"
-  const staffType = (membership?.staff_type as StaffType) ?? null
+  const typedMembership = membership as {
+    role?: MembershipRole | null
+    organization_id?: string | null
+    staff_type?: StaffType
+    position?: string | null
+    extra_permissions?: unknown
+  }
+  const role = typedMembership.role ?? "employee"
+  const staffType = typedMembership.staff_type ?? null
   const extraPermissions = normalizeExtraPermissions(
-    (membership as any)?.extra_permissions
+    typedMembership.extra_permissions
   )
   const basePermissions = buildPermissions(role, staffType, extraPermissions)
+  const { data: moduleRows } = await supabase
+    .from("organization_modules")
+    .select("module_key")
+    .eq("organization_id", typedMembership.organization_id)
+    .eq("is_enabled", true)
+  const enabledModules = (moduleRows || [])
+    .map((row) => row.module_key)
+    .filter((value): value is ModuleKey => typeof value === "string")
   const substitution = await getActiveSubstitutionPermissions({
-    organizationId: membership?.organization_id ?? null,
+    organizationId: typedMembership.organization_id ?? null,
     substituteUserId: user.id,
   })
 
   return {
     role,
     staffType,
-    position: (membership as any)?.position ?? null,
+    position: typedMembership.position ?? null,
     extraPermissions,
-    organizationId: membership?.organization_id ?? null,
+    organizationId: typedMembership.organization_id ?? null,
     permissions: Array.from(
       new Set([...basePermissions, ...substitution.permissions]),
     ),
     substitutionPermissions: substitution.permissions,
     substitutedForUserIds: substitution.substitutedForUserIds,
     email,
+    enabledModules,
   }
 }

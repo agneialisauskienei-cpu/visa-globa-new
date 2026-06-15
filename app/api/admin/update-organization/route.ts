@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServiceClient, requireSystemAdmin } from "@/lib/server/service-auth"
+import { syncOrganizationPlan } from "@/lib/server/plan-access"
 
 export async function POST(request: Request) {
   try {
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
       .select("*")
       .single()
     if (error) throw error
+    await syncOrganizationPlan(admin, id, plan)
 
     await admin.rpc("log_audit_event", {
       p_actor_user_id: user.id,

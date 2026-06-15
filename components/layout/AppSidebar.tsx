@@ -24,6 +24,7 @@ import {
 
 import {
   getCurrentAccess,
+  hasModuleAccess,
   hasPermission,
   roleLabel,
   staffTypeLabel,
@@ -148,10 +149,6 @@ export default function AppSidebar() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [profileName, setProfileName] = useState<string>("")
 
-  useEffect(() => {
-    void loadAccess()
-  }, [])
-
   async function loadAccess() {
     const current = await getCurrentAccess()
     setAccess(current)
@@ -191,6 +188,10 @@ export default function AppSidebar() {
     }
   }
 
+  useEffect(() => {
+    void loadAccess()
+  }, [])
+
   async function logout() {
     await supabase.auth.signOut()
     router.push("/login")
@@ -214,12 +215,14 @@ export default function AppSidebar() {
 
     if (access.role === "employee") {
       return EMPLOYEE_MENU.filter((item) =>
-        hasPermission(access, item.permission),
+        hasPermission(access, item.permission) &&
+        hasModuleAccess(access, item.moduleKey),
       )
     }
 
     return ADMIN_MENU.filter((item) =>
-      hasPermission(access, item.permission),
+      hasPermission(access, item.permission) &&
+      hasModuleAccess(access, item.moduleKey),
     )
   }, [access])
 
