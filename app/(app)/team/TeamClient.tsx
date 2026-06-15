@@ -387,7 +387,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
   { key: "fte", label: "Etatų planas", icon: BriefcaseBusiness },
   { key: "schedule", label: "Grafikas", icon: CalendarDays },
   { key: "vacations", label: "Atostogos", icon: Umbrella },
-  { key: "candidates", label: "Kandidatai", icon: UserPlus },
+  { key: "candidates", label: "Priėmimo prašymai", icon: UserPlus },
   { key: "invites", label: "Kvietimai", icon: Mail },
   { key: "access", label: "Pareigos ir teisės", icon: UserCog },
   { key: "trainings", label: "Mokymai", icon: GraduationCap },
@@ -3388,12 +3388,18 @@ export default function TeamPage() {
             className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
-              Kandidatai
+              Priėmimo prašymai
             </p>
             <p className="mt-1 text-2xl font-black text-[#10251f]">
-              {candidates.length}
+              {
+                candidates.filter((candidate) =>
+                  ["questionnaire_sent", "answered"].includes(candidate.status || ""),
+                ).length
+              }
             </p>
-            <p className="mt-1 text-xs font-bold text-slate-500">atrankos</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">
+              aktyvūs prašymai
+            </p>
           </button>
         </section>
 
@@ -3489,12 +3495,12 @@ export default function TeamPage() {
 
             <Card>
               <h2 className="text-2xl font-black tracking-tight">
-                Kandidatai ir priėmimas
+                Darbuotojų priėmimas
               </h2>
               <div className="mt-5 space-y-3">
                 <ActivityItem
-                  title="Kandidatų anketos"
-                  meta={`${candidates.length} įrašai`}
+                  title="Priėmimo prašymai"
+                  meta={`${candidates.filter((candidate) => ["questionnaire_sent", "answered"].includes(candidate.status || "")).length} aktyvūs`}
                 />
                 <ActivityItem
                   title="Laukia kvietimų"
@@ -4279,15 +4285,46 @@ function FtePlanModule({
       </div>
 
       {planIsMissing ? (
-        <div className="mt-5 rounded-2xl border border-[#fecdd3] bg-[#fff1f2] p-4 text-sm font-bold text-[#be123c]">
-          Etatų planas dar nesuvestas. Žemiau matomi preliminarūs skaičiai pagal
-          esamus darbuotojus. Įrašyk planuojamas pareigybes, kad sistema galėtų
-          tiksliai skaičiuoti trūkumus.
+        <div className="mt-5 flex items-start gap-3 rounded-2xl border-2 border-[#486b5d] bg-white p-4 text-sm font-bold text-[#10251f]">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[#486b5d] text-lg font-black text-[#486b5d]">
+            !
+          </span>
+          <div>
+            <p className="font-black text-[#486b5d]">Etatų planas dar nesuvestas</p>
+            <p className="mt-1">
+              Esamų darbuotojų skaičius nėra patvirtintas etatų planas. Įrašykite
+              planuojamas pareigybes ir etatų skaičių, kad sistema galėtų
+              patikimai apskaičiuoti trūkumą.
+            </p>
+          </div>
         </div>
       ) : null}
 
-      <section className="mt-5 rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <section className="mt-5 rounded-2xl border border-[#486b5d] bg-white p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#dbe6e0] pb-4">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#486b5d]">
+              Pareigybės įrašas
+            </p>
+            <h3 className="mt-1 text-xl font-black text-[#10251f]">
+              {form.id ? "Redaguoti etatų planą" : "Pridėti į etatų planą"}
+            </h3>
+          </div>
+          {form.id ? (
+            <button
+              type="button"
+              onClick={onNew}
+              className="rounded-[14px] border border-[#486b5d] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:border-2"
+            >
+              Naujas įrašas
+            </button>
+          ) : null}
+        </div>
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-2">
+          <div className="rounded-2xl border border-[#dbe6e0] bg-white p-4">
+            <h4 className="font-black text-[#486b5d]">Pareigybė ir poreikis</h4>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
           <Field label="Padalinys">
             <input
               value={form.department}
@@ -4325,7 +4362,12 @@ function FtePlanModule({
               className="input"
             />
           </Field>
+            </div>
+          </div>
 
+          <div className="rounded-2xl border border-[#dbe6e0] bg-white p-4">
+            <h4 className="font-black text-[#486b5d]">Darbo sąlygos</h4>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
           <Field label="Koef. nuo">
             <input
               type="number"
@@ -4353,26 +4395,6 @@ function FtePlanModule({
               placeholder="1.35"
             />
           </Field>
-
-          <div className="flex items-end gap-2">
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={saving}
-              className="h-[50px] flex-1 rounded-2xl bg-[#486b5d] px-4 font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
-            >
-              {saving ? "Saugoma..." : form.id ? "Atnaujinti" : "Pridėti"}
-            </button>
-            {form.id ? (
-              <button
-                type="button"
-                onClick={onNew}
-                className="h-[50px] rounded-[14px] border border-[#dbe6e0] bg-white px-4 font-black text-[#486b5d] transition hover:bg-[#ffffff]"
-              >
-                Naujas
-              </button>
-            ) : null}
-          </div>
 
           <Field label="Min. dienos pamaina">
             <input
@@ -4406,7 +4428,7 @@ function FtePlanModule({
             />
           </Field>
 
-          <label className="flex items-center gap-3 rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 font-black text-[#486b5d] md:col-span-2 xl:col-span-2">
+          <label className="flex items-center gap-3 rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-3 font-black text-[#486b5d] md:col-span-2">
             <input
               type="checkbox"
               checked={form.active}
@@ -4417,6 +4439,19 @@ function FtePlanModule({
             />
             Aktyvi pareigybė
           </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="min-h-11 min-w-48 rounded-[14px] bg-[#486b5d] px-5 font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
+          >
+            {saving ? "Saugoma..." : form.id ? "Atnaujinti pareigybę" : "Pridėti pareigybę"}
+          </button>
         </div>
       </section>
 

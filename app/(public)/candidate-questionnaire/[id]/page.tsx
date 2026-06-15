@@ -328,18 +328,18 @@ export default function CandidateQuestionnairePage() {
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
-                  Kandidato anketa
+                  Priėmimo prašymas
                 </p>
                 <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
-                  {submitted ? "Anketa pateikta" : "Užpildykite kandidatavimo anketą"}
+                  {submitted ? "Prašymas pateiktas" : "Užpildykite prašymą priimti į darbą"}
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-white/82">
-                  Sveiki, {candidateName}. Prašome atsakyti tik į atrankai būtinus klausimus.
+                  Sveiki, {candidateName}. Pateikite informaciją, reikalingą jūsų priėmimui ir darbo sutarties paruošimui.
                 </p>
               </div>
 
               <div className="rounded-2xl bg-white/12 px-4 py-3 text-sm font-black text-white">
-                {candidate?.desired_role ? candidate.desired_role : "Atrankos anketa"}
+                {candidate?.desired_role ? candidate.desired_role : "Priėmimo prašymas"}
               </div>
             </div>
           </header>
@@ -352,7 +352,7 @@ export default function CandidateQuestionnairePage() {
                 <p className="mt-1 text-sm font-semibold leading-6 text-[#52685f]">
                   Neprašome asmens kodo, dokumentų kopijų, paso/ID kortelės, sveikatos diagnozių,
                   politinių, religinių ar kitų specialių kategorijų duomenų. Pateikite tik tai, kas
-                  būtina atrankai ir būsimam darbo sutarties paruošimui.
+                  būtina darbo sutarties ir priėmimo dokumentų paruošimui.
                 </p>
               </div>
             </div>

@@ -34,14 +34,14 @@ type CandidatesModuleProps = {
 const DEFAULT_QUESTIONS: CandidateQuestion[] = [
   {
     id: "start_date",
-    label: "Nuo kada galėtumėte pradėti dirbti?",
+    label: "Kokia pageidaujama darbo pradžios data?",
     required: true,
     includeInContract: false,
     category: "work",
   },
   {
     id: "desired_position",
-    label: "Į kokias pareigas kandidatuojate?",
+    label: "Patvirtinkite pareigas, į kurias prašote priimti.",
     required: true,
     includeInContract: true,
     category: "contract",
@@ -49,58 +49,58 @@ const DEFAULT_QUESTIONS: CandidateQuestion[] = [
   {
     id: "employment_type",
     label:
-      "Kokio darbo krūvio pageidaujate: pilno etato, dalinio etato ar pamaininio darbo?",
+      "Kokia sutarties rūšis ir darbo krūvis sutarti: neterminuota ar terminuota, visas ar ne visas darbo laikas?",
     required: true,
     includeInContract: true,
     category: "contract",
   },
   {
-    id: "availability",
-    label: "Kokiomis savaitės dienomis ir valandomis galite dirbti?",
+    id: "salary_payment_frequency",
+    label: "Kaip pageidaujate gauti darbo užmokestį: vieną ar du kartus per mėnesį?",
     required: true,
-    includeInContract: false,
-    category: "availability",
+    includeInContract: true,
+    category: "contract",
   },
   {
-    id: "night_weekend",
+    id: "npd",
     label:
-      "Ar sutiktumėte dirbti vakarais, savaitgaliais ar švenčių dienomis, jei pareigybė to reikalauja?",
-    required: false,
-    includeInContract: false,
-    category: "availability",
+      "Ar pageidaujate, kad šioje darbovietėje būtų taikomas neapmokestinamasis pajamų dydis (NPD)?",
+    required: true,
+    includeInContract: true,
+    category: "contract",
   },
   {
-    id: "education",
-    label: "Koks Jūsų išsilavinimas ar kvalifikacija, susijusi su šiomis pareigomis?",
+    id: "bank_details_delivery",
+    label: "Nurodykite, kaip saugiai pateiksite banko sąskaitos duomenis atsakingam darbuotojui.",
+    required: false,
+    includeInContract: false,
+    category: "other",
+  },
+  {
+    id: "documents",
+    label: "Kokius pareigoms reikalingus išsilavinimo, kvalifikacijos ar licencijų dokumentus pateiksite?",
     required: false,
     includeInContract: false,
     category: "qualification",
   },
   {
-    id: "experience",
-    label: "Trumpai aprašykite patirtį, kuri aktuali šioms pareigoms.",
-    required: false,
-    includeInContract: false,
-    category: "qualification",
-  },
-  {
-    id: "certificates",
+    id: "work_schedule",
     label:
-      "Ar turite pareigoms reikalingų pažymų, licencijų ar mokymų? Nurodykite tik dokumento tipą ir galiojimą, be asmens kodo ar dokumento kopijų.",
+      "Patvirtinkite sutartą darbo laiko normą, pamainas ir ar numatytas darbas naktimis, savaitgaliais ar švenčių dienomis.",
     required: false,
-    includeInContract: false,
-    category: "qualification",
-  },
-  {
-    id: "salary_expectation",
-    label: "Kokio darbo užmokesčio intervalo tikitės?",
-    required: false,
-    includeInContract: false,
+    includeInContract: true,
     category: "work",
   },
   {
-    id: "notice_period",
-    label: "Jeigu šiuo metu dirbate, koks būtų Jūsų įspėjimo / perėjimo laikotarpis?",
+    id: "probation",
+    label: "Ar buvo sutartas išbandymo laikotarpis?",
+    required: false,
+    includeInContract: true,
+    category: "contract",
+  },
+  {
+    id: "additional_conditions",
+    label: "Nurodykite kitas sutartas darbo sąlygas ar informaciją, svarbią priėmimui.",
     required: false,
     includeInContract: false,
     category: "work",
@@ -165,18 +165,17 @@ function buildShortEmailBody(candidateName: string, questionnaireLink: string) {
   return [
     `Sveiki, ${candidateName || ""},`,
     "",
-    "Dėkojame už susidomėjimą darbu mūsų organizacijoje.",
-    "Kad galėtume įvertinti tinkamumą pareigoms, kviečiame užpildyti trumpą kandidatavimo anketą:",
+    "Kviečiame nuotoliniu būdu užpildyti prašymą priimti į darbą ir pateikti darbo sutarties paruošimui reikalingą informaciją:",
     "",
     questionnaireLink,
     "",
-    "Anketos pildymas užtruks apie 5–10 min.",
+    "Prašymo pildymas užtruks apie 5–10 min.",
     "",
     "Svarbu dėl asmens duomenų:",
     "- Neprašome asmens kodo.",
     "- Neprašome dokumentų kopijų, paso, ID kortelės ar kitų perteklinių dokumentų.",
     "- Neprašome sveikatos diagnozių, politinių, religinių ar kitų specialių kategorijų duomenų.",
-    "- Pateikite tik informaciją, kuri būtina atrankai ir būsimos darbo sutarties paruošimui.",
+    "- Pateikite tik informaciją, kuri būtina darbo sutarties paruošimui.",
     "",
     "Pagarbiai",
   ].join("\n");
@@ -608,11 +607,11 @@ export default function CandidatesModule({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
-              Kandidatai
+              Darbuotojo priėmimas
             </p>
-            <h2 className="mt-1 text-2xl font-black tracking-tight">Atranka ir klausimynai</h2>
+            <h2 className="mt-1 text-2xl font-black tracking-tight">Priėmimo prašymai</h2>
             <p className="mt-1 max-w-4xl text-sm font-semibold text-white/80">
-              Kandidatų kontaktai, klausimynai ir priėmimas į komandą vienoje vietoje.
+              Paruoškite pasirinktam darbuotojui nuorodą, kad prašymą priimti į darbą jis užpildytų nuotoliniu būdu.
             </p>
           </div>
 
@@ -629,14 +628,14 @@ export default function CandidatesModule({
       </header>
 
       <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-2 text-sm font-bold text-[#486b5d]">
-        BDAR saugi atranka: neklausiama asmens kodo, dokumentų kopijų, diagnozių ar kitų perteklinių jautrių duomenų.
+        Ši sritis skirta jau pasirinktam darbuotojui. Ji nepakeičia atrankos ir neprašo perteklinių jautrių duomenų.
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
-          <h3 className="text-xl font-black text-[#10251f]">Kandidato duomenys</h3>
+          <h3 className="text-xl font-black text-[#10251f]">Pasirinkto darbuotojo duomenys</h3>
           <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
-            Įvesk tik būtinus atrankos kontaktinius duomenis.
+            Įveskite kontaktus ir pareigas, dėl kurių jau susitarta.
           </p>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -682,7 +681,7 @@ export default function CandidatesModule({
             </label>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-black text-[#6a7e75]">Norimos pareigos</span>
+              <span className="text-sm font-black text-[#6a7e75]">Pareigos, į kurias priimamas</span>
               <input
                 value={desiredRole}
                 onChange={(event) => setDesiredRole(event.target.value)}
@@ -692,11 +691,11 @@ export default function CandidatesModule({
             </label>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-black text-[#6a7e75]">Trumpa aktuali patirtis</span>
+              <span className="text-sm font-black text-[#6a7e75]">Padalinys arba priėmimo pastaba</span>
               <textarea
                 value={experience}
                 onChange={(event) => setExperience(event.target.value)}
-                placeholder="Tik su pareigomis susijusi patirtis. Nerašyti perteklinių asmens duomenų."
+                placeholder="Pvz., Slaugos skyrius, planuojama pradžia ar kita atsakingam darbuotojui svarbi pastaba."
                 rows={3}
                 className="w-full resize-none rounded-lg border border-[#c2d3ca] bg-white px-4 py-2 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#dce7e2]"
               />
@@ -711,7 +710,7 @@ export default function CandidatesModule({
               className="mt-1 h-5 w-5 rounded border-[#c2d3ca] text-[#486b5d] focus:ring-emerald-600"
             />
             <span className="text-sm font-black leading-6 text-[#486b5d]">
-              Kandidatas sutiko, kad jo pateikti duomenys būtų tvarkomi atrankos tikslu.
+              Darbuotojas informuotas, kad jo duomenys bus tvarkomi darbo sutarties sudarymo ir vykdymo tikslu.
             </span>
           </label>
 
@@ -723,7 +722,7 @@ export default function CandidatesModule({
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:bg-[#ffffff] disabled:opacity-60"
             >
               <Plus size={16} />
-              {saving ? "Saugoma..." : "Išsaugoti kandidatą"}
+              {saving ? "Saugoma..." : "Išsaugoti prašymą"}
             </button>
 
             <button
@@ -733,7 +732,7 @@ export default function CandidatesModule({
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#486b5d] px-4 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
             >
               <Mail size={16} />
-              {saving ? "Ruošiama..." : "Siųsti anketos nuorodą"}
+              {saving ? "Ruošiama..." : "Siųsti prašymo nuorodą"}
             </button>
 
             <button
@@ -768,9 +767,9 @@ export default function CandidatesModule({
         </div>
 
         <div className="rounded-xl border border-[#dbe6e0] bg-white p-4">
-          <h3 className="text-xl font-black text-[#10251f]">Klausimynas kandidatui</h3>
+          <h3 className="text-xl font-black text-[#10251f]">Priėmimo prašymo laukai</h3>
           <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
-            Šabloną galima papildyti savo klausimais, bet sistema blokuoja akivaizdžiai perteklinius klausimus.
+            Pasirinkite informaciją, kurios reikia darbo sutarties ir priėmimo dokumentų paruošimui.
           </p>
 
           <div className="mt-5 space-y-3">
@@ -856,10 +855,10 @@ export default function CandidatesModule({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#6a7e75]">
-                  Kandidato anketos peržiūra
+                  Darbuotojo prašymo peržiūra
                 </h4>
                 <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
-                  Kandidatui siunčiamas trumpas laiškas su nuoroda, o klausimai pildomi atskiroje anketoje.
+                  Darbuotojui siunčiamas trumpas laiškas su saugia nuoroda į atskirą prašymo formą.
                 </p>
               </div>
               <button
@@ -875,7 +874,7 @@ export default function CandidatesModule({
             <div className="mt-4 rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
               <div className="flex items-center gap-2 text-sm font-black text-[#10251f]">
                 <ExternalLink size={16} className="text-[#486b5d]" />
-                Vieša kandidato anketa
+                Vieša priėmimo prašymo forma
               </div>
               <p className="mt-2 break-all rounded-lg bg-white px-3 py-2 text-sm font-bold text-[#486b5d]">
                 {questionnairePreviewLink}
@@ -913,12 +912,12 @@ export default function CandidatesModule({
       </div>
 
       <div className="mt-6 rounded-xl border border-[#dbe6e0] bg-white p-4">
-        <h3 className="text-xl font-black text-[#10251f]">Kandidatų sąrašas</h3>
+        <h3 className="text-xl font-black text-[#10251f]">Priėmimo prašymų sąrašas</h3>
         <div className="mt-4 overflow-hidden rounded-lg border border-[#dbe6e0]">
           <table className="w-full text-left text-sm">
             <thead className="bg-[#ffffff] text-[#6a7e75]">
               <tr>
-                <th className="px-4 py-2 font-black">Kandidatas</th>
+                <th className="px-4 py-2 font-black">Darbuotojas</th>
                 <th className="px-4 py-2 font-black">Kontaktai</th>
                 <th className="px-4 py-2 font-black">Pareigos</th>
                 <th className="px-4 py-2 font-black">Būsena</th>
@@ -966,7 +965,7 @@ export default function CandidatesModule({
               ) : (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center font-bold text-[#6a7e75]">
-                    Kandidatų dar nėra.
+                    Priėmimo prašymų dar nėra.
                   </td>
                 </tr>
               )}
