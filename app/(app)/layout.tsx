@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation"
 import { usePathname, useRouter } from "next/navigation"
 import { NotificationProvider } from "@/components/providers/NotificationProvider"
 import AppSidebar from "@/components/layout/AppSidebar"
+import PageInstructions from "@/components/layout/PageInstructions"
 import { getCurrentAccess, hasModuleAccess } from "@/lib/app-access"
 import { moduleForPath } from "@/lib/plans"
 
@@ -103,6 +104,7 @@ function AppLayoutShell({
         <main style={embedded ? styles.embeddedMain : styles.main}>
           <div style={styles.content}>{children}</div>
         </main>
+        {!embedded ? <PageInstructions /> : null}
       </div>
     </NotificationProvider>
   )
