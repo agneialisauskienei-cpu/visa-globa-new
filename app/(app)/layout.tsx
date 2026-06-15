@@ -102,9 +102,13 @@ function AppLayoutShell({
         {showSidebar ? <AppSidebar /> : null}
 
         <main style={embedded ? styles.embeddedMain : styles.main}>
+          {!embedded ? (
+            <div className="vg-page-toolbar">
+              <PageInstructions />
+            </div>
+          ) : null}
           <div style={styles.content}>{children}</div>
         </main>
-        {!embedded ? <PageInstructions /> : null}
       </div>
     </NotificationProvider>
   )

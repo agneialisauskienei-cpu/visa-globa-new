@@ -290,7 +290,12 @@ export default function AdminDashboardPage() {
           : stats.expiringCertificates
             ? "red" as const
             : "emerald" as const,
-      onClick: () => openTeamModule("docs"),
+      onClick: () => {
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("team-active-module", "docs");
+        }
+        router.push("/team?module=docs&section=expiring");
+      },
     },
     {
       title: "Mokymų neatitikimai",

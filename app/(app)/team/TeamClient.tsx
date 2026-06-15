@@ -3731,6 +3731,9 @@ export default function TeamPage() {
               role: employee.position || employee.role || null,
             }))}
             credentials={credentials}
+            initialFilter={
+              searchParams.get("section") === "expiring" ? "expiring" : "all"
+            }
             onRefresh={loadAll}
           />
         )}

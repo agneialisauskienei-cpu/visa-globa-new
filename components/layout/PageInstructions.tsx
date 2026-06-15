@@ -109,29 +109,22 @@ export default function PageInstructions() {
               <article>
                 <b>1</b>
                 <div>
-                  <h3>Peržiūrėkite informaciją</h3>
-                  <p>Viršuje rasite svarbiausius rodiklius, filtrus ir šio lango veiksmus.</p>
+                  <h3>Peržiūrėkite</h3>
+                  <p>Viršuje rasite svarbiausius šio lango rodiklius ir veiksmus.</p>
                 </div>
               </article>
               <article>
                 <b>2</b>
                 <div>
-                  <h3>Pasirinkite įrašą</h3>
-                  <p>Spustelėkite kortelę, eilutę arba pavadinimą, kad atidarytumėte išsamesnę informaciją.</p>
+                  <h3>Pasirinkite</h3>
+                  <p>Spustelėkite kortelę arba eilutę, kurią norite atidaryti.</p>
                 </div>
               </article>
               <article>
                 <b>3</b>
                 <div>
                   <h3>Atlikite veiksmą</h3>
-                  <p>Naudokite aiškiai pažymėtus kūrimo, redagavimo, patvirtinimo arba ataskaitų mygtukus.</p>
-                </div>
-              </article>
-              <article>
-                <b>4</b>
-                <div>
-                  <h3>Filtruokite ir ieškokite</h3>
-                  <p>Jei sąrašas ilgas, naudokite paiešką ir filtrus. Aktyvų filtrą visada matysite paryškintą.</p>
+                  <p>Naudokite kūrimo, redagavimo arba patvirtinimo mygtukus.</p>
                 </div>
               </article>
             </div>

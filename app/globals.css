@@ -59,11 +59,13 @@ h3 {
   letter-spacing: -0.015em;
 }
 
+.vg-page-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 12px;
+}
+
 .vg-instruction-trigger {
-  position: fixed;
-  right: 24px;
-  top: 24px;
-  z-index: 45;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -73,7 +75,7 @@ h3 {
   background: #ffffff;
   color: #39594c;
   padding: 0 16px;
-  box-shadow: 0 10px 28px rgba(16, 37, 31, .14);
+  box-shadow: 0 2px 8px rgba(16, 37, 31, .10);
   font-weight: 800;
   cursor: pointer;
 }
@@ -149,7 +151,7 @@ h3 {
 
 .vg-instruction-content {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
   padding: 24px;
 }
@@ -241,14 +243,14 @@ a[class*="bg-[#486b5d]"]:hover {
 
 .vg-instruction-content h3 {
   margin: 0;
-  color: #10251f;
+  color: #486b5d;
   font-size: 17px;
   font-weight: 600;
 }
 
 .vg-instruction-content p {
   margin: 6px 0 0;
-  color: #60766c;
+  color: #10251f;
   font-size: 14px;
   line-height: 1.55;
 }
@@ -273,11 +275,6 @@ a[class*="bg-[#486b5d]"]:hover {
 }
 
 @media (max-width: 640px) {
-  .vg-instruction-trigger {
-    right: 16px;
-    top: 16px;
-  }
-
   .vg-instruction-content {
     grid-template-columns: 1fr;
     padding: 16px;

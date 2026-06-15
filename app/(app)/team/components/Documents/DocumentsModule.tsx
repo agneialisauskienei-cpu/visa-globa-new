@@ -36,6 +36,7 @@ type DocumentsModuleProps = {
   employees: EmployeeOption[];
   credentials: CredentialRecord[];
   requiredDocuments?: string[];
+  initialFilter?: DocsFilter;
   onRefresh?: () => void | Promise<void>;
 };
 
@@ -209,9 +210,10 @@ export default function DocumentsModule({
   employees,
   credentials,
   requiredDocuments = DEFAULT_REQUIRED_DOCUMENTS,
+  initialFilter = "all",
   onRefresh,
 }: DocumentsModuleProps) {
-  const [filter, setFilter] = useState<DocsFilter>("all");
+  const [filter, setFilter] = useState<DocsFilter>(initialFilter);
   const [employeeId, setEmployeeId] = useState("");
   const [type, setType] = useState(CREDENTIAL_TYPES[0]);
   const [number, setNumber] = useState("");
@@ -239,6 +241,10 @@ export default function DocumentsModule({
     text: string;
     details?: string;
   } | null>(null);
+
+  useEffect(() => {
+    setFilter(initialFilter);
+  }, [initialFilter]);
 
   useEffect(() => {
     let mounted = true;
