@@ -1454,15 +1454,15 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
       ];
 
   return (
-    <div className="mt-5 overflow-hidden rounded-2xl border border-[#dbe6e0]">
-      <div className="hidden grid-cols-[1fr_0.7fr_0.7fr_0.7fr] bg-[#ffffff] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
+    <div className="mt-5 overflow-hidden rounded-2xl border border-[#486b5d] bg-white">
+      <div className="hidden grid-cols-[1fr_0.7fr_0.7fr_0.7fr] border-b border-[#dbe6e0] bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#486b5d] md:grid">
         <div>Pareigybė</div>
         <div>Užimta</div>
         <div>Laisva</div>
         <div>Būsena</div>
       </div>
 
-      <div className="divide-y divide-[#f7fcf9] bg-white">
+      <div className="divide-y divide-[#dbe6e0] bg-white">
         {visibleRows.map((row) => (
           <div
             key={row.key}
@@ -1669,8 +1669,8 @@ function FtePlanningSection({
         <FteSummaryCard label="Laisvi etatai" value={loading ? "…" : formatFte(freeFte)} tone={freeFte > 0 ? "red" : "emerald"} />
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-[#dbe6e0]">
-        <div className="hidden grid-cols-[1.25fr_0.8fr_0.55fr_0.8fr_0.65fr] bg-[#ffffff] px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#6a7e75] md:grid">
+      <div className="mt-5 overflow-hidden rounded-2xl border border-[#486b5d] bg-white">
+        <div className="hidden grid-cols-[1.25fr_0.8fr_0.55fr_0.8fr_0.65fr] border-b border-[#dbe6e0] bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-[#486b5d] md:grid">
           <div>Pareigybė / grupė</div>
           <div>Užpildyta</div>
           <div>Laisva</div>
@@ -1678,7 +1678,7 @@ function FtePlanningSection({
           <div>Statusas</div>
         </div>
 
-        <div className="divide-y divide-[#f7fcf9] bg-white">
+        <div className="divide-y divide-[#dbe6e0] bg-white">
           {visibleRows.map((row) => (
             <div
               key={row.key}
@@ -1818,7 +1818,7 @@ function TopMetric({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 hover:bg-[#ffffff]"
+      className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:bg-[#f7fcf9] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)]"
     >
       <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">{title}</p>
       <p className={`mt-1 text-2xl font-black ${valueClass}`}>{value}</p>
