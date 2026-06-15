@@ -1,11 +1,20 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Arsenal, Geist_Mono, Radley } from 'next/font/google'
 import './globals.css'
 import MobileBottomNav from '@/components/mobile/MobileBottomNav'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const arsenal = Arsenal({
+  variable: '--font-arsenal',
   subsets: ['latin'],
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+})
+
+const radley = Radley({
+  variable: '--font-radley',
+  subsets: ['latin'],
+  weight: '400',
+  style: ['normal', 'italic'],
 })
 
 const geistMono = Geist_Mono({
@@ -26,7 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="lt"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${arsenal.variable} ${radley.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
         {children}
