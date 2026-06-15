@@ -1714,17 +1714,16 @@ function AttendanceModal({
         ) : null}
 
         <div className="max-h-[calc(94vh-118px)] space-y-5 overflow-y-auto p-5 lg:p-6">
-          <section className="rounded-3xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-bold leading-6 text-emerald-900">
-            <span className="font-black">Greitai:</span> eilutėje spausk D / N / A / T. One-click žymi visas viršuje pasirinktas veiklas. Masiniai mygtukai taip pat taikomi pasirinktoms veikloms.
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={() => setHelpOpen(true)}
-              className="ml-2 inline-flex items-center gap-1 font-black underline underline-offset-4"
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
             >
               <HelpCircle className="h-4 w-4" />
-              plačiau
+              Plačiau
             </button>
-          </section>
+          </div>
 
           <section className="grid gap-3 md:grid-cols-5">
             <MiniStat
