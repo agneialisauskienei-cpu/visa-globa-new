@@ -46,6 +46,7 @@ type DashboardStats = {
   incidentAlerts: number;
   medicationAlerts: number;
   activityGaps: number;
+  hasFtePlan: boolean;
   plannedFte: number;
   filledFte: number;
   freeFte: number;
@@ -87,6 +88,7 @@ const EMPTY_STATS: DashboardStats = {
   incidentAlerts: 0,
   medicationAlerts: 0,
   activityGaps: 0,
+  hasFtePlan: false,
   plannedFte: 0,
   filledFte: 0,
   freeFte: 0,
@@ -193,6 +195,7 @@ export default function AdminDashboardPage() {
       incidentAlerts,
       medicationAlerts,
       activityGaps,
+      hasFtePlan: fteSummary.hasPlan,
       plannedFte: fteSummary.plannedFte,
       filledFte: fteSummary.filledFte,
       freeFte: fteSummary.freeFte,
@@ -422,7 +425,13 @@ export default function AdminDashboardPage() {
           <TopMetric title="Užimtumas" value={loading ? "…" : `${computed.occupancy}%`} meta="vietos" accent="emerald" onClick={() => router.push("/rooms")} />
           <TopMetric title="Darbuotojai" value={loading ? "…" : String(stats.activeEmployees)} meta="aktyvūs" onClick={() => openTeamModule("employees")} />
           <TopMetric title="Kvietimai" value={loading ? "…" : String(stats.pendingInvites)} meta={stats.pendingInvites ? "laukia" : `${stats.totalInvites} iš viso`} accent={stats.pendingInvites ? "amber" : "emerald"} onClick={() => openTeamModule("invites")} />
-          <TopMetric title="Etatai" value={loading ? "…" : formatFte(stats.freeFte)} meta={`laisva iš ${formatFte(stats.plannedFte)} et.`} accent={stats.freeFte > 0 ? "red" : "emerald"} onClick={() => openTeamModule("fte")} />
+          <TopMetric
+            title="Etatai"
+            value={loading ? "…" : stats.hasFtePlan ? formatFte(stats.freeFte) : "—"}
+            meta={stats.hasFtePlan ? `laisva iš ${formatFte(stats.plannedFte)} et.` : "planas nesuvestas"}
+            accent={!stats.hasFtePlan || stats.freeFte > 0 ? "amber" : "emerald"}
+            onClick={() => openTeamModule("fte")}
+          />
           <TopMetric title="Užduotys" value={loading ? "…" : String(stats.pendingTasks)} meta={stats.pendingTasks ? "laukia" : "nėra"} accent={stats.pendingTasks ? "amber" : "emerald"} onClick={() => router.push("/tasks")} />
           <TopMetric title="Mokymai" value={loading ? "…" : `${computed.trainingCompletion}%`} meta="sutvarkyta" accent={computed.trainingCompletion < 70 ? "amber" : "emerald"} onClick={() => openTeamModule("trainings")} />
           <TopMetric
@@ -531,9 +540,9 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="mt-5 grid gap-3 md:grid-cols-4">
-                <FteSummaryCard label="Planuota" value={loading ? "…" : formatFte(stats.plannedFte)} />
+                <FteSummaryCard label="Planuota" value={loading ? "…" : stats.hasFtePlan ? formatFte(stats.plannedFte) : "—"} tone={!stats.hasFtePlan ? "amber" : undefined} />
                 <FteSummaryCard label="Užimta" value={loading ? "…" : formatFte(stats.filledFte)} tone="emerald" />
-                <FteSummaryCard label="Laisva" value={loading ? "…" : formatFte(stats.freeFte)} tone={stats.freeFte > 0 ? "red" : "emerald"} />
+                <FteSummaryCard label="Laisva" value={loading ? "…" : stats.hasFtePlan ? formatFte(stats.freeFte) : "—"} tone={!stats.hasFtePlan || stats.freeFte > 0 ? "amber" : "emerald"} />
                 <FteSummaryCard label="Laikinai nedirba" value={loading ? "…" : formatFte(stats.temporaryUnavailableFte)} tone={stats.temporaryUnavailableFte > 0 ? "amber" : "emerald"} />
               </div>
 
@@ -550,12 +559,14 @@ export default function AdminDashboardPage() {
                 <RiskAttentionCard
                   title="Pavadavimo poreikis"
                   text={
-                    stats.replacementNeededFte > 0
+                    !stats.hasFtePlan
+                      ? "Pirmiausia įveskite patvirtintą pareigybių ir etatų planą."
+                      : stats.replacementNeededFte > 0
                       ? `Reikia pavaduoti ${formatFte(stats.replacementNeededFte)} et.`
                       : "Pavadavimo poreikio nerasta."
                   }
-                  badge={stats.replacementNeededFte > 0 ? "Svarbu" : "Gerai"}
-                  tone={stats.replacementNeededFte > 0 ? "amber" : "emerald"}
+                  badge={!stats.hasFtePlan ? "Planas nesuvestas" : stats.replacementNeededFte > 0 ? "Svarbu" : "Gerai"}
+                  tone={!stats.hasFtePlan || stats.replacementNeededFte > 0 ? "amber" : "emerald"}
                   onClick={() => openTeamModule("schedule")}
                 />
 
@@ -820,6 +831,7 @@ async function countPendingDocumentApprovals(): Promise<number> {
 
 
 async function loadFteSummary(): Promise<{
+  hasPlan: boolean;
   plannedFte: number;
   filledFte: number;
   freeFte: number;
@@ -843,44 +855,14 @@ async function loadFteSummary(): Promise<{
   const positionRows = positionsResult.filter((row: any) => row?.active !== false);
 
   if (!positionRows.length) {
-    const groups = new Map<string, { title: string; filled: number; planned: number; coefficient: string }>();
-
-    for (const member of members) {
-      const key = normalizeFteGroup(member.staff_type || member.department || member.position || member.role);
-      const title = fteGroupLabel(key, member);
-      const current = groups.get(key) || {
-        title,
-        filled: 0,
-        planned: 0,
-        coefficient: "—",
-      };
-
-      current.filled += Number(member.employment_rate || 1);
-      current.planned = Math.max(current.planned, Math.ceil(current.filled));
-      groups.set(key, current);
-    }
-
-    const rows = Array.from(groups.entries()).map(([key, group]) =>
-      makeFteRow({
-        key,
-        title: group.title,
-        planned: group.planned,
-        filled: group.filled,
-        coefficient: group.coefficient,
-      }),
-    );
-
-    const plannedFte = roundFte(rows.reduce((sum, row) => sum + row.planned, 0));
-    const filledFte = roundFte(rows.reduce((sum, row) => sum + row.filled, 0));
-    const freeFte = roundFte(Math.max(0, plannedFte - filledFte));
-
     return {
-      plannedFte,
-      filledFte,
-      freeFte,
+      hasPlan: false,
+      plannedFte: 0,
+      filledFte: roundFte(members.reduce((sum: number, member: any) => sum + Number(member.employment_rate || 1), 0)),
+      freeFte: 0,
       temporaryUnavailableFte,
-      replacementNeededFte: temporaryUnavailableFte,
-      rows,
+      replacementNeededFte: 0,
+      rows: [],
     };
   }
 
@@ -908,6 +890,7 @@ async function loadFteSummary(): Promise<{
   const freeFte = roundFte(Math.max(0, plannedFte - filledFte));
 
   return {
+    hasPlan: true,
     plannedFte,
     filledFte,
     freeFte,
@@ -1563,30 +1546,33 @@ function RiskAttentionCard({
   tone: "emerald" | "amber" | "blue" | "red";
   onClick: () => void;
 }) {
-  const classes =
-    tone === "red"
-      ? "border-[#fecdd3] bg-[#fff1f2] text-[#047857]"
-      : tone === "amber"
-        ? "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]"
-        : tone === "blue"
-          ? "border-[#c9d8d0] bg-[#f7fcf9] text-[#047857]"
-          : "border-emerald-100 bg-emerald-50 text-emerald-700";
+  const hasWarning = tone === "red" || tone === "amber";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-2xl border p-4 text-left transition hover:shadow-sm ${classes}`}
+      className="w-full rounded-2xl border border-[#486b5d] bg-white p-4 text-left text-[#10251f] transition hover:border-[#10251f] hover:shadow-sm"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-lg font-black text-[#10251f]">{title}</p>
-          <p className="mt-1 text-sm font-bold opacity-80">{text}</p>
+          <p className="mt-1 text-sm font-bold text-[#10251f]">{text}</p>
         </div>
 
-        <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black">
-          {badge}
-        </span>
+        {hasWarning ? (
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#486b5d] bg-white text-[#486b5d]"
+            title={badge}
+            aria-label={badge}
+          >
+            <span className="text-lg font-black leading-none">!</span>
+          </span>
+        ) : (
+          <span className="shrink-0 rounded-full border border-[#dbe6e0] bg-white px-3 py-1 text-xs font-black text-[#486b5d]">
+            {badge}
+          </span>
+        )}
       </div>
     </button>
   );
@@ -1775,18 +1761,16 @@ function FteSummaryCard({
   value: string;
   tone?: "emerald" | "amber" | "red";
 }) {
-  const classes =
-    tone === "red"
-      ? "border-[#fecdd3] bg-[#fff1f2] text-[#047857]"
-      : tone === "amber"
-        ? "border-[#fecdd3] bg-[#fff1f2] text-[#be123c]"
-        : "border-[#dbe6e0] bg-[#ffffff] text-[#10251f]";
+  const hasWarning = tone === "red" || tone === "amber";
 
   return (
-    <article className={`rounded-2xl border p-4 ${classes}`}>
-      <p className="text-xs font-black uppercase tracking-[0.14em] opacity-70">
-        {label}
-      </p>
+    <article className="relative rounded-2xl border border-[#486b5d] bg-white p-4 text-[#10251f]">
+      {hasWarning ? (
+        <span className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full border border-[#486b5d] text-sm font-black text-[#486b5d]">
+          !
+        </span>
+      ) : null}
+      <p className="pr-8 text-xs font-black uppercase tracking-[0.14em] text-[#486b5d]">{label}</p>
       <p className="mt-2 text-3xl font-black">{value}</p>
     </article>
   );
