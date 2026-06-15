@@ -3269,13 +3269,14 @@ export default function TeamPage() {
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={() => changeTab("schedule")}
-              className="ml-auto rounded-lg border border-[#c2d3ca] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
-            >
-              Kompaktiškas režimas
-            </button>
+            {tab === "schedule" ? (
+              <button
+                type="button"
+                className="ml-auto rounded-lg border border-[#c2d3ca] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
+              >
+                Kompaktiškas grafikas
+              </button>
+            ) : null}
           </nav>
         </section>
 
@@ -3289,7 +3290,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("employees")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Darbuotojai
@@ -3305,7 +3306,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("fte")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Etatai
@@ -3323,7 +3324,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("vacations")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Atostogos
@@ -3339,7 +3340,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("schedule")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Grafikas
@@ -3353,7 +3354,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("trainings")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Mokymai
@@ -3369,7 +3370,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("docs")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Dokumentai
@@ -3385,7 +3386,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("candidates")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Priėmimo prašymai
@@ -4259,7 +4260,7 @@ function FtePlanModule({
         <button
           type="button"
           onClick={onNew}
-          className="inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#486b5d] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#39594c]"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[12px] bg-[#486b5d] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c]"
         >
           <Plus className="h-4 w-4" />
           Nauja pareigybė

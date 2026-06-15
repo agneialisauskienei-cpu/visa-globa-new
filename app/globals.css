@@ -62,7 +62,7 @@ h3 {
 .vg-instruction-trigger {
   position: fixed;
   right: 24px;
-  bottom: 24px;
+  top: 24px;
   z-index: 45;
   display: inline-flex;
   align-items: center;
@@ -113,14 +113,14 @@ h3 {
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  border-bottom: 1px solid #dbe6e0;
+  border-bottom: 1px solid #39594c;
   padding: 22px 24px;
-  background: #f7fcf9;
+  background: #486b5d;
 }
 
 .vg-instruction-header p {
   margin: 0 0 5px;
-  color: #60766c;
+  color: rgba(255, 255, 255, .72);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: .17em;
@@ -129,7 +129,7 @@ h3 {
 
 .vg-instruction-header h2 {
   margin: 0;
-  color: #10251f;
+  color: #ffffff;
   font-size: 28px;
   font-weight: 600;
 }
@@ -140,7 +140,7 @@ h3 {
   height: 40px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid #dbe6e0;
+  border: 1px solid rgba(255, 255, 255, .45);
   border-radius: 12px;
   background: #ffffff;
   color: #486b5d;
@@ -230,7 +230,7 @@ a[class*="bg-[#486b5d]"]:hover {
 @media (max-width: 640px) {
   .vg-instruction-trigger {
     right: 16px;
-    bottom: 82px;
+    top: 16px;
   }
 
   .vg-instruction-content {

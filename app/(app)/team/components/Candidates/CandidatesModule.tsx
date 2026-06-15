@@ -843,7 +843,7 @@ export default function CandidatesModule({
               <button
                 type="button"
                 onClick={addQuestion}
-                className="ml-auto inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-black text-white hover:bg-slate-800"
+                className="ml-auto inline-flex items-center gap-2 rounded-lg bg-[#486b5d] px-4 py-2 text-sm font-black text-white hover:bg-[#39594c]"
               >
                 <Plus size={16} />
                 Pridėti klausimą

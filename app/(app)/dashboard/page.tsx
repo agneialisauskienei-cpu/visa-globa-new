@@ -1552,7 +1552,7 @@ function RiskAttentionCard({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-2xl border border-[#486b5d] bg-white p-4 text-left text-[#10251f] transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f] hover:shadow-sm"
+      className="w-full rounded-2xl border border-[#486b5d] bg-white p-4 text-left text-[#10251f] transition hover:border-2 hover:border-[#486b5d] hover:shadow-sm"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -1802,7 +1802,7 @@ function TopMetric({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)]"
+      className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-2 hover:border-[#486b5d] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)]"
     >
       <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">{title}</p>
       <p className={`mt-1 text-2xl font-black ${valueClass}`}>{value}</p>
@@ -1993,7 +1993,7 @@ function QuickLink({ title, onClick }: { title: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center justify-between rounded-xl border border-[#486b5d] bg-white px-4 py-3 text-left font-black transition hover:ring-2 hover:ring-[#486b5d]"
+      className="flex items-center justify-between rounded-xl border border-[#486b5d] bg-white px-4 py-3 text-left font-black transition hover:border-2 hover:border-[#486b5d]"
     >
       <span>+ {title}</span>
       <ArrowRight className="h-5 w-5 text-[#6a7e75]" />
@@ -2051,8 +2051,8 @@ function TimelineItem({
   blue?: boolean;
 }) {
   return (
-    <div className="flex gap-3 rounded-xl border border-[#486b5d] bg-white p-3 transition hover:ring-2 hover:ring-[#486b5d]">
-      <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+    <div className="flex gap-3 rounded-xl border border-[#486b5d] bg-white p-3 transition hover:border-2 hover:border-[#486b5d]">
+      <span className="mt-1 h-3 w-3 shrink-0 rounded-full bg-[#486b5d]" />
       <div>
         <b>{title}</b>
         <p className="text-sm font-bold text-[#10251f]">
