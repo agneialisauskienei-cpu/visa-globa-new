@@ -402,7 +402,7 @@ export default function CandidateQuestionnairePage() {
                   <CheckCircle2 className="mx-auto h-10 w-10 text-[#486b5d]" />
                   <h2 className="mt-4 text-xl font-black text-[#10251f]">Ačiū, atsakymai gauti</h2>
                   <p className="mt-2 text-sm font-semibold leading-6 text-[#52685f]">
-                    Organizacija peržiūrės Jūsų atsakymus ir, jei reikės, susisieks dėl kito atrankos etapo.
+                    Organizacija peržiūrės Jūsų atsakymus ir parengs priėmimo bei darbo sutarties dokumentus.
                   </p>
                 </div>
               ) : (
@@ -438,7 +438,7 @@ export default function CandidateQuestionnairePage() {
                     {questions.map((question, index) => (
                       <label
                         key={question.id}
-                        className="block rounded-2xl border border-[#dbe6e0] bg-white p-4 shadow-sm"
+                        className="block border border-[#c2d3ca] bg-white p-4 shadow-sm"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
@@ -475,7 +475,7 @@ export default function CandidateQuestionnairePage() {
                   <div className="sticky bottom-0 -mx-5 mt-6 border-t border-[#dbe6e0] bg-white/95 px-5 py-4 backdrop-blur sm:-mx-8 sm:px-8">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-xs font-bold leading-5 text-[#6a7e75]">
-                        Pateikdami anketą patvirtinate, kad informacija teisinga ir gali būti naudojama atrankos tikslu.
+                        Pateikdami prašymą patvirtinate, kad informacija teisinga ir gali būti naudojama priėmimo bei darbo sutarties dokumentams parengti.
                       </p>
                       <button
                         type="button"

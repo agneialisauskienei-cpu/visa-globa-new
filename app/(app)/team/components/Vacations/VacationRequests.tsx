@@ -5,8 +5,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  FileDown,
   History,
   Plus,
+  Printer,
   TrendingDown,
   Umbrella,
   XCircle,
@@ -54,6 +56,8 @@ type VacationRequest = {
   rejection_reason?: string | null;
   created_at: string | null;
   substitute_user_id?: string | null;
+  handover_note?: string | null;
+  vacation_pay_method?: "with_salary" | "before_vacation" | null;
 };
 
 type AbsenceType = { value: string; label: string; code: string };
@@ -66,6 +70,8 @@ type VacationForm = {
   start_time?: string;
   end_time?: string;
   substitute_user_id?: string;
+  handover_note?: string;
+  vacation_pay_method?: "with_salary" | "before_vacation";
   note: string;
 };
 
@@ -555,6 +561,69 @@ function normalizeReasonText(value: string) {
 
 function rejectionReasonText(request?: VacationRequest | null) {
   return String(request?.rejection_reason || "").trim();
+}
+
+function payMethodLabel(value?: string | null) {
+  return value === "before_vacation"
+    ? "Išmokėti prieš atostogas"
+    : "Išmokėti kartu su darbo užmokesčiu";
+}
+
+function requestDocumentHtml(
+  request: VacationRequest,
+  employee: Employee | undefined,
+  typeLabel: string,
+) {
+  const safe = (value: unknown) =>
+    String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  body{font-family:Arial,sans-serif;color:#10251f;margin:48px;line-height:1.5}
+  h1{color:#486b5d;font-size:24px;margin-bottom:32px} table{border-collapse:collapse;width:100%}
+  td{border-bottom:1px solid #dbe6e0;padding:10px 0;vertical-align:top} td:first-child{font-weight:700;width:34%}
+  </style></head><body><h1>Atostogų prašymas</h1><table>
+  <tr><td>Darbuotojas</td><td>${safe(employeeDisplayName(employee))}</td></tr>
+  <tr><td>Pareigos</td><td>${safe(employeePositionText(employee) || "Nenurodyta")}</td></tr>
+  <tr><td>Atostogų rūšis</td><td>${safe(typeLabel)}</td></tr>
+  <tr><td>Laikotarpis</td><td>${safe(request.start_date)} – ${safe(request.end_date)}</td></tr>
+  <tr><td>Atostoginių išmokėjimas</td><td>${safe(payMethodLabel(request.vacation_pay_method))}</td></tr>
+  <tr><td>Pavadavimas</td><td>${safe(request.substitute_user_id ? "Pasirinktas pavaduotojas" : "Nenurodytas")}</td></tr>
+  <tr><td>Perduodama informacija</td><td>${safe(request.handover_note || "Nenurodyta")}</td></tr>
+  <tr><td>Pastaba</td><td>${safe(request.note || "Nėra")}</td></tr>
+  </table></body></html>`;
+}
+
+function downloadWord(
+  request: VacationRequest,
+  employee: Employee | undefined,
+  typeLabel: string,
+) {
+  const blob = new Blob([requestDocumentHtml(request, employee, typeLabel)], {
+    type: "application/msword;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `atostogu-prasymas-${request.start_date}.doc`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function printPdf(
+  request: VacationRequest,
+  employee: Employee | undefined,
+  typeLabel: string,
+) {
+  const popup = window.open("", "_blank");
+  if (!popup) return;
+  popup.opener = null;
+  popup.document.write(requestDocumentHtml(request, employee, typeLabel));
+  popup.document.close();
+  popup.focus();
+  popup.print();
 }
 
 export default function VacationRequests({
@@ -1047,6 +1116,8 @@ export default function VacationRequests({
       : form.note || null,
     created_at: null,
     substitute_user_id: form.substitute_user_id || null,
+    handover_note: form.handover_note || null,
+    vacation_pay_method: form.vacation_pay_method || "with_salary",
   };
   const canPreview = isTemporaryLeave(form.type)
     ? Boolean(
@@ -1107,6 +1178,8 @@ export default function VacationRequests({
       note: form.note || null,
       created_at: null,
       substitute_user_id: form.substitute_user_id || null,
+      handover_note: form.handover_note || null,
+      vacation_pay_method: form.vacation_pay_method || "with_salary",
     };
     const validationMessages = validationMessagesFor(draftForValidation);
     if (validationMessages.length) {
@@ -1128,6 +1201,8 @@ export default function VacationRequests({
         : form.note || null,
       created_at: new Date().toISOString(),
       substitute_user_id: form.substitute_user_id || null,
+      handover_note: form.handover_note || null,
+      vacation_pay_method: form.vacation_pay_method || "with_salary",
     };
 
     setOptimisticRequests((previous) => [optimisticRequest, ...previous]);
@@ -1437,6 +1512,29 @@ export default function VacationRequests({
             </option>
           ))}
         </select>
+        {isAnnual(form.type) ? (
+          <select
+            value={form.vacation_pay_method || "with_salary"}
+            onChange={(event) =>
+              update(
+                "vacation_pay_method",
+                event.target.value as VacationForm["vacation_pay_method"],
+              )
+            }
+            title="Atostoginių išmokėjimo būdas"
+          >
+            <option value="with_salary">Kartu su darbo užmokesčiu</option>
+            <option value="before_vacation">Prieš atostogas</option>
+          </select>
+        ) : null}
+        {form.substitute_user_id ? (
+          <input
+            value={form.handover_note || ""}
+            onChange={(event) => update("handover_note", event.target.value)}
+            placeholder="Ką perduoti pavaduotojui: užduotys, gyventojai, terminai"
+            title="Ši informacija bus matoma pavaduotojui aktyvaus pavadavimo metu"
+          />
+        ) : null}
         <button
           type="button"
           disabled={
@@ -1566,6 +1664,16 @@ export default function VacationRequests({
                         {fmt(request.end_date)}
                       </span>
                     ) : null}
+                    {request.handover_note ? (
+                      <span className="vr-note">
+                        Perdavimas: {request.handover_note}
+                      </span>
+                    ) : null}
+                    {isAnnual(request.type) ? (
+                      <span className="vr-note">
+                        Atostoginiai: {payMethodLabel(request.vacation_pay_method)}
+                      </span>
+                    ) : null}
                     {request.note ? (
                       <span className="vr-note">{request.note}</span>
                     ) : null}
@@ -1637,6 +1745,22 @@ export default function VacationRequests({
                     ) : (
                       <span>—</span>
                     )}
+                    <button
+                      type="button"
+                      className="vr-document"
+                      onClick={() => downloadWord(request, employee, type.label)}
+                      title="Atsisiųsti Word dokumentą"
+                    >
+                      <FileDown size={15} /> Word
+                    </button>
+                    <button
+                      type="button"
+                      className="vr-document"
+                      onClick={() => printPdf(request, employee, type.label)}
+                      title="Atidaryti spausdinimą arba išsaugoti PDF"
+                    >
+                      <Printer size={15} /> PDF
+                    </button>
                   </div>
                 </article>
                 {rejectRequestId === request.id && status === "submitted" ? (
@@ -2097,7 +2221,7 @@ const css = `
 .vr-filter.danger:not(.active) { background:#fff1f2; border-color:#fecdd3; color:#be123c; }
 .vr-form {
   display:grid;
-  grid-template-columns:minmax(230px,1.35fr) minmax(210px,1.05fr) minmax(145px,.78fr) minmax(145px,.78fr) minmax(170px,1fr) auto;
+  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
   gap:10px;
   margin:0;
   padding:16px 22px;
@@ -2146,7 +2270,7 @@ const css = `
 .vr-main-list-title small{ color:#6a7e75; font-weight:800; text-align:right; max-width:460px; }
 .vr-table-shell {
   border:1px solid #dbe6e0;
-  border-radius:14px;
+  border-radius:4px;
   overflow:hidden;
   max-width:calc(100% - 44px);
   margin:14px 22px 18px;
@@ -2178,11 +2302,11 @@ const css = `
 .vr-row-pending { background:#fff; }
 .vr-person { display:flex; align-items:center; gap:12px; min-width:0; text-align:left; border:0; background:transparent; padding:0; cursor:pointer; }
 .vr-person:hover strong{ text-decoration:underline; }
-.vr-avatar{ flex:0 0 auto; width:42px; height:42px; border-radius:14px; background:#f7fcf9; color:#486b5d; display:grid; place-items:center; font-weight:950; }
-.vr-person strong{ display:block; color:#10251f; font-weight:950; overflow:hidden; text-overflow:ellipsis; }
-.vr-person small{ color:#6a7e75; font-weight:800; display:block; overflow:hidden; text-overflow:ellipsis; }
-.vr-meta { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:#40594f; font-weight:850; min-width:0; }
-.vr-meta span{ background:#ffffff; border:1px solid #dbe6e0; border-radius:999px; padding:7px 10px; }
+.vr-avatar{ flex:0 0 auto; width:40px; height:40px; border-radius:6px; background:#f7fcf9; color:#486b5d; display:grid; place-items:center; font-weight:950; }
+.vr-person strong{ display:block; color:#10251f; font-size:14px; font-weight:950; overflow:hidden; text-overflow:ellipsis; }
+.vr-person small{ color:#6a7e75; font-size:12px; font-weight:800; display:block; overflow:hidden; text-overflow:ellipsis; }
+.vr-meta { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:#40594f; font-size:13px; font-weight:850; min-width:0; }
+.vr-meta span{ background:#ffffff; border:1px solid #dbe6e0; border-radius:6px; padding:7px 10px; }
 .vr-type b{ color:#486b5d; }
 .vr-note{ border-radius:10px!important; max-width:100%; white-space:normal; }
 .vr-rejection-reason{ background:#ffffff!important; color:#40594f!important; border-color:#dbe6e0!important; }
@@ -2196,9 +2320,11 @@ const css = `
 .vr-decision small{ font-weight:850; }
 .vr-decision-risk{ background:#ffffff; color:#8a2f27; border:1px solid #dbe6e0; }
 .vr-actions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
-.vr-actions button{ border:0; border-radius:10px; padding:9px 11px; font-weight:950; cursor:pointer; }
+.vr-actions button{ min-height:38px; border:1px solid transparent; border-radius:8px; padding:8px 10px; font-size:13px; font-weight:950; cursor:pointer; }
 .vr-approve{ background:#486b5d; color:#fff; }
 .vr-reject{ background:#ffffff; color:#8a2f27; }
+.vr-document{ display:inline-flex; align-items:center; gap:5px; background:#fff; border-color:#c2d3ca!important; color:#486b5d; }
+.vr-document:hover{ border-color:#486b5d!important; }
 .vr-empty{ border-top:1px solid #dbe6e0; padding:28px; text-align:center; color:#6a7e75; font-weight:900; background:#ffffff; }
 .vr-inline-reject{
   display:grid;

@@ -929,14 +929,30 @@ export default function CandidatesModule({
               </div>
             </div>
 
-            <details className="mt-4 rounded-xl border border-[#dbe6e0] bg-white p-4">
-              <summary className="cursor-pointer text-sm font-black text-[#486b5d]">
-                Rodyti siunčiamo laiško tekstą
-              </summary>
-              <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950 p-4 text-xs font-semibold leading-5 text-slate-100">
-                {emailBody}
-              </pre>
-            </details>
+            <div className="mt-4 border border-[#dbe6e0] bg-white p-4">
+              <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#486b5d]">
+                Darbuotojo matoma forma
+              </h4>
+              <p className="mt-2 text-sm font-semibold text-black">
+                Atsakymai pateikiami saugioje internetinėje formoje, ne el. paštu.
+              </p>
+              <div className="mt-4 space-y-3">
+                {selectedQuestions.map((question, index) => (
+                  <div
+                    key={question.id}
+                    className="border border-[#c2d3ca] bg-white p-4"
+                  >
+                    <p className="text-sm font-black text-black">
+                      {index + 1}. {question.label}
+                      {question.required ? " *" : ""}
+                    </p>
+                    <div className="mt-3 min-h-11 border-b-2 border-[#c2d3ca] px-1 py-2 text-sm text-[#6a7e75]">
+                      Darbuotojas atsakys čia
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>

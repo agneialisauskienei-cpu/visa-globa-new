@@ -122,6 +122,8 @@ type VacationRequest = {
   rejection_reason?: string | null;
   created_at: string | null;
   substitute_user_id?: string | null;
+  handover_note?: string | null;
+  vacation_pay_method?: "with_salary" | "before_vacation" | null;
   approved_at?: string | null;
   approved_by?: string | null;
   rejected_at?: string | null;
@@ -188,6 +190,8 @@ type VacationForm = {
   start_time?: string;
   end_time?: string;
   substitute_user_id?: string;
+  handover_note?: string;
+  vacation_pay_method?: "with_salary" | "before_vacation";
   note: string;
 };
 
@@ -1141,6 +1145,8 @@ export default function TeamPage() {
     start_time: "",
     end_time: "",
     substitute_user_id: "",
+    handover_note: "",
+    vacation_pay_method: "with_salary",
     note: "",
   });
   const [trainings, setTrainings] = useState<Training[]>([]);
@@ -2670,6 +2676,10 @@ export default function TeamPage() {
           : vacationForm.end_date,
         requested_days: requestedDays,
         note: noteParts.length ? noteParts.join(" · ") : null,
+        substitute_user_id: vacationForm.substitute_user_id || null,
+        handover_note: vacationForm.handover_note?.trim() || null,
+        vacation_pay_method:
+          vacationForm.vacation_pay_method || "with_salary",
         status: "submitted",
       };
 
@@ -2677,7 +2687,7 @@ export default function TeamPage() {
         .from("vacation_requests")
         .insert(payload)
         .select(
-          "id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at",
+          "id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, substitute_user_id, handover_note, vacation_pay_method, created_at",
         )
         .single();
 
@@ -2737,6 +2747,8 @@ export default function TeamPage() {
         start_time: "",
         end_time: "",
         substitute_user_id: "",
+        handover_note: "",
+        vacation_pay_method: "with_salary",
         note: "",
       });
       setVacationFilter("submitted");
@@ -2866,7 +2878,7 @@ export default function TeamPage() {
           .eq("organization_id", organizationId)
           .eq("id", id)
           .select(
-            "id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, created_at",
+            "id, employee_id, type, start_date, end_date, status, requested_days, note, rejection_reason, substitute_user_id, handover_note, vacation_pay_method, created_at",
           )
           .maybeSingle();
 
