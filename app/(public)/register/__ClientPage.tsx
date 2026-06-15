@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { setStoredOrganizationId } from "@/lib/current-organization";
 
 type InviteRow = {
   id: string;
@@ -170,9 +171,7 @@ export default function RegisterPage() {
 
       await createMembership(accessToken);
 
-      try {
-        window.localStorage.setItem("active_organization_id", invite.organization_id);
-      } catch {}
+      setStoredOrganizationId(invite.organization_id);
 
       setMessage("Paskyra aktyvuota.");
       router.replace(invite.role === "admin" ? "/dashboard" : "/employee-dashboard");

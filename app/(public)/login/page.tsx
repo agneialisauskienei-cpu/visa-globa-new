@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { setStoredOrganizationId } from '@/lib/current-organization'
 
 function getReadableError(message: string) {
   if (message === 'Email not confirmed') {
@@ -74,12 +75,7 @@ export default function LoginPage() {
         return
       }
 
-      try {
-        window.localStorage.setItem(
-          'active_organization_id',
-          membership.organization_id,
-        )
-      } catch {}
+      setStoredOrganizationId(membership.organization_id)
 
       if (role === 'owner' || role === 'admin') {
         router.replace('/dashboard')

@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 
 const KEY = 'active_organization_id'
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
 export type ActiveMembership = {
   organization_id: string
@@ -28,10 +29,12 @@ export function setStoredOrganizationId(id: string | null) {
   try {
     if (!id) {
       window.localStorage.removeItem(KEY)
+      document.cookie = `${KEY}=; Path=/; Max-Age=0; SameSite=Lax`
       return
     }
 
     window.localStorage.setItem(KEY, id)
+    document.cookie = `${KEY}=${encodeURIComponent(id)}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax; Secure`
   } catch {
     // ignore storage errors
   }
@@ -64,7 +67,13 @@ export async function getActiveMemberships(): Promise<ActiveMembership[]> {
     return []
   }
 
-  return (data as any[]).map((row) => ({
+  const rows = data as Array<{
+    organization_id: string
+    role?: ActiveMembership['role']
+    organizations?: { name?: string | null } | null
+  }>
+
+  return rows.map((row) => ({
     organization_id: row.organization_id,
     role: row.role,
     organization_name: row.organizations?.name || 'Be pavadinimo',

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { setStoredOrganizationId } from '@/lib/current-organization'
 
 function getReadableError(error: unknown) {
   if (!error) return 'Nežinoma klaida.'
@@ -85,9 +86,7 @@ export default function SignupPage() {
         .maybeSingle()
 
       if (existingMembership?.is_active) {
-        try {
-          window.localStorage.setItem('active_organization_id', organization.id)
-        } catch {}
+        setStoredOrganizationId(organization.id)
         router.replace('/employee-dashboard')
         return
       }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { setStoredOrganizationId } from '@/lib/current-organization'
 
 export default function PendingApprovalPage() {
   const router = useRouter()
@@ -56,9 +57,7 @@ export default function PendingApprovalPage() {
         return
       }
 
-      try {
-        window.localStorage.setItem('active_organization_id', membership.organization_id)
-      } catch {}
+      setStoredOrganizationId(membership.organization_id)
 
       const role = membership.role || profile?.role
 
