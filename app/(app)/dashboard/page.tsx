@@ -1993,7 +1993,7 @@ function QuickLink({ title, onClick }: { title: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center justify-between rounded-xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 text-left font-black transition hover:bg-[#f7fcf9]"
+      className="flex items-center justify-between rounded-xl border border-[#486b5d] bg-white px-4 py-3 text-left font-black transition hover:ring-2 hover:ring-[#486b5d]"
     >
       <span>+ {title}</span>
       <ArrowRight className="h-5 w-5 text-[#6a7e75]" />
@@ -2051,19 +2051,11 @@ function TimelineItem({
   blue?: boolean;
 }) {
   return (
-    <div className={`flex gap-3 rounded-xl border p-3 ${
-      danger
-        ? "border-[#fecdd3] bg-[#fff1f2]"
-        : warm
-          ? "border-[#fecdd3] bg-[#fff1f2]"
-          : blue
-            ? "border-[#c9d8d0] bg-[#f7fcf9]"
-            : "border-[#dbe6e0] bg-[#ffffff]"
-    }`}>
+    <div className="flex gap-3 rounded-xl border border-[#486b5d] bg-white p-3 transition hover:ring-2 hover:ring-[#486b5d]">
       <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
       <div>
         <b>{title}</b>
-        <p className={`text-sm font-bold ${danger ? "text-[#486b5d]/75" : warm ? "text-[#9f1239]" : blue ? "text-[#486b5d]/75" : "text-[#6a7e75]"}`}>
+        <p className="text-sm font-bold text-[#10251f]">
           {meta}
         </p>
       </div>

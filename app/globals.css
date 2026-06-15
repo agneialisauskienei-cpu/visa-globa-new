@@ -408,9 +408,58 @@ a[class*="bg-[#486b5d]"]:hover {
 .vg-chip-good { background: #e7f5ee; color: #087a55; }
 .vg-chip-warn { background: var(--vg-warning-bg); color: var(--vg-warning-text); }
 .vg-chip-bad { background: var(--vg-danger-bg); color: var(--vg-danger-text); }
-.vg-table { overflow: hidden; border: 1px solid var(--vg-border-soft); border-radius: 16px; background: #fff; }
-.vg-table-head { display: grid; background: #dce7e2; color: #40594f; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.vg-table { overflow: hidden; border: 1px solid var(--vg-primary); border-radius: 16px; background: #fff; }
+.vg-table-head { display: grid; border-bottom: 1px solid var(--vg-border-soft); background: #fff; color: var(--vg-primary); font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .vg-table-row { display: grid; align-items: center; border-top: 1px solid var(--vg-border-soft); background: #fff; }
+.vg-table-row:hover { background: #fff; box-shadow: inset 3px 0 0 var(--vg-primary); }
 .vg-empty { padding: 34px 16px; text-align: center; color: #60766c; font-weight: 800; }
 .vg-section-title { font-size: 18px; font-weight: 900; color: var(--vg-text); }
 .vg-panel-title { font-size: 14px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--vg-muted); }
+
+/* Shared data-table appearance. Schedule and spreadsheet matrices keep their
+   functional cell colors and are intentionally excluded. */
+table:not(.htCore):not(.schedule-table):not(.legend):not(.issues-table) {
+  width: 100%;
+  border: 1px solid var(--vg-primary);
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+}
+
+table:not(.htCore):not(.schedule-table):not(.legend):not(.issues-table) thead {
+  background: #fff !important;
+  color: var(--vg-primary) !important;
+}
+
+table:not(.htCore):not(.schedule-table):not(.legend):not(.issues-table) th {
+  border-bottom: 1px solid var(--vg-border-soft);
+  background: #fff !important;
+  color: var(--vg-primary) !important;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+table:not(.htCore):not(.schedule-table):not(.legend):not(.issues-table) td {
+  border-bottom: 1px solid var(--vg-border-soft);
+  background: #fff;
+  color: var(--vg-text);
+}
+
+table:not(.htCore):not(.schedule-table):not(.legend):not(.issues-table) tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+table:not(.htCore):not(.schedule-table):not(.legend):not(.issues-table) tbody tr {
+  background: #fff;
+  transition: box-shadow .18s ease;
+}
+
+table:not(.htCore):not(.schedule-table):not(.legend):not(.issues-table) tbody tr:hover {
+  background: #fff !important;
+  box-shadow: inset 3px 0 0 var(--vg-primary);
+}
