@@ -3,8 +3,11 @@
 import type { ReactNode } from "react"
 import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { NotificationProvider } from "@/components/providers/NotificationProvider"
 import AppSidebar from "@/components/layout/AppSidebar"
+import { getCurrentAccess, hasModuleAccess } from "@/lib/app-access"
+import { moduleForPath } from "@/lib/plans"
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -31,10 +34,56 @@ function AppLayoutContent({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AppLayoutShell embedded={embedded} showSidebar={isDesktop && !embedded}>
-      {children}
-    </AppLayoutShell>
+    <ModuleAccessGuard>
+      <AppLayoutShell embedded={embedded} showSidebar={isDesktop && !embedded}>
+        {children}
+      </AppLayoutShell>
+    </ModuleAccessGuard>
   )
+}
+
+function ModuleAccessGuard({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [checkedPath, setCheckedPath] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    async function checkAccess() {
+      const moduleKey = moduleForPath(pathname)
+      if (!moduleKey) {
+        if (active) setCheckedPath(pathname)
+        return
+      }
+
+      const access = await getCurrentAccess()
+      if (!active) return
+
+      if (!access.role) {
+        router.replace("/login")
+        return
+      }
+
+      if (!hasModuleAccess(access, moduleKey)) {
+        router.replace(`/module-unavailable?module=${encodeURIComponent(moduleKey)}`)
+        return
+      }
+
+      setCheckedPath(pathname)
+    }
+
+    void checkAccess()
+    return () => {
+      active = false
+    }
+  }, [pathname, router])
+
+  if (checkedPath !== pathname) {
+    return <AppLayoutShell embedded={false}>Tikrinama prieiga...</AppLayoutShell>
+  }
+
+  return children
 }
 
 function AppLayoutShell({

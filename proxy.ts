@@ -5,21 +5,14 @@ import { moduleForPath } from "@/lib/plans"
 const ACTIVE_ORGANIZATION_COOKIE = "active_organization_id"
 
 function forbiddenResponse(request: NextRequest, moduleKey: string) {
-  if (request.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Šis modulis nepriklauso organizacijos paketui.",
-        module: moduleKey,
-      },
-      { status: 403 },
-    )
-  }
-
-  const target = request.nextUrl.clone()
-  target.pathname = "/module-unavailable"
-  target.search = `?module=${encodeURIComponent(moduleKey)}`
-  return NextResponse.redirect(target)
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "Šis modulis nepriklauso organizacijos paketui.",
+      module: moduleKey,
+    },
+    { status: 403 },
+  )
 }
 
 export async function proxy(request: NextRequest) {
@@ -64,19 +57,14 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const moduleKey = moduleForPath(request.nextUrl.pathname)
-  if (!moduleKey) return response
+  if (!moduleKey || !request.nextUrl.pathname.startsWith("/api/")) {
+    return response
+  }
   if (!user) {
-    if (request.nextUrl.pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        { ok: false, error: "Neprisijungta." },
-        { status: 401 },
-      )
-    }
-
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = "/login"
-    loginUrl.search = ""
-    return NextResponse.redirect(loginUrl)
+    return NextResponse.json(
+      { ok: false, error: "Neprisijungta." },
+      { status: 401 },
+    )
   }
 
   const { data: profile } = await supabase
@@ -87,9 +75,9 @@ export async function proxy(request: NextRequest) {
 
   if (profile?.role === "super_admin") return response
 
-  const requestedOrganizationId = request.nextUrl.pathname.startsWith("/api/")
-    ? request.headers.get("x-organization-id")?.trim()
-    : request.cookies.get(ACTIVE_ORGANIZATION_COOKIE)?.value
+  const requestedOrganizationId =
+    request.headers.get("x-organization-id")?.trim() ||
+    request.cookies.get(ACTIVE_ORGANIZATION_COOKIE)?.value
 
   let membershipQuery = supabase
     .from("organization_members")
@@ -129,15 +117,6 @@ export async function proxy(request: NextRequest) {
 
   if (entitlement?.is_enabled !== true) {
     return forbiddenResponse(request, moduleKey)
-  }
-
-  if (!requestedOrganizationId && !request.nextUrl.pathname.startsWith("/api/")) {
-    response.cookies.set(ACTIVE_ORGANIZATION_COOKIE, membership.organization_id, {
-      path: "/",
-      sameSite: "lax",
-      secure: true,
-      maxAge: 60 * 60 * 24 * 365,
-    })
   }
 
   return response
