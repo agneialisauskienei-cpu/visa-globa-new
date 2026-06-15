@@ -3289,7 +3289,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("employees")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Darbuotojai
@@ -3305,7 +3305,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("fte")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Etatai
@@ -3323,7 +3323,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("vacations")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Atostogos
@@ -3339,7 +3339,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("schedule")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Grafikas
@@ -3353,7 +3353,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("trainings")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Mokymai
@@ -3369,7 +3369,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("docs")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Dokumentai
@@ -3385,7 +3385,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("candidates")}
-            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:bg-[#ffffff]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Kandidatai
