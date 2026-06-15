@@ -1877,9 +1877,9 @@ function PriorityActionCard({
   onClick: () => void;
 }) {
   const accentStyles = {
-    amber: "text-[#8f5f55]",
-    red: "text-[#9b514d]",
-    blue: "text-[#486b5d]",
+    amber: "text-[#2563eb]",
+    red: "text-[#2563eb]",
+    blue: "text-[#2563eb]",
     emerald: "text-[#047857]",
   }[color];
 
@@ -1891,8 +1891,16 @@ function PriorityActionCard({
           <h3 className="mt-1 text-lg font-black text-[#10251f]">{title}</h3>
           <p className={`mt-1 text-sm font-bold ${accentStyles}`}>{desc}</p>
         </div>
-        <span className={`shrink-0 rounded-full border border-[#dbe6e0] bg-white px-3 py-1 text-xs font-black ${accentStyles}`}>
-          {badge}
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${
+            color === "emerald"
+              ? "border-emerald-200 bg-emerald-50 text-[#047857]"
+              : "border-blue-200 bg-blue-50 text-[#2563eb]"
+          }`}
+          title={badge}
+          aria-label={badge}
+        >
+          <span className="text-lg font-black leading-none">!</span>
         </span>
       </div>
 

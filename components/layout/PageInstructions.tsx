@@ -35,6 +35,14 @@ const PAGE_NAMES: Record<string, string> = {
   team: "Komanda",
 }
 
+const PAGES_WITH_OWN_INSTRUCTIONS = new Set([
+  "activities",
+  "dashboard",
+  "medications",
+  "medicine",
+  "residents",
+])
+
 function getPageName(pathname: string) {
   const segment = pathname.split("/").filter(Boolean)[0] ?? "dashboard"
   return PAGE_NAMES[segment] ?? "Šis langas"
@@ -44,6 +52,7 @@ export default function PageInstructions() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const pageName = getPageName(pathname)
+  const pageSegment = pathname.split("/").filter(Boolean)[0] ?? "dashboard"
 
   useEffect(() => {
     if (!open) return
@@ -55,6 +64,10 @@ export default function PageInstructions() {
     window.addEventListener("keydown", closeOnEscape)
     return () => window.removeEventListener("keydown", closeOnEscape)
   }, [open])
+
+  if (PAGES_WITH_OWN_INSTRUCTIONS.has(pageSegment)) {
+    return null
+  }
 
   return (
     <>
