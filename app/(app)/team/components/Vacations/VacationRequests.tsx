@@ -914,12 +914,6 @@ export default function VacationRequests({
       return messages;
     }
 
-    if (!isSameStaffingGroup(absentEmployee, substitute)) {
-      messages.push(
-        "Pavaduotojas turi būti iš tos pačios pareigybės / personalo grupės. Jei reikia išimties, ją turi patvirtinti serverio teisės.",
-      );
-    }
-
     if (!isEmployeeActiveDuringRequest(substitute, request)) {
       messages.push(
         "Pasirinktas pavaduotojas tuo laikotarpiu nėra aktyvus darbuotojas.",
@@ -938,16 +932,24 @@ export default function VacationRequests({
   function availableSubstitutesFor(request: VacationRequest) {
     const absentEmployee = employeeMap.get(request.employee_id);
 
-    return employees.filter((employee) => {
-      if (!absentEmployee) return false;
-      if (employee.user_id === request.employee_id) return false;
-      if (!isSameStaffingGroup(absentEmployee, employee)) return false;
-      if (!isEmployeeActiveDuringRequest(employee, request)) return false;
-      if (hasOverlappingNonRejectedAbsence(employee.user_id, request))
-        return false;
-
-      return true;
-    });
+    return employees
+      .filter((employee) => {
+        if (!absentEmployee) return false;
+        if (employee.user_id === request.employee_id) return false;
+        if (!isEmployeeActiveDuringRequest(employee, request)) return false;
+        if (hasOverlappingNonRejectedAbsence(employee.user_id, request))
+          return false;
+        return true;
+      })
+      .sort((left, right) => {
+        const leftPriority = isSameStaffingGroup(absentEmployee, left) ? 0 : 1;
+        const rightPriority = isSameStaffingGroup(absentEmployee, right) ? 0 : 1;
+        if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+        return employeeDisplayName(left).localeCompare(
+          employeeDisplayName(right),
+          "lt",
+        );
+      });
   }
 
   function validationMessagesFor(request: VacationRequest) {
@@ -1428,6 +1430,7 @@ export default function VacationRequests({
 
       <div className="vr-form">
         <select
+          className="vr-form-employee"
           value={form.employee_id}
           onChange={(event) => {
             update("employee_id", event.target.value);
@@ -1448,6 +1451,7 @@ export default function VacationRequests({
           })}
         </select>
         <select
+          className="vr-form-type"
           value={form.type}
           onChange={(event) => update("type", event.target.value)}
         >
@@ -1458,6 +1462,7 @@ export default function VacationRequests({
           ))}
         </select>
         <input
+          className="vr-form-date"
           type="date"
           value={form.start_date}
           onChange={(event) => update("start_date", event.target.value)}
@@ -1465,6 +1470,7 @@ export default function VacationRequests({
         {isTemporaryLeave(form.type) ? (
           <>
             <input
+              className="vr-form-date"
               value={form.start_time || ""}
               onChange={(event) => update("start_time", event.target.value)}
               onBlur={(event) =>
@@ -1473,6 +1479,7 @@ export default function VacationRequests({
               placeholder="Nuo, pvz. 10:00"
             />
             <input
+              className="vr-form-date"
               value={form.end_time || ""}
               onChange={(event) => update("end_time", event.target.value)}
               onBlur={(event) =>
@@ -1483,17 +1490,20 @@ export default function VacationRequests({
           </>
         ) : (
           <input
+            className="vr-form-date"
             type="date"
             value={form.end_date}
             onChange={(event) => update("end_date", event.target.value)}
           />
         )}
         <input
+          className="vr-form-note"
           value={form.note}
           onChange={(event) => update("note", event.target.value)}
           placeholder="Pastaba"
         />
         <select
+          className="vr-form-substitute"
           value={form.substitute_user_id || ""}
           onChange={(event) => update("substitute_user_id", event.target.value)}
           title="Pavaduotojo pasirinkimas. Teisių suteikimą ir automatinį galiojimo pabaigos terminą turi įgyvendinti serverio logika."
@@ -1505,7 +1515,10 @@ export default function VacationRequests({
           </option>
           {availableSubstitutes.map((employee) => (
             <option key={employee.user_id} value={employee.user_id}>
-              Pavaduotojas: {employeeDisplayName(employee)}
+              {isSameStaffingGroup(selectedEmployee, employee)
+                ? "Rekomenduojamas: "
+                : ""}
+              {employeeDisplayName(employee)}
               {employeePositionText(employee)
                 ? ` — ${employeePositionText(employee)}`
                 : ""}
@@ -1514,6 +1527,7 @@ export default function VacationRequests({
         </select>
         {isAnnual(form.type) ? (
           <select
+            className="vr-form-payment"
             value={form.vacation_pay_method || "with_salary"}
             onChange={(event) =>
               update(
@@ -1529,6 +1543,7 @@ export default function VacationRequests({
         ) : null}
         {form.substitute_user_id ? (
           <input
+            className="vr-form-handover"
             value={form.handover_note || ""}
             onChange={(event) => update("handover_note", event.target.value)}
             placeholder="Ką perduoti pavaduotojui: užduotys, gyventojai, terminai"
@@ -1536,6 +1551,7 @@ export default function VacationRequests({
           />
         ) : null}
         <button
+          className="vr-form-submit"
           type="button"
           disabled={
             saving ||
@@ -1573,8 +1589,8 @@ export default function VacationRequests({
           <div>
             <b>Nėra tinkamo pavaduotojo</b>
             <span>
-              Pagal dabartinius darbuotojų duomenis nerasta aktyvaus tos pačios
-              grupės pavaduotojo be persidengiančio neatvykimo.
+              Pagal dabartinius duomenis nerasta kito aktyvaus darbuotojo be
+              persidengiančio neatvykimo.
             </span>
           </div>
         </div>
@@ -2221,13 +2237,21 @@ const css = `
 .vr-filter.danger:not(.active) { background:#fff1f2; border-color:#fecdd3; color:#be123c; }
 .vr-form {
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  grid-template-columns:repeat(12,minmax(0,1fr));
   gap:10px;
   margin:0;
   padding:16px 22px;
   border-bottom:1px solid #dbe6e0;
   background:#f7fcf9;
 }
+.vr-form-employee{ grid-column:span 3; }
+.vr-form-type{ grid-column:span 3; }
+.vr-form-date{ grid-column:span 2; }
+.vr-form-note{ grid-column:span 2; }
+.vr-form-substitute{ grid-column:span 4; }
+.vr-form-payment{ grid-column:span 4; }
+.vr-form-handover{ grid-column:span 8; }
+.vr-form-submit{ grid-column:span 4; }
 .vr-form select,.vr-form input {
   width:100%;
   min-width:0;
@@ -2534,6 +2558,8 @@ const css = `
   .vr-header{ grid-template-columns:1fr; }
   .vr-summary{ justify-content:flex-start; }
   .vr-form{ grid-template-columns:1fr 1fr; }
+  .vr-form > *{ grid-column:span 1; }
+  .vr-form-handover{ grid-column:1 / -1!important; }
   .vr-balance{ grid-template-columns:1fr 1fr; }
   .vr-rule-grid{ grid-template-columns:1fr; }
   .vr-forecast-main{ flex-direction:column; align-items:stretch; }
@@ -2546,6 +2572,7 @@ const css = `
 }
 @container (max-width: 720px){
   .vr-form{ grid-template-columns:1fr; }
+  .vr-form > *{ grid-column:1 / -1!important; }
   .vr-balance{ grid-template-columns:1fr; }
   .vr-row{ grid-template-columns:1fr; }
   .vr-history-head{ display:none; }
