@@ -215,7 +215,7 @@ a[class*="bg-[#486b5d]"]:hover {
   border-color: #c9d8d0 !important;
 }
 
-.vg-app-shell button:not([aria-label]):not([class*="rounded-full"]):not([class*="aspect-square"]):not(:has(> svg:only-child)):not(:has(> p)) {
+.vg-app-shell button:not([data-content-card]):not([aria-label]):not([class*="rounded-full"]):not([class*="aspect-square"]):not(:has(> svg:only-child)):not(:has(> p)) {
   min-height: 42px !important;
   height: 42px !important;
   padding: 0 16px !important;

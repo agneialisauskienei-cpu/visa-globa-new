@@ -1556,6 +1556,7 @@ function RiskAttentionCard({
   return (
     <button
       type="button"
+      data-content-card
       onClick={onClick}
       className="w-full rounded-2xl border border-[#486b5d] bg-white p-4 text-left text-[#10251f] transition hover:border-2 hover:border-[#486b5d] hover:shadow-sm"
     >
@@ -1806,6 +1807,7 @@ function TopMetric({
   return (
     <button
       type="button"
+      data-content-card
       onClick={onClick}
       className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-2 hover:border-[#486b5d] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)]"
     >
@@ -1997,6 +1999,7 @@ function QuickLink({ title, onClick }: { title: string; onClick: () => void }) {
   return (
     <button
       type="button"
+      data-content-card
       onClick={onClick}
       className="flex items-center justify-between rounded-xl border border-[#486b5d] bg-white px-4 py-3 text-left font-black transition hover:border-2 hover:border-[#486b5d]"
     >
@@ -2028,6 +2031,7 @@ function RiskRow({
   return (
     <button
       type="button"
+      data-content-card
       onClick={onClick}
       className={`flex items-center justify-between gap-4 rounded-xl border p-3 text-left transition hover:shadow-sm ${value > 0 ? styles : "border-[#dbe6e0] bg-[#ffffff] text-[#486b5d]"}`}
     >
