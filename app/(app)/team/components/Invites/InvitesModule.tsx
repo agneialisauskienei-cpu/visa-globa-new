@@ -472,7 +472,7 @@ export default function InvitesModule() {
 
         <div className="grid gap-5 p-5 xl:grid-cols-[0.82fr_1.18fr]">
           <div className="rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-5">
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#047857]">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#486b5d]">
               Naujas kvietimas
             </p>
             <h3 className="mt-2 text-2xl font-black text-[#10251f]">
@@ -489,7 +489,7 @@ export default function InvitesModule() {
                   value={form.email}
                   onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
                   placeholder="vardas@imone.lt"
-                  className="mt-2 w-full rounded-2xl border border-[#c9d8d0] bg-white px-4 py-3 text-base font-bold text-[#10251f] outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
+                  className="mt-2 w-full rounded-2xl border border-[#c9d8d0] bg-white px-4 py-3 text-base font-bold text-[#10251f] outline-none transition focus:border-[#486b5d] focus:ring-4 focus:ring-emerald-100"
                 />
               </label>
 
@@ -503,7 +503,7 @@ export default function InvitesModule() {
                       role: event.target.value as NewInviteForm["role"],
                     }))
                   }
-                  className="mt-2 w-full rounded-2xl border border-[#c9d8d0] bg-white px-4 py-3 text-base font-bold text-[#10251f] outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
+                  className="mt-2 w-full rounded-2xl border border-[#c9d8d0] bg-white px-4 py-3 text-base font-bold text-[#10251f] outline-none transition focus:border-[#486b5d] focus:ring-4 focus:ring-emerald-100"
                 >
                   <option value="employee">Darbuotojas</option>
                   <option value="admin">Administratorius</option>
@@ -515,7 +515,7 @@ export default function InvitesModule() {
                 type="button"
                 onClick={() => void createInvite()}
                 disabled={saving}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#065f46] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <UserPlus className="h-4 w-4" />
                 {saving ? "Siunčiama..." : "Sukurti ir išsiųsti kvietimą"}
@@ -539,7 +539,7 @@ export default function InvitesModule() {
             <div className="rounded-2xl border border-[#dbe6e0] bg-white p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#047857]">
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#486b5d]">
                     Sąrašas
                   </p>
                   <h3 className="mt-1 text-2xl font-black text-[#10251f]">
@@ -554,14 +554,14 @@ export default function InvitesModule() {
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Ieškoti..."
-                      className="w-full rounded-xl border border-[#c9d8d0] bg-[#ffffff] py-2 pl-9 pr-3 text-sm font-bold outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100 sm:w-56"
+                      className="w-full rounded-xl border border-[#c9d8d0] bg-[#ffffff] py-2 pl-9 pr-3 text-sm font-bold outline-none focus:border-[#486b5d] focus:ring-4 focus:ring-emerald-100 sm:w-56"
                     />
                   </div>
 
                   <select
                     value={filter}
                     onChange={(event) => setFilter(event.target.value as typeof filter)}
-                    className="rounded-xl border border-[#c9d8d0] bg-[#ffffff] px-3 py-2 text-sm font-black text-[#486b5d] outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
+                    className="rounded-xl border border-[#c9d8d0] bg-[#ffffff] px-3 py-2 text-sm font-black text-[#486b5d] outline-none focus:border-[#486b5d] focus:ring-4 focus:ring-emerald-100"
                   >
                     <option value="active">Aktyvūs</option>
                     <option value="pending">Laukia</option>

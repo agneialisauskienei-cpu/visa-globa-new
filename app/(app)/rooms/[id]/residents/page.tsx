@@ -425,7 +425,7 @@ function Badge({
   tone?: "green" | "blue" | "warning" | "danger" | "neutral"
 }) {
   const tones = {
-    green: "border-[#a7f3d0] bg-[#eefaf3] text-[#047857]",
+    green: "border-[#a7f3d0] bg-[#eefaf3] text-[#486b5d]",
     blue: "border-blue-200 bg-blue-50 text-blue-700",
     warning: "border-amber-200 bg-amber-50 text-amber-700",
     danger: "border-red-200 bg-red-50 text-red-700",
@@ -453,7 +453,7 @@ function StatCard({
   return (
     <div className="rounded-[24px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eefaf3] text-[#047857]">
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eefaf3] text-[#486b5d]">
           {icon}
         </div>
         {badge}
@@ -1136,7 +1136,7 @@ export default function RoomsPage() {
               <button
                 type="button"
                 onClick={openNewRoom}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747]"
+                className="inline-flex items-center gap-2 rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c]"
               >
                 <Plus size={18} />
                 Naujas kambarys
@@ -1182,7 +1182,7 @@ export default function RoomsPage() {
         ) : null}
 
         {success ? (
-          <div className="mb-5 rounded-2xl border border-[#a7f3d0] bg-[#eefaf3] px-4 py-3 text-sm font-bold text-[#047857]">
+          <div className="mb-5 rounded-2xl border border-[#a7f3d0] bg-[#eefaf3] px-4 py-3 text-sm font-bold text-[#486b5d]">
             {success}
           </div>
         ) : null}
@@ -1198,7 +1198,7 @@ export default function RoomsPage() {
         <section className="mb-5 rounded-[26px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-black uppercase tracking-[0.18em] text-[#047857]">Reikia dėmesio</div>
+              <div className="text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">Reikia dėmesio</div>
               <h2 className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#10251f]">Kambarių rizikos ir veiksmai</h2>
               <p className="mt-1 text-sm font-bold text-[#526174]">
                 Čia rodomi pasibaigusių rezervacijų, remontuojamų kambarių ir talpos konfliktų signalai.
@@ -1338,7 +1338,7 @@ export default function RoomsPage() {
                 type="button"
                 onClick={bulkCreateRooms}
                 disabled={saving}
-                className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
+                className="rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white hover:bg-[#39594c] disabled:opacity-60"
               >
                 {saving ? "Kuriama..." : "Sukurti kambarius"}
               </button>
@@ -1523,7 +1523,7 @@ export default function RoomsPage() {
                     <button
                       type="button"
                       onClick={() => openRoom(room, "reserve")}
-                      className="rounded-2xl bg-[#047857] px-4 py-3 text-sm font-black text-white transition hover:bg-[#036747]"
+                      className="rounded-2xl bg-[#486b5d] px-4 py-3 text-sm font-black text-white transition hover:bg-[#39594c]"
                     >
                       Rezervuoti
                     </button>
@@ -1553,7 +1553,7 @@ export default function RoomsPage() {
             <div className="my-auto w-full max-w-[1180px] max-h-[calc(100vh-48px)] overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
               <div className="sticky top-0 z-20 flex items-start justify-between gap-5 border-b border-[#f7fcf9] bg-white px-6 py-5">
                 <div className="flex items-center gap-4">
-                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-[#eefaf3] text-2xl font-black text-[#047857]">
+                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[24px] bg-[#eefaf3] text-2xl font-black text-[#486b5d]">
                     {selectedRoomId === "new" ? "+" : selectedRoom?.name}
                   </div>
                   <div>
@@ -1681,7 +1681,7 @@ export default function RoomsPage() {
                             type="button"
                             onClick={assignResident}
                             disabled={saving}
-                            className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
+                            className="rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white hover:bg-[#39594c] disabled:opacity-60"
                           >
                             {saving
                               ? "Saugoma..."
@@ -1805,7 +1805,7 @@ export default function RoomsPage() {
                         type="button"
                         onClick={saveRoom}
                         disabled={saving}
-                        className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
+                        className="rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white hover:bg-[#39594c] disabled:opacity-60"
                       >
                         {saving ? "Saugoma..." : "Išsaugoti kambarį"}
                       </button>
@@ -1863,7 +1863,7 @@ export default function RoomsPage() {
                                       <button
                                         type="button"
                                         onClick={() => confirmArrival(resident.id)}
-                                        className="rounded-2xl bg-[#047857] px-3 py-2 text-xs font-black text-white hover:bg-[#036747]"
+                                        className="rounded-2xl bg-[#486b5d] px-3 py-2 text-xs font-black text-white hover:bg-[#39594c]"
                                       >
                                         Atvyko
                                       </button>
@@ -1933,7 +1933,7 @@ export default function RoomsPage() {
                           type="button"
                           onClick={assignResident}
                           disabled={saving}
-                          className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
+                          className="rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white hover:bg-[#39594c] disabled:opacity-60"
                         >
                           {saving ? "Saugoma..." : assignForm.mode === "arriving_soon" ? "Rezervuoti" : "Priskirti"}
                         </button>
@@ -1959,7 +1959,7 @@ export default function RoomsPage() {
                         type="button"
                         onClick={() => updateRoomStatus(null)}
                         disabled={!selectedRoom || selectedRoomId === "new"}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#047857] px-4 py-3 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#486b5d] px-4 py-3 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
                       >
                         <CheckCircle2 size={17} />
                         Pažymėti kaip paruoštą
@@ -2015,7 +2015,7 @@ export default function RoomsPage() {
                       ) : null}
 
                       {!selectedRoom || (!selectedRoom.reserved && selectedRoom.occupied + selectedRoom.reserved < selectedRoom.capacity && selectedRoom.room_status !== "repair") ? (
-                        <div className="rounded-2xl border border-[#a7f3d0] bg-[#eefaf3] p-4 text-sm font-bold leading-6 text-[#036747]">
+                        <div className="rounded-2xl border border-[#a7f3d0] bg-[#eefaf3] p-4 text-sm font-bold leading-6 text-[#39594c]">
                           Kritinių įspėjimų nėra.
                         </div>
                       ) : null}

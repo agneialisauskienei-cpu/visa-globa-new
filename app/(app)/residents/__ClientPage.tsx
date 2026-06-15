@@ -304,7 +304,7 @@ function statusClass(status: string | null) {
   const normalized = normalizeResidentStatus(status);
 
   if (normalized === "gyvena")
-    return "border-[#a7f3d0] bg-emerald-50 text-[#047857]";
+    return "border-[#a7f3d0] bg-emerald-50 text-[#486b5d]";
   if (normalized === "netrukus_atvyks")
     return "border-blue-200 bg-white text-[#486b5d]";
   if (normalized === "ligonineje")
@@ -1120,7 +1120,7 @@ export default function ResidentsPage() {
               <button
                 type="button"
                 onClick={openCreateModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#036747]"
+                className="inline-flex items-center gap-2 rounded-2xl bg-[#486b5d] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#39594c]"
               >
                 <Plus className="h-4 w-4" />
                 Naujas gyventojas
@@ -1167,7 +1167,7 @@ export default function ResidentsPage() {
         </div>
 
         {message ? (
-          <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/80 px-5 py-3 font-bold text-[#036747]">
+          <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/80 px-5 py-3 font-bold text-[#39594c]">
             {message}
           </div>
         ) : null}
@@ -1233,7 +1233,7 @@ export default function ResidentsPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Ieškoti pagal vardą, telefoną, kambarį ar darbuotoją..."
-                className="w-full rounded-2xl border border-[#dbe6e0] bg-[#ffffff] py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-[#047857] focus:bg-white focus:ring-4 focus:ring-[#047857]/10"
+                className="w-full rounded-2xl border border-[#dbe6e0] bg-[#ffffff] py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-[#486b5d] focus:bg-white focus:ring-4 focus:ring-[#486b5d]/10"
               />
             </label>
           </div>
@@ -1278,7 +1278,7 @@ export default function ResidentsPage() {
                                 event.stopPropagation();
                                 router.push(`/residents/${resident.id}`);
                               }}
-                              className="text-left text-xl font-black text-[#10251f] transition hover:text-[#047857] hover:underline"
+                              className="text-left text-xl font-black text-[#10251f] transition hover:text-[#486b5d] hover:underline"
                             >
                               {residentName(resident)}
                             </button>
@@ -1319,7 +1319,7 @@ export default function ResidentsPage() {
                         <button
                           type="button"
                           onClick={() => router.push(`/residents/${resident.id}`)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#047857] px-4 py-3 font-extrabold text-white transition hover:bg-[#036747]"
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#486b5d] px-4 py-3 font-extrabold text-white transition hover:bg-[#39594c]"
                         >
                           <User className="h-4 w-4" />
                           Atidaryti kortelę
@@ -1453,7 +1453,7 @@ function InfoBox({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`inline-flex items-center gap-2 rounded-full border border-[#dbe6e0] bg-white text-xs font-black text-[#526174] shadow-sm transition hover:border-[#a7f3d0] hover:bg-[#ecfdf5] hover:text-[#036747] ${
+        className={`inline-flex items-center gap-2 rounded-full border border-[#dbe6e0] bg-white text-xs font-black text-[#526174] shadow-sm transition hover:border-[#a7f3d0] hover:bg-[#ecfdf5] hover:text-[#39594c] ${
           compact ? "px-3 py-1.5" : "px-4 py-2"
         }`}
         title={title}
@@ -1517,7 +1517,7 @@ function StatCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[18px] border bg-white px-5 py-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.10)] transition ${active ? "border-[#047857] ring-2 ring-[#d1fae5]" : "border-[#c9d8d0] hover:border-[#a7f3d0] hover:bg-[#ffffff]"}`}
+      className={`rounded-[18px] border bg-white px-5 py-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.10)] transition ${active ? "border-[#486b5d] ring-2 ring-[#d1fae5]" : "border-[#c9d8d0] hover:border-[#a7f3d0] hover:bg-[#ffffff]"}`}
     >
       <p className="font-extrabold text-[#66756c]">{title}</p>
       <p className="mt-2 text-4xl font-black tracking-[-0.04em] text-[#10251f]">{value}</p>
@@ -2011,7 +2011,7 @@ function ResidentModal({
                 <button
                   type="button"
                   onClick={addContact}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#a7f3d0] bg-emerald-50 px-4 py-3 font-extrabold text-[#047857] transition hover:bg-emerald-100"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#a7f3d0] bg-emerald-50 px-4 py-3 font-extrabold text-[#486b5d] transition hover:bg-emerald-100"
                 >
                   <Plus className="h-4 w-4" />
                   Pridėti dar vieną artimąjį
@@ -2049,7 +2049,7 @@ function ResidentModal({
                             setStaffSearch(event.target.value)
                           }
                           placeholder="Rašyk vardą, el. paštą ar pareigas..."
-                          className="w-full rounded-2xl border border-[#dbe6e0] bg-white py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-[#047857]"
+                          className="w-full rounded-2xl border border-[#dbe6e0] bg-white py-3 pl-12 pr-4 font-semibold outline-none transition focus:border-[#486b5d]"
                         />
                       </label>
 
@@ -2074,7 +2074,7 @@ function ResidentModal({
                               key={userId}
                               type="button"
                               onClick={() => toggleStaff(userId)}
-                              className="rounded-full border border-[#a7f3d0] bg-emerald-50 px-3 py-2 text-sm font-black text-[#047857] transition hover:bg-emerald-100"
+                              className="rounded-full border border-[#a7f3d0] bg-emerald-50 px-3 py-2 text-sm font-black text-[#486b5d] transition hover:bg-emerald-100"
                             >
                               {staffName(member)}
                               {index === 0 ? " · pagrindinis" : ""} ×
@@ -2136,7 +2136,7 @@ function ResidentModal({
                                   onClick={() =>
                                     moveStaffToPrimary(member.user_id)
                                   }
-                                  className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-black text-[#047857] ring-1 ring-emerald-200 transition hover:bg-emerald-100"
+                                  className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-black text-[#486b5d] ring-1 ring-emerald-200 transition hover:bg-emerald-100"
                                 >
                                   Pagrindinis
                                 </button>
@@ -2194,7 +2194,7 @@ function ResidentModal({
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#047857] px-6 py-3 font-extrabold text-white transition hover:bg-[#036747] disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#486b5d] px-6 py-3 font-extrabold text-white transition hover:bg-[#39594c] disabled:opacity-60"
               >
                 <CheckCircle2 className="h-5 w-5" />
                 {saving ? "Saugoma..." : "Išsaugoti gyventoją"}
@@ -2233,7 +2233,7 @@ function FormSection({
     <section className="rounded-[28px] border border-[#dbe6e0] bg-[#ffffff] p-5">
       <div className="mb-5 flex items-start gap-3">
         {icon ? (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#047857] shadow-sm">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#486b5d] shadow-sm">
             {icon}
           </div>
         ) : null}
@@ -2271,4 +2271,4 @@ function Field({
 }
 
 const inputClass =
-  "w-full rounded-2xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 font-semibold outline-none transition focus:border-[#047857] focus:bg-white focus:ring-4 focus:ring-[#047857]/10";
+  "w-full rounded-2xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 font-semibold outline-none transition focus:border-[#486b5d] focus:bg-white focus:ring-4 focus:ring-[#486b5d]/10";

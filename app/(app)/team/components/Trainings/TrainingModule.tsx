@@ -340,7 +340,7 @@ function statusForTraining(record?: TrainingRecord | null) {
     return {
       key: "valid" as const,
       label: "Galioja",
-      cls: "bg-[#e9f7ef] text-[#047857] ring-[#b7e7c8]",
+      cls: "bg-[#e9f7ef] text-[#486b5d] ring-[#b7e7c8]",
     };
   }
 
@@ -367,7 +367,7 @@ function statusForTraining(record?: TrainingRecord | null) {
   return {
     key: "valid" as const,
     label: "Galioja",
-    cls: "bg-[#e9f7ef] text-[#047857] ring-[#b7e7c8]",
+    cls: "bg-[#e9f7ef] text-[#486b5d] ring-[#b7e7c8]",
   };
 }
 
@@ -1622,7 +1622,7 @@ export default function TrainingModule({
                       setShowNewForm(true);
                       setShowLibrary(false);
                     }}
-                    className="rounded-xl border border-[#86efac] bg-[#e9f7ef] px-4 py-3 text-left text-sm font-black text-[#047857] hover:bg-[#dcfce7]"
+                    className="rounded-xl border border-[#86efac] bg-[#e9f7ef] px-4 py-3 text-left text-sm font-black text-[#486b5d] hover:bg-[#dcfce7]"
                   >
                     ✓ {item.title}
                     <span className="mt-1 block text-xs text-[#486b5d]">
@@ -1648,7 +1648,7 @@ export default function TrainingModule({
                 onClick={() => setDepartmentFilter(department.key)}
                 className={
                   departmentFilter === department.key
-                    ? "rounded-lg bg-[#047857] px-4 py-2 text-sm font-black text-white"
+                    ? "rounded-lg bg-[#486b5d] px-4 py-2 text-sm font-black text-white"
                     : "rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#f7fcf9]"
                 }
               >
@@ -1668,7 +1668,7 @@ export default function TrainingModule({
                 onClick={() => setSelectedRequirementKey(requirement.key)}
                 className={
                   selectedRequirement.key === requirement.key
-                    ? "rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#047857]"
+                    ? "rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#486b5d]"
                     : "rounded-full border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#40594f] hover:bg-[#f7fcf9]"
                 }
               >
@@ -1742,7 +1742,7 @@ export default function TrainingModule({
                     onClick={() => {
                       setShowNewForm(true);
                     }}
-                    className="rounded-xl bg-[#047857] px-4 py-3 text-sm font-black text-white"
+                    className="rounded-xl bg-[#486b5d] px-4 py-3 text-sm font-black text-white"
                   >
                     + Naujas
                   </button>
@@ -1830,7 +1830,7 @@ export default function TrainingModule({
                     <button
                       type="button"
                       onClick={() => void addRequiredTrainingForPosition()}
-                      className="rounded-lg bg-[#047857] px-4 py-2 text-sm font-black text-white"
+                      className="rounded-lg bg-[#486b5d] px-4 py-2 text-sm font-black text-white"
                     >
                       {editingRequirementTitle ? "Išsaugoti" : "Pridėti"}
                     </button>
@@ -1846,7 +1846,7 @@ export default function TrainingModule({
                   {selectedPositionSpecificTrainings.map((item) => (
                     <span
                       key={`${item.title}-${item.hours}`}
-                      className="inline-flex items-center gap-2 rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#047857]"
+                      className="inline-flex items-center gap-2 rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#486b5d]"
                     >
                       ✓ {item.title} · {item.hours} val.
                       {canManageRequirements ? (
@@ -1882,7 +1882,7 @@ export default function TrainingModule({
         <section className="mt-4 rounded-xl border border-[#dbe6e0] bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                 Darbuotojų mokymai
               </div>
               <h3 className="mt-1 text-3xl font-black">
@@ -1898,7 +1898,7 @@ export default function TrainingModule({
                 onClick={() => setFilter("all")}
                 className={
                   filter === "all"
-                    ? "rounded-xl bg-[#047857] px-4 py-3 text-sm font-black text-white"
+                    ? "rounded-xl bg-[#486b5d] px-4 py-3 text-sm font-black text-white"
                     : "rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#40594f]"
                 }
               >
@@ -1931,7 +1931,7 @@ export default function TrainingModule({
                 onClick={() => setFilter("missing")}
                 className={
                   filter === "missing"
-                    ? "rounded-xl bg-[#047857] px-4 py-3 text-sm font-black text-white"
+                    ? "rounded-xl bg-[#486b5d] px-4 py-3 text-sm font-black text-white"
                     : "rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#40594f]"
                 }
               >
@@ -1991,7 +1991,7 @@ export default function TrainingModule({
                         type="button"
                         onClick={() => void approveTraining(training.id)}
                         disabled={approvingId === training.id}
-                        className="rounded-lg bg-[#047857] px-3 py-2 text-xs font-black text-white disabled:opacity-60"
+                        className="rounded-lg bg-[#486b5d] px-3 py-2 text-xs font-black text-white disabled:opacity-60"
                       >
                         {approvingId === training.id
                           ? "Tvirtinama..."
@@ -2132,7 +2132,7 @@ export default function TrainingModule({
                     type="button"
                     onClick={() => void approveTraining(selectedTraining.id)}
                     disabled={approvingId === selectedTraining.id}
-                    className="rounded-lg bg-[#047857] px-4 py-2 text-sm font-black text-white disabled:opacity-60"
+                    className="rounded-lg bg-[#486b5d] px-4 py-2 text-sm font-black text-white disabled:opacity-60"
                   >
                     {approvingId === selectedTraining.id
                       ? "Tvirtinama..."
@@ -2214,7 +2214,7 @@ function RequirementBlock({
           items.map((item) => (
             <span
               key={`${item.title}-${item.hours}`}
-              className="rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#047857]"
+              className="rounded-full border border-[#86efac] bg-[#e9f7ef] px-4 py-2 text-sm font-black text-[#486b5d]"
             >
               ✓ {item.title} · {item.hours} val.
             </span>
@@ -2319,7 +2319,7 @@ function FragmentRow({
               ) : null}
             </div>
           ) : (
-            <span className="rounded-full bg-[#e9f7ef] px-3 py-1 text-xs font-black text-[#047857]">
+            <span className="rounded-full bg-[#e9f7ef] px-3 py-1 text-xs font-black text-[#486b5d]">
               Tvarkinga
             </span>
           )}
@@ -2330,7 +2330,7 @@ function FragmentRow({
         <td className="px-4 py-3">
           <div className="h-2 rounded-full bg-[#f7fcf9]">
             <div
-              className="h-2 rounded-full bg-[#047857]"
+              className="h-2 rounded-full bg-[#486b5d]"
               style={{ width: `${row.progress}%` }}
             />
           </div>
@@ -2396,7 +2396,7 @@ function FragmentRow({
                           type="button"
                           onClick={() => onApprove(detail.record!.id)}
                           disabled={approvingId === detail.record.id}
-                          className="rounded-lg bg-[#047857] px-3 py-2 text-xs font-black text-white disabled:opacity-60"
+                          className="rounded-lg bg-[#486b5d] px-3 py-2 text-xs font-black text-white disabled:opacity-60"
                         >
                           {approvingId === detail.record.id
                             ? "Tvirtinama..."

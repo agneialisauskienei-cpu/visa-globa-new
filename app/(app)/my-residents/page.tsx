@@ -543,7 +543,7 @@ function ResidentTab({
       {icon}
       {label}
       {typeof count === "number" ? (
-        <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+        <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
           {count}
         </span>
       ) : null}
@@ -631,7 +631,7 @@ function MobileResidentCard({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#e8f7ef] text-lg font-black text-[#047857]">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#e8f7ef] text-lg font-black text-[#486b5d]">
             {getResidentInitials(resident)}
           </div>
 

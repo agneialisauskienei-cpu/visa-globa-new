@@ -1234,7 +1234,7 @@ export default function DocumentsModule({
                               type="button"
                               disabled={saving}
                               onClick={() => void approveCredential(row)}
-                              className="rounded-xl bg-[#047857] px-3 py-2 text-xs font-black text-white hover:bg-[#065f46] disabled:opacity-60"
+                              className="rounded-xl bg-[#486b5d] px-3 py-2 text-xs font-black text-white hover:bg-[#39594c] disabled:opacity-60"
                             >
                               Patvirtinti originalą
                             </button>

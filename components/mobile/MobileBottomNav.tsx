@@ -84,7 +84,7 @@ export default function MobileBottomNav({
             }}
             style={{
               textDecoration: 'none',
-              color: active ? '#047857' : '#64748b',
+              color: active ? '#486b5d' : '#64748b',
               display: 'grid',
               placeItems: 'center',
               gap: 4,
@@ -103,7 +103,7 @@ export default function MobileBottomNav({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: active ? '#065f46' : 'transparent',
+                background: active ? '#39594c' : 'transparent',
                 color: active ? '#fff' : '#64748b',
                 transition: 'all .2s ease',
               }}
@@ -143,7 +143,7 @@ export default function MobileBottomNav({
                   width: 24,
                   height: 3,
                   borderRadius: 999,
-                  background: '#047857',
+                  background: '#486b5d',
                 }}
               />
             ) : null}

@@ -553,9 +553,9 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 const inputClass =
-  "h-12 w-full rounded-[18px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10";
+  "h-12 w-full rounded-[18px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none transition focus:border-[#486b5d] focus:ring-4 focus:ring-[#486b5d]/10";
 const textareaClass =
-  "min-h-[108px] w-full rounded-[18px] border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10";
+  "min-h-[108px] w-full rounded-[18px] border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none transition focus:border-[#486b5d] focus:ring-4 focus:ring-[#486b5d]/10";
 
 const emptyContact = {
   full_name: "",
@@ -1409,7 +1409,7 @@ export default function ResidentDetailPage() {
             <button
               type="button"
               onClick={() => setWriteOffOpen(true)}
-              className="inline-flex items-center gap-2 rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747]"
+              className="inline-flex items-center gap-2 rounded-[14px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c]"
             >
               <Plus size={18} />
               Nurašyti prekę
@@ -1609,7 +1609,7 @@ export default function ResidentDetailPage() {
                     type="button"
                     onClick={saveResident}
                     disabled={saving}
-                    className="inline-flex items-center gap-2 rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-[14px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c] disabled:opacity-60"
                   >
                     <Save size={17} />
                     {saving ? "Saugoma..." : "Išsaugoti"}
@@ -1868,7 +1868,7 @@ export default function ResidentDetailPage() {
                       setCareTab("slauga");
                       setCareModalOpen(true);
                     }}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747]"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white hover:bg-[#39594c]"
                   >
                     <ShieldAlert size={17} />
                     Atidaryti priežiūros informaciją
@@ -2026,7 +2026,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={addContact}
                   disabled={saving}
-                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white"
+                  className="rounded-[18px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white"
                 >
                   Pridėti kontaktą
                 </button>
@@ -2159,7 +2159,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={addGoal}
                   disabled={saving}
-                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white"
+                  className="rounded-[18px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white"
                 >
                   Pridėti tikslą
                 </button>
@@ -2259,7 +2259,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={addEntry}
                   disabled={saving}
-                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white"
+                  className="rounded-[18px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white"
                 >
                   Pridėti įrašą
                 </button>
@@ -2398,7 +2398,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={addIncident}
                   disabled={saving}
-                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white"
+                  className="rounded-[18px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white"
                 >
                   Pridėti incidentą
                 </button>
@@ -2465,7 +2465,7 @@ export default function ResidentDetailPage() {
                 <button
                   type="button"
                   onClick={() => setWriteOffOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-[18px] bg-[#047857] px-4 py-2.5 text-sm font-black text-white hover:bg-[#036747]"
+                  className="inline-flex items-center gap-2 rounded-[18px] bg-[#486b5d] px-4 py-2.5 text-sm font-black text-white hover:bg-[#39594c]"
                 >
                   <Plus size={17} />
                   Nurašyti prekę
@@ -2561,7 +2561,7 @@ export default function ResidentDetailPage() {
                       key={tab.value}
                       type="button"
                       onClick={() => setCareTab(tab.value)}
-                      className={`rounded-[18px] px-4 py-2.5 text-sm font-black transition ${isActive ? "bg-[#047857] text-white shadow-sm" : "bg-white text-[#526174] hover:bg-emerald-50 hover:text-emerald-800"}`}
+                      className={`rounded-[18px] px-4 py-2.5 text-sm font-black transition ${isActive ? "bg-[#486b5d] text-white shadow-sm" : "bg-white text-[#526174] hover:bg-emerald-50 hover:text-emerald-800"}`}
                     >
                       {tab.label}
                     </button>
@@ -2768,7 +2768,7 @@ export default function ResidentDetailPage() {
                 <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
                   <Field label="Pastabos darbuotojams">
                     <textarea
-                      className="min-h-[220px] w-full rounded-[18px] border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10"
+                      className="min-h-[220px] w-full rounded-[18px] border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none transition focus:border-[#486b5d] focus:ring-4 focus:ring-[#486b5d]/10"
                       value={careInfo.staff_notes}
                       onChange={(event) =>
                         updateCareInfo({ staff_notes: event.target.value })
@@ -2809,7 +2809,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={saveCareInfo}
                   disabled={saving}
-                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
+                  className="rounded-[18px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white hover:bg-[#39594c] disabled:opacity-60"
                 >
                   {saving ? "Saugoma..." : "Išsaugoti priežiūros informaciją"}
                 </button>
@@ -2912,7 +2912,7 @@ export default function ResidentDetailPage() {
                   type="button"
                   onClick={submitWriteOff}
                   disabled={saving}
-                  className="rounded-[18px] bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
+                  className="rounded-[18px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white hover:bg-[#39594c] disabled:opacity-60"
                 >
                   {saving ? "Saugoma..." : "Nurašyti"}
                 </button>

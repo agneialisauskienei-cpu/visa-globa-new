@@ -1001,7 +1001,7 @@ export default function StaffTypesModulePage() {
               className={cn(
                 "rounded-xl border p-4 text-left shadow-sm transition hover:bg-[#ffffff]",
                 activeFilter === stat.key
-                  ? "border-[#a8d8bd] bg-[#e9f7ef] text-[#047857]"
+                  ? "border-[#a8d8bd] bg-[#e9f7ef] text-[#486b5d]"
                   : "border-[#dbe6e0] bg-white text-[#10251f]",
               )}
             >
@@ -1121,7 +1121,7 @@ export default function StaffTypesModulePage() {
                           : "border-[#dbe6e0] bg-white hover:bg-[#f7fcf9]",
                       )}
                     >
-                      <div className="grid h-10 w-10 place-items-center rounded-lg bg-white text-sm font-black text-[#007a5a] shadow-sm">
+                      <div className="grid h-10 w-10 place-items-center rounded-lg bg-white text-sm font-black text-[#486b5d] shadow-sm">
                         {employeeInitials(employee)}
                       </div>
                       <div className="min-w-0">
@@ -1141,7 +1141,7 @@ export default function StaffTypesModulePage() {
                           "rounded-full px-2 py-1 text-[11px] font-black",
                           employee.is_active === false
                             ? "bg-slate-100 text-slate-500"
-                            : "bg-[#d9f8e7] text-[#047857]",
+                            : "bg-[#d9f8e7] text-[#486b5d]",
                         )}
                       >
                         {employee.is_active === false ? "Neaktyvus" : "Aktyvus"}
@@ -1256,7 +1256,7 @@ function EmployeeAccessEditor({
     <div className="grid gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-14 w-14 place-items-center rounded-xl bg-[#e9f7ef] text-xl font-black text-[#007a5a]">
+          <div className="grid h-14 w-14 place-items-center rounded-xl bg-[#e9f7ef] text-xl font-black text-[#486b5d]">
             {employeeInitials(employee)}
           </div>
           <div>
@@ -1274,7 +1274,7 @@ function EmployeeAccessEditor({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className="rounded-full bg-[#d9f8e7] px-3 py-1 text-xs font-black text-[#047857]">
+          <span className="rounded-full bg-[#d9f8e7] px-3 py-1 text-xs font-black text-[#486b5d]">
             {employee.is_active === false ? "Neaktyvus" : "Aktyvus"}
           </span>
           <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d] ring-1 ring-[#dbe6e0]">
@@ -1407,7 +1407,7 @@ function EmployeeAccessEditor({
                 value={`${extraPermissions.length}`}
                 border
               />
-              <div className="border-l border-[#dbe6e0] bg-[#e9f7ef] p-3 text-[#047857]">
+              <div className="border-l border-[#dbe6e0] bg-[#e9f7ef] p-3 text-[#486b5d]">
                 <div className="text-[11px] font-black uppercase">Iš viso</div>
                 <div className="mt-1 font-black">
                   {effectivePermissions.length}
@@ -1430,7 +1430,7 @@ function EmployeeAccessEditor({
                 {baseTemplate.description}
               </p>
             </div>
-            <span className="rounded-full bg-[#d9f8e7] px-3 py-1 text-xs font-black text-[#047857]">
+            <span className="rounded-full bg-[#d9f8e7] px-3 py-1 text-xs font-black text-[#486b5d]">
               {basePermissions.length} aktyvios
             </span>
           </div>

@@ -3289,7 +3289,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("employees")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Darbuotojai
@@ -3305,7 +3305,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("fte")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Etatai
@@ -3323,7 +3323,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("vacations")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Atostogos
@@ -3339,7 +3339,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("schedule")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Grafikas
@@ -3353,7 +3353,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("trainings")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Mokymai
@@ -3369,7 +3369,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("docs")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Dokumentai
@@ -3385,7 +3385,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => changeTab("candidates")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f]"
+            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Kandidatai
@@ -4253,7 +4253,7 @@ function FtePlanModule({
         <button
           type="button"
           onClick={onNew}
-          className="inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#047857] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#036747]"
+          className="inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#486b5d] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#39594c]"
         >
           <Plus className="h-4 w-4" />
           Nauja pareigybė
@@ -4359,7 +4359,7 @@ function FtePlanModule({
               type="button"
               onClick={onSave}
               disabled={saving}
-              className="h-[50px] flex-1 rounded-2xl bg-[#047857] px-4 font-black text-white transition hover:bg-[#065f46] disabled:opacity-60"
+              className="h-[50px] flex-1 rounded-2xl bg-[#486b5d] px-4 font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
             >
               {saving ? "Saugoma..." : form.id ? "Atnaujinti" : "Pridėti"}
             </button>
@@ -4454,7 +4454,7 @@ function FtePlanModule({
                         <div
                           className={`h-full rounded-full ${
                             row.tone === "emerald"
-                              ? "bg-[#047857]"
+                              ? "bg-[#486b5d]"
                               : row.tone === "red"
                                 ? "bg-red-700"
                                 : "bg-[#ca8a04]"
@@ -5522,7 +5522,7 @@ function ModalFooter({
         type={onSave ? "button" : "submit"}
         onClick={onSave}
         disabled={saving}
-        className="rounded-[14px] bg-[#047857] px-5 py-3 font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
+        className="rounded-[14px] bg-[#486b5d] px-5 py-3 font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
       >
         {saving ? "Saugoma..." : submitText}
       </button>

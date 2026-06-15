@@ -109,7 +109,7 @@ export default function ReportsPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-emerald-50 text-[#047857] shadow-sm">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-emerald-50 text-[#486b5d] shadow-sm">
                       <Icon className="h-7 w-7" />
                     </div>
                     <span className="rounded-full bg-[#ffffff] px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-[#526174]">
@@ -117,7 +117,7 @@ export default function ReportsPage() {
                     </span>
                   </div>
 
-                  <ArrowRight className="h-5 w-5 text-slate-300 transition group-hover:text-[#047857]" />
+                  <ArrowRight className="h-5 w-5 text-slate-300 transition group-hover:text-[#486b5d]" />
                 </div>
 
                 <h2 className="mt-6 text-3xl font-black text-[#10251f]">
@@ -128,7 +128,7 @@ export default function ReportsPage() {
                   {item.description}
                 </p>
 
-                <div className="mt-6 text-sm font-black text-[#047857]">
+                <div className="mt-6 text-sm font-black text-[#486b5d]">
                   Peržiūrėti ataskaitą →
                 </div>
               </a>

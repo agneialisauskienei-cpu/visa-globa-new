@@ -1598,7 +1598,7 @@ const styles: Record<string, CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    color: "#047857",
+    color: "#486b5d",
     textDecoration: "none",
     fontSize: 14,
     fontWeight: 900,
@@ -1754,7 +1754,7 @@ const styles: Record<string, CSSProperties> = {
   },
   quickStatActive: {
     outline: "4px solid rgba(4,120,87,.10)",
-    borderColor: "#047857",
+    borderColor: "#486b5d",
     transform: "translateY(-1px)",
   },
   quickStatText: {
@@ -1829,7 +1829,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "center",
   },
   cardKicker: {
-    color: "#047857",
+    color: "#486b5d",
     fontSize: 12,
     fontWeight: 950,
     textTransform: "uppercase",

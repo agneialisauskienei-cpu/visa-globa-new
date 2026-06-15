@@ -94,7 +94,7 @@ function getTaskCardStyle(task: TaskRow): React.CSSProperties {
   if (task.status === 'done') {
     return {
       border: '1px solid #bbf7d0',
-      borderLeft: '8px solid #047857',
+      borderLeft: '8px solid #486b5d',
       background: '#f0fdf4',
     }
   }
@@ -688,7 +688,7 @@ const styles: Record<string, React.CSSProperties> = {
   primaryButton: {
     border: 'none',
     borderRadius: 12,
-    background: '#047857',
+    background: '#486b5d',
     color: '#fff',
     padding: '12px 14px',
     fontWeight: 700,

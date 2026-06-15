@@ -4253,8 +4253,8 @@ export default function ScheduleBlock({
           --vg-border-strong: #b9cfc4;
           --vg-text: #14251f;
           --vg-muted: #64756d;
-          --vg-green: #047857;
-          --vg-green-dark: #065f46;
+          --vg-green: #486b5d;
+          --vg-green-dark: #39594c;
           --vg-green-soft: #ecfdf5;
           --vg-green-bar: #d9eee5;
           --vg-amber: #d97706;

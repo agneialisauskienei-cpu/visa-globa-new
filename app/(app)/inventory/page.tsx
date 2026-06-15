@@ -1238,7 +1238,7 @@ export default function InventoryPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#10251f]">
         <div className="rounded-3xl border border-[#c9d8d0] bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-[#047857]" />
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-[#486b5d]" />
           <p className="mt-4 text-lg font-black text-[#486b5d]">
             Kraunamas sandėlis...
           </p>
@@ -1376,7 +1376,7 @@ export default function InventoryPage() {
                   Darbo eiga
                 </h2>
               </div>
-              <PackageOpen className="h-5 w-5 text-[#047857]" />
+              <PackageOpen className="h-5 w-5 text-[#486b5d]" />
             </div>
 
             <div className="grid gap-2">
@@ -1701,7 +1701,7 @@ function StatButton({
 }) {
   const toneClass =
     tone === "green"
-      ? "text-[#047857]"
+      ? "text-[#486b5d]"
       : tone === "amber"
         ? "text-[#be123c]"
         : tone === "red"
@@ -1747,7 +1747,7 @@ function QuickAction({
     >
       <span className="flex min-w-0 items-center gap-3">
         <span
-          className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${danger ? "bg-white text-red-700" : "bg-white text-[#047857]"}`}
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${danger ? "bg-white text-red-700" : "bg-white text-[#486b5d]"}`}
         >
           {icon}
         </span>
@@ -1779,7 +1779,7 @@ function OverviewPanel({
     <section className="rounded-2xl border border-[#c9d8d0] bg-white p-4 shadow-sm">
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#047857]">
+          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#486b5d]">
             Apžvalga
           </p>
           <h2 className="text-2xl font-black tracking-tight text-[#10251f]">
@@ -1964,7 +1964,7 @@ function LaundryPanel({
       <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#047857]">
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#486b5d]">
               Skalbyklos apskaita
             </p>
             <h2 className="text-2xl font-black tracking-tight text-[#10251f]">
@@ -1979,7 +1979,7 @@ function LaundryPanel({
             <button
               type="button"
               onClick={onOut}
-              className="rounded-xl bg-[#047857] px-4 py-2 text-sm font-black text-white"
+              className="rounded-xl bg-[#486b5d] px-4 py-2 text-sm font-black text-white"
             >
               Išvežti
             </button>
@@ -2237,9 +2237,9 @@ function FormField({
 }
 
 const inputClass =
-  "h-12 w-full rounded-2xl border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10";
+  "h-12 w-full rounded-2xl border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-4 focus:ring-[#486b5d]/10";
 const textareaClass =
-  "min-h-24 w-full rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10";
+  "min-h-24 w-full rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-4 focus:ring-[#486b5d]/10";
 
 function AddItemsModal({
   forms,
@@ -2665,7 +2665,7 @@ function ModalActions({
         type="button"
         onClick={onSubmit}
         disabled={saving}
-        className={`rounded-2xl px-4 py-3 text-sm font-black text-white disabled:opacity-60 ${danger ? "bg-red-700 hover:bg-red-800" : "bg-[#047857] hover:bg-[#036747]"}`}
+        className={`rounded-2xl px-4 py-3 text-sm font-black text-white disabled:opacity-60 ${danger ? "bg-red-700 hover:bg-red-800" : "bg-[#486b5d] hover:bg-[#39594c]"}`}
       >
         {saving ? "Saugoma..." : submitText}
       </button>

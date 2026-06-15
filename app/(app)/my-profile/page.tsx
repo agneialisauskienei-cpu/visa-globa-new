@@ -860,7 +860,7 @@ export default function MyProfilePage() {
                   ) : (
                     initials(profile)
                   )}
-                  <span className="absolute inset-x-2 bottom-2 flex items-center justify-center rounded-xl bg-[#047857]/75 px-2 py-1 text-white opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
+                  <span className="absolute inset-x-2 bottom-2 flex items-center justify-center rounded-xl bg-[#486b5d]/75 px-2 py-1 text-white opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
                     <Camera className="h-4 w-4" />
                   </span>
                 </button>
@@ -996,7 +996,7 @@ export default function MyProfilePage() {
                 <button
                   type="button"
                   onClick={() => setShowTrainingModal(true)}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747]"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c]"
                 >
                   <Plus className="h-4 w-4" />
                   Pridėti
@@ -1144,7 +1144,7 @@ export default function MyProfilePage() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="inline-flex items-center gap-1 rounded-xl bg-[#047857] px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
+                  className="inline-flex items-center gap-1 rounded-xl bg-[#486b5d] px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#39594c] disabled:opacity-60"
                 >
                   <Camera className="h-4 w-4" />
                   {uploadingPhoto ? "Keliama..." : photo ? "Keisti foto" : "Įkelti foto"}
@@ -1211,7 +1211,7 @@ export default function MyProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowVacationModal(true)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747]"
+                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c]"
               >
                 <CalendarPlus className="h-4 w-4" />
                 Pateikti
@@ -1386,7 +1386,7 @@ export default function MyProfilePage() {
                   ) : (
                     initials(profile)
                   )}
-                  <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-xl bg-[#047857]/75 px-2 py-1 text-xs font-black text-white">
+                  <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-xl bg-[#486b5d]/75 px-2 py-1 text-xs font-black text-white">
                     <Camera className="h-4 w-4" />
                     Įkelti
                   </span>
@@ -1465,7 +1465,7 @@ export default function MyProfilePage() {
                 type="button"
                 disabled={saving || uploadingPhoto}
                 onClick={() => void updateProfileInfo()}
-                className="rounded-2xl bg-[#047857] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
+                className="rounded-2xl bg-[#486b5d] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c] disabled:opacity-60"
               >
                 {saving ? "Saugoma..." : "Išsaugoti"}
               </button>
@@ -1556,7 +1556,7 @@ export default function MyProfilePage() {
                 type="button"
                 disabled={saving}
                 onClick={() => void updateDocumentsInfo()}
-                className="rounded-2xl bg-[#047857] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
+                className="rounded-2xl bg-[#486b5d] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c] disabled:opacity-60"
               >
                 {saving ? "Siunčiama..." : "Pateikti patvirtinimui"}
               </button>
@@ -1693,7 +1693,7 @@ export default function MyProfilePage() {
                 type="button"
                 disabled={saving}
                 onClick={() => void submitTraining()}
-                className="rounded-2xl bg-[#047857] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#036747] disabled:opacity-60"
+                className="rounded-2xl bg-[#486b5d] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c] disabled:opacity-60"
               >
                 {saving ? "Saugoma..." : "Pateikti mokymus"}
               </button>
@@ -1847,7 +1847,7 @@ export default function MyProfilePage() {
                 type="button"
                 disabled={saving}
                 onClick={() => void submitVacation()}
-                className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white hover:bg-[#036747] disabled:opacity-60"
+                className="rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white hover:bg-[#39594c] disabled:opacity-60"
               >
                 {saving ? "Saugoma..." : "Pateikti prašymą"}
               </button>
@@ -1885,7 +1885,7 @@ function ProfileTab({
       {icon}
       {label}
       {typeof count === "number" ? (
-        <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+        <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
           {count}
         </span>
       ) : null}
@@ -2308,7 +2308,7 @@ function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#047857]/50 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#486b5d]/50 p-3 backdrop-blur-sm sm:items-center sm:p-4">
       <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[2rem] border border-[#dbe6e0] bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-[#dbe6e0] bg-white px-5 py-5 sm:px-6">
           <div>

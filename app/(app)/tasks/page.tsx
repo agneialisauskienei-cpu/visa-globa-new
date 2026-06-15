@@ -1812,14 +1812,14 @@ export default function TasksPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Camera className="h-5 w-5 text-[#047857]" />
+                    <Camera className="h-5 w-5 text-[#486b5d]" />
                     <h3 className="text-base font-black">Pridėti foto / screenshot</h3>
                   </div>
                   <p className="mt-1 text-xs font-semibold leading-5 text-[#526174]">
                     Galima pridėti naujų nuotraukų ir redaguojant užduotį. Dokumentų čia nekelk.
                   </p>
                 </div>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#047857]">
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#486b5d]">
                   {editTaskImages.length}/{MAX_TASK_IMAGE_COUNT}
                 </span>
               </div>
@@ -1833,7 +1833,7 @@ export default function TasksPage() {
                 className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#ffffff] px-4 py-3 transition hover:bg-emerald-50/60"
               >
                 <span className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#047857]">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#486b5d]">
                     <Camera className="h-5 w-5" />
                   </span>
                   <span>
@@ -1841,7 +1841,7 @@ export default function TasksPage() {
                     <span className="block text-xs font-bold text-[#526174]">JPG, PNG, WEBP · iki {MAX_TASK_IMAGE_SIZE_MB} MB</span>
                   </span>
                 </span>
-                <Plus className="h-5 w-5 text-[#047857]" />
+                <Plus className="h-5 w-5 text-[#486b5d]" />
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
@@ -1981,7 +1981,7 @@ export default function TasksPage() {
               >
                 <UserRound className="h-4 w-4" />
                 Užduotys
-                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
                   {filteredTasks.length}
                 </span>
               </button>
@@ -2002,7 +2002,7 @@ export default function TasksPage() {
               >
                 <Sparkles className="h-4 w-4" />
                 Naujos
-                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
                   {newStatusTasks.length}
                 </span>
               </button>
@@ -2023,7 +2023,7 @@ export default function TasksPage() {
               >
                 <Timer className="h-4 w-4" />
                 Vykdoma
-                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
                   {inProgressStatusTasks.length}
                 </span>
               </button>
@@ -2044,7 +2044,7 @@ export default function TasksPage() {
               >
                 <Clock className="h-4 w-4" />
                 Laukia dalių
-                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
                   {waitingPartsStatusTasks.length}
                 </span>
               </button>
@@ -2065,7 +2065,7 @@ export default function TasksPage() {
               >
                 <CheckCircle2 className="h-4 w-4" />
                 Atlikta
-                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
                   {doneStatusTasks.length}
                 </span>
               </button>
@@ -2087,7 +2087,7 @@ export default function TasksPage() {
               >
                 <Wrench className="h-4 w-4" />
                 Ūkis
-                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
                   {maintenanceTasks.length}
                 </span>
               </button>
@@ -2109,7 +2109,7 @@ export default function TasksPage() {
               >
                 <Repeat className="h-4 w-4" />
                 Periodinės
-                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+                <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
                   {recurringTasks.length}
                 </span>
               </button>
@@ -2428,9 +2428,9 @@ export default function TasksPage() {
                         interval_days: preset.interval_days || previous.interval_days,
                       }))
                     }
-                    className="inline-flex items-center gap-2 rounded-[14px] border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-[#047857] shadow-sm transition hover:bg-emerald-50 active:scale-[0.98]"
+                    className="inline-flex items-center gap-2 rounded-[14px] border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-emerald-50 active:scale-[0.98]"
                   >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-[10px] bg-emerald-50 text-[#047857]">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-[10px] bg-emerald-50 text-[#486b5d]">
                       {presetIcon(preset.label)}
                     </span>
                     {preset.label}
@@ -2677,14 +2677,14 @@ export default function TasksPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Camera className="h-5 w-5 text-[#047857]" />
+                      <Camera className="h-5 w-5 text-[#486b5d]" />
                       <h3 className="text-base font-black">Foto / screenshot</h3>
                     </div>
                     <p className="mt-1 text-xs font-semibold leading-5 text-[#526174]">
                       JPG, PNG, WEBP · iki {MAX_TASK_IMAGE_COUNT} vnt. · iki {MAX_TASK_IMAGE_SIZE_MB} MB. Dokumentų čia nekelk.
                     </p>
                   </div>
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#047857]">
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#486b5d]">
                     {taskImages.length}/{MAX_TASK_IMAGE_COUNT}
                   </span>
                 </div>
@@ -2698,7 +2698,7 @@ export default function TasksPage() {
                   className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#ffffff] px-4 py-3 transition hover:bg-emerald-50/60"
                 >
                   <span className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#047857]">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#486b5d]">
                       <Camera className="h-5 w-5" />
                     </span>
                     <span>
@@ -2706,7 +2706,7 @@ export default function TasksPage() {
                       <span className="block text-xs font-bold text-[#526174]">Gedimas, inventorius ar screenshot</span>
                     </span>
                   </span>
-                  <Plus className="h-5 w-5 text-[#047857]" />
+                  <Plus className="h-5 w-5 text-[#486b5d]" />
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
@@ -2814,7 +2814,7 @@ export default function TasksPage() {
                   >
                     Išsaugoti juodraštį
                   </button>
-                  <button type="submit" disabled={saving} className="btn-primary bg-[#047857] hover:bg-[#036747]">
+                  <button type="submit" disabled={saving} className="btn-primary bg-[#486b5d] hover:bg-[#39594c]">
                     {saving ? "Kuriama..." : "Sukurti užduotį"}
                   </button>
                 </div>
@@ -2842,12 +2842,12 @@ export default function TasksPage() {
                 <span className={`rounded-full px-3 py-1 text-xs font-black ${
                   isTaskLate(selectedTask)
                     ? "bg-rose-50 text-rose-700"
-                    : "bg-emerald-50 text-[#047857]"
+                    : "bg-emerald-50 text-[#486b5d]"
                 }`}>
                   {isTaskLate(selectedTask) ? "Vėluoja" : getTaskStatusLabel(selectedTask.status)}
                 </span>
                 {taskAttachmentsMap[selectedTask.id]?.length ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-black text-[#047857] ring-1 ring-emerald-100">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d] ring-1 ring-emerald-100">
                     <Camera className="h-3.5 w-3.5" />
                     {taskAttachmentsMap[selectedTask.id].length} foto
                   </span>
@@ -2898,7 +2898,7 @@ export default function TasksPage() {
             ) : (
               <section className="rounded-[20px] border border-dashed border-[#c9d8d0] bg-white p-4">
                 <div className="flex items-center gap-2 text-sm font-black text-[#526174]">
-                  <Camera className="h-5 w-5 text-[#047857]" />
+                  <Camera className="h-5 w-5 text-[#486b5d]" />
                   Nuotraukų nėra
                 </div>
                 <p className="mt-1 text-xs font-semibold text-[#526174]">
@@ -3112,14 +3112,14 @@ export default function TasksPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Camera className="h-5 w-5 text-[#047857]" />
+                    <Camera className="h-5 w-5 text-[#486b5d]" />
                     <h3 className="text-base font-black">Pridėti foto / screenshot</h3>
                   </div>
                   <p className="mt-1 text-xs font-semibold leading-5 text-[#526174]">
                     Galima pridėti naujų nuotraukų ir redaguojant užduotį. Dokumentų čia nekelk.
                   </p>
                 </div>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#047857]">
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#486b5d]">
                   {editTaskImages.length}/{MAX_TASK_IMAGE_COUNT}
                 </span>
               </div>
@@ -3133,7 +3133,7 @@ export default function TasksPage() {
                 className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[14px] border border-dashed border-[#a7f3d0] bg-[#ffffff] px-4 py-3 transition hover:bg-emerald-50/60"
               >
                 <span className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#047857]">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white text-[#486b5d]">
                     <Camera className="h-5 w-5" />
                   </span>
                   <span>
@@ -3141,7 +3141,7 @@ export default function TasksPage() {
                     <span className="block text-xs font-bold text-[#526174]">JPG, PNG, WEBP · iki {MAX_TASK_IMAGE_SIZE_MB} MB</span>
                   </span>
                 </span>
-                <Plus className="h-5 w-5 text-[#047857]" />
+                <Plus className="h-5 w-5 text-[#486b5d]" />
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
@@ -3221,13 +3221,13 @@ export default function TasksPage() {
         }
 
         .input:focus {
-          border-color: #047857;
+          border-color: #486b5d;
           box-shadow: 0 0 0 4px rgba(4, 120, 87, 0.12);
         }
 
         .btn-primary {
           border-radius: 1rem;
-          background: #047857;
+          background: #486b5d;
           padding: 0.85rem 1.35rem;
           font-weight: 900;
           color: white;
@@ -3235,7 +3235,7 @@ export default function TasksPage() {
         }
 
         .btn-primary:hover {
-          background: #065f46;
+          background: #39594c;
         }
 
         .btn-primary:active {
@@ -3601,7 +3601,7 @@ function MobileCreateTaskSheet({
             <button
               type="submit"
               disabled={saving}
-              className="h-14 w-full rounded-[14px] bg-[#047857] text-base font-black text-white disabled:opacity-60"
+              className="h-14 w-full rounded-[14px] bg-[#486b5d] text-base font-black text-white disabled:opacity-60"
             >
               {saving ? "Kuriama..." : "Sukurti užduotį"}
             </button>
@@ -3693,7 +3693,7 @@ function MobileTaskDetailsSheet({
             type="button"
             disabled={saving}
             onClick={() => onStatusChange("done")}
-            className="h-13 rounded-[14px] bg-[#047857] px-4 py-3 font-black text-white disabled:opacity-60"
+            className="h-13 rounded-[14px] bg-[#486b5d] px-4 py-3 font-black text-white disabled:opacity-60"
           >
             Atlikta
           </button>
@@ -3720,7 +3720,7 @@ function CircleStat({
   helper: string
 }) {
   const color = {
-    emerald: "#047857",
+    emerald: "#486b5d",
     blue: "#2563eb",
     amber: "#d97706",
     rose: "#e11d48",
@@ -3944,7 +3944,7 @@ function TaskTableRow({
               </span>
             ) : null}
             {attachmentCount ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[#047857]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[#486b5d]">
                 <Camera className="h-3.5 w-3.5" />
                 {attachmentCount} foto
               </span>
@@ -3980,7 +3980,7 @@ function TaskTableRow({
             late
               ? "bg-rose-50 text-rose-700"
               : done
-                ? "bg-emerald-50 text-[#047857]"
+                ? "bg-emerald-50 text-[#486b5d]"
                 : "bg-[#f7fcf9] text-[#486b5d]"
           }`}
         >
@@ -4006,7 +4006,7 @@ function TaskTableRow({
               type="button"
               disabled={saving}
               onClick={() => onStatusChange("done")}
-              className="rounded-[12px] bg-slate-950 px-3 py-2 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
+              className="rounded-[12px] bg-slate-950 px-3 py-2 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
             >
               Atlikta
             </button>
@@ -4053,7 +4053,7 @@ function TaskCard({
     <article
       className={`rounded-[22px] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         done
-          ? "border-emerald-100 border-l-[8px] border-l-[#047857]"
+          ? "border-emerald-100 border-l-[8px] border-l-[#486b5d]"
           : late
             ? "border-rose-100 border-l-[8px] border-l-rose-600"
             : "border-[#dbe6e0] border-l-[8px] border-l-[#486b5d]"
@@ -4074,7 +4074,7 @@ function TaskCard({
                   {getPriorityLabel(task.priority)}
                 </span>
                 <span className="text-[#8ea0b5]">•</span>
-                <span className={late ? "text-rose-700" : done ? "text-[#047857]" : "text-[#486b5d]"}>
+                <span className={late ? "text-rose-700" : done ? "text-[#486b5d]" : "text-[#486b5d]"}>
                   {late ? "Vėluoja" : getTaskStatusLabel(task.status)}
                 </span>
                 {!task.viewed_at ? (
@@ -4086,7 +4086,7 @@ function TaskCard({
                 {attachmentCount ? (
                   <>
                     <span className="text-[#8ea0b5]">•</span>
-                    <span className="inline-flex items-center gap-1 text-[#047857]">
+                    <span className="inline-flex items-center gap-1 text-[#486b5d]">
                       <Camera className="h-3.5 w-3.5" />
                       {attachmentCount} foto
                     </span>
@@ -4100,7 +4100,7 @@ function TaskCard({
                 late
                   ? "bg-rose-50 text-rose-700"
                   : done
-                    ? "bg-emerald-50 text-[#047857]"
+                    ? "bg-emerald-50 text-[#486b5d]"
                     : "bg-[#f7fcf9] text-[#486b5d]"
               }`}
             >
@@ -4152,7 +4152,7 @@ function TaskCard({
                 type="button"
                 disabled={saving}
                 onClick={() => onStatusChange("done")}
-                className="rounded-[14px] bg-slate-950 px-4 py-2 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60"
+                className="rounded-[14px] bg-slate-950 px-4 py-2 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
               >
                 Atlikta
               </button>
@@ -4224,10 +4224,10 @@ function TaskAttachmentGallery({
     <div className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.06)]">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Camera className="h-5 w-5 text-[#047857]" />
+          <Camera className="h-5 w-5 text-[#486b5d]" />
           <h3 className="text-lg font-black text-[#10251f]">{title}</h3>
         </div>
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#047857]">
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#486b5d]">
           {attachments.length}
         </span>
       </div>

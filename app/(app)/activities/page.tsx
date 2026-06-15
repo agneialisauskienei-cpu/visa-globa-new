@@ -999,7 +999,7 @@ export default function ActivitiesPage() {
               <button type="button" onClick={() => void loadData()} className="rounded-[14px] border border-white/20 bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-white/90">
                 <RefreshCw className="mr-2 inline h-4 w-4" /> Atnaujinti
               </button>
-              <button type="button" onClick={() => openActivityModal()} className="rounded-[14px] bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-md shadow-green-950/10 transition hover:bg-[#036747]">
+              <button type="button" onClick={() => openActivityModal()} className="rounded-[14px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white shadow-md shadow-green-950/10 transition hover:bg-[#39594c]">
                 <Plus className="mr-2 inline h-4 w-4" /> Nauja veikla
               </button>
             </div>
@@ -1069,7 +1069,7 @@ export default function ActivitiesPage() {
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Ieškoti veiklos..."
-                    className="h-12 w-full rounded-2xl border border-[#dbe6e0] bg-white py-3 pl-12 pr-4 text-sm font-bold outline-none transition placeholder:text-[#8a9a91] focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10"
+                    className="h-12 w-full rounded-2xl border border-[#dbe6e0] bg-white py-3 pl-12 pr-4 text-sm font-bold outline-none transition placeholder:text-[#8a9a91] focus:border-[#486b5d] focus:ring-4 focus:ring-[#486b5d]/10"
                   />
                 </label>
 
@@ -1115,7 +1115,7 @@ export default function ActivitiesPage() {
                 <h2 className="text-xl font-black text-[#10251f]">Šios dienos planas</h2>
                 <p className="mt-1 text-sm font-semibold capitalize text-[#526174]">{fullDateLabel(selectedDate)}</p>
               </div>
-              <button type="button" onClick={() => openActivityModal(selectedDate)} className="rounded-2xl bg-[#047857] px-4 py-2 text-sm font-black text-white transition hover:bg-[#036747]">
+              <button type="button" onClick={() => openActivityModal(selectedDate)} className="rounded-2xl bg-[#486b5d] px-4 py-2 text-sm font-black text-white transition hover:bg-[#39594c]">
                 + Pridėti
               </button>
             </div>
@@ -1154,7 +1154,7 @@ export default function ActivitiesPage() {
                 <div className="rounded-3xl border border-dashed border-[#dbe6e0] bg-[#ffffff] p-8 text-center">
                   <CalendarDays className="mx-auto h-8 w-8 text-[#8a9a91]" />
                   <p className="mt-3 font-black text-[#10251f]">Šią dieną veiklų nėra</p>
-                  <button type="button" onClick={() => openActivityModal(selectedDate)} className="mt-4 rounded-2xl bg-[#047857] px-4 py-2 text-sm font-black text-white">
+                  <button type="button" onClick={() => openActivityModal(selectedDate)} className="mt-4 rounded-2xl bg-[#486b5d] px-4 py-2 text-sm font-black text-white">
                     Sukurti veiklą
                   </button>
                 </div>
@@ -1227,7 +1227,7 @@ export default function ActivitiesPage() {
                 <button
                   type="button"
                   onClick={() => setCalendarHelpOpen(false)}
-                  className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white transition hover:bg-[#036747]"
+                  className="rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white transition hover:bg-[#39594c]"
                 >
                   Supratau
                 </button>
@@ -1254,7 +1254,7 @@ export default function ActivitiesPage() {
         }
 
         .input:focus {
-          border-color: #047857;
+          border-color: #486b5d;
           box-shadow: 0 0 0 4px rgba(4, 120, 87, 0.12);
         }
       `}</style>
@@ -1352,10 +1352,10 @@ function CalendarGrid({
               }}
               className={`min-h-[156px] border-b border-r border-[#e4ece6] bg-white p-3 text-left transition hover:bg-[#ffffff] ${
                 !isCurrentMonth && viewMode === "month" ? "opacity-45" : ""
-              } ${isSelected ? "ring-2 ring-inset ring-[#047857]" : ""}`}
+              } ${isSelected ? "ring-2 ring-inset ring-[#486b5d]" : ""}`}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black ${isToday ? "bg-[#047857] text-white" : "bg-[#f7fcf9] text-[#10251f]"}`}>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black ${isToday ? "bg-[#486b5d] text-white" : "bg-[#f7fcf9] text-[#10251f]"}`}>
                   {day.getDate()}
                 </div>
                 {dayActivities.length ? <span className="rounded-full bg-[#f7fcf9] px-2 py-1 text-xs font-black text-[#486b5d]">{dayActivities.length}</span> : null}
@@ -1505,7 +1505,7 @@ function ActivityModal({
                   <button
                     type="button"
                     onClick={() => setHelpOpen(false)}
-                    className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white transition hover:bg-[#036747]"
+                    className="rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white transition hover:bg-[#39594c]"
                   >
                     Supratau
                   </button>
@@ -1553,7 +1553,7 @@ function ActivityModal({
             <button type="button" onClick={onClose} className="rounded-[14px] border border-white/20 bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-white/90">
               Atšaukti
             </button>
-            <button type="button" onClick={onSubmit} disabled={saving || timeInvalid} className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60">
+            <button type="button" onClick={onSubmit} disabled={saving || timeInvalid} className="rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60">
               {saving ? "Saugoma..." : "Sukurti veiklą"}
             </button>
           </div>
@@ -1703,7 +1703,7 @@ function AttendanceModal({
                   <button
                     type="button"
                     onClick={() => setHelpOpen(false)}
-                    className="rounded-2xl bg-[#047857] px-5 py-3 text-sm font-black text-white transition hover:bg-[#036747]"
+                    className="rounded-2xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white transition hover:bg-[#39594c]"
                   >
                     Supratau
                   </button>
@@ -1787,7 +1787,7 @@ function AttendanceModal({
                     onClick={() => onToggleSession(item.id)}
                     className={`shrink-0 rounded-2xl border px-4 py-3 text-left transition ${
                       selected
-                        ? "border-[#2f4f3f] bg-[#047857] text-white"
+                        ? "border-[#2f4f3f] bg-[#486b5d] text-white"
                         : "border-[#dbe6e0] bg-white text-[#486b5d] hover:bg-[#f7fcf9]"
                     }`}
                   >
@@ -1805,17 +1805,17 @@ function AttendanceModal({
             <div className="grid gap-3 xl:grid-cols-[1fr_220px_220px]">
               <label className="relative block">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a9a91]" />
-                <input value={residentQuery} onChange={(event) => onResidentQuery(event.target.value)} placeholder="Ieškoti gyventojo..." className="h-12 w-full rounded-2xl border border-[#dbe6e0] bg-white py-3 pl-12 pr-4 text-sm font-bold outline-none transition placeholder:text-[#8a9a91] focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10" />
+                <input value={residentQuery} onChange={(event) => onResidentQuery(event.target.value)} placeholder="Ieškoti gyventojo..." className="h-12 w-full rounded-2xl border border-[#dbe6e0] bg-white py-3 pl-12 pr-4 text-sm font-bold outline-none transition placeholder:text-[#8a9a91] focus:border-[#486b5d] focus:ring-4 focus:ring-[#486b5d]/10" />
               </label>
 
-              <select value={roomFilter} onChange={(event) => onRoomFilter(event.target.value)} className="h-12 rounded-2xl border border-[#dbe6e0] bg-white px-4 text-sm font-bold outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10">
+              <select value={roomFilter} onChange={(event) => onRoomFilter(event.target.value)} className="h-12 rounded-2xl border border-[#dbe6e0] bg-white px-4 text-sm font-bold outline-none transition focus:border-[#486b5d] focus:ring-4 focus:ring-[#486b5d]/10">
                 <option value="all">Visi kambariai</option>
                 {rooms.map((room) => (
                   <option key={room.id} value={room.id}>{room.name || "Kambarys"}</option>
                 ))}
               </select>
 
-              <select value={attendanceFilter} onChange={(event) => onAttendanceFilter(event.target.value as AttendanceFilter)} className="h-12 rounded-2xl border border-[#dbe6e0] bg-white px-4 text-sm font-bold outline-none transition focus:border-[#047857] focus:ring-4 focus:ring-[#047857]/10">
+              <select value={attendanceFilter} onChange={(event) => onAttendanceFilter(event.target.value as AttendanceFilter)} className="h-12 rounded-2xl border border-[#dbe6e0] bg-white px-4 text-sm font-bold outline-none transition focus:border-[#486b5d] focus:ring-4 focus:ring-[#486b5d]/10">
                 {ATTENDANCE_FILTER_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -1830,7 +1830,7 @@ function AttendanceModal({
                     key={option.value}
                     type="button"
                     onClick={() => onQuickStatus(option.value)}
-                    className={`rounded-full border px-3 py-1 text-xs font-black transition ${option.chipClass} ${quickStatus === option.value ? "ring-2 ring-[#047857] ring-offset-2" : ""}`}
+                    className={`rounded-full border px-3 py-1 text-xs font-black transition ${option.chipClass} ${quickStatus === option.value ? "ring-2 ring-[#486b5d] ring-offset-2" : ""}`}
                   >
                     {option.short} = {option.label}
                   </button>
@@ -1843,7 +1843,7 @@ function AttendanceModal({
             </p>
 
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={onApplySelected} disabled={bulkSaving} className="rounded-2xl bg-[#047857] px-4 py-2 text-sm font-black text-white transition hover:bg-[#036747] disabled:opacity-60">
+              <button type="button" onClick={onApplySelected} disabled={bulkSaving} className="rounded-2xl bg-[#486b5d] px-4 py-2 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60">
                 <CheckCircle2 className="mr-2 inline h-4 w-4" /> Pritaikyti pažymėtiems ({selectedCells.size}) į pasirinktas veiklas
               </button>
               <button type="button" onClick={() => onMarkAll("attended")} disabled={bulkSaving} className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#f7fcf9] disabled:opacity-60">
@@ -1952,7 +1952,7 @@ function AttendanceModal({
                       <button
                         type="button"
                         onClick={() => onToggleSelection(resident.id)}
-                        className={`flex h-8 w-8 items-center justify-center rounded-xl border text-xs font-black ${selected ? "border-[#2f4f3f] bg-[#047857] text-white" : "border-[#dbe6e0] bg-white text-[#526174]"}`}
+                        className={`flex h-8 w-8 items-center justify-center rounded-xl border text-xs font-black ${selected ? "border-[#2f4f3f] bg-[#486b5d] text-white" : "border-[#dbe6e0] bg-white text-[#526174]"}`}
                         title="Pažymėti masinei komandai"
                       >
                         {selected ? "✓" : "+"}
@@ -2020,7 +2020,7 @@ function MiniStat({
       type="button"
       onClick={onClick}
       className={`rounded-3xl border p-5 text-left transition hover:scale-[1.01] hover:shadow-sm ${
-        active ? "border-[#2f4f3f] ring-2 ring-[#047857] ring-offset-2" : "border-slate-200"
+        active ? "border-[#2f4f3f] ring-2 ring-[#486b5d] ring-offset-2" : "border-slate-200"
       } ${toneClass}`}
     >
       <p className="text-sm font-black uppercase tracking-widest opacity-80">{label}</p>

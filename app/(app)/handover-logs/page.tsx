@@ -763,7 +763,7 @@ export default function HandoverLogsPage() {
                             {priorityLabel(log.priority)}
                           </span>
                           {!read ? (
-                            <span className="rounded-full bg-[#047857] px-3 py-1 text-[11px] font-black text-white">Nauja</span>
+                            <span className="rounded-full bg-[#486b5d] px-3 py-1 text-[11px] font-black text-white">Nauja</span>
                           ) : null}
                           {log.is_important ? (
                             <span className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-black text-rose-700">Svarbu</span>
@@ -805,7 +805,7 @@ export default function HandoverLogsPage() {
                       <button
                         type="button"
                         onClick={() => setSelectedLog(log)}
-                        className="flex-1 rounded-[18px] bg-[#047857] px-4 py-3 text-sm font-black text-white"
+                        className="flex-1 rounded-[18px] bg-[#486b5d] px-4 py-3 text-sm font-black text-white"
                       >
                         Atidaryti
                       </button>
@@ -829,14 +829,14 @@ export default function HandoverLogsPage() {
         <button
           type="button"
           onClick={() => setMobileCreateOpen(true)}
-          className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-[#047857] text-white shadow-2xl active:scale-95"
+          className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-[#486b5d] text-white shadow-2xl active:scale-95"
           aria-label="Naujas perdavimo įrašas"
         >
           <Plus className="h-7 w-7" />
         </button>
 
         {mobileCreateOpen ? (
-          <div className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-[#047857]/50 p-4 backdrop-blur-sm md:p-6">
+          <div className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-[#486b5d]/50 p-4 backdrop-blur-sm md:p-6">
             <section className="max-h-[calc(100vh-48px)] w-full max-w-[980px] overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
               <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
                 <div>
@@ -1094,7 +1094,7 @@ export default function HandoverLogsPage() {
                 Reikia sekti / perduoti kitai pamainai
               </label>
 
-              <button type="button" onClick={() => void createLog()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#047857] px-5 py-3 font-extrabold text-white transition hover:bg-[#036747] disabled:opacity-60">
+              <button type="button" onClick={() => void createLog()} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#486b5d] px-5 py-3 font-extrabold text-white transition hover:bg-[#39594c] disabled:opacity-60">
                 <Plus className="h-4 w-4" /> {saving ? "Saugoma..." : "Sukurti įrašą"}
               </button>
             </div>
@@ -1197,7 +1197,7 @@ export default function HandoverLogsPage() {
                             <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d]">{shiftLabel(log.shift_type)}</span>
                             <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d]">{log.category}</span>
                             {log.is_important ? <span className="rounded-full bg-red-900 px-3 py-1 text-xs font-black text-white">Svarbu</span> : null}
-                            {log.needs_follow_up ? <span className="rounded-full bg-[#047857] px-3 py-1 text-xs font-black text-white">Sekti</span> : null}
+                            {log.needs_follow_up ? <span className="rounded-full bg-[#486b5d] px-3 py-1 text-xs font-black text-white">Sekti</span> : null}
                           </div>
                           <h3 className="mt-3 text-2xl font-black text-[#10251f]">{log.title}</h3>
                           <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#486b5d]">{log.note}</p>
@@ -1235,7 +1235,7 @@ export default function HandoverLogsPage() {
       ) : null}
 
       {helpOpen ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#047857]/45 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#486b5d]/45 p-4 backdrop-blur-sm">
           <section className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-6 bg-[#486b5d] p-5 text-white">
               <div>
@@ -1302,7 +1302,7 @@ export default function HandoverLogsPage() {
           outline: none;
         }
         .input:focus {
-          border-color: #047857;
+          border-color: #486b5d;
           box-shadow: 0 0 0 4px rgba(4, 120, 87, 0.12);
         }
       `}</style>
@@ -1336,7 +1336,7 @@ function HandoverTab({
       {icon}
       {label}
       {typeof count === "number" ? (
-        <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#047857] ring-1 ring-[#c9d8d0]">
+        <span className="ml-1 rounded-full bg-white/80 px-2 py-0.5 text-xs font-black text-[#486b5d] ring-1 ring-[#c9d8d0]">
           {count}
         </span>
       ) : null}
@@ -1369,7 +1369,7 @@ function MobileFilterChip({ active, onClick, children }: { active: boolean; onCl
       onClick={onClick}
       className={`whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-black transition active:scale-[0.98] ${
         active
-          ? "bg-[#047857] text-white shadow-sm"
+          ? "bg-[#486b5d] text-white shadow-sm"
           : "border border-[#dbe6e0] bg-white text-[#526174]"
       }`}
     >
@@ -1381,10 +1381,10 @@ function MobileFilterChip({ active, onClick, children }: { active: boolean; onCl
 function Stat({ title, value, tone = "slate" }: { title: string; value: number; tone?: "slate" | "blue" | "amber" | "rose" | "emerald" }) {
   const toneClass = {
     slate: "bg-white text-[#486b5d]",
-    blue: "bg-[#f7fcf9] text-[#047857]",
+    blue: "bg-[#f7fcf9] text-[#486b5d]",
     amber: "bg-amber-50 text-amber-800",
     rose: "bg-rose-50 text-rose-800",
-    emerald: "bg-emerald-50 text-[#047857]",
+    emerald: "bg-emerald-50 text-[#486b5d]",
   }[tone];
 
   return (
@@ -1448,7 +1448,7 @@ function LogModal({
   saving: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#047857]/45 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#486b5d]/45 p-4 backdrop-blur-sm">
       <section className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-6 border-b border-[#dbe6e0] p-5">
           <div>

@@ -1426,7 +1426,7 @@ export default function EmployeeDashboardPage() {
               <button
                 type="button"
                 onClick={() => void markNotificationsRead()}
-                className="rounded-[14px] bg-[#047857] px-4 py-3 text-sm font-black text-white"
+                className="rounded-[14px] bg-[#486b5d] px-4 py-3 text-sm font-black text-white"
               >
                 Pažymėti visus kaip skaitytus
               </button>
@@ -1645,7 +1645,7 @@ export default function EmployeeDashboardPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#10251f]">
         <div className="rounded-[28px] border border-[#dbe6e0] bg-white p-8 text-center shadow-sm">
-          <Loader2 className="mx-auto h-9 w-9 animate-spin text-[#047857]" />
+          <Loader2 className="mx-auto h-9 w-9 animate-spin text-[#486b5d]" />
           <p className="mt-4 text-lg font-black text-[#10251f]">Kraunama...</p>
           <p className="mt-1 text-sm font-semibold text-[#526174]">
             Ruošiame darbuotojo darbo centrą.
@@ -1706,7 +1706,7 @@ export default function EmployeeDashboardPage() {
               <select
                 value={activePanel}
                 onChange={(event) => openPanel(event.target.value as PanelKey)}
-                className="w-full rounded-[16px] border border-[#c9d8d0] bg-white px-4 py-3 text-base font-black text-[#486b5d] shadow-sm outline-none focus:ring-2 focus:ring-[#047857]/25"
+                className="w-full rounded-[16px] border border-[#c9d8d0] bg-white px-4 py-3 text-base font-black text-[#486b5d] shadow-sm outline-none focus:ring-2 focus:ring-[#486b5d]/25"
               >
                 {panelOptions.map((option) => (
                   <option key={option.key} value={option.key}>
@@ -1900,7 +1900,7 @@ export default function EmployeeDashboardPage() {
         <section className="rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-sm sm:rounded-[22px] sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                 Mano informacija
               </p>
               <h2 className="mt-1 text-2xl font-black tracking-tight text-[#10251f]">
@@ -1997,7 +1997,7 @@ export default function EmployeeDashboardPage() {
       {toast ? (
         <div className="fixed bottom-20 left-3 right-3 z-[120] rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-2xl sm:bottom-5 sm:left-auto sm:max-w-sm">
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 text-[#047857]" />
+            <CheckCircle2 className="mt-0.5 h-5 w-5 text-[#486b5d]" />
             <div>
               <div className="font-black text-[#10251f]">{toast.title}</div>
               <div className="mt-1 text-sm font-bold text-[#526174]">
@@ -2172,7 +2172,7 @@ function Panel({
     <section className="rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-sm sm:rounded-[22px] sm:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
             {kicker}
           </p>
           <h2 className="mt-1 break-words text-[26px] font-black leading-tight tracking-tight text-[#10251f] sm:text-2xl">
@@ -2189,7 +2189,7 @@ function Panel({
 function ShiftCard({ shift }: { shift: EmployeeSchedule }) {
   return (
     <div className="rounded-[18px] border border-emerald-100 bg-emerald-50 p-4">
-      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#047857]">
+      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#486b5d]">
         Kita pamaina
       </p>
       <h3 className="mt-2 text-xl font-black leading-tight text-[#10251f]">
@@ -2303,7 +2303,7 @@ function SideBox({
 }) {
   return (
     <aside className="rounded-[18px] border border-[#dbe6e0] bg-[#ffffff] p-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#047857]">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#486b5d]">
         {kicker}
       </p>
       <h3 className="mt-1 break-words text-xl font-black leading-tight text-[#10251f]">
@@ -2370,7 +2370,7 @@ function TaskCard({
         <button
           type="button"
           onClick={onComplete}
-          className="w-full rounded-[12px] bg-[#047857] px-3 py-2 text-xs font-black text-white sm:w-auto"
+          className="w-full rounded-[12px] bg-[#486b5d] px-3 py-2 text-xs font-black text-white sm:w-auto"
         >
           Atlikta
         </button>
@@ -2383,7 +2383,7 @@ function TaskCard({
       <button
         type="button"
         onClick={onOpen}
-        className="mt-3 w-full rounded-[14px] bg-[#f7fcf9] px-4 py-3 text-sm font-black text-[#047857] sm:w-auto sm:bg-transparent sm:px-0 sm:py-0"
+        className="mt-3 w-full rounded-[14px] bg-[#f7fcf9] px-4 py-3 text-sm font-black text-[#486b5d] sm:w-auto sm:bg-transparent sm:px-0 sm:py-0"
       >
         Peržiūrėti
       </button>
@@ -2407,7 +2407,7 @@ function DocumentLine({
         <div className="mt-0.5 text-sm font-bold text-[#526174]">{value}</div>
       </div>
       <span
-        className={`rounded-full px-3 py-1 text-xs font-black ${ok ? "bg-emerald-50 text-[#047857]" : "bg-amber-50 text-amber-700"}`}
+        className={`rounded-full px-3 py-1 text-xs font-black ${ok ? "bg-emerald-50 text-[#486b5d]" : "bg-amber-50 text-amber-700"}`}
       >
         {ok ? "OK" : "Trūksta"}
       </span>
@@ -2612,7 +2612,7 @@ function ModalField({
         lang={type === "date" ? "lt-LT" : undefined}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#047857] focus:ring-4 focus:ring-emerald-100"
+        className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-4 focus:ring-emerald-100"
       />
     </label>
   );
@@ -2642,7 +2642,7 @@ function ModalActions({
         type="button"
         onClick={onSubmit}
         disabled={saving}
-        className="rounded-[16px] bg-[#047857] px-5 py-3 font-black text-white disabled:opacity-60"
+        className="rounded-[16px] bg-[#486b5d] px-5 py-3 font-black text-white disabled:opacity-60"
       >
         {saving ? "Saugoma..." : submitLabel}
       </button>

@@ -449,7 +449,7 @@ export default function AdminDashboardPage() {
               <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                       Rodiklių apžvalga
                     </p>
                     <h2 className="mt-1 text-2xl font-black">Bendra situacija</h2>
@@ -471,7 +471,7 @@ export default function AdminDashboardPage() {
                     value={computed.occupancy}
                     center={stats.capacity ? `${stats.activeResidents}/${stats.capacity}` : `${computed.occupancy}%`}
                     sublabel="vietos"
-                    color="#047857"
+                    color="#486b5d"
                   />
 
                   <RoundMetric
@@ -480,7 +480,7 @@ export default function AdminDashboardPage() {
                     value={computed.ftePercent}
                     center={stats.plannedFte ? `${formatFte(stats.filledFte)}/${formatFte(stats.plannedFte)}` : "—"}
                     sublabel="etatai"
-                    color="#0f766e"
+                    color="#486b5d"
                   />
 
                   <RoundMetric
@@ -489,14 +489,14 @@ export default function AdminDashboardPage() {
                     value={100 - computed.careRisk}
                     center={`${100 - computed.careRisk}%`}
                     sublabel="pajėgumas"
-                    color={computed.careRisk > 30 ? "#ca8a04" : "#047857"}
+                    color={computed.careRisk > 30 ? "#ca8a04" : "#486b5d"}
                     warm={computed.careRisk > 30}
                   />
                 </div>
               </section>
 
               <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                   Veiksmų centras
                 </p>
                 <h2 className="mt-1 text-2xl font-black">Kas šiandien svarbiausia?</h2>
@@ -524,7 +524,7 @@ export default function AdminDashboardPage() {
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                     Pajėgumas
                   </p>
                   <h2 className="mt-1 text-2xl font-black">Etatų ir pamainų santrauka</h2>
@@ -533,7 +533,7 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => openTeamModule("fte")}
-                  className="rounded-xl bg-[#047857] px-4 py-2 text-sm font-black text-white transition hover:bg-[#065f46]"
+                  className="rounded-xl bg-[#486b5d] px-4 py-2 text-sm font-black text-white transition hover:bg-[#39594c]"
                 >
                   Atidaryti etatų valdymą
                 </button>
@@ -550,7 +550,7 @@ export default function AdminDashboardPage() {
             </section>
 
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                 Pamainų rizikos
               </p>
               <h2 className="mt-1 text-2xl font-black">Pavadavimas ir grafikas</h2>
@@ -589,7 +589,7 @@ export default function AdminDashboardPage() {
         {activeTab === "risks" ? (
           <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                 Rizikos
               </p>
               <h2 className="mt-1 text-2xl font-black">Reikia dėmesio</h2>
@@ -646,7 +646,7 @@ export default function AdminDashboardPage() {
             </section>
 
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                 Greiti veiksmai
               </p>
               <h2 className="mt-1 text-2xl font-black">Kur eiti toliau?</h2>
@@ -665,13 +665,13 @@ export default function AdminDashboardPage() {
         {activeTab === "activity" ? (
           <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                 Dienos eiga
               </p>
               <h2 className="mt-1 text-2xl font-black">Naujausi įvykiai</h2>
 
               <div className="mt-4 space-y-3">
-                <TimelineItem color="#047857" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
+                <TimelineItem color="#486b5d" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
                 <TimelineItem color="#be123c" title="Atostogų / išvykimo užklausos" meta={`${stats.pendingLeaves} laukia sprendimo`} warm />
                 <TimelineItem
                   color="#b91c1c"
@@ -684,7 +684,7 @@ export default function AdminDashboardPage() {
             </section>
 
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                 Veiklos kryptys
               </p>
               <h2 className="mt-1 text-2xl font-black">Greitos nuorodos</h2>
@@ -702,7 +702,7 @@ export default function AdminDashboardPage() {
         {activeTab === "documents" ? (
           <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                 Dokumentai
               </p>
               <h2 className="mt-1 text-2xl font-black">Darbuotojų pateikti duomenys</h2>
@@ -718,7 +718,7 @@ export default function AdminDashboardPage() {
             </section>
 
             <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
                 Veiksmai
               </p>
               <h2 className="mt-1 text-2xl font-black">
@@ -729,7 +729,7 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => openTeamModule("docs")}
-                  className="min-h-14 rounded-xl bg-[#047857] px-5 text-left text-base font-black text-white transition hover:bg-[#065f46]"
+                  className="min-h-14 rounded-xl bg-[#486b5d] px-5 text-left text-base font-black text-white transition hover:bg-[#39594c]"
                 >
                   {stats.pendingDocumentApprovals > 0
                     ? "Atidaryti dokumentų patvirtinimą"
@@ -1327,7 +1327,7 @@ function DashboardSidePanel({
   return (
     <aside className="grid content-start gap-4">
       <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
           Pranešimai
         </p>
         <h2 className="mt-1 text-2xl font-black">Reikia dėmesio</h2>
@@ -1393,13 +1393,13 @@ function DashboardSidePanel({
       </section>
 
       <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
           Dienos eiga
         </p>
         <h2 className="mt-1 text-2xl font-black">Naujausi įvykiai</h2>
 
         <div className="mt-4 space-y-3">
-          <TimelineItem color="#047857" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
+          <TimelineItem color="#486b5d" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
           <TimelineItem color="#2563eb" title="Darbuotojų kvietimai" meta={`${pendingInvites} laukia atsakymo`} blue />
           <TimelineItem color="#be123c" title="Atostogų / išvykimo užklausos" meta={`${pendingLeaves} laukia sprendimo`} warm />
           <TimelineItem
@@ -1457,7 +1457,7 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
                 <div
                   className={`h-full rounded-full ${
                     row.color === "emerald"
-                      ? "bg-[#047857]"
+                      ? "bg-[#486b5d]"
                       : row.color === "red"
                         ? "bg-[#be123c]"
                         : "bg-[#ca8a04]"
@@ -1468,7 +1468,7 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
             </div>
 
             <div className="font-black">{formatFte(row.filled)} / {formatFte(row.planned)}</div>
-            <div className={row.free > 0 ? "font-black text-[#047857]" : "font-black text-emerald-700"}>
+            <div className={row.free > 0 ? "font-black text-[#486b5d]" : "font-black text-emerald-700"}>
               {formatFte(row.free)} et.
             </div>
             <div>
@@ -1477,7 +1477,7 @@ function CompactFteRows({ rows }: { rows: FteRow[] }) {
                   row.color === "emerald"
                     ? "bg-emerald-50 text-emerald-700"
                     : row.color === "red"
-                      ? "bg-red-50 text-[#047857]"
+                      ? "bg-red-50 text-[#486b5d]"
                       : "bg-[#fff1f2] text-[#be123c]"
                 }`}
               >
@@ -1552,7 +1552,7 @@ function RiskAttentionCard({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-2xl border border-[#486b5d] bg-white p-4 text-left text-[#10251f] transition hover:border-[#10251f] hover:shadow-sm"
+      className="w-full rounded-2xl border border-[#486b5d] bg-white p-4 text-left text-[#10251f] transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f] hover:shadow-sm"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -1621,7 +1621,7 @@ function FtePlanningSection({
     <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
             Personalo analizė
           </p>
           <h2 className="mt-1 text-2xl font-black">Etatų užpildymas</h2>
@@ -1641,7 +1641,7 @@ function FtePlanningSection({
           <button
             type="button"
             onClick={onOpenSchedule}
-            className="rounded-xl bg-[#047857] px-4 py-2 text-sm font-black text-white transition hover:bg-[#065f46]"
+            className="rounded-xl bg-[#486b5d] px-4 py-2 text-sm font-black text-white transition hover:bg-[#39594c]"
           >
             Grafikas
           </button>
@@ -1676,7 +1676,7 @@ function FtePlanningSection({
                   <div
                     className={`h-full rounded-full ${
                       row.color === "emerald"
-                        ? "bg-[#047857]"
+                        ? "bg-[#486b5d]"
                         : row.color === "red"
                           ? "bg-[#be123c]"
                           : "bg-[#ca8a04]"
@@ -1694,7 +1694,7 @@ function FtePlanningSection({
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-black ${
                     row.free > 0
-                      ? "bg-red-50 text-[#047857]"
+                      ? "bg-red-50 text-[#486b5d]"
                       : "bg-emerald-50 text-emerald-700"
                   }`}
                 >
@@ -1710,7 +1710,7 @@ function FtePlanningSection({
                     row.color === "emerald"
                       ? "bg-emerald-50 text-emerald-700"
                       : row.color === "red"
-                        ? "bg-red-50 text-[#047857]"
+                        ? "bg-red-50 text-[#486b5d]"
                         : "bg-[#fff1f2] text-[#be123c]"
                   }`}
                 >
@@ -1723,7 +1723,7 @@ function FtePlanningSection({
       </div>
 
       <div className="mt-5 rounded-2xl border border-[#c9d8d0] bg-[#f7fcf9] p-5">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#047857]">
+        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
           Pamainų rizikos
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -1733,7 +1733,7 @@ function FtePlanningSection({
                 ? `Reikia pavaduoti ${formatFte(replacementNeededFte)} et.`
                 : "Pavadavimo poreikio nerasta"}
             </div>
-            <div className="mt-1 text-sm font-bold text-[#047857]/70">
+            <div className="mt-1 text-sm font-bold text-[#486b5d]/70">
               Skaičiuojama pagal patvirtintus neatvykimus.
             </div>
           </div>
@@ -1742,7 +1742,7 @@ function FtePlanningSection({
             <div className="font-black text-[#10251f]">
               Tikrinti minimalų pamainos komplektą
             </div>
-            <div className="mt-1 text-sm font-bold text-[#047857]/70">
+            <div className="mt-1 text-sm font-bold text-[#486b5d]/70">
               Kitas etapas — lyginti grafiką su minimaliu pareigybių poreikiu.
             </div>
           </div>
@@ -1795,14 +1795,14 @@ function TopMetric({
     : accent === "amber"
       ? "text-[#be123c]"
       : accent === "emerald"
-        ? "text-[#047857]"
+        ? "text-[#486b5d]"
         : "text-[#10251f]";
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-[#10251f] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)]"
+      className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-[#10251f] hover:ring-2 hover:ring-[#10251f] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)]"
     >
       <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">{title}</p>
       <p className={`mt-1 text-2xl font-black ${valueClass}`}>{value}</p>
@@ -1860,7 +1860,7 @@ function PriorityActionCard({
   onClick: () => void;
 }) {
   return (
-    <article className="rounded-2xl border border-[#dbe6e0] bg-white p-4 transition hover:border-[#486b5d]">
+    <article className="rounded-2xl border border-[#dbe6e0] bg-white p-4 transition hover:border-[#486b5d] hover:ring-2 hover:ring-[#486b5d]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.14em] text-[#10251f]">Dėmesio</p>
@@ -1952,13 +1952,13 @@ function MiniCircularCard({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className={`text-xs font-black uppercase tracking-[0.14em] ${
-            danger ? "text-[#047857]" : warm ? "text-[#be123c]" : "text-[#6a7e75]"
+            danger ? "text-[#486b5d]" : warm ? "text-[#be123c]" : "text-[#6a7e75]"
           }`}>
             {eyebrow}
           </p>
           <h3 className="mt-1 text-lg font-black">{title}</h3>
           <p className={`mt-1 text-sm font-bold ${
-            danger ? "text-[#047857]/75" : warm ? "text-[#9f1239]" : "text-[#6a7e75]"
+            danger ? "text-[#486b5d]/75" : warm ? "text-[#9f1239]" : "text-[#6a7e75]"
           }`}>
             {meta}
           </p>
@@ -2063,7 +2063,7 @@ function TimelineItem({
       <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
       <div>
         <b>{title}</b>
-        <p className={`text-sm font-bold ${danger ? "text-[#047857]/75" : warm ? "text-[#9f1239]" : blue ? "text-[#047857]/75" : "text-[#6a7e75]"}`}>
+        <p className={`text-sm font-bold ${danger ? "text-[#486b5d]/75" : warm ? "text-[#9f1239]" : blue ? "text-[#486b5d]/75" : "text-[#6a7e75]"}`}>
           {meta}
         </p>
       </div>
@@ -2173,7 +2173,7 @@ function HelpModal({ activeTab, onClose }: { activeTab: DashboardTab; onClose: (
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-[#047857] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#065f46]"
+            className="rounded-xl bg-[#486b5d] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c]"
           >
             Supratau
           </button>

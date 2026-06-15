@@ -171,7 +171,7 @@ function getToastStyle(type: ToastType): React.CSSProperties {
     case 'success':
       return {
         background: '#ecfdf5',
-        color: '#065f46',
+        color: '#39594c',
         border: '1px solid #a7f3d0',
       }
     case 'error':
@@ -1016,7 +1016,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 14px',
     borderRadius: 10,
     background: '#ecfdf5',
-    color: '#047857',
+    color: '#486b5d',
     border: '1px solid #a7f3d0',
     fontWeight: 700,
     cursor: 'pointer',

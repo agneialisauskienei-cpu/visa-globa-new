@@ -181,6 +181,19 @@ h3 {
   color: #022c22 !important;
 }
 
+button[class*="bg-[#486b5d]"],
+a[class*="bg-[#486b5d]"] {
+  border-radius: 12px;
+  background: #486b5d;
+  font-weight: 800;
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+button[class*="bg-[#486b5d]"]:hover,
+a[class*="bg-[#486b5d]"]:hover {
+  background: #39594c;
+}
+
 .vg-instruction-content h3 {
   margin: 0;
   color: #10251f;
