@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStarterAuthContext } from '@/lib/server/auth-context'
 
 type AttendanceStatus = 'attended' | 'absent' | 'refused'
+type ResidentIdRow = { id: string }
+type NormalizedAttendanceRow = {
+  session_id: string
+  resident_id: string
+  status: AttendanceStatus
+  note: string | null
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +41,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const normalizedRows = rows
+    const normalizedRows: NormalizedAttendanceRow[] = rows
       .map((row: any) => ({
         session_id,
         resident_id: String(row?.resident_id || '').trim(),
@@ -47,7 +54,7 @@ export async function POST(request: NextRequest) {
           resident_id: string
           status: string
           note: string | null
-        }) => row.resident_id && row.status
+        }) => Boolean(row.resident_id && row.status)
       )
 
     if (normalizedRows.length === 0) {
@@ -78,7 +85,9 @@ export async function POST(request: NextRequest) {
 
     if (residentsError) throw residentsError
 
-    const validResidentSet = new Set((validResidents || []).map((row) => row.id))
+    const validResidentSet = new Set(
+      ((validResidents || []) as ResidentIdRow[]).map((row) => row.id)
+    )
     const invalidRow = normalizedRows.find((row) => !validResidentSet.has(row.resident_id))
 
     if (invalidRow) {

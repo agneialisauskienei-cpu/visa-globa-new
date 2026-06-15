@@ -1525,9 +1525,7 @@ export default function EmployeeDashboardPage() {
                 <DocumentLine
                   title="Sveikatos pažyma"
                   value={fmtDate(documentForm.healthCertificateUntil)}
-                  status={
-                    documentForm.healthCertificateUntil ? "OK" : "Trūksta"
-                  }
+                  ok={Boolean(documentForm.healthCertificateUntil)}
                 />
                 <DocumentLine
                   title="Licencija"
@@ -1537,7 +1535,7 @@ export default function EmployeeDashboardPage() {
                   ]
                     .filter(Boolean)
                     .join(" · ")}
-                  status={documentForm.licenseUntil ? "OK" : "Trūksta"}
+                  ok={Boolean(documentForm.licenseUntil)}
                 />
               </div>
             </SideBox>,

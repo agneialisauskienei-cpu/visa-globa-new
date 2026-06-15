@@ -35,10 +35,16 @@ export default function SignupPage() {
 
     try {
       const normalizedCode = organizationCode.trim().toUpperCase()
+      const normalizedEmail = email.trim().toLowerCase()
 
       if (!normalizedCode) {
         setMessage('Įvesk įstaigos kodą.')
         setSaving(false)
+        return
+      }
+
+      if (password.length < 8) {
+        setMessage('Slaptažodis turi būti bent 8 simbolių.')
         return
       }
 
@@ -57,7 +63,7 @@ export default function SignupPage() {
       }
 
       const authRes = await supabase.auth.signUp({
-        email: email.trim(),
+        email: normalizedEmail,
         password,
       })
 
@@ -71,9 +77,32 @@ export default function SignupPage() {
         return
       }
 
+      const { data: existingMembership } = await supabase
+        .from('organization_members')
+        .select('id, is_active')
+        .eq('organization_id', organization.id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (existingMembership?.is_active) {
+        try {
+          window.localStorage.setItem('active_organization_id', organization.id)
+        } catch {}
+        router.replace('/employee-dashboard')
+        return
+      }
+
+      const { data: existingRequest } = await supabase
+        .from('organization_join_requests')
+        .select('id, status')
+        .eq('organization_id', organization.id)
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .maybeSingle()
+
       const { error: profileError } = await supabase.from('profiles').upsert({
         id: user.id,
-        email: email.trim(),
+        email: normalizedEmail,
         first_name: firstName.trim() || null,
         last_name: lastName.trim() || null,
         full_name: [firstName, lastName].filter(Boolean).join(' ').trim() || null,
@@ -81,18 +110,20 @@ export default function SignupPage() {
 
       if (profileError) throw profileError
 
-      const { error: requestError } = await supabase
-        .from('organization_join_requests')
-        .insert({
-          organization_id: organization.id,
-          user_id: user.id,
-          email: email.trim(),
-          first_name: firstName.trim() || null,
-          last_name: lastName.trim() || null,
-          status: 'pending',
-        })
+      if (!existingRequest) {
+        const { error: requestError } = await supabase
+          .from('organization_join_requests')
+          .insert({
+            organization_id: organization.id,
+            user_id: user.id,
+            email: normalizedEmail,
+            first_name: firstName.trim() || null,
+            last_name: lastName.trim() || null,
+            status: 'pending',
+          })
 
-      if (requestError) throw requestError
+        if (requestError) throw requestError
+      }
 
       router.replace('/pending-approval')
     } catch (error) {
@@ -133,6 +164,7 @@ export default function SignupPage() {
             placeholder="El. paštas"
             style={styles.input}
             required
+            minLength={8}
           />
 
           <input

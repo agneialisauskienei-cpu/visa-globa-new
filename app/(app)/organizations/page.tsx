@@ -439,19 +439,25 @@ export default function OrganizationsPage() {
       setSaving(true)
 
       const {
-        data: { user },
-      } = await supabase.auth.getUser()
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new Error('Prisijungimo sesija nebegalioja.')
+      }
 
       const response = await fetch('/api/admin/update-organization', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           id: editForm.id,
           name: cleanName,
           code: cleanCode,
           address: cleanAddress,
           plan: cleanPlan,
-          actorUserId: user?.id || null,
         }),
       })
 

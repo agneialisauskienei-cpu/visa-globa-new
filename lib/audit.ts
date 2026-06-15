@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 
-export type AuditAction = 'insert' | 'update' | 'delete'
+export type AuditAction = 'insert' | 'update' | 'delete' | (string & {})
 
 function normalizeUuid(value?: string | null) {
   if (!value) return null

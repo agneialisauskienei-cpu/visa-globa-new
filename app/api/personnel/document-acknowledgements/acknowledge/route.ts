@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { requireAuthenticatedUser } from "@/lib/server/service-auth"
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -33,11 +34,16 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseAdmin()
+    const user = await requireAuthenticatedUser(request)
+    if (!user) {
+      return NextResponse.json({ error: "Neautorizuota." }, { status: 401 })
+    }
 
     const { data: acknowledgement, error: readError } = await supabase
       .from("personnel_document_acknowledgements")
-      .select("id, viewed_at, status")
+      .select("id, employee_id, viewed_at, status")
       .eq("id", acknowledgementId)
+      .eq("employee_id", user.id)
       .single()
 
     if (readError || !acknowledgement) {
@@ -65,6 +71,7 @@ export async function POST(request: Request) {
         acknowledged_user_agent: userAgent,
       })
       .eq("id", acknowledgementId)
+      .eq("employee_id", user.id)
 
     if (error) {
       return NextResponse.json(

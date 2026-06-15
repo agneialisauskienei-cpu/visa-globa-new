@@ -519,7 +519,7 @@ async function writeAuditLog(input: {
     for (const attempt of attempts) {
       const { error } = await supabase
         .from(attempt.table)
-        .insert(attempt.payload as any);
+        .insert(attempt.payload as never);
       if (!error) return;
     }
   } catch {
@@ -823,13 +823,11 @@ export default function InventoryPage() {
     if (!organizationId) throw new Error("Nepavyko nustatyti įstaigos.");
 
     const currentQuantity = Number(input.item.quantity || 0);
-    const nextQuantity =
-      input.mode === "increase"
-        ? currentQuantity + input.quantity
-        : input.mode === "decrease"
-          ? currentQuantity - input.quantity
-          : currentQuantity;
-
+    const nextQuantity = input.mode === "increase"
+      ? currentQuantity + input.quantity
+      : input.mode === "decrease"
+        ? currentQuantity - input.quantity
+        : currentQuantity;
     if (input.mode === "decrease" && input.quantity > currentQuantity) {
       throw new Error(
         `Prekei „${input.item.name}“ sandėlyje yra tik ${formatQuantity(currentQuantity, input.item.unit)}.`,
@@ -839,13 +837,13 @@ export default function InventoryPage() {
     const actor = await getActor();
 
     if (input.mode !== "nochange") {
-      const { error } = await supabase
-        .from("inventory_items")
-        .update({
-          quantity: nextQuantity,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", input.item.id);
+      const delta =
+        input.mode === "increase" ? input.quantity : -input.quantity;
+      const { error } = await supabase.rpc("adjust_inventory_item_quantity", {
+        p_item_id: input.item.id,
+        p_organization_id: organizationId,
+        p_delta: delta,
+      });
       if (error) throw error;
     }
 

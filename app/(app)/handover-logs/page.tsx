@@ -262,7 +262,7 @@ async function writeAuditLog(input: {
     ];
 
     for (const attempt of attempts) {
-      const { error } = await supabase.from(attempt.table).insert(attempt.payload as any);
+      const { error } = await supabase.from(attempt.table).insert(attempt.payload as never);
       if (!error) return;
     }
   } catch {
@@ -528,7 +528,11 @@ export default function HandoverLogsPage() {
     try {
       if (!currentUserId) return;
       setSaving(true);
-      const { error } = await supabase.from("handover_logs").update({ archived: true, updated_by: currentUserId }).eq("id", log.id);
+      const { error } = await supabase
+        .from("handover_logs")
+        .update({ archived: true, updated_by: currentUserId, updated_at: new Date().toISOString() })
+        .eq("id", log.id)
+        .eq("organization_id", log.organization_id);
       if (error) throw error;
 
       await writeAuditLog({
@@ -915,7 +919,7 @@ export default function HandoverLogsPage() {
             commentText={commentText}
             setCommentText={setCommentText}
             onClose={() => setSelectedLog(null)}
-            onAddComment={() => void addComment(selectedLog)}
+            onAddComment={() => void addComment()}
             saving={saving}
           />
         ) : null}

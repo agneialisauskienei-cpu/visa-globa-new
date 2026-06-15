@@ -358,18 +358,21 @@ function employeeName(employee?: EmployeeOption | null) {
 }
 
 
-function normalizeMedicineResident(row: any): Resident {
-  const source = row?.residents || row?.resident || row || {}
+function normalizeMedicineResident(row: Record<string, unknown>): Resident {
+  const nested = row.residents || row.resident
+  const source = nested && typeof nested === "object" && !Array.isArray(nested)
+    ? nested as Record<string, unknown>
+    : row
 
   return {
     id: String(source.id || row?.resident_id || ""),
-    full_name: source.full_name || null,
-    first_name: source.first_name || null,
-    last_name: source.last_name || null,
-    resident_code: source.resident_code || null,
-    current_room_id: source.current_room_id || null,
-    room_number: source.room_number || null,
-    status: source.status || source.current_status || null,
+    full_name: String(source.full_name || "") || null,
+    first_name: String(source.first_name || "") || null,
+    last_name: String(source.last_name || "") || null,
+    resident_code: String(source.resident_code || "") || null,
+    current_room_id: String(source.current_room_id || "") || null,
+    room_number: String(source.room_number || "") || null,
+    status: String(source.status || source.current_status || "") || null,
   }
 }
 
@@ -484,7 +487,7 @@ async function loadMedicineResidents(orgId: string) {
 
   if (!stayResidents.error && stayResidents.data?.length) {
     const ids = (stayResidents.data || [])
-      .map((row: any) => row.resident_id)
+      .map((row) => (row as { resident_id?: string | null }).resident_id)
       .filter((id: string | null | undefined): id is string => Boolean(id))
     const rows = await loadResidentsByIds(ids)
     if (rows.length > 0) return rows
@@ -753,13 +756,13 @@ export default function MedicinePage() {
 
     setEmployees(
       memberRows.map((member) => {
-        const profile = profileMap.get(member.user_id) || {}
+        const profile = profileMap.get(member.user_id)
         return {
           user_id: member.user_id,
-          email: profile.email || null,
-          first_name: profile.first_name || null,
-          last_name: profile.last_name || null,
-          full_name: profile.full_name || null,
+          email: profile?.email || null,
+          first_name: profile?.first_name || null,
+          last_name: profile?.last_name || null,
+          full_name: profile?.full_name || null,
           role: member.role || member.legacy_role || null,
           position: member.position || null,
         }
@@ -4303,7 +4306,6 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 10,
     border: "1px solid #dbe6e0",
-    borderRadius: 20,
     padding: "0 14px",
     height: 52,
     background: "#f8faf8",
@@ -4439,8 +4441,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   distributionItem: {
     border: "1px solid #c9d8d0",
-    background: "#ffffff",
-    borderRadius: 20,
     padding: 14,
     display: "grid",
     gridTemplateColumns: "1fr auto",
@@ -4802,7 +4802,6 @@ const styles: Record<string, React.CSSProperties> = {
   message: {
     marginTop: 14,
     padding: 14,
-    borderRadius: 20,
     background: "#eef4f1",
     border: "1px solid #cfeadd",
     color: "#047857",
@@ -4943,7 +4942,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#526174",
     textAlign: "center",
     border: "1px dashed #d7ddd9",
-    borderRadius: 20,
     fontWeight: 750,
   },
   emptySmall: {
@@ -5178,7 +5176,6 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
     gap: 10,
     maxHeight: 260,
-    overflowY: "auto",
   },
   quickItem: {
     border: "1px solid #c9d8d0",
@@ -5564,16 +5561,10 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#ffffff",
     boxShadow: "0 26px 80px rgba(15, 23, 42, 0.28)",
     fontFamily: "'Segoe UI', Arial, Helvetica, sans-serif",
-    width: "100%",
     maxWidth: 1120,
-    maxHeight: "92vh",
-    overflowY: "auto",
-    background: "#ffffff",
-    borderRadius: 20,
     padding: 24,
     display: "grid",
     gap: 18,
-    boxShadow: "0 26px 76px rgba(15, 23, 42, 0.30)",
     border: "1px solid #dbe6e0",
   },
   historyFilters: {
@@ -5583,9 +5574,6 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "end",
     paddingTop: 22,
     borderTop: "1px solid #dbe6e0",
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: 14,
   },
   historyTableWrap: {
     border: "1px solid #dbe6e0",
@@ -5873,7 +5861,6 @@ const styles: Record<string, React.CSSProperties> = {
   attentionValue: {
     width: 58,
     height: 58,
-    borderRadius: 20,
     background: "#ffffff",
     display: "flex",
     alignItems: "center",
@@ -5912,7 +5899,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   historyRows: {
     maxHeight: 320,
-    overflowY: "auto",
     overflowX: "auto",
     border: "1px solid #dbe6e0",
     borderRadius: 14,
@@ -5944,13 +5930,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   historyGridBody: {
     maxHeight: 320,
-    overflowY: "auto",
     overflowX: "auto",
   },
 
   modalBody: {
     maxHeight: "calc(100vh - 220px)",
-    overflowY: "auto",
     padding: 26,
     background: "#f3f6f4",
   },

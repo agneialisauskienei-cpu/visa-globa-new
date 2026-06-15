@@ -2,34 +2,55 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { getCurrentAccess, hasPermission } from '@/lib/app-access'
 import { supabase } from '@/lib/supabase'
 
+type ArchivedResident = {
+  id: string
+  full_name: string | null
+  current_status: string | null
+  archived_at: string
+}
+
 export default function ResidentsArchivePage() {
-  const [residents, setResidents] = useState<any[]>([])
+  const [residents, setResidents] = useState<ArchivedResident[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    load()
+    async function load() {
+      try {
+        const access = await getCurrentAccess()
+        if (!access.organizationId || !hasPermission(access, 'residents.view_basic')) {
+          throw new Error('Neturite teisės peržiūrėti gyventojų archyvo.')
+        }
+
+        const { data, error: queryError } = await supabase
+          .from('residents')
+          .select('id, full_name, current_status, archived_at')
+          .eq('organization_id', access.organizationId)
+          .not('archived_at', 'is', null)
+          .order('archived_at', { ascending: false })
+
+        if (queryError) throw queryError
+        setResidents((data || []) as ArchivedResident[])
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : 'Nepavyko įkelti archyvo.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void load()
   }, [])
 
-  async function load() {
-    const { data } = await supabase
-      .from('residents')
-      .select('*')
-      .not('archived_at', 'is', null)
-      .order('archived_at', { ascending: false })
-
-    setResidents(data || [])
-    setLoading(false)
-  }
-
-  if (loading) return <div>Loading...</div>
+  if (loading) return <div>Kraunama...</div>
 
   return (
     <div style={{ padding: 24 }}>
       <h1>Archyvas</h1>
-
       <Link href="/residents">← Grįžti į aktyvius</Link>
+      {error ? <p role="alert">{error}</p> : null}
 
       <table style={{ marginTop: 20, width: '100%' }}>
         <thead>
@@ -39,13 +60,12 @@ export default function ResidentsArchivePage() {
             <th>Archyvuota</th>
           </tr>
         </thead>
-
         <tbody>
-          {residents.map((r) => (
-            <tr key={r.id}>
-              <td>{r.full_name}</td>
-              <td>{r.current_status}</td>
-              <td>{new Date(r.archived_at).toLocaleString()}</td>
+          {!error && residents.map((resident) => (
+            <tr key={resident.id}>
+              <td>{resident.full_name || '—'}</td>
+              <td>{resident.current_status || '—'}</td>
+              <td>{new Date(resident.archived_at).toLocaleString('lt-LT')}</td>
             </tr>
           ))}
         </tbody>

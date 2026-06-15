@@ -79,15 +79,15 @@ export default function RegisterPage() {
     return data?.id || null;
   }
 
-  async function createMembership(invite: InviteRow, userId: string, normalizedEmail: string) {
+  async function createMembership(accessToken: string) {
     const response = await fetch("/api/invitations/approve", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
       body: JSON.stringify({
-        email: normalizedEmail,
-        organizationId: invite.organization_id,
-        role: invite.role || "employee",
-        userId,
+        inviteToken: token,
       }),
     });
 
@@ -120,13 +120,32 @@ export default function RegisterPage() {
         throw new Error(`Šis kvietimas skirtas el. paštui ${invite.email}.`);
       }
 
-      if (!password || password.length < 6) {
+      if (!password || password.length < 8) {
         throw new Error("Slaptažodis turi būti bent 6 simbolių.");
       }
 
-      let userId = await findExistingUserIdByEmail(normalizedEmail);
+      const {
+        data: { session: existingSession },
+      } = await supabase.auth.getSession();
+      let accessToken = existingSession?.access_token || "";
+      let sessionEmail = normalizeEmail(existingSession?.user.email || "");
 
-      if (!userId) {
+      if (accessToken && sessionEmail === normalizedEmail) {
+        const { error: passwordError } = await supabase.auth.updateUser({ password });
+        if (passwordError) throw passwordError;
+      } else {
+        const existingUserId = await findExistingUserIdByEmail(normalizedEmail);
+
+        if (existingUserId) {
+          const { data: signInData, error: signInError } =
+            await supabase.auth.signInWithPassword({
+              email: normalizedEmail,
+              password,
+            });
+          if (signInError) throw signInError;
+          accessToken = signInData.session?.access_token || "";
+          sessionEmail = normalizeEmail(signInData.user?.email || "");
+        } else {
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: normalizedEmail,
           password,
@@ -138,18 +157,25 @@ export default function RegisterPage() {
         });
 
         if (signUpError) throw signUpError;
-
-        userId = authData.user?.id || null;
+          accessToken = authData.session?.access_token || "";
+          sessionEmail = normalizeEmail(authData.user?.email || "");
+        }
       }
 
-      if (!userId) {
-        throw new Error("Nepavyko nustatyti naudotojo paskyros.");
+      if (!accessToken || sessionEmail !== normalizedEmail) {
+        throw new Error(
+          "Patvirtinkite el. paštą ir dar kartą atidarykite kvietimo nuorodą.",
+        );
       }
 
-      await createMembership(invite, userId, normalizedEmail);
+      await createMembership(accessToken);
 
-      setMessage("Paskyra aktyvuota. Gali prisijungti.");
-      router.replace("/login");
+      try {
+        window.localStorage.setItem("active_organization_id", invite.organization_id);
+      } catch {}
+
+      setMessage("Paskyra aktyvuota.");
+      router.replace(invite.role === "admin" ? "/dashboard" : "/employee-dashboard");
     } catch (error) {
       setMessage(getReadableError(error));
     } finally {
@@ -185,6 +211,7 @@ export default function RegisterPage() {
                 placeholder="vardas@pastas.lt"
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold outline-none transition focus:border-emerald-300 focus:bg-white"
                 required
+                minLength={8}
               />
             </label>
 

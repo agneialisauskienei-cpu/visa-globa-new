@@ -1957,12 +1957,10 @@ export default function ScheduleBlock({
     );
   };
 
-  const gridTemplateColumns = useMemo(() => {
-    if (scheduleView === "week")
-      return `190px repeat(${visibleScheduleDays.length}, 112px) 120px`;
-
-    return `175px repeat(${visibleScheduleDays.length}, 39px) 92px`;
-  }, [scheduleView, visibleScheduleDays.length]);
+  const gridTemplateColumns =
+    scheduleView === "week"
+      ? `190px repeat(${visibleScheduleDays.length}, 112px) 120px`
+      : `175px repeat(${visibleScheduleDays.length}, 39px) 92px`;
 
   const recordHistory = (label: string, changes: GridChange[]) => {
     const item = {
@@ -2281,7 +2279,7 @@ export default function ScheduleBlock({
     }));
   };
 
-  const useTemplate = (template: string) => {
+  const applyTemplate = (template: string) => {
     const parsed = parseShiftWithDefaultBreak(
       template,
       settings.defaultBreakMinutes,
@@ -2703,7 +2701,7 @@ export default function ScheduleBlock({
       })
       .join("");
 
-    let totals = {
+    const totals = {
       norm: 0,
       worked: 0,
       night: 0,
@@ -3221,7 +3219,7 @@ export default function ScheduleBlock({
                 type="button"
                 className="template-pill"
                 key={template}
-                onClick={() => useTemplate(template)}
+                onClick={() => applyTemplate(template)}
               >
                 {template}
                 {activeEmployee &&

@@ -148,6 +148,10 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function medicationScheduleKey(medication: Medication) {
+  return `${todayKey()}T${toTime(medication.scheduled_time)}:00`
+}
+
 function formatDate(value?: string | null) {
   if (!value) return "—"
   const d = new Date(value)
@@ -533,13 +537,13 @@ export default function MedicinePage() {
 
     setEmployees(
       memberRows.map((member) => {
-        const profile = profileMap.get(member.user_id) || {}
+        const profile = profileMap.get(member.user_id)
         return {
           user_id: member.user_id,
-          email: profile.email || null,
-          first_name: profile.first_name || null,
-          last_name: profile.last_name || null,
-          full_name: profile.full_name || null,
+          email: profile?.email || null,
+          first_name: profile?.first_name || null,
+          last_name: profile?.last_name || null,
+          full_name: profile?.full_name || null,
           role: member.role || member.legacy_role || null,
           position: member.position || null,
         }
@@ -697,7 +701,7 @@ export default function MedicinePage() {
       (log) =>
         log.medication_id === medicationId &&
         log.status === status &&
-        String(log.created_at || "").slice(0, 10) === todayKey()
+        String(log.scheduled_for || log.created_at || "").slice(0, 10) === todayKey()
     )
   }
 
@@ -738,7 +742,7 @@ export default function MedicinePage() {
 
   async function saveMedicationFromModal() {
     await createMedication()
-    if (medForm.medication_name.trim() && medForm.dose.trim() && medForm.prescription_source.trim() && medForm.inventory_item_id) {
+    if (medForm.medication_name.trim() && medForm.dose.trim() && medForm.prescription_source.trim() && (medForm.is_external || medForm.inventory_item_id)) {
       closeAddMedicationModal()
     }
   }
@@ -757,7 +761,7 @@ export default function MedicinePage() {
         return
       }
 
-      if (!medForm.inventory_item_id) {
+      if (!medForm.is_external && !medForm.inventory_item_id) {
         setMessage("Privalomas laukas: sandėlio prekė. Ji reikalinga automatiniam nurašymui.")
         return
       }
@@ -776,7 +780,7 @@ export default function MedicinePage() {
         prescription_source: medForm.prescription_source.trim(),
         prescribed_by: medForm.prescribed_by.trim() || null,
         prescription_date: medForm.prescription_date || null,
-        inventory_item_id: medForm.inventory_item_id || null,
+        inventory_item_id: medForm.is_external ? null : medForm.inventory_item_id || null,
         inventory_units_per_dose: Number(medForm.inventory_units_per_dose || 1),
         is_fractional: medForm.is_fractional,
         is_external: medForm.is_external,
@@ -923,11 +927,24 @@ export default function MedicinePage() {
 
       setSaving(true)
 
+      const scheduledFor = medicationScheduleKey(medication)
+      const existingPrepared = adminLogs.find(
+        (log) =>
+          log.medication_id === medication.id &&
+          log.status === "prepared" &&
+          log.scheduled_for === scheduledFor
+      )
+
+      if (existingPrepared) {
+        setMessage("Šis vaistas šiandien jau pažymėtas kaip paruoštas.")
+        return true
+      }
+
       const { error } = await supabase.from("medication_administration_logs").insert({
         organization_id: organizationId,
         resident_id: selected.id,
         medication_id: medication.id,
-        scheduled_for: `${todayKey()}T${toTime(medication.scheduled_time)}:00`,
+        scheduled_for: scheduledFor,
         status: "prepared",
         prepared_by: currentUserId,
         prepared_at: new Date().toISOString(),
@@ -1310,7 +1327,7 @@ selectedMedications.some((med) => {
           description: "Patikrink sandėlį ir sukurk papildymo užduotį.",
         }
       : null,
-  ].filter(Boolean)
+  ].filter((item): item is NonNullable<typeof item> => item !== null)
 
   return (
     <div style={styles.page}>

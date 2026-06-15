@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireSystemAdmin } from '@/lib/server/service-auth'
 
 type RestoreOrganizationBody = {
   organizationId?: string
@@ -30,7 +31,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as RestoreOrganizationBody
     const organizationId = body.organizationId?.trim()
-    const actorUserId = body.actorUserId?.trim() || null
+    const authUser = await requireSystemAdmin(request)
+    if (!authUser) return jsonError('Neturite teisių.', 403)
+    const actorUserId = authUser.id
 
     if (!organizationId) {
       return jsonError('Trūksta organizationId.')

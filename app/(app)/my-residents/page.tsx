@@ -500,7 +500,7 @@ export default function MyResidentsPage() {
         ) : null}
       </section>
 
-      <MobileBottomNav notificationsCount={notificationsCount} />
+      <MobileBottomNav />
 
       {selectedResident ? (
         <ResidentModal

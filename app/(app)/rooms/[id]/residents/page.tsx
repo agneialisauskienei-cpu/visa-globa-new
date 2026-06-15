@@ -819,7 +819,7 @@ export default function RoomsPage() {
         if (insertError) throw insertError
         setSuccess("Kambarys sukurtas.")
       } else {
-        const { error: updateError } = await supabase.from("rooms").update(payload).eq("id", roomForm.id)
+        const { error: updateError } = await supabase.from("rooms").update(payload).eq("id", roomForm.id).eq("organization_id", organizationId)
         if (updateError) throw updateError
         setSuccess("Kambarys išsaugotas.")
       }
@@ -843,7 +843,7 @@ export default function RoomsPage() {
     setSuccess(null)
 
     try {
-      const { error: deleteError } = await supabase.from("rooms").delete().eq("id", roomId)
+      const { error: deleteError } = await supabase.from("rooms").delete().eq("id", roomId).eq("organization_id", organizationId)
       if (deleteError) throw deleteError
 
       setSuccess("Kambarys ištrintas.")
@@ -885,6 +885,7 @@ export default function RoomsPage() {
             assignForm.mode === "arriving_soon" ? assignForm.reservedUntil || null : null,
         })
         .eq("id", assignForm.residentId)
+        .eq("organization_id", organizationId)
 
       if (residentError) throw residentError
 
@@ -899,6 +900,7 @@ export default function RoomsPage() {
             reserved_until: assignForm.reservedUntil || null,
           })
           .eq("id", assignForm.roomId)
+          .eq("organization_id", organizationId)
 
         if (roomError) throw roomError
       }
@@ -928,6 +930,7 @@ export default function RoomsPage() {
           room_reserved_until: null,
         })
         .eq("id", residentId)
+        .eq("organization_id", organizationId)
 
       if (residentError) throw residentError
 
@@ -955,6 +958,7 @@ export default function RoomsPage() {
           room_reserved_until: null,
         })
         .eq("id", residentId)
+        .eq("organization_id", organizationId)
 
       if (residentError) throw residentError
 
@@ -967,6 +971,7 @@ export default function RoomsPage() {
             reserved_until: null,
           })
           .eq("id", selectedRoom.id)
+          .eq("organization_id", organizationId)
 
         if (roomError) throw roomError
       }
@@ -992,6 +997,7 @@ export default function RoomsPage() {
         .from("rooms")
         .update({ room_status: status })
         .eq("id", selectedRoom.id)
+        .eq("organization_id", organizationId)
 
       if (statusError) throw statusError
 

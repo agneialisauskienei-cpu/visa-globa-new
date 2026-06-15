@@ -1,8 +1,9 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { canAccessResident, maskSensitiveResident } from './auth'
 import type { ResidentRow, StarterAuthContext } from './types'
 
 export async function listAssignedResidentIds(
-  supabase: any,
+  supabase: SupabaseClient,
   ctx: StarterAuthContext
 ): Promise<string[]> {
   const { data, error } = await supabase
@@ -15,7 +16,7 @@ export async function listAssignedResidentIds(
   return (data ?? []).map((row: { resident_id: string }) => row.resident_id)
 }
 
-export async function listResidents(supabase: any, ctx: StarterAuthContext) {
+export async function listResidents(supabase: SupabaseClient, ctx: StarterAuthContext) {
   const assignedResidentIds = await listAssignedResidentIds(supabase, ctx)
 
   const { data, error } = await supabase
@@ -32,7 +33,7 @@ export async function listResidents(supabase: any, ctx: StarterAuthContext) {
 }
 
 export async function getResidentById(
-  supabase: any,
+  supabase: SupabaseClient,
   ctx: StarterAuthContext,
   id: string
 ) {

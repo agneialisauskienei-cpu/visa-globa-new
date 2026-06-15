@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireSystemAdmin } from '@/lib/server/service-auth'
 
 type AssignAdminBody = {
   organizationId?: string
@@ -87,7 +88,7 @@ async function requireAdmin(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authUser = await requireAdmin(request)
+    const authUser = await requireSystemAdmin(request)
 
     if (!authUser) {
       return jsonError("Neturite teisių.", 403)

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase"
+import { getCurrentOrganizationId } from "@/lib/current-organization"
 
 export type MembershipRole =
   | "super_admin"
@@ -410,14 +411,45 @@ export async function getCurrentAccess(): Promise<CurrentAccess> {
   }
 
   // ORGANIZATION MEMBER
+  const activeOrganizationId = await getCurrentOrganizationId()
+
+  if (!activeOrganizationId) {
+    return {
+      role: null,
+      staffType: null,
+      position: null,
+      extraPermissions: [],
+      organizationId: null,
+      permissions: [],
+      substitutionPermissions: [],
+      substitutedForUserIds: [],
+      email,
+    }
+  }
+
   const { data: membership } = await supabase
     .from("organization_members")
     .select("role, organization_id, staff_type, position, extra_permissions")
     .eq("user_id", user.id)
-    .limit(1)
+    .eq("organization_id", activeOrganizationId)
+    .eq("is_active", true)
     .maybeSingle()
 
-  const role = (membership?.role as MembershipRole) ?? "employee"
+  if (!membership) {
+    return {
+      role: null,
+      staffType: null,
+      position: null,
+      extraPermissions: [],
+      organizationId: null,
+      permissions: [],
+      substitutionPermissions: [],
+      substitutedForUserIds: [],
+      email,
+    }
+  }
+
+  const role = (membership.role as MembershipRole) ?? "employee"
   const staffType = (membership?.staff_type as StaffType) ?? null
   const extraPermissions = normalizeExtraPermissions(
     (membership as any)?.extra_permissions

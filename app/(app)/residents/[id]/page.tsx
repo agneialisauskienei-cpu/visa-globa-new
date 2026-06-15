@@ -657,6 +657,7 @@ export default function ResidentDetailPage() {
   const [saving, setSaving] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [writeOffOpen, setWriteOffOpen] = useState(false);
   const [careModalOpen, setCareModalOpen] = useState(false);
   const [careTab, setCareTab] = useState<CareTab>("slauga");
@@ -784,6 +785,11 @@ export default function ResidentDetailPage() {
     setErrorText("");
 
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+
       const { data: residentData, error: residentError } = await supabase
         .from("residents")
         .select("*")
@@ -993,6 +999,7 @@ export default function ResidentDetailPage() {
         .from("residents")
         .update(payload)
         .eq("id", residentId)
+        .eq("organization_id", resident?.organization_id || "")
         .select("*")
         .single();
       if (error) throw error;
@@ -1067,7 +1074,11 @@ export default function ResidentDetailPage() {
     setSuccessText("");
 
     try {
-      const { error } = await supabase.from(table).delete().eq("id", id);
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .eq("id", id)
+        .eq("organization_id", resident?.organization_id || "");
       if (error) throw error;
 
       await writeAuditLog({
@@ -1099,7 +1110,8 @@ export default function ResidentDetailPage() {
       const { error } = await supabase
         .from("handover_logs")
         .update({ archived: true, updated_at: new Date().toISOString() })
-        .eq("id", entry.id);
+        .eq("id", entry.id)
+        .eq("organization_id", resident?.organization_id || "");
 
       if (error) throw error;
 

@@ -664,7 +664,7 @@ export default function TasksPage() {
           .order("resident_code")
 
         if (!residentsError) {
-          residents = (residentsData as ResidentRow[]) || []
+          residents = (residentsData as unknown as ResidentRow[]) || []
           break
         }
       }

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
-import type { StarterAuthContext } from './types'
+import type { StarterAuthContext } from '../starter/types'
 
 type StarterRole = 'owner' | 'admin' | 'manager' | 'employee'
 

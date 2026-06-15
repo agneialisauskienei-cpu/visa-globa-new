@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
-import { getCurrentMembership } from "@/lib/current-membership";
+import { getCurrentMembership, type CurrentMembership } from "@/lib/current-membership";
 import { getReadableError } from "@/lib/errors";
 import { formatDate } from "@/lib/format";
 import { ROUTES } from "@/lib/routes";
@@ -53,6 +53,12 @@ type ProfileRow = {
   role: string | null;
 };
 
+type MembershipState = CurrentMembership & {
+  documents_review_status?: string | null;
+  documents_verified?: boolean | null;
+  documents_admin_seen?: boolean | null;
+  documents_submitted_at?: string | null;
+};
 type NotificationCountRow = {
   id: string;
   is_read: boolean | null;
@@ -269,7 +275,7 @@ export default function MyProfilePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [membership, setMembership] = useState<any>(null);
+  const [membership, setMembership] = useState<MembershipState | null>(null);
   const [organizationName, setOrganizationName] = useState("");
   const [notificationsCount, setNotificationsCount] = useState(0);
   const [trainings, setTrainings] = useState<TrainingRow[]>([]);
@@ -346,7 +352,7 @@ export default function MyProfilePage() {
       });
 
       const currentMembership = await getCurrentMembership(user.id);
-      setMembership(currentMembership);
+      setMembership(currentMembership as MembershipState | null);
       setDocumentForm({
         professional_license_number:
           currentMembership?.professional_license_number || "",
@@ -372,7 +378,7 @@ export default function MyProfilePage() {
           .maybeSingle();
 
         if (!organizationError) {
-          setOrganizationName(String((organization as any)?.name || ""));
+          setOrganizationName(String((organization as { name?: string | null } | null)?.name || ""));
         }
 
         const [notificationsResult, trainingsResult, vacationsResult] =
@@ -418,7 +424,10 @@ export default function MyProfilePage() {
   }
 
   useEffect(() => {
-    void loadData();
+    const timeoutId = window.setTimeout(() => void loadData(), 0);
+    return () => window.clearTimeout(timeoutId);
+    // loadData intentionally runs once per router instance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const pendingVacations = useMemo(
@@ -669,7 +678,7 @@ export default function MyProfilePage() {
 
       if (error) throw error;
 
-      setMembership((prev: any) =>
+      setMembership((prev) =>
         prev
           ? {
               ...prev,

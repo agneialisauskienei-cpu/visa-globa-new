@@ -250,18 +250,15 @@ const FIELD_LABELS: Record<string, string> = {
   Kiekis: "Kiekis",
   Kam: "Kam",
   Kas: "Kas grąžino",
-  Darbuotojas: "Darbuotojas",
   "Minimalus kiekis": "Minimalus kiekis",
   requested_days: "Prašoma dienų",
   Size: "Dydis / matmuo",
   size: "Dydis / matmuo",
   subcategory: "Potipis",
   Subcategory: "Potipis",
-  category: "Kategorija",
   Category: "Kategorija",
   employee_user_id: "Darbuotojas",
   employeeUserId: "Darbuotojas",
-  employee_id: "Darbuotojas",
   "Employee User Id": "Darbuotojas",
   user_id: "Naudotojas",
   "User Id": "Naudotojas",
@@ -819,25 +816,28 @@ function diffObjects(before: Record<string, unknown>, after: Record<string, unkn
   return result
 }
 
-function normalizeAuditRow(row: any, sourceTable: "audit_log" | "audit_logs"): AuditLog {
-  const changedAt = row.changed_at || row.created_at || row.inserted_at || null
-  const tableName = row.table_name || row.entity_type || row.entity || "—"
-  const recordId = row.record_id || row.entity_id || row.record || null
-  const changedBy = row.changed_by || row.user_id || row.actor || row.created_by || null
-  const changes = row.changes || row.metadata || row.payload || {}
+function normalizeAuditRow(row: Record<string, unknown>, sourceTable: "audit_log" | "audit_logs"): AuditLog {
+  const changedAt = String(row.changed_at || row.created_at || row.inserted_at || "") || null
+  const tableName = String(row.table_name || row.entity_type || row.entity || "—")
+  const recordId = String(row.record_id || row.entity_id || row.record || "") || null
+  const changedBy = String(row.changed_by || row.user_id || row.actor || row.created_by || "") || null
+  const rawChanges = row.changes || row.metadata || row.payload
+  const changes = rawChanges && typeof rawChanges === "object" && !Array.isArray(rawChanges)
+    ? rawChanges as Record<string, unknown>
+    : {}
 
   return {
     ...row,
     id: String(row.id || `${sourceTable}-${tableName}-${recordId || "record"}-${changedAt || Math.random()}`),
-    organization_id: row.organization_id || null,
+    organization_id: String(row.organization_id || "") || null,
     table_name: tableName,
     record_id: recordId,
-    action: row.action || "update",
+    action: String(row.action || "update"),
     changed_by: changedBy,
-    actor: row.actor || row.user_id || changedBy,
-    user_id: row.user_id || changedBy,
+    actor: String(row.actor || row.user_id || changedBy || "") || null,
+    user_id: String(row.user_id || changedBy || "") || null,
     changed_at: changedAt,
-    created_at: row.created_at || changedAt,
+    created_at: String(row.created_at || changedAt || "") || null,
     changes,
   }
 }
@@ -856,7 +856,7 @@ async function loadAuditTable(tableName: "audit_log" | "audit_logs", orgId: stri
     return [] as AuditLog[]
   }
 
-  return ((data || []) as any[]).map((row) => normalizeAuditRow(row, tableName))
+  return ((data || []) as Record<string, unknown>[]).map((row) => normalizeAuditRow(row, tableName))
 }
 
 export default function AuditPage() {
@@ -1068,7 +1068,7 @@ export default function AuditPage() {
     }
   }
 
-  function cleanValue(value: unknown, key?: string) {
+  function cleanValue(value: unknown, key?: string): string {
     if (value === null || value === undefined || value === "") return "—"
     if (typeof value === "boolean") return value ? "Taip" : "Ne"
 
@@ -1376,7 +1376,6 @@ export default function AuditPage() {
   }, [filteredLogs])
 
   const highRiskCount = filteredLogs.filter((log) => riskLevel(log) === "danger").length
-  const warningCount = filteredLogs.filter((log) => riskLevel(log) === "warning").length
   const todayCount = filteredLogs.filter((log) => dayHeading(log.changed_at || log.created_at) === "Šiandien").length
 
   return (

@@ -32,9 +32,14 @@ export async function GET(req: NextRequest) {
     })
 
     return NextResponse.json(report)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error.message ?? "Nepavyko gauti ataskaitos." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Nepavyko gauti ataskaitos.",
+      },
       { status: 500 }
     )
   }

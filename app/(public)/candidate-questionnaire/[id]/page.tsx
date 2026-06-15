@@ -272,7 +272,9 @@ export default function CandidateQuestionnairePage() {
           status: "answered",
           submitted_at: submittedAt,
         })
-        .eq("candidate_id", questionnaire.candidate_id);
+        .eq("candidate_id", questionnaire.candidate_id)
+        .eq("organization_id", questionnaire.organization_id)
+        .is("submitted_at", null);
 
       if (questionnaireError) {
         setMessage({
@@ -286,7 +288,8 @@ export default function CandidateQuestionnairePage() {
       await supabase
         .from("candidates")
         .update({ status: "answered" })
-        .eq("id", questionnaire.candidate_id);
+        .eq("id", questionnaire.candidate_id)
+        .eq("organization_id", questionnaire.organization_id);
 
       setSubmitted(true);
       setQuestionnaire((prev) =>

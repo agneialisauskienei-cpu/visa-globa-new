@@ -74,6 +74,13 @@ export default function LoginPage() {
         return
       }
 
+      try {
+        window.localStorage.setItem(
+          'active_organization_id',
+          membership.organization_id,
+        )
+      } catch {}
+
       if (role === 'owner' || role === 'admin') {
         router.replace('/dashboard')
         router.refresh()

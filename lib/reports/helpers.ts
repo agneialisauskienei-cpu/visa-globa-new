@@ -9,18 +9,20 @@ export async function getActiveOrganizationId(
     .select("organization_id, user_id, role, is_active")
     .eq("user_id", userId)
     .eq("is_active", true)
+    .in("role", ["owner", "admin"])
     .limit(1)
-
-  console.log("HELPER USER ID", userId)
-  console.log("HELPER MEMBERSHIP DATA", data)
-  console.log("HELPER MEMBERSHIP ERROR", error)
 
   if (error) throw error
 
   return data?.[0]?.organization_id as string | undefined
 }
 
-export function fullName(profile: any) {
+export function fullName(profile?: {
+  full_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  email?: string | null
+} | null) {
   return (
     profile?.full_name ||
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||

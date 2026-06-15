@@ -25,6 +25,7 @@ import {
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getCurrentAccess } from "@/lib/app-access";
+import { getCurrentOrganizationId } from "@/lib/current-organization";
 
 type DashboardStats = {
   organizations: number;
@@ -750,6 +751,7 @@ async function safeCount(table: string, apply?: (query: any) => any): Promise<nu
 async function safeCountResult(table: string, apply?: (query: any) => any): Promise<{ ok: boolean; count: number }> {
   try {
     let query = supabase.from(table).select("*", { count: "exact", head: true });
+    query = await applyDashboardOrganizationScope(table, query);
     if (apply) query = apply(query);
     const { count, error } = await query;
     if (error) return { ok: false, count: 0 };
@@ -917,7 +919,9 @@ async function loadFteSummary(): Promise<{
 
 async function safeSelectRows(table: string, columns: string): Promise<any[]> {
   try {
-    const { data, error } = await supabase.from(table).select(columns);
+    let query = supabase.from(table).select(columns);
+    query = await applyDashboardOrganizationScope(table, query);
+    const { data, error } = await query;
     if (error || !data) return [];
     return data as any[];
   } catch {
@@ -976,6 +980,7 @@ async function safeSelectFilteredRows(
 ): Promise<any[]> {
   try {
     let query = supabase.from(table).select(columns);
+    query = await applyDashboardOrganizationScope(table, query);
     query = apply(query);
     const { data, error } = await query;
     if (error || !data) return [];
@@ -983,6 +988,53 @@ async function safeSelectFilteredRows(
   } catch {
     return [];
   }
+}
+
+const ORGANIZATION_SCOPED_DASHBOARD_TABLES = new Set([
+  "residents",
+  "organization_members",
+  "tasks",
+  "admin_tasks",
+  "employee_tasks",
+  "requests",
+  "vacation_requests",
+  "leave_requests",
+  "absence_requests",
+  "organization_invites",
+  "personnel_credentials",
+  "personnel_positions",
+  "personnel_trainings",
+  "employee_trainings",
+  "staff_trainings",
+  "training_records",
+  "training_requirements",
+  "role_training_requirements",
+  "position_training_requirements",
+  "employee_certificates",
+  "personnel_documents",
+  "employee_schedules",
+  "work_schedule_entries",
+  "resident_incidents",
+  "medication_administration_logs",
+  "activity_attendance",
+])
+
+async function applyDashboardOrganizationScope(
+  table: string,
+  query: any,
+) {
+  const organizationId = await getCurrentOrganizationId()
+  if (!organizationId) return query.eq("organization_id", "__missing__")
+
+  if (table === "organizations") {
+    return query.eq("id", organizationId)
+  }
+
+  if (ORGANIZATION_SCOPED_DASHBOARD_TABLES.has(table)) {
+    return query.eq("organization_id", organizationId)
+  }
+
+  return query
 }
 
 function makeFteRow({
@@ -1101,6 +1153,7 @@ async function countExpiringCertificates(): Promise<number> {
     const { data, error } = await supabase
       .from("organization_members")
       .select("occupational_health_valid_until, professional_license_valid_until")
+      .eq("organization_id", await getCurrentOrganizationId())
       .eq("is_active", true);
 
     if (!error && data) {
@@ -1155,7 +1208,14 @@ async function countTrainingProgress(): Promise<{ completed: number; required: n
 
 async function getOrganizationCapacity(): Promise<number | null> {
   try {
-    const { data, error } = await supabase.from("organizations").select("*").limit(1).maybeSingle();
+    const organizationId = await getCurrentOrganizationId();
+    if (!organizationId) return null;
+
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", organizationId)
+      .maybeSingle();
     if (error || !data) return null;
 
     const possibleKeys = [

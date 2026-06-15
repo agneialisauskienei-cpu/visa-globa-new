@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { getCurrentOrganizationId } from '@/lib/current-organization'
 
 type CategoryKey = 'diapers' | 'bedding' | 'cleaning' | 'medication' | 'uniforms' | 'other'
 type StockFilter = '' | 'ok' | 'low' | 'empty'
@@ -144,17 +145,35 @@ export default function InventoryCategoryPage() {
   }, [categoryKey])
 
   async function loadData() {
-    const { data: itemsData } = await supabase
+    const orgId = await getCurrentOrganizationId()
+
+    if (!orgId) {
+      setMessage('Nepavyko nustatyti aktyvios įstaigos.')
+      setItems([])
+      setHistory([])
+      return
+    }
+
+    const { data: itemsData, error: itemsError } = await supabase
       .from('inventory_items')
       .select('*')
+      .eq('organization_id', orgId)
       .eq('category', categoryKey)
       .order('created_at', { ascending: false })
 
-    const { data: historyData } = await supabase
+    const { data: historyData, error: historyError } = await supabase
       .from('inventory_issue_history_view')
       .select('*')
+      .eq('organization_id', orgId)
       .eq('category', categoryKey)
       .order('created_at', { ascending: false })
+
+    if (itemsError || historyError) {
+      setMessage(itemsError?.message || historyError?.message || 'Nepavyko įkelti kategorijos duomenų.')
+      setItems([])
+      setHistory([])
+      return
+    }
 
     setItems((itemsData || []) as InventoryItem[])
     setHistory((historyData || []) as InventoryHistory[])
@@ -252,16 +271,11 @@ export default function InventoryCategoryPage() {
       setMessage('')
 
       const actor = await getActorName()
-      const currentQuantity = Number(refillItem.quantity || 0)
-      const newQuantity = currentQuantity + quantity
-
-      const { error: updateError } = await supabase
-        .from('inventory_items')
-        .update({
-          quantity: newQuantity,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', refillItem.id)
+      const { error: updateError } = await supabase.rpc('adjust_inventory_item_quantity', {
+        p_item_id: refillItem.id,
+        p_organization_id: refillItem.organization_id,
+        p_delta: quantity,
+      })
 
       if (updateError) throw updateError
 

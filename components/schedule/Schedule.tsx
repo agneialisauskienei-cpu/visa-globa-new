@@ -335,7 +335,7 @@ export default function Schedule() {
           preventOverflow="horizontal"
           licenseKey="non-commercial-and-evaluation"
           afterChange={(changes, source) => {
-            if (!changes || source === "loadData" || source === "internal-normalize") return
+            if (!changes || source === "loadData") return
 
             setData((prev) => {
               const next = prev.map((row) => [...row])

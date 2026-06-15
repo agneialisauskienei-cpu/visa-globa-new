@@ -1,144 +1,103 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
+function adminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error("Trūksta Supabase serverio nustatymų.")
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
+
+function bearerToken(request: Request) {
+  const value = request.headers.get("authorization") || ""
+  return value.startsWith("Bearer ") ? value.slice(7).trim() : ""
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+    const inviteToken = String(body.inviteToken || "").trim()
+    const accessToken = bearerToken(request)
 
-    const email = String(body.email || "").trim().toLowerCase()
-    const organizationId = String(
-      body.organizationId || body.organization_id || "",
-    ).trim()
-    const role = String(body.role || "employee").trim()
-    const requestedUserId = String(body.userId || body.user_id || "").trim()
-
-    if (!email || !organizationId) {
-      return NextResponse.json(
-        { error: "Trūksta el. pašto arba organizacijos ID." },
-        { status: 400 },
-      )
+    if (!inviteToken || !accessToken) {
+      return NextResponse.json({ error: "Trūksta kvietimo arba sesijos." }, { status: 400 })
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const admin = adminClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await admin.auth.getUser(accessToken)
 
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { error: "Trūksta Supabase nustatymų." },
-        { status: 500 },
-      )
+    if (userError || !user?.email) {
+      return NextResponse.json({ error: "Prisijungimo sesija negalioja." }, { status: 401 })
     }
 
-    const admin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
-    let userId = requestedUserId
-
-    if (!userId) {
-      const { data: usersData, error: usersError } =
-        await admin.auth.admin.listUsers()
-
-      if (usersError) {
-        return NextResponse.json({ error: usersError.message }, { status: 400 })
-      }
-
-      userId =
-        usersData.users.find(
-          (item) => String(item.email || "").trim().toLowerCase() === email,
-        )?.id || ""
-    }
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Darbuotojas dar neprisijungė pagal kvietimą." },
-        { status: 400 },
-      )
-    }
-
-    const { data: candidate } = await admin
-      .from("candidates")
-      .select("first_name, last_name, phone, desired_role, experience")
-      .eq("organization_id", organizationId)
-      .ilike("email", email)
-      .order("created_at", { ascending: false })
-      .limit(1)
+    const email = user.email.trim().toLowerCase()
+    const { data: invite, error: inviteError } = await admin
+      .from("organization_invites")
+      .select("id, organization_id, email, role, status, expires_at")
+      .eq("token", inviteToken)
       .maybeSingle()
 
-    const firstName = String(candidate?.first_name || "").trim()
-    const lastName = String(candidate?.last_name || "").trim()
-    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
-
-    if (firstName || lastName || candidate?.phone) {
-      const { error: profileError } = await admin.from("profiles").upsert(
-        {
-          id: userId,
-          email,
-          first_name: firstName || null,
-          last_name: lastName || null,
-          full_name: fullName || null,
-          phone: candidate?.phone || null,
-        },
-        { onConflict: "id" },
-      )
-
-      if (profileError) {
-        return NextResponse.json(
-          { error: profileError.message },
-          { status: 400 },
-        )
-      }
+    if (inviteError) throw inviteError
+    if (!invite || invite.status !== "pending") {
+      return NextResponse.json({ error: "Kvietimas nerastas arba nebegalioja." }, { status: 400 })
+    }
+    if (String(invite.email || "").trim().toLowerCase() !== email) {
+      return NextResponse.json({ error: "Kvietimas skirtas kitam el. paštui." }, { status: 403 })
+    }
+    if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
+      await admin.from("organization_invites").update({ status: "expired" }).eq("id", invite.id)
+      return NextResponse.json({ error: "Kvietimo galiojimas pasibaigė." }, { status: 410 })
     }
 
-    const safeRole = role === "admin" ? "admin" : "employee"
-
+    const safeRole = invite.role === "admin" ? "admin" : "employee"
     const { error: memberError } = await admin
       .from("organization_members")
       .upsert(
         {
-          organization_id: organizationId,
-          user_id: userId,
+          organization_id: invite.organization_id,
+          user_id: user.id,
           role: safeRole,
           is_active: true,
-          position: candidate?.desired_role || null,
-          department: candidate?.experience || null,
         },
         { onConflict: "organization_id,user_id" },
       )
+    if (memberError) throw memberError
 
-    if (memberError) {
-      return NextResponse.json({ error: memberError.message }, { status: 400 })
-    }
+    await admin
+      .from("organization_join_requests")
+      .update({
+        status: "approved",
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: user.id,
+      })
+      .eq("organization_id", invite.organization_id)
+      .eq("user_id", user.id)
+      .eq("status", "pending")
 
-    const { error: inviteError } = await admin
+    const { error: acceptError } = await admin
       .from("organization_invites")
       .update({
         status: "accepted",
         accepted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("organization_id", organizationId)
-      .ilike("email", email)
-
-    if (inviteError) {
-      return NextResponse.json({ error: inviteError.message }, { status: 400 })
-    }
+      .eq("id", invite.id)
+      .eq("status", "pending")
+    if (acceptError) throw acceptError
 
     return NextResponse.json({
       ok: true,
-      userId,
+      organizationId: invite.organization_id,
+      role: safeRole,
     })
   } catch (error) {
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Nepavyko patvirtinti kvietimo.",
-      },
+      { error: error instanceof Error ? error.message : "Nepavyko aktyvuoti kvietimo." },
       { status: 500 },
     )
   }

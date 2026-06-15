@@ -247,6 +247,8 @@ export default function AdminJoinRequestsPage() {
           reviewed_by: adminUserId,
         })
         .eq('id', item.id)
+        .eq('organization_id', organizationId)
+        .eq('status', 'pending')
 
       if (requestError) throw requestError
 
@@ -260,7 +262,7 @@ export default function AdminJoinRequestsPage() {
   }
 
   async function rejectRequest(item: JoinRequestRow) {
-    if (!adminUserId) return
+    if (!adminUserId || !organizationId) return
 
     setSavingId(item.id)
     setMessage('')
@@ -274,6 +276,8 @@ export default function AdminJoinRequestsPage() {
           reviewed_by: adminUserId,
         })
         .eq('id', item.id)
+        .eq('organization_id', organizationId)
+        .eq('status', 'pending')
 
       if (error) throw error
 

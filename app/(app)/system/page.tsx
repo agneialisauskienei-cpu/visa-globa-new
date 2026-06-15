@@ -1,36 +1,39 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getCurrentAccess, hasPermission } from '@/lib/app-access'
 import { supabase } from '@/lib/supabase'
-import { getCurrentOrganizationId } from '@/lib/current-organization'
 
 export default function SystemPage() {
   const [userId, setUserId] = useState('')
   const [organizationId, setOrganizationId] = useState('')
   const [email, setEmail] = useState('')
+  const [allowed, setAllowed] = useState<boolean | null>(null)
 
   useEffect(() => {
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const [access, authResult] = await Promise.all([
+        getCurrentAccess(),
+        supabase.auth.getUser(),
+      ])
+      const user = authResult.data.user
 
-      if (!user) return
+      if (!user || !hasPermission(access, 'system.super')) {
+        setAllowed(false)
+        return
+      }
 
       setUserId(user.id)
       setEmail(user.email || '')
-
-      const activeOrganizationId = await getCurrentOrganizationId()
-
-      if (activeOrganizationId) {
-        setOrganizationId(activeOrganizationId)
-      } else {
-        setOrganizationId('')
-      }
+      setOrganizationId(access.organizationId || '')
+      setAllowed(true)
     }
 
     void load()
   }, [])
+
+  if (allowed === null) return <div style={styles.page}>Kraunama...</div>
+  if (!allowed) return <div style={styles.page}>Neturite teisės peržiūrėti sistemos informacijos.</div>
 
   return (
     <div style={styles.page}>

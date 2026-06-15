@@ -1,12 +1,12 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import Sidebar from '@/components/navigation/Sidebar'
+import AppSidebar from '@/components/layout/AppSidebar'
 
 export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div style={styles.shell}>
-      <Sidebar />
+      <AppSidebar />
 
       <main style={styles.main}>
         <div style={styles.content}>{children}</div>

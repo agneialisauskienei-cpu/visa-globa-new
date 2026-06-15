@@ -21,7 +21,7 @@ export default function UpdatePasswordPage() {
     setMessage('')
     setIsSuccess(false)
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       setMessage('Slaptažodis turi būti bent 6 simbolių.')
       setLoading(false)
       return
@@ -171,7 +171,7 @@ function PasswordField({
           onChange={(e) => onChange(e.target.value)}
           placeholder="••••••••"
           required
-          minLength={6}
+          minLength={8}
           className="block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 pr-14 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white"
         />
 

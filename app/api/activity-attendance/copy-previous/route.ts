@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStarterAuthContext } from '@/lib/server/auth-context'
 
+type AttendanceRow = {
+  resident_id: string
+  status: string
+  note: string | null
+}
+
+type ResidentIdRow = { id: string }
+
 export async function POST(request: NextRequest) {
   try {
     const { supabase, ctx } = await getStarterAuthContext(request)
@@ -57,7 +65,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const residentIds = previousAttendance.map((row) => row.resident_id)
+    const typedAttendance = (previousAttendance || []) as AttendanceRow[]
+    const residentIds = typedAttendance.map((row) => row.resident_id)
 
     const { data: validResidents, error: residentsError } = await supabase
       .from('residents')
@@ -67,9 +76,11 @@ export async function POST(request: NextRequest) {
 
     if (residentsError) throw residentsError
 
-    const validResidentSet = new Set((validResidents || []).map((row) => row.id))
+    const validResidentSet = new Set(
+      ((validResidents || []) as ResidentIdRow[]).map((row) => row.id)
+    )
 
-    const rows = previousAttendance
+    const rows = typedAttendance
       .filter((row) => validResidentSet.has(row.resident_id))
       .map((row) => ({
         session_id,

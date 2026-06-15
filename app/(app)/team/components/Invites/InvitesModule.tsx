@@ -306,10 +306,19 @@ export default function InvitesModule() {
   }
 
   async function sendInviteEmail(email: string, role: string, orgId: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error("Prisijungimo sesija nebegalioja.");
+    }
+
     const response = await fetch("/api/invitations/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({
         email,
@@ -381,10 +390,19 @@ export default function InvitesModule() {
         return;
       }
 
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Prisijungimo sesija nebegalioja.");
+      }
+
       const response = await fetch("/api/invitations/approve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           email: invite.email,

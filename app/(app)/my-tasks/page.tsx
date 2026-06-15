@@ -150,6 +150,8 @@ export default function MyTasksPage() {
 
   const [tasks, setTasks] = useState<TaskRow[]>([])
   const [residentsMap, setResidentsMap] = useState<Record<string, string>>({})
+  const [currentUserId, setCurrentUserId] = useState('')
+  const [organizationId, setOrganizationId] = useState('')
 
   const [statusFilter, setStatusFilter] = useState('')
   const [viewFilter, setViewFilter] = useState<'today' | 'late' | 'all'>('today')
@@ -179,6 +181,9 @@ export default function MyTasksPage() {
         setLoading(false)
         return
       }
+
+      setCurrentUserId(user.id)
+      setOrganizationId(organizationId)
 
       const { data: tasksData, error: tasksError } = await supabase
         .from('employee_tasks')
@@ -238,6 +243,11 @@ export default function MyTasksPage() {
   }
 
   async function updateTaskStatus(taskId: string, nextStatus: 'in_progress' | 'done') {
+    if (!currentUserId || !organizationId) {
+      setMessage('Nepavyko patvirtinti naudotojo arba įstaigos.')
+      return
+    }
+
     setSavingId(taskId)
     setMessage('')
 
@@ -256,6 +266,8 @@ export default function MyTasksPage() {
         .from('employee_tasks')
         .update(payload)
         .eq('id', taskId)
+        .eq('organization_id', organizationId)
+        .eq('assigned_user_id', currentUserId)
 
       if (error) throw error
 

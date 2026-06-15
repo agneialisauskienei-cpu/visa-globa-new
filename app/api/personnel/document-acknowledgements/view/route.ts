@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { requireAuthenticatedUser } from "@/lib/server/service-auth"
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -33,6 +34,10 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseAdmin()
+    const user = await requireAuthenticatedUser(request)
+    if (!user) {
+      return NextResponse.json({ error: "Neautorizuota." }, { status: 401 })
+    }
     const userAgent = request.headers.get("user-agent")
     const ip = getClientIp(request)
 
@@ -44,6 +49,7 @@ export async function POST(request: Request) {
         viewed_user_agent: userAgent,
       })
       .eq("id", acknowledgementId)
+      .eq("employee_id", user.id)
       .is("viewed_at", null)
 
     if (error) {

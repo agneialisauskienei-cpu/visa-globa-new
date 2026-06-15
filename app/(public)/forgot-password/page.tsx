@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
     const normalizedEmail = email.trim().toLowerCase()
 
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${getSiteUrl()}/update-password`,
+      redirectTo: `${getSiteUrl()}/auth/callback?next=/update-password`,
     })
 
     if (error) {

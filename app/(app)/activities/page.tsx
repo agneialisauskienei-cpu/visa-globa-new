@@ -264,29 +264,6 @@ function canUseResidentForActivities(resident: Resident) {
   return !BLOCKED_RESIDENT_STATUSES.has(normalized);
 }
 
-function blockedResidentReason(status?: string | null) {
-  const normalized = normalizeResidentStatus(status);
-
-  if (["netrukus_atvyks", "reserved", "rezervuotas", "arriving_soon"].includes(normalized)) {
-    return "dar neatvyko";
-  }
-
-  if (["mire", "mirė", "deceased"].includes(normalized)) {
-    return "miręs";
-  }
-
-  if (["isvykes", "išvykęs", "permanently_left", "left", "archived"].includes(normalized)) {
-    return "išvykęs visam laikui";
-  }
-
-  if (["neaktyvus", "inactive"].includes(normalized)) {
-    return "neaktyvus";
-  }
-
-  return "negalima žymėti veiklose";
-}
-
-
 function residentHasReadableName(resident: Resident) {
   return residentName(resident) !== "Gyventojas";
 }
@@ -956,7 +933,7 @@ export default function ActivitiesPage() {
 
       return matchesSearch && matchesRoom && matchesAttendance;
     });
-  }, [residents, residentQuery, roomFilter, attendanceFilter, attendance, activeSession?.id]);
+  }, [residents, residentQuery, roomFilter, attendanceFilter, attendance, activeSession]);
 
   const activeAttendance = activeSession ? attendance.filter((item) => item.session_id === activeSession.id) : [];
 

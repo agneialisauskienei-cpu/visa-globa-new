@@ -125,10 +125,10 @@ function priorityClasses(priority: Priority) {
   }
 }
 
-function priorityIcon(priority: Priority) {
-  if (priority === 'critical') return AlertTriangle
-  if (priority === 'action') return Bell
-  return Clock3
+function PriorityIcon({ priority }: { priority: Priority }) {
+  if (priority === 'critical') return <AlertTriangle className="h-5 w-5" />
+  if (priority === 'action') return <Bell className="h-5 w-5" />
+  return <Clock3 className="h-5 w-5" />
 }
 
 export default function NotificationsPage() {
@@ -138,6 +138,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [items, setItems] = useState<NotificationRow[]>([])
+  const [currentUserId, setCurrentUserId] = useState('')
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
   const [soundEnabled, setSoundEnabled] = useState(true)
 
@@ -220,6 +221,8 @@ export default function NotificationsPage() {
         return
       }
 
+      setCurrentUserId(user.id)
+
       const { data, error } = await supabase
         .from('notifications')
         .select('id, title, message, type, is_read, created_at')
@@ -238,6 +241,8 @@ export default function NotificationsPage() {
   }
 
   async function markAsRead(id: string) {
+    if (!currentUserId) return
+
     setMessage('')
 
     try {
@@ -245,6 +250,7 @@ export default function NotificationsPage() {
         .from('notifications')
         .update({ is_read: true })
         .eq('id', id)
+        .eq('user_id', currentUserId)
 
       if (error) throw error
 
@@ -257,7 +263,7 @@ export default function NotificationsPage() {
   async function markAllAsRead() {
     const ids = unreadItems.map((item) => item.id)
 
-    if (!ids.length) return
+    if (!ids.length || !currentUserId) return
 
     setMessage('')
 
@@ -266,6 +272,7 @@ export default function NotificationsPage() {
         .from('notifications')
         .update({ is_read: true })
         .in('id', ids)
+        .eq('user_id', currentUserId)
 
       if (error) throw error
 
@@ -520,7 +527,6 @@ function NotificationCard({
 }) {
   const priority = notificationPriority(item.type, item.title)
   const classes = priorityClasses(priority)
-  const Icon = priorityIcon(priority)
 
   return (
     <article
@@ -563,7 +569,7 @@ function NotificationCard({
           {item.is_read && priority !== 'critical' ? (
             <CheckCircle2 className="h-5 w-5" />
           ) : (
-            <Icon className="h-5 w-5" />
+            <PriorityIcon priority={priority} />
           )}
         </div>
       </div>

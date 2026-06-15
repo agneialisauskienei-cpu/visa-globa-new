@@ -19,10 +19,13 @@ type NavItem = {
   action?: () => Promise<void> | void
 }
 
-export default function MobileBottomNav() {
+export default function MobileBottomNav({
+  notificationsCount = 0,
+}: {
+  notificationsCount?: number
+}) {
   const pathname = usePathname()
   const router = useRouter()
-  const unreadCount = 0
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
@@ -43,7 +46,7 @@ export default function MobileBottomNav() {
     { href: ROUTES.employeeDashboard, label: 'Pagr.', icon: Home },
     { href: ROUTES.myResidents, label: 'Gyvent.', icon: Users },
     { href: ROUTES.mySchedule, label: 'Grafikas', icon: CalendarDays },
-    { href: ROUTES.notifications, label: 'Praneš.', icon: Bell, badge: unreadCount },
+    { href: ROUTES.notifications, label: 'Praneš.', icon: Bell, badge: notificationsCount },
     { href: ROUTES.myProfile, label: 'Profilis', icon: User },
     { href: '#logout', label: 'Išeiti', icon: LogOut, action: handleLogout },
   ]

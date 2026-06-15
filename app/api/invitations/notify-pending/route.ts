@@ -1,49 +1,48 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createServiceClient, requireAuthenticatedUser } from "@/lib/server/service-auth"
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-
     const email = String(body.email || "").trim().toLowerCase()
     const organizationId = String(
       body.organizationId || body.organization_id || "",
     ).trim()
 
     if (!email || !organizationId) {
-      return NextResponse.json(
-        { error: "Trūksta duomenų." },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: "Trūksta duomenų." }, { status: 400 })
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { error: "Trūksta serverio nustatymų." },
-        { status: 500 },
-      )
+    const user = await requireAuthenticatedUser(request)
+    if (!user || String(user.email || "").trim().toLowerCase() !== email) {
+      return NextResponse.json({ error: "Neturite teisių." }, { status: 403 })
     }
 
-    const admin = createClient(supabaseUrl, serviceRoleKey)
+    const admin = createServiceClient()
+    const { data: pendingRequest } = await admin
+      .from("organization_join_requests")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .maybeSingle()
 
-    const { data: admins } = await admin
+    if (!pendingRequest) {
+      return NextResponse.json({ error: "Laukiantis prašymas nerastas." }, { status: 404 })
+    }
+
+    const { data: admins, error } = await admin
       .from("organization_members")
-      .select("user_id, role")
+      .select("user_id")
       .eq("organization_id", organizationId)
       .in("role", ["owner", "admin"])
       .eq("is_active", true)
 
-    console.log("Notify admins:", admins)
-
-    console.log(
-      `Darbuotojas ${email} prisijungė ir laukia patvirtinimo.`,
-    )
+    if (error) throw error
 
     return NextResponse.json({
       ok: true,
+      notifiedAdmins: admins?.length || 0,
     })
   } catch (error) {
     return NextResponse.json(
@@ -51,7 +50,7 @@ export async function POST(request: Request) {
         error:
           error instanceof Error
             ? error.message
-            : "Nepavyko išsiųsti pranešimų.",
+            : "Nepavyko paruošti pranešimų.",
       },
       { status: 500 },
     )
