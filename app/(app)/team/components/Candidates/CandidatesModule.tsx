@@ -806,6 +806,7 @@ export default function CandidatesModule({
                     <label className="flex items-center gap-2 text-xs font-black text-[#486b5d]">
                       <input
                         type="checkbox"
+                        className="accent-[#486b5d]"
                         checked={question.required}
                         onChange={(event) =>
                           updateQuestion(question.id, {
@@ -818,6 +819,7 @@ export default function CandidatesModule({
                     <label className="flex items-center gap-2 text-xs font-black text-[#486b5d]">
                       <input
                         type="checkbox"
+                        className="accent-[#486b5d]"
                         checked={question.includeInContract}
                         onChange={(event) =>
                           updateQuestion(question.id, {
@@ -856,6 +858,7 @@ export default function CandidatesModule({
               <label className="flex items-center gap-2 text-sm font-bold text-[#486b5d]">
                 <input
                   type="checkbox"
+                  className="accent-[#486b5d]"
                   checked={newQuestionRequired}
                   onChange={(event) => setNewQuestionRequired(event.target.checked)}
                 />
@@ -864,6 +867,7 @@ export default function CandidatesModule({
               <label className="flex items-center gap-2 text-sm font-bold text-[#486b5d]">
                 <input
                   type="checkbox"
+                  className="accent-[#486b5d]"
                   checked={newQuestionContract}
                   onChange={(event) => setNewQuestionContract(event.target.checked)}
                 />
