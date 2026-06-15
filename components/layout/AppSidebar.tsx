@@ -254,6 +254,7 @@ export default function AppSidebar() {
               <Link
                 key={`${item.href}-${item.permission}`}
                 href={item.href}
+                className={active ? "vg-sidebar-link-active" : "vg-sidebar-link"}
                 style={active ? styles.linkActive : styles.link}
               >
                 <Icon size={17} />
@@ -364,7 +365,7 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    color: "#d1fae5",
+    color: "#ffffff",
     textDecoration: "none",
     fontSize: 13,
     fontWeight: 850,

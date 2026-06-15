@@ -171,8 +171,14 @@ h3 {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 10px;
-  background: #e7f2ed;
-  color: #047857;
+  border: 1px solid #486b5d;
+  background: #ffffff;
+  color: #486b5d;
+}
+
+.vg-sidebar-link:hover {
+  background: #ffffff;
+  color: #022c22 !important;
 }
 
 .vg-instruction-content h3 {

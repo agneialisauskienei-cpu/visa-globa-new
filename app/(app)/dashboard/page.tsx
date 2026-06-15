@@ -2158,7 +2158,7 @@ function HelpModal({ activeTab, onClose }: { activeTab: DashboardTab; onClose: (
             {help.steps.map(([number, title, desc]) => (
               <div key={number} className="rounded-xl border border-[#dbe6e0] bg-white p-4">
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e9f7ef] text-lg font-black text-[#047857]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#486b5d] bg-white text-lg font-black text-[#486b5d]">
                     {number}
                   </div>
                   <h3 className="text-xl font-black text-[#486b5d]">{title}</h3>
