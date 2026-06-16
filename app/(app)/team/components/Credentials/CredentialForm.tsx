@@ -421,27 +421,27 @@ export default function CredentialForm({
         </label>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-        <h4 className="text-sm font-black uppercase tracking-[0.14em] text-amber-800">
+      <div className="mt-5 rounded-2xl border border-[#c9d8d0] bg-white p-4">
+        <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#486b5d]">
           Privalomas patikrinimo faktas
         </h4>
 
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <label className="space-y-2">
             <span className="text-sm font-black text-slate-600">Patikrinimo būdas</span>
-            <select value={checkMethod} onChange={(event) => setCheckMethod(event.target.value)} className="h-12 w-full rounded-2xl border border-amber-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100">
+            <select value={checkMethod} onChange={(event) => setCheckMethod(event.target.value)} className="h-12 w-full rounded-2xl border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#e7f2ed]">
               {CHECK_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}
             </select>
           </label>
 
           <label className="space-y-2">
             <span className="text-sm font-black text-slate-600">Patikrinimo data</span>
-            <input type="date" value={checkedAt} onChange={(event) => setCheckedAt(event.target.value)} className="h-12 w-full rounded-2xl border border-amber-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100" />
+            <input type="date" value={checkedAt} onChange={(event) => setCheckedAt(event.target.value)} className="h-12 w-full rounded-2xl border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#e7f2ed]" />
           </label>
 
           <label className="space-y-2">
             <span className="text-sm font-black text-slate-600">Kas patikrino</span>
-            <input value={checkedByText} onChange={(event) => setCheckedByText(event.target.value)} placeholder="Vardas arba pareigos" className="h-12 w-full rounded-2xl border border-amber-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100" />
+            <input value={checkedByText} onChange={(event) => setCheckedByText(event.target.value)} placeholder="Vardas arba pareigos" className="h-12 w-full rounded-2xl border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#e7f2ed]" />
           </label>
         </div>
       </div>

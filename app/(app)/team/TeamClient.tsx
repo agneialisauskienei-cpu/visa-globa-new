@@ -4675,7 +4675,7 @@ function Card({
 }
 
 function StatCard({
-  icon,
+  icon: _icon,
   title,
   value,
   meta,
@@ -4689,40 +4689,25 @@ function StatCard({
   tone: "emerald" | "amber" | "blue" | "rose";
   onClick?: () => void;
 }) {
-  const toneClass = {
-    emerald: "bg-emerald-50 text-emerald-700",
-    amber: "bg-amber-50 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
-    rose: "bg-rose-50 text-rose-700",
-  }[tone];
-
   const textClass = {
-    emerald: "text-emerald-700",
-    amber: "text-amber-700",
-    blue: "text-blue-700",
-    rose: "text-rose-700",
+    emerald: "text-[#486b5d]",
+    amber: "text-[#be123c]",
+    blue: "text-[#486b5d]",
+    rose: "text-[#be123c]",
   }[tone];
 
   return (
     <button
       type="button"
+      data-content-card
+      data-stat-card
       onClick={onClick}
-      className="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-emerald-200 hover:shadow-md active:scale-[0.99]"
+      className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-2 hover:border-[#486b5d] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)] active:scale-[0.99]"
     >
-      <div className="flex items-center gap-4">
-        <div
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl ${toneClass}`}
-        >
-          {icon}
-        </div>
-
-        <div>
-          <p className="font-extrabold text-slate-500">{title}</p>
-          <p className="mt-1 text-4xl font-black">
-            {value}{" "}
-            <span className={`text-sm font-bold ${textClass}`}>{meta}</span>
-          </p>
-        </div>
+      <div>
+        <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">{title}</p>
+        <p className={`mt-1 text-2xl font-black ${textClass}`}>{value}</p>
+        <p className="mt-1 text-xs font-bold text-[#6a7e75]">{meta}</p>
       </div>
     </button>
   );

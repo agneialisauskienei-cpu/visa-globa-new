@@ -1045,8 +1045,8 @@ export default function DocumentsModule({
             </label>
           </div>
 
-          <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <h4 className="text-sm font-black uppercase tracking-[0.14em] text-amber-800">
+          <div className="mt-5 rounded-lg border border-[#c9d8d0] bg-white p-4">
+            <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#486b5d]">
               Privalomas patikrinimo faktas
             </h4>
 
@@ -1058,7 +1058,7 @@ export default function DocumentsModule({
                 <select
                   value={checkMethod}
                   onChange={(event) => setCheckMethod(event.target.value)}
-                  className="h-10 w-full rounded-lg border border-amber-200 bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                  className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#e7f2ed]"
                 >
                   {CHECK_METHODS.map((method) => (
                     <option key={method} value={method}>
@@ -1077,7 +1077,7 @@ export default function DocumentsModule({
                     type="date"
                     value={checkedAt}
                     onChange={(event) => setCheckedAt(event.target.value)}
-                    className="h-10 w-full rounded-lg border border-amber-200 bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                    className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#e7f2ed]"
                   />
                 </label>
 
@@ -1089,7 +1089,7 @@ export default function DocumentsModule({
                     value={checkedByText}
                     onChange={(event) => setCheckedByText(event.target.value)}
                     placeholder="Vardas arba pareigos"
-                    className="h-10 w-full rounded-lg border border-amber-200 bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                    className="h-10 w-full rounded-lg border border-[#c2d3ca] bg-white px-4 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d] focus:ring-2 focus:ring-[#e7f2ed]"
                   />
                 </label>
               </div>

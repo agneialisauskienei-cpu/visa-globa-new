@@ -1731,27 +1731,27 @@ function FtePlanningSection({
         </div>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-[#c9d8d0] bg-[#f7fcf9] p-5">
+      <div className="mt-5 rounded-2xl border border-[#c9d8d0] bg-white p-5">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
           Pamainų rizikos
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-blue-200 bg-white p-4">
+          <div className="rounded-xl border border-[#486b5d] bg-white p-4">
             <div className="font-black text-[#10251f]">
               {replacementNeededFte > 0
                 ? `Reikia pavaduoti ${formatFte(replacementNeededFte)} et.`
                 : "Pavadavimo poreikio nerasta"}
             </div>
-            <div className="mt-1 text-sm font-bold text-[#486b5d]/70">
+            <div className="mt-1 text-sm font-bold text-[#10251f]">
               Skaičiuojama pagal patvirtintus neatvykimus.
             </div>
           </div>
 
-          <div className="rounded-xl border border-blue-200 bg-white p-4">
+          <div className="rounded-xl border border-[#486b5d] bg-white p-4">
             <div className="font-black text-[#10251f]">
               Tikrinti minimalų pamainos komplektą
             </div>
-            <div className="mt-1 text-sm font-bold text-[#486b5d]/70">
+            <div className="mt-1 text-sm font-bold text-[#10251f]">
               Kitas etapas — lyginti grafiką su minimaliu pareigybių poreikiu.
             </div>
           </div>
@@ -2048,12 +2048,12 @@ function RiskRow({
 }
 
 function TimelineItem({
-  color,
+  color: _color,
   title,
   meta,
   warm,
   danger,
-  blue,
+  blue: _blue,
 }: {
   color: string;
   title: string;
@@ -2062,12 +2062,14 @@ function TimelineItem({
   danger?: boolean;
   blue?: boolean;
 }) {
+  const state = warm || danger ? "warning" : "ok";
+
   return (
-    <div className="flex gap-3 rounded-xl border border-[#486b5d] bg-white p-3 transition hover:border-2 hover:border-[#486b5d]">
-      <span className="mt-1 h-3 w-3 shrink-0 rounded-full bg-[#486b5d]" />
+    <div className="vg-list-card" data-state={state}>
+      <span className="vg-list-mark" aria-hidden="true" />
       <div>
-        <b>{title}</b>
-        <p className="text-sm font-bold text-[#10251f]">
+        <b className="vg-list-title">{title}</b>
+        <p className="vg-list-meta">
           {meta}
         </p>
       </div>

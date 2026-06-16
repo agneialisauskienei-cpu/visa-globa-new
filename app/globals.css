@@ -222,7 +222,7 @@ a[class*="bg-[#486b5d]"]:hover {
   border-color: #c9d8d0 !important;
 }
 
-.vg-app-shell button:not([data-content-card]):not([aria-label]):not([class*="rounded-full"]):not([class*="aspect-square"]):not(:has(> svg:only-child)):not(:has(> p)) {
+.vg-app-shell button:not([data-content-card]):not([data-card-button]):not([data-stat-card]):not([aria-label]):not([class*="rounded-full"]):not([class*="aspect-square"]):not(:has(> svg:only-child)):not(:has(> p)) {
   min-height: 42px !important;
   height: 42px !important;
   padding: 0 16px !important;
@@ -464,6 +464,90 @@ a[class*="bg-[#486b5d]"]:hover {
 .vg-empty { padding: 34px 16px; text-align: center; color: #60766c; font-weight: 800; }
 .vg-section-title { font-size: 18px; font-weight: 900; color: var(--vg-text); }
 .vg-panel-title { font-size: 14px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--vg-muted); }
+
+.vg-list-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  border: 1px solid var(--vg-primary);
+  border-radius: 16px;
+  background: #fff;
+  padding: 16px 18px;
+  color: var(--vg-text);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.vg-list-card:hover {
+  border-width: 2px;
+  box-shadow: 0 4px 12px rgba(16, 37, 31, .08);
+}
+
+.vg-list-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--vg-primary);
+  border-radius: 999px;
+  color: var(--vg-primary);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.vg-list-mark::before {
+  content: "!";
+}
+
+.vg-list-card[data-state="ok"] .vg-list-mark::before {
+  content: "";
+}
+
+.vg-list-card[data-state="ok"] .vg-list-mark {
+  width: 18px;
+  height: 18px;
+  margin-top: 7px;
+  border: 0;
+  background: var(--vg-primary);
+}
+
+.vg-list-title {
+  color: var(--vg-text);
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.vg-list-meta {
+  margin-top: 4px;
+  color: var(--vg-text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.vg-form-panel {
+  border: 1px solid var(--vg-border-soft);
+  border-radius: 16px;
+  background: #fff;
+  padding: 18px;
+}
+
+.vg-form-panel-title {
+  margin: 0 0 14px;
+  color: var(--vg-primary);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.vg-app-shell input,
+.vg-app-shell select,
+.vg-app-shell textarea {
+  max-width: 100%;
+}
 
 /* Shared data-table appearance. Schedule and spreadsheet matrices keep their
    functional cell colors and are intentionally excluded. */
