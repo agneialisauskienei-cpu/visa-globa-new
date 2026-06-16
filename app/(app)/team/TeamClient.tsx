@@ -56,6 +56,7 @@ type Employee = {
   member_id?: string | null;
   user_id: string;
   email?: string | null;
+  avatar_url?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   full_name?: string | null;
@@ -454,18 +455,25 @@ function normalizePlanText(value?: string | null) {
     .replace(/\p{Diacritic}/gu, "");
 }
 
+function canonicalPositionGroupFromText(value?: string | null) {
+  const text = normalizePlanText(value);
+
+  if (!text) return "";
+  if (/bendrosios praktikos slaug|slaug|nurse|medic|sveikat/.test(text)) return "slauga";
+  if (/social|soc|glob|uzimt/.test(text)) return "socialine sritis";
+  if (/virtuv|maitin|vir|kitchen|cook/.test(text)) return "maitinimas";
+  if (/uk|techn|sandel|valy|maintenance/.test(text)) return "ukis";
+  if (/admin|direkt|vadov|owner/.test(text)) return "administracija";
+
+  return text;
+}
+
 function positionGroupKey(employee: Employee) {
-  const text = normalizePlanText(
+  const text = canonicalPositionGroupFromText(
     [employee.staff_type, employee.department, employee.position, employee.role]
       .filter(Boolean)
       .join(" "),
   );
-
-  if (/slaug|nurse|medic|sveikat/.test(text)) return "slauga";
-  if (/social|soc|glob|uzimt/.test(text)) return "socialine sritis";
-  if (/virtuv|maitin|vir|kitchen|cook/.test(text)) return "maitinimas";
-  if (/uk|ūk|techn|sandel|valy|maintenance/.test(text)) return "ukis";
-  if (/admin|direkt|vadov|owner/.test(text)) return "administracija";
 
   return text || "kita";
 }
@@ -483,6 +491,17 @@ function groupLabel(key: string) {
   return labels[key] || key;
 }
 
+function staffTypeFromPositionText(value?: string | null) {
+  const group = canonicalPositionGroupFromText(value);
+
+  if (group === "slauga") return "nurse";
+  if (group === "socialine sritis") return "social_worker";
+  if (group === "ukis") return "maintenance";
+  if (group === "administracija") return "administration";
+
+  return "";
+}
+
 function employeeMatchesPosition(
   employee: Employee,
   position: PersonnelPosition,
@@ -492,17 +511,30 @@ function employeeMatchesPosition(
   const employeePosition = normalizePlanText(employee.position);
   const employeeDepartment = normalizePlanText(employee.department);
   const employeeStaffType = normalizePlanText(employee.staff_type);
+  const positionGroup = canonicalPositionGroupFromText(
+    [position.department, position.position_name].filter(Boolean).join(" "),
+  );
+  const employeeGroup = canonicalPositionGroupFromText(
+    [employee.staff_type, employee.department, employee.position, employee.role]
+      .filter(Boolean)
+      .join(" "),
+  );
 
   if (!positionName) return false;
 
   const positionMatches =
-    employeePosition === positionName || employeeStaffType === positionName;
+    employeePosition === positionName ||
+    employeeStaffType === positionName ||
+    (!!positionGroup && positionGroup === employeeGroup);
 
   if (!positionMatches) return false;
 
   if (!department) return true;
 
-  return employeeDepartment === department;
+  return (
+    employeeDepartment === department ||
+    canonicalPositionGroupFromText(department) === employeeGroup
+  );
 }
 
 function coefficientText(position: PersonnelPosition) {
@@ -1011,6 +1043,7 @@ function employeeRole(employee?: Employee | null) {
     employee?.position,
     employee?.staff_type,
     employee?.department,
+    employee?.role,
   ];
 
   for (const value of candidates) {
@@ -1018,7 +1051,19 @@ function employeeRole(employee?: Employee | null) {
 
     if (!raw) continue;
 
-    return raw;
+    const staffLabel = staffTypeLabel(raw);
+    if (staffLabel !== "Nepasirinkta") return staffLabel;
+
+    const roleLabels: Record<string, string> = {
+      administration: "Administracija",
+      admin: "Administratorius",
+      employee: "Darbuotojas",
+      hr: "Personalas",
+      manager: "Vadovas",
+      owner: "Savininkas",
+    };
+
+    return roleLabels[raw.toLowerCase()] || raw;
   }
 
   return "Pareigos dar nepriskirtos";
@@ -1421,8 +1466,8 @@ export default function TeamPage() {
 
       if (userIds.length > 0) {
         const profileSelect = canViewSensitive
-          ? "id, email, first_name, last_name, full_name, phone"
-          : "id, email, first_name, last_name, full_name";
+          ? "id, email, first_name, last_name, full_name, phone, avatar_url"
+          : "id, email, first_name, last_name, full_name, avatar_url";
 
         let profilesResult = await supabase
           .from("profiles")
@@ -1432,7 +1477,7 @@ export default function TeamPage() {
         if (profilesResult.error) {
           profilesResult = await supabase
             .from("profiles")
-            .select("id, email, first_name, last_name, full_name")
+            .select("id, email, first_name, last_name, full_name, avatar_url")
             .in("id", userIds);
         }
 
@@ -1449,6 +1494,7 @@ export default function TeamPage() {
                 first_name: profile.first_name || null,
                 last_name: profile.last_name || null,
                 full_name: profile.full_name || null,
+                avatar_url: profile.avatar_url || null,
                 phone: canViewSensitive ? employeeProfilePhone(profile) : null,
               },
             ]),
@@ -1518,6 +1564,7 @@ export default function TeamPage() {
             first_name: firstName || employee.first_name || null,
             last_name: lastName || employee.last_name || null,
             full_name: fullName,
+            avatar_url: profile.avatar_url || employee.avatar_url || null,
             phone: canViewSensitive
               ? String(
                   profile.phone || employee.phone || candidate?.phone || "",
@@ -1694,6 +1741,22 @@ export default function TeamPage() {
 
     if (!firstName && !lastName && !fullName) {
       setMessage("Įvesk darbuotojo vardą, pavardę arba bent rodomą vardą.");
+      return;
+    }
+
+    if (
+      activePositionOptions.length &&
+      !findPlannedPosition(editForm.position, editForm.department)
+    ) {
+      setMessage("Pasirinkite pareigybę iš patvirtinto etatų plano.");
+      return;
+    }
+
+    if (
+      editEmployeePositionWarning &&
+      typeof window !== "undefined" &&
+      !window.confirm(`${editEmployeePositionWarning} Ar vis tiek saugoti?`)
+    ) {
       return;
     }
 
@@ -1884,6 +1947,24 @@ export default function TeamPage() {
     if (newEmployeeForm.send_invite && !email) {
       setCreateModalMessage("Norint siųsti kvietimą, būtinas el. paštas.");
       setMessage("Norint siųsti kvietimą, būtinas el. paštas.");
+      return;
+    }
+
+    if (
+      activePositionOptions.length &&
+      !findPlannedPosition(newEmployeeForm.position, newEmployeeForm.department)
+    ) {
+      const warning = "Pasirinkite pareigybę iš patvirtinto etatų plano.";
+      setCreateModalMessage(warning);
+      setMessage(warning);
+      return;
+    }
+
+    if (
+      newEmployeePositionWarning &&
+      typeof window !== "undefined" &&
+      !window.confirm(`${newEmployeePositionWarning} Ar vis tiek tęsti?`)
+    ) {
       return;
     }
 
@@ -2168,6 +2249,131 @@ export default function TeamPage() {
       hasPlan: plannedRows.length > 0,
     };
   }, [ftePlanRows, vacations, employees]);
+
+  const activePositionOptions = useMemo(
+    () =>
+      personnelPositions
+        .filter((position) => position.active !== false)
+        .filter((position) => position.position_name?.trim())
+        .sort((a, b) =>
+          `${a.department || ""} ${a.position_name || ""}`.localeCompare(
+            `${b.department || ""} ${b.position_name || ""}`,
+            "lt",
+          ),
+        ),
+    [personnelPositions],
+  );
+
+  function findPlannedPosition(
+    positionName?: string | null,
+    department?: string | null,
+  ) {
+    const normalizedName = normalizePlanText(positionName);
+    const normalizedDepartment = normalizePlanText(department);
+
+    if (!normalizedName) return null;
+
+    return (
+      activePositionOptions.find((position) => {
+        const sameName =
+          normalizePlanText(position.position_name) === normalizedName;
+        if (!sameName) return false;
+
+        if (!normalizedDepartment) return true;
+
+        return (
+          normalizePlanText(position.department) === normalizedDepartment ||
+          canonicalPositionGroupFromText(position.department) ===
+            canonicalPositionGroupFromText(department)
+        );
+      }) || null
+    );
+  }
+
+  function positionOptionLabel(position: PersonnelPosition) {
+    const planned = Number(position.planned_fte || 0);
+    const suffix = planned > 0 ? ` · ${formatFte(planned)} et.` : "";
+    return `${position.position_name}${position.department ? ` · ${position.department}` : ""}${suffix}`;
+  }
+
+  function applyPlannedPositionToNewEmployee(positionId: string) {
+    const position = activePositionOptions.find((item) => item.id === positionId);
+
+    if (!position) return;
+
+    const inferredStaffType = staffTypeFromPositionText(
+      [position.department, position.position_name].filter(Boolean).join(" "),
+    );
+
+    setNewEmployeeForm((prev) => ({
+      ...prev,
+      position: position.position_name || "",
+      department: position.department || "",
+      staff_type: inferredStaffType || prev.staff_type,
+    }));
+  }
+
+  function applyPlannedPositionToEditForm(positionId: string) {
+    const position = activePositionOptions.find((item) => item.id === positionId);
+
+    if (!position || !editForm) return;
+
+    const inferredStaffType = staffTypeFromPositionText(
+      [position.department, position.position_name].filter(Boolean).join(" "),
+    );
+
+    setEditForm({
+      ...editForm,
+      position: position.position_name || "",
+      department: position.department || "",
+      staff_type: inferredStaffType || editForm.staff_type,
+    });
+  }
+
+  function positionCapacityWarning(
+    positionName?: string | null,
+    department?: string | null,
+    excludedEmployeeId?: string | null,
+    rate = 1,
+  ) {
+    const position = findPlannedPosition(positionName, department);
+
+    if (!position) {
+      return activePositionOptions.length
+        ? "Pasirinkite pareigybę iš patvirtinto etatų plano."
+        : null;
+    }
+
+    const planned = Number(position.planned_fte || 0);
+    if (planned <= 0) return null;
+
+    const filled = activeEmployees
+      .filter((employee) => employee.user_id !== excludedEmployeeId)
+      .filter((employee) => employeeMatchesPosition(employee, position))
+      .reduce((sum, employee) => sum + Number(employee.employment_rate || 1), 0);
+    const projected = roundFte(filled + Number(rate || 1));
+
+    if (projected <= planned) return null;
+
+    return `Įspėjimas: pasirinkus šią pareigybę būtų ${formatFte(projected)} / ${formatFte(planned)} et.`;
+  }
+
+  const newEmployeePositionWarning = positionCapacityWarning(
+    newEmployeeForm.position,
+    newEmployeeForm.department,
+    null,
+    1,
+  );
+
+  const editEmployeePositionWarning =
+    editingEmployee && editForm
+      ? positionCapacityWarning(
+          editForm.position,
+          editForm.department,
+          editingEmployee.user_id,
+          editForm.employment_rate || 1,
+        )
+      : null;
 
   const scheduleDays = useMemo(() => {
     const first = new Date(
@@ -3431,21 +3637,21 @@ export default function TeamPage() {
                   setCreateModalMessage("");
                   setShowCreateModal(true);
                 }}
-                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
+                className={teamPrimaryButtonClass}
               >
                 + Darbuotojas
               </button>
               <button
                 type="button"
                 onClick={() => changeTab("vacations")}
-                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
+                className={teamPrimaryButtonClass}
               >
                 + Prašymas
               </button>
               <button
                 type="button"
                 onClick={() => void loadAll()}
-                className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9]"
+                className={teamOutlineButtonClass}
               >
                 Atnaujinti
               </button>
@@ -3464,7 +3670,7 @@ export default function TeamPage() {
               <button
                 type="button"
                 onClick={() => changeTab("schedule")}
-                className="ml-auto rounded-lg bg-[#fff1f2] px-3 py-2 text-xs font-black text-[#be123c] ring-1 ring-[#fecdd3]"
+                className="ml-auto inline-flex min-h-10 items-center justify-center rounded-xl border-2 border-[#486b5d] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:border-[#0b3f33]"
               >
                 Grafiko įspėjimai: {scheduleComplianceRows.length}
               </button>
@@ -3609,7 +3815,7 @@ export default function TeamPage() {
                 <button
                   type="button"
                   onClick={closeEmployeeEditor}
-                  className="ml-auto rounded-xl border border-[#dbe6e0] bg-white px-4 py-2 text-[#486b5d]"
+                  className={`ml-auto ${teamOutlineButtonClass}`}
                 >
                   Uždaryti kortelę
                 </button>
@@ -3620,7 +3826,7 @@ export default function TeamPage() {
                     setCreateModalMessage("");
                     setShowCreateModal(true);
                   }}
-                  className="ml-auto rounded-xl border border-[#dbe6e0] bg-white px-4 py-2 text-[#486b5d]"
+                  className={`ml-auto ${teamPrimaryButtonClass}`}
                 >
                   + Darbuotojas
                 </button>
@@ -3648,8 +3854,8 @@ export default function TeamPage() {
                     onClick={() => setEmployeeFilter(key as EmployeeFilterKey)}
                     className={
                       employeeFilter === key
-                        ? "rounded-lg bg-emerald-700 px-4 py-2 text-xs font-black text-white"
-                        : "rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]"
+                        ? teamFilterActiveButtonClass
+                        : teamFilterButtonClass
                     }
                   >
                     {label}
@@ -3658,7 +3864,7 @@ export default function TeamPage() {
                 <button
                   type="button"
                   onClick={() => void loadAll()}
-                  className="ml-auto rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-xs font-black text-[#486b5d]"
+                  className={`ml-auto ${teamOutlineButtonClass}`}
                 >
                   Atnaujinti
                 </button>
@@ -3702,7 +3908,16 @@ export default function TeamPage() {
                             )}
                             saving={saving}
                             canViewSensitiveFields={canViewSensitiveFields}
+                            positionOptions={activePositionOptions}
+                            selectedPositionId={
+                              findPlannedPosition(
+                                editForm.position,
+                                editForm.department,
+                              )?.id || ""
+                            }
+                            positionWarning={editEmployeePositionWarning}
                             onChange={setEditForm}
+                            onSelectPosition={applyPlannedPositionToEditForm}
                             onTabChange={setEmployeeEditorTab}
                             onTogglePermission={toggleExtraPermission}
                             onSave={() => void saveEmployee()}
@@ -3921,17 +4136,44 @@ export default function TeamPage() {
                 ) : null}
 
                 <Field label="Konkrečios pareigos">
-                  <input
-                    value={newEmployeeForm.position}
-                    onChange={(event) =>
-                      setNewEmployeeForm((prev) => ({
-                        ...prev,
-                        position: event.target.value,
-                      }))
-                    }
-                    className="input"
-                    placeholder="Pvz., vyr. slaugytoja"
-                  />
+                  {activePositionOptions.length ? (
+                    <select
+                      value={
+                        findPlannedPosition(
+                          newEmployeeForm.position,
+                          newEmployeeForm.department,
+                        )?.id || ""
+                      }
+                      onChange={(event) =>
+                        applyPlannedPositionToNewEmployee(event.target.value)
+                      }
+                      className="input"
+                    >
+                      <option value="">Pasirinkite iš etatų plano</option>
+                      {activePositionOptions.map((position) => (
+                        <option key={position.id} value={position.id}>
+                          {positionOptionLabel(position)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={newEmployeeForm.position}
+                      onChange={(event) =>
+                        setNewEmployeeForm((prev) => ({
+                          ...prev,
+                          position: event.target.value,
+                        }))
+                      }
+                      className="input"
+                      placeholder="Pvz., vyr. slaugytoja"
+                    />
+                  )}
+                  {newEmployeePositionWarning ? (
+                    <p className="mt-2 text-sm font-black text-[#486b5d]">
+                      {newEmployeePositionWarning}
+                    </p>
+                  ) : null}
                 </Field>
 
                 <Field label="Skyrius">
@@ -4713,6 +4955,23 @@ function StatCard({
   );
 }
 
+function employeeAvatarUrl(employee?: Employee | null) {
+  const url = String(employee?.avatar_url || "").trim();
+  return url || null;
+}
+
+const teamPrimaryButtonClass =
+  "inline-flex min-h-10 items-center justify-center rounded-xl border-2 border-[#486b5d] bg-[#486b5d] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:border-[#0b3f33] hover:bg-[#0b3f33] disabled:cursor-not-allowed disabled:opacity-60";
+
+const teamOutlineButtonClass =
+  "inline-flex min-h-10 items-center justify-center rounded-xl border-2 border-[#486b5d] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:border-[#0b3f33] hover:text-[#0b3f33]";
+
+const teamFilterButtonClass =
+  "rounded-xl border-2 border-[#486b5d] bg-white px-4 py-2 text-xs font-black text-[#486b5d] transition hover:border-[#0b3f33] hover:text-[#0b3f33]";
+
+const teamFilterActiveButtonClass =
+  "rounded-xl border-[3px] border-[#0b3f33] bg-[#486b5d] px-4 py-2 text-xs font-black text-white shadow-sm";
+
 function ActionCard({
   title,
   desc,
@@ -4814,7 +5073,11 @@ function EmployeeTabbedEditor({
   credentials,
   saving,
   canViewSensitiveFields,
+  positionOptions,
+  selectedPositionId,
+  positionWarning,
   onChange,
+  onSelectPosition,
   onTabChange,
   onTogglePermission,
   onSave,
@@ -4826,7 +5089,11 @@ function EmployeeTabbedEditor({
   credentials: Credential[];
   saving: boolean;
   canViewSensitiveFields: boolean;
+  positionOptions: PersonnelPosition[];
+  selectedPositionId: string;
+  positionWarning: string | null;
   onChange: (form: EditForm) => void;
+  onSelectPosition: (positionId: string) => void;
   onTabChange: (tab: EmployeeEditorTab) => void;
   onTogglePermission: (permission: string) => void;
   onSave: () => void;
@@ -4944,14 +5211,34 @@ function EmployeeTabbedEditor({
         {activeTab === "contract" ? (
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <Field label="Konkrečios pareigos">
-              <input
-                value={editForm.position}
-                onChange={(event) =>
-                  onChange({ ...editForm, position: event.target.value })
-                }
-                className="input"
-                placeholder="Pvz., vyr. slaugytoja"
-              />
+              {positionOptions.length ? (
+                <select
+                  value={selectedPositionId}
+                  onChange={(event) => onSelectPosition(event.target.value)}
+                  className="input"
+                >
+                  <option value="">Pasirinkite iš etatų plano</option>
+                  {positionOptions.map((position) => (
+                    <option key={position.id} value={position.id}>
+                      {`${position.position_name}${position.department ? ` · ${position.department}` : ""}${Number(position.planned_fte || 0) > 0 ? ` · ${formatFte(Number(position.planned_fte || 0))} et.` : ""}`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={editForm.position}
+                  onChange={(event) =>
+                    onChange({ ...editForm, position: event.target.value })
+                  }
+                  className="input"
+                  placeholder="Pvz., vyr. slaugytoja"
+                />
+              )}
+              {positionWarning ? (
+                <p className="mt-2 text-sm font-black text-[#486b5d]">
+                  {positionWarning}
+                </p>
+              ) : null}
             </Field>
             <Field label="Skyrius">
               <input
@@ -5323,6 +5610,7 @@ function EmployeeRowCard({
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const avatarUrl = employeeAvatarUrl(employee);
 
   return (
     <button
@@ -5330,12 +5618,20 @@ function EmployeeRowCard({
       onClick={onEdit}
       className={`grid w-full gap-3 rounded-2xl border p-4 text-left shadow-sm transition md:grid-cols-[56px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center ${
         selected
-          ? "border-emerald-300 bg-emerald-50"
-          : "border-[#dbe6e0] bg-[#ffffff] hover:border-emerald-200 hover:bg-emerald-50/40"
+          ? "border-2 border-[#486b5d] bg-white"
+          : "border border-[#dbe6e0] bg-white hover:border-2 hover:border-[#486b5d]"
       }`}
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-black text-emerald-700 shadow-sm">
-        {initials || "DR"}
+      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white text-lg font-black text-[#008065] shadow-sm ring-1 ring-[#dbe6e0]">
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={`${employeeName(employee)} nuotrauka`}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          initials || "DR"
+        )}
       </div>
 
       <div>
@@ -5368,8 +5664,8 @@ function EmployeeRowCard({
       <span
         className={
           selected
-            ? "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-black text-white"
-            : "rounded-lg border border-[#dbe6e0] bg-white px-4 py-2 text-sm font-black text-[#486b5d]"
+            ? teamPrimaryButtonClass
+            : teamPrimaryButtonClass
         }
       >
         Redaguoti

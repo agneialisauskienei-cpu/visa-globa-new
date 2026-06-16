@@ -585,6 +585,7 @@ function requestDocumentHtml(
   approver: Employee | undefined,
   substitute: Employee | undefined,
   typeLabel: string,
+  requestSeries: string,
 ) {
   const safe = (value: unknown) =>
     String(value ?? "")
@@ -593,8 +594,8 @@ function requestDocumentHtml(
       .replaceAll(">", "&gt;");
 
   const createdDate = String(request.created_at || request.start_date).slice(0, 10);
-  const requestNumber = request.id ? request.id.slice(0, 8).toUpperCase() : "";
-  const approverPosition = employeePositionText(approver) || "Įstaigos direktorius";
+  const requestNumber = `${requestSeries ? `${requestSeries}-` : ""}${request.id ? request.id.slice(0, 8).toUpperCase() : ""}`;
+  const approverPosition = employeePositionText(approver) || "Direktorius";
   const approverName = employeeDisplayName(approver) || "Vadovas nenurodytas";
   const employeePosition = employeePositionText(employee) || "Pareigos nenurodytos";
   const employeeName = employeeDisplayName(employee);
@@ -604,22 +605,25 @@ function requestDocumentHtml(
   const title = requestTitleFor(typeLabel);
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-  @page{size:A4;margin:20mm 22mm} body{font-family:"Times New Roman",serif;color:#000;margin:0;line-height:1.25;font-size:12pt}
-  .legal-note{width:47%;margin-left:auto;margin-bottom:30px;font-size:11pt;line-height:1.18}
-  .form-name{text-align:center;font-weight:700;margin:0 0 44px;font-size:12pt}
-  .line-block{width:55%;margin-left:auto;margin-bottom:22px}
-  .line{border-bottom:1px solid #000;height:22px;margin-bottom:10px;text-align:center;font-weight:700}
-  .line small{display:block;margin-top:2px;font-weight:400;font-size:8pt}
-  .left-line{width:32%;border-bottom:1px solid #000;height:22px;margin:46px 0 26px}
-  h1{text-align:center;font-size:14pt;margin:0 0 16px;text-transform:uppercase}
-  .meta{text-align:center;margin-bottom:22px}.meta span{display:inline-block;min-width:130px;border-bottom:1px solid #000}
-  .recipient{width:48%;margin-left:auto;margin-bottom:26px}.recipient div{margin-bottom:3px;text-align:left}
+  @page{size:A4;margin:20mm 22mm}
+  html,body{background:#fff}
+  body{font-family:"Times New Roman",serif;color:#000;margin:0;line-height:1.2;font-size:12pt}
+  .legal-note{width:47%;margin-left:auto;margin-bottom:30px;font-size:11pt;line-height:1.18;text-align:left}
+  .form-name{text-align:center;font-weight:700;margin:0 0 48px;font-size:12pt}
+  .applicant{width:55%;margin:0 auto 54px;text-align:center}
+  .applicant .line{border-bottom:1px solid #000;min-height:24px;margin-bottom:12px;text-align:center;font-weight:700}
+  .applicant .caption{display:block;margin-top:1px;font-weight:400;font-size:8pt}
+  .recipient{width:42%;margin:0 0 58px;text-align:left;font-size:13pt}
+  h1{text-align:center;font-size:16pt;line-height:1.1;margin:0 0 22px;text-transform:uppercase}
+  .meta{text-align:center;margin-bottom:48px;font-size:13pt}.meta span{display:inline-block;min-width:135px;border-bottom:1px solid #000}
+  .addressed{text-align:center;margin-bottom:34px;font-size:12pt}.addressed div{margin-bottom:4px}
   table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10.5pt}
   th,td{border:1px solid #000;padding:8px;vertical-align:top}th{font-weight:700;text-align:center}
   .mark{font-size:16pt;font-weight:700;text-align:center;width:34px}.label{font-weight:700;width:31%}
   .signature{margin-top:44px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center}
   .signature div{border-top:1px solid #000;padding-top:3px;font-size:9pt}
   .note{margin-top:28px;font-size:9pt}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style></head><body>
   <div class="legal-note">
     2022 m. vasario 17 d. įsakymu Nr. V-78<br>
@@ -627,15 +631,14 @@ function requestDocumentHtml(
     2024 m. kovo 25 d. įsakymo Nr. V-98 redakcija)
   </div>
   <div class="form-name">(Prašymo suteikti atostogas ar poilsio laiką forma)</div>
-  <div class="line-block">
-    <div class="line">${safe(approverPosition)}<small>(pareigos)</small></div>
-    <div class="line">${safe(approverName)}<small>(vardas, pavardė)</small></div>
-    <div class="line">${safe(employeePosition)}<small>(darbuotojo pareigos)</small></div>
+  <div class="applicant">
+    <div class="line">${safe(employeePosition)}<span class="caption">(pareigos)</span></div>
+    <div class="line">${safe(employeeName)}<span class="caption">(vardas, pavardė)</span></div>
   </div>
-  <div class="left-line"></div>
+  <div class="recipient">${safe(approverPosition)}<br>${safe(approverName)}</div>
   <h1>${safe(title)}</h1>
   <div class="meta"><span>${safe(createdDate)}</span> Nr. <span>${safe(requestNumber)}</span></div>
-  <div class="recipient">
+  <div class="addressed">
     <div>${safe(approverPosition)}</div>
     <div><strong>${safe(approverName)}</strong></div>
   </div>
@@ -660,8 +663,9 @@ function downloadWord(
   approver: Employee | undefined,
   substitute: Employee | undefined,
   typeLabel: string,
+  requestSeries: string,
 ) {
-  const blob = new Blob([requestDocumentHtml(request, employee, approver, substitute, typeLabel)], {
+  const blob = new Blob([requestDocumentHtml(request, employee, approver, substitute, typeLabel, requestSeries)], {
     type: "application/msword;charset=utf-8",
   });
   const url = URL.createObjectURL(blob);
@@ -678,12 +682,13 @@ function printPdf(
   approver: Employee | undefined,
   substitute: Employee | undefined,
   typeLabel: string,
+  requestSeries: string,
 ) {
   const popup = window.open("", "_blank");
   if (!popup) return;
   popup.opener = null;
   popup.document.write(
-    requestDocumentHtml(request, employee, approver, substitute, typeLabel),
+    requestDocumentHtml(request, employee, approver, substitute, typeLabel, requestSeries),
   );
   popup.document.close();
   popup.focus();
@@ -1874,6 +1879,7 @@ export default function VacationRequests({
                             ? employeeMap.get(request.substitute_user_id)
                             : undefined,
                           type.label,
+                          "",
                         )
                       }
                       title="Atsisiųsti Word dokumentą"
@@ -1892,6 +1898,7 @@ export default function VacationRequests({
                             ? employeeMap.get(request.substitute_user_id)
                             : undefined,
                           type.label,
+                          "",
                         )
                       }
                       title="Atidaryti spausdinimą arba išsaugoti PDF"

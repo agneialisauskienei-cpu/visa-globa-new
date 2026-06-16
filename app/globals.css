@@ -207,6 +207,12 @@ a[class*="bg-[#486b5d]"]:hover {
    their semantic colors; content cards stay white and actions share one size. */
 .vg-app-shell article[class*="rounded"][class*="border"]:not([class*="rounded-full"]),
 .vg-app-shell section[class*="rounded"][class*="border"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="bg-emerald-50"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="bg-green-50"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="bg-blue-50"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="bg-amber-50"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="bg-rose-50"]:not([class*="rounded-full"]),
+.vg-app-shell div[class*="rounded"][class*="bg-red-50"]:not([class*="rounded-full"]),
 .vg-app-shell div[class*="rounded"][class*="border"][class*="bg-emerald-"]:not([class*="rounded-full"]),
 .vg-app-shell div[class*="rounded"][class*="border"][class*="bg-green-"]:not([class*="rounded-full"]),
 .vg-app-shell div[class*="rounded"][class*="border"][class*="bg-red-"]:not([class*="rounded-full"]),
@@ -222,6 +228,27 @@ a[class*="bg-[#486b5d]"]:hover {
   border-color: #c9d8d0 !important;
 }
 
+.vg-app-shell div[class*="border-emerald-"],
+.vg-app-shell div[class*="border-green-"],
+.vg-app-shell div[class*="border-blue-"],
+.vg-app-shell div[class*="border-amber-"],
+.vg-app-shell div[class*="border-rose-"],
+.vg-app-shell div[class*="border-red-"],
+.vg-app-shell article[class*="border-emerald-"],
+.vg-app-shell article[class*="border-green-"],
+.vg-app-shell article[class*="border-blue-"],
+.vg-app-shell article[class*="border-amber-"],
+.vg-app-shell article[class*="border-rose-"],
+.vg-app-shell article[class*="border-red-"],
+.vg-app-shell section[class*="border-emerald-"],
+.vg-app-shell section[class*="border-green-"],
+.vg-app-shell section[class*="border-blue-"],
+.vg-app-shell section[class*="border-amber-"],
+.vg-app-shell section[class*="border-rose-"],
+.vg-app-shell section[class*="border-red-"] {
+  border-color: #c9d8d0 !important;
+}
+
 .vg-app-shell button:not([data-content-card]):not([data-card-button]):not([data-stat-card]):not([aria-label]):not([class*="rounded-full"]):not([class*="aspect-square"]):not(:has(> svg:only-child)):not(:has(> p)) {
   min-height: 42px !important;
   height: 42px !important;
@@ -231,12 +258,25 @@ a[class*="bg-[#486b5d]"]:hover {
   line-height: 1.2 !important;
 }
 
+.vg-app-shell a[class*="rounded"]:not([class*="rounded-full"]):not([aria-label]) {
+  min-height: 42px !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+
 .vg-app-shell button[class*="bg-slate-900"]:not([aria-label]):not(:has(> svg:only-child)),
 .vg-app-shell button[class*="bg-slate-950"]:not([aria-label]):not(:has(> svg:only-child)),
 .vg-app-shell button[class*="bg-emerald-700"]:not([aria-label]):not(:has(> svg:only-child)),
 .vg-app-shell button[class*="bg-emerald-800"]:not([aria-label]):not(:has(> svg:only-child)),
-.vg-app-shell button[class*="bg-emerald-900"]:not([aria-label]):not(:has(> svg:only-child)) {
+.vg-app-shell button[class*="bg-emerald-900"]:not([aria-label]):not(:has(> svg:only-child)),
+.vg-app-shell a[class*="bg-slate-900"]:not([aria-label]),
+.vg-app-shell a[class*="bg-slate-950"]:not([aria-label]),
+.vg-app-shell a[class*="bg-emerald-700"]:not([aria-label]),
+.vg-app-shell a[class*="bg-emerald-800"]:not([aria-label]),
+.vg-app-shell a[class*="bg-emerald-900"]:not([aria-label]) {
   background-color: #486b5d !important;
+  border-color: #486b5d !important;
   color: #ffffff !important;
 }
 
@@ -244,8 +284,56 @@ a[class*="bg-[#486b5d]"]:hover {
 .vg-app-shell button[class*="bg-slate-950"]:not([aria-label]):not(:has(> svg:only-child)):hover,
 .vg-app-shell button[class*="bg-emerald-700"]:not([aria-label]):not(:has(> svg:only-child)):hover,
 .vg-app-shell button[class*="bg-emerald-800"]:not([aria-label]):not(:has(> svg:only-child)):hover,
-.vg-app-shell button[class*="bg-emerald-900"]:not([aria-label]):not(:has(> svg:only-child)):hover {
+.vg-app-shell button[class*="bg-emerald-900"]:not([aria-label]):not(:has(> svg:only-child)):hover,
+.vg-app-shell a[class*="bg-slate-900"]:not([aria-label]):hover,
+.vg-app-shell a[class*="bg-slate-950"]:not([aria-label]):hover,
+.vg-app-shell a[class*="bg-emerald-700"]:not([aria-label]):hover,
+.vg-app-shell a[class*="bg-emerald-800"]:not([aria-label]):hover,
+.vg-app-shell a[class*="bg-emerald-900"]:not([aria-label]):hover {
   background-color: #39594c !important;
+  border-color: #39594c !important;
+}
+
+.vg-app-shell button[class*="ring-1"][class*="ring-[#c9d8d0]"],
+.vg-app-shell a[class*="ring-1"][class*="ring-[#c9d8d0]"],
+.vg-app-shell button[class*="border-2"][class*="border-[#486b5d]"],
+.vg-app-shell a[class*="border-2"][class*="border-[#486b5d]"] {
+  border-width: 2px !important;
+  border-color: #486b5d !important;
+  box-shadow: none !important;
+}
+
+.vg-app-shell [class*="rounded-full"][class*="bg-emerald-"],
+.vg-app-shell [class*="rounded-full"][class*="bg-green-"],
+.vg-app-shell [class*="rounded-full"][class*="bg-blue-"],
+.vg-app-shell [class*="rounded-full"][class*="bg-amber-"],
+.vg-app-shell [class*="rounded-full"][class*="bg-rose-"],
+.vg-app-shell [class*="rounded-full"][class*="bg-red-"] {
+  background: #ffffff !important;
+  border: 1px solid #dbe6e0 !important;
+  box-shadow: none !important;
+}
+
+.vg-app-shell [class*="rounded-full"][class*="text-emerald-"],
+.vg-app-shell [class*="rounded-full"][class*="text-green-"],
+.vg-app-shell [class*="rounded-full"][class*="text-blue-"],
+.vg-app-shell [class*="rounded-full"][class*="text-amber-"],
+.vg-app-shell [class*="rounded-full"][class*="text-rose-"],
+.vg-app-shell [class*="rounded-full"][class*="text-red-"] {
+  font-weight: 900 !important;
+}
+
+.vg-app-shell h1 { font-size: clamp(2rem, 2.6vw, 3.15rem); line-height: 1.08; }
+.vg-app-shell h2 { font-size: clamp(1.65rem, 2.05vw, 2.45rem); line-height: 1.12; }
+.vg-app-shell h3 { font-size: clamp(1.3rem, 1.55vw, 1.8rem); line-height: 1.18; }
+.vg-app-shell p,
+.vg-app-shell li,
+.vg-app-shell td,
+.vg-app-shell label,
+.vg-app-shell input,
+.vg-app-shell select,
+.vg-app-shell textarea {
+  font-size: 14px;
 }
 
 .vg-instruction-content h3 {

@@ -326,8 +326,14 @@ export default function MyProfilePage() {
 
     try {
       const {
-        data: { user },
+        data: { session },
+      } = await supabase.auth.getSession();
+      const sessionUser = session?.user ?? null;
+
+      const {
+        data: { user: fetchedUser },
       } = await supabase.auth.getUser();
+      const user = sessionUser ?? fetchedUser ?? null;
 
       if (!user) {
         router.replace(ROUTES.login);
@@ -361,14 +367,6 @@ export default function MyProfilePage() {
         occupational_health_valid_until:
           currentMembership?.occupational_health_valid_until || "",
       });
-
-      if (
-        currentMembership?.role === "owner" ||
-        currentMembership?.role === "admin"
-      ) {
-        router.replace(ROUTES.adminDashboard);
-        return;
-      }
 
       if (currentMembership?.organization_id) {
         const { data: organization, error: organizationError } = await supabase

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CheckCircle2, Copy, ExternalLink, Link2, Mail, Plus, Trash2, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Copy, Download, ExternalLink, FileText, Link2, Mail, Plus, Send, Trash2, UserPlus, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getChangedFields, logAudit } from "@/lib/audit";
 
@@ -23,6 +23,15 @@ type CandidateQuestion = {
   required: boolean;
   includeInContract: boolean;
   category: "contract" | "work" | "availability" | "qualification" | "other";
+};
+
+type CandidateQuestionnaire = {
+  candidate_id: string | null;
+  status: string | null;
+  questions?: CandidateQuestion[] | null;
+  answers?: Record<string, string> | null;
+  submitted_at?: string | null;
+  sent_to?: string | null;
 };
 
 type CandidatesModuleProps = {
@@ -181,6 +190,340 @@ function buildShortEmailBody(candidateName: string, questionnaireLink: string) {
   ].join("\n");
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return "Nenurodyta";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("lt-LT", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function questionnaireAnswerRows(questionnaire?: CandidateQuestionnaire | null) {
+  const questions = Array.isArray(questionnaire?.questions)
+    ? questionnaire?.questions || []
+    : [];
+  const answers = questionnaire?.answers || {};
+
+  return questions.map((question) => ({
+    id: question.id,
+    label: question.label,
+    required: question.required,
+    answer: String(answers[question.id] || "").trim() || "Neatsakyta",
+  }));
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function questionnaireAnswerValue(
+  questionnaire: CandidateQuestionnaire | null | undefined,
+  key: string,
+) {
+  const raw = questionnaire?.answers?.[key];
+  if (typeof raw !== "string") return "";
+  return raw.trim();
+}
+
+function buildQuestionnaireDocumentHtml(
+  candidate: Candidate,
+  questionnaire?: CandidateQuestionnaire | null,
+) {
+  const fullName = `${candidate.first_name || ""} ${candidate.last_name || ""}`.trim() || "Kandidatas";
+  const contactLine = [candidate.email || "", candidate.phone || ""].filter(Boolean).join(" | ") || "Kontaktai nenurodyti";
+  const desiredPosition =
+    questionnaireAnswerValue(questionnaire, "desired_position") ||
+    candidate.desired_role ||
+    "Nenurodyta";
+  const startDate =
+    questionnaireAnswerValue(questionnaire, "start_date") || "Nenurodyta";
+  const employmentType =
+    questionnaireAnswerValue(questionnaire, "employment_type") ||
+    "Nenurodyta";
+  const salaryFrequency =
+    questionnaireAnswerValue(questionnaire, "salary_payment_frequency") ||
+    "Nenurodyta";
+  const npd = questionnaireAnswerValue(questionnaire, "npd") || "Nenurodyta";
+  const workSchedule =
+    questionnaireAnswerValue(questionnaire, "work_schedule") || "Nenurodyta";
+  const probation =
+    questionnaireAnswerValue(questionnaire, "probation") || "Nenurodyta";
+  const documents =
+    questionnaireAnswerValue(questionnaire, "documents") || "Nenurodyta";
+  const bankDetails =
+    questionnaireAnswerValue(questionnaire, "bank_details_delivery") ||
+    "Nenurodyta";
+  const additionalConditions =
+    questionnaireAnswerValue(questionnaire, "additional_conditions") ||
+    "Nenurodyta";
+  const submittedAt = formatDateTime(questionnaire?.submitted_at);
+  const submittedDate =
+    questionnaire?.submitted_at && !Number.isNaN(new Date(questionnaire.submitted_at).getTime())
+      ? new Intl.DateTimeFormat("lt-LT", { year: "numeric", month: "2-digit", day: "2-digit" }).format(
+          new Date(questionnaire.submitted_at),
+        )
+      : "______________";
+
+  const extraRows = questionnaireAnswerRows(questionnaire).filter(
+    (row) =>
+      ![
+        "start_date",
+        "desired_position",
+        "employment_type",
+        "salary_payment_frequency",
+        "npd",
+        "work_schedule",
+        "probation",
+        "documents",
+        "bank_details_delivery",
+        "additional_conditions",
+      ].includes(row.id),
+  );
+
+  return `<!DOCTYPE html>
+<html lang="lt">
+  <head>
+    <meta charset="utf-8" />
+    <title>Priemimo prasymas</title>
+    <style>
+      @page { size: A4; margin: 24mm 18mm 20mm 24mm; }
+      body {
+        margin: 0;
+        color: #111111;
+        font-family: "Times New Roman", Times, serif;
+        font-size: 12pt;
+        line-height: 1.35;
+      }
+      .page { width: 100%; }
+      .approval {
+        margin-left: auto;
+        width: 280px;
+        text-align: left;
+      }
+      .center { text-align: center; }
+      .spacer-lg { height: 24px; }
+      .spacer-md { height: 14px; }
+      .line {
+        margin: 0 auto;
+        width: 56%;
+        border-bottom: 1px solid #111111;
+        height: 18px;
+      }
+      .line-wide {
+        margin: 0 auto;
+        width: 70%;
+        border-bottom: 1px solid #111111;
+        height: 18px;
+      }
+      .hint {
+        font-size: 9pt;
+        text-align: center;
+      }
+      .request-title {
+        margin: 24px 0 12px;
+        font-size: 16pt;
+        font-weight: 700;
+        text-align: center;
+      }
+      .request-meta {
+        display: flex;
+        justify-content: center;
+        gap: 28px;
+        margin-bottom: 14px;
+      }
+      .request-meta span {
+        display: inline-block;
+        min-width: 180px;
+        border-bottom: 1px solid #111111;
+        text-align: center;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 18px;
+      }
+      th, td {
+        border: 1px solid #111111;
+        padding: 8px 10px;
+        vertical-align: top;
+      }
+      th {
+        font-weight: 700;
+        text-align: left;
+      }
+      .label {
+        width: 34%;
+        font-weight: 700;
+      }
+      .footnote {
+        margin-top: 16px;
+        font-size: 10pt;
+      }
+      .signature-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        margin-top: 28px;
+      }
+      .signature {
+        flex: 1;
+        text-align: center;
+      }
+      .signature .rule {
+        border-bottom: 1px solid #111111;
+        height: 18px;
+        margin-bottom: 4px;
+      }
+      .muted {
+        color: #444444;
+        font-size: 10pt;
+      }
+      ul {
+        margin: 8px 0 0 18px;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="approval">
+        <div>PATVIRTINTA</div>
+        <div>Nacionalinio bendrųjų funkcijų centro</div>
+        <div>direktoriaus</div>
+        <div>2022 m. vasario 17 d. įsakymu Nr. V-78</div>
+        <div>(2024 m. kovo 25 d. įsakymo Nr. V-98 redakcija)</div>
+      </div>
+
+      <div class="spacer-lg"></div>
+      <div class="center"><strong>(Prašymo priimti į darbą forma)</strong></div>
+
+      <div class="spacer-lg"></div>
+      <div class="line-wide"></div>
+      <div class="hint">${escapeHtml(fullName)}</div>
+      <div class="line-wide"></div>
+      <div class="hint">${escapeHtml(contactLine)}</div>
+
+      <div class="spacer-md"></div>
+      <div style="width: 240px; border-bottom: 1px solid #111111;"></div>
+
+      <div class="request-title">PRAŠYMAS PRIIMTI Į DARBĄ</div>
+      <div class="request-meta">
+        <span>${escapeHtml(submittedDate)}</span>
+        <span>Nr. __________</span>
+      </div>
+
+      <table>
+        <tr>
+          <td class="label">Pareiškėjas</td>
+          <td>${escapeHtml(fullName)}</td>
+        </tr>
+        <tr>
+          <td class="label">Kontaktai</td>
+          <td>${escapeHtml(contactLine)}</td>
+        </tr>
+        <tr>
+          <td class="label">Pageidaujama darbo pradžios data</td>
+          <td>${escapeHtml(startDate)}</td>
+        </tr>
+        <tr>
+          <td class="label">Pareigos, į kurias prašoma priimti</td>
+          <td>${escapeHtml(desiredPosition)}</td>
+        </tr>
+        <tr>
+          <td class="label">Darbo sutarties rūšis ir darbo krūvis</td>
+          <td>${escapeHtml(employmentType)}</td>
+        </tr>
+        <tr>
+          <td class="label">Darbo užmokesčio išmokėjimo būdas</td>
+          <td>${escapeHtml(salaryFrequency)}</td>
+        </tr>
+        <tr>
+          <td class="label">NPD taikymas</td>
+          <td>${escapeHtml(npd)}</td>
+        </tr>
+        <tr>
+          <td class="label">Darbo grafikas / pamainos</td>
+          <td>${escapeHtml(workSchedule)}</td>
+        </tr>
+        <tr>
+          <td class="label">Išbandymo laikotarpis</td>
+          <td>${escapeHtml(probation)}</td>
+        </tr>
+        <tr>
+          <td class="label">Pateikiami kvalifikacijos dokumentai</td>
+          <td>${escapeHtml(documents)}</td>
+        </tr>
+        <tr>
+          <td class="label">Banko duomenų pateikimo būdas</td>
+          <td>${escapeHtml(bankDetails)}</td>
+        </tr>
+        <tr>
+          <td class="label">Papildomos sąlygos ar informacija</td>
+          <td>${escapeHtml(additionalConditions)}</td>
+        </tr>
+        <tr>
+          <td class="label">Anketa pateikta</td>
+          <td>${escapeHtml(submittedAt)}</td>
+        </tr>
+      </table>
+
+      ${
+        extraRows.length
+          ? `<div class="footnote"><strong>Papildomi atsakymai</strong><ul>${extraRows
+              .map(
+                (row) =>
+                  `<li><strong>${escapeHtml(row.label)}:</strong> ${escapeHtml(row.answer)}</li>`,
+              )
+              .join("")}</ul></div>`
+          : ""
+      }
+
+      <div class="signature-row">
+        <div class="signature">
+          <div class="rule"></div>
+          <div class="muted">pareigos</div>
+        </div>
+        <div class="signature">
+          <div class="rule"></div>
+          <div class="muted">parašas</div>
+        </div>
+        <div class="signature">
+          <div class="rule"></div>
+          <div class="muted">${escapeHtml(fullName)}</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+function buildQuestionnaireSummary(
+  candidate: Candidate,
+  questionnaire?: CandidateQuestionnaire | null,
+) {
+  const rows = questionnaireAnswerRows(questionnaire);
+
+  return [
+    `Priemimo prasymo atsakymai`,
+    `Darbuotojas: ${candidate.first_name} ${candidate.last_name}`.trim(),
+    `El. pastas: ${candidate.email || "Nenurodytas"}`,
+    `Telefonas: ${candidate.phone || "Nenurodytas"}`,
+    `Pareigos: ${candidate.desired_role || "Nenurodytos"}`,
+    `Atsakyta: ${formatDateTime(questionnaire?.submitted_at)}`,
+    "",
+    ...rows.map((row, index) => `${index + 1}. ${row.label}\n${row.answer}`),
+  ].join("\n\n");
+}
+
 function errorText(error: unknown) {
   if (!error) return "Nežinoma klaida.";
   if (error instanceof Error) return error.message;
@@ -221,6 +564,11 @@ export default function CandidatesModule({
   const [newQuestion, setNewQuestion] = useState("");
   const [newQuestionRequired, setNewQuestionRequired] = useState(false);
   const [newQuestionContract, setNewQuestionContract] = useState(false);
+  const [questionnairesByCandidateId, setQuestionnairesByCandidateId] =
+    useState<Record<string, CandidateQuestionnaire>>({});
+  const [previewCandidateId, setPreviewCandidateId] = useState<string | null>(
+    null,
+  );
 
   const [saving, setSaving] = useState(false);
   const [acceptingCandidateId, setAcceptingCandidateId] = useState<string | null>(null);
@@ -242,6 +590,51 @@ export default function CandidatesModule({
     () => buildShortEmailBody(candidateName || "kandidate", questionnairePreviewLink),
     [candidateName, questionnairePreviewLink],
   );
+
+  const previewCandidate = useMemo(
+    () =>
+      previewCandidateId
+        ? safeCandidates.find((candidate) => candidate.id === previewCandidateId) ||
+          null
+        : null,
+    [previewCandidateId, safeCandidates],
+  );
+
+  const previewQuestionnaire = previewCandidateId
+    ? questionnairesByCandidateId[previewCandidateId] || null
+    : null;
+
+  useEffect(() => {
+    if (!organizationId) return;
+
+    let active = true;
+
+    async function loadQuestionnaires() {
+      const { data, error } = await supabase
+        .from("candidate_questionnaires")
+        .select(
+          "candidate_id, status, questions, answers, submitted_at, sent_to",
+        )
+        .eq("organization_id", organizationId);
+
+      if (error || !active) return;
+
+      const nextMap = ((data as CandidateQuestionnaire[] | null) || []).reduce<
+        Record<string, CandidateQuestionnaire>
+      >((acc, row) => {
+        if (row.candidate_id) acc[row.candidate_id] = row;
+        return acc;
+      }, {});
+
+      setQuestionnairesByCandidateId(nextMap);
+    }
+
+    void loadQuestionnaires();
+
+    return () => {
+      active = false;
+    };
+  }, [organizationId, safeCandidates.length]);
 
   function addQuestion() {
     const trimmed = newQuestion.trim();
@@ -303,6 +696,46 @@ export default function CandidatesModule({
   async function copyQuestionnaireLink(candidateId?: string | null) {
     await navigator.clipboard.writeText(buildQuestionnaireLink(candidateId));
     setMessage({ type: "success", text: "Anketos nuoroda nukopijuota." });
+  }
+
+  async function copyQuestionnaireSummary(candidate: Candidate) {
+    const text = buildQuestionnaireSummary(
+      candidate,
+      questionnairesByCandidateId[candidate.id] || null,
+    );
+    await navigator.clipboard.writeText(text);
+    setMessage({
+      type: "success",
+      text: "Atsakymų santrauka nukopijuota.",
+    });
+  }
+
+function downloadQuestionnaireSummary(candidate: Candidate) {
+    const questionnaire = questionnairesByCandidateId[candidate.id] || null;
+    const html = buildQuestionnaireDocumentHtml(
+      candidate,
+      questionnaire,
+    );
+    const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `priemimo-prasymas-${candidate.first_name || "kandidatas"}-${candidate.last_name || candidate.id}.doc`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function forwardQuestionnaireToAccounting(candidate: Candidate) {
+    const subject = encodeURIComponent(
+      `Priemimo prasymo atsakymai: ${candidate.first_name} ${candidate.last_name}`.trim(),
+    );
+    const body = encodeURIComponent(
+      buildQuestionnaireSummary(
+        candidate,
+        questionnairesByCandidateId[candidate.id] || null,
+      ),
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   }
 
   async function saveCandidate(status: "new" | "questionnaire_sent" = "new", resetAfterSave = true) {
@@ -993,22 +1426,60 @@ export default function CandidatesModule({
                     </td>
                     <td className="px-4 py-2">{candidate.experience || "—"}</td>
                     <td className="px-4 py-2 text-right">
-                      {(candidate.status || "new") === "invited" || (candidate.status || "new") === "hired" ? (
-                        <span className="inline-flex items-center gap-2 rounded-full bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#486b5d]">
-                          <CheckCircle2 size={14} />
-                          Perduota komandai
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={acceptingCandidateId === candidate.id}
-                          onClick={() => void acceptCandidateToTeam(candidate)}
-                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#486b5d] px-4 text-xs font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
-                        >
-                          <UserPlus size={15} />
-                          {acceptingCandidateId === candidate.id ? "Kuriama..." : "Priimti į komandą"}
-                        </button>
-                      )}
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {questionnairesByCandidateId[candidate.id] ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewCandidateId(candidate.id)}
+                              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#cfe0d7] bg-white px-4 text-xs font-black text-[#486b5d] transition hover:border-[#486b5d]"
+                            >
+                              <FileText size={15} />
+                              Peržiūrėti atsakymus
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadQuestionnaireSummary(candidate)}
+                              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#cfe0d7] bg-white px-4 text-xs font-black text-[#486b5d] transition hover:border-[#486b5d]"
+                            >
+                              <Download size={15} />
+                              Atsisiųsti
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void copyQuestionnaireSummary(candidate)}
+                              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#cfe0d7] bg-white px-4 text-xs font-black text-[#486b5d] transition hover:border-[#486b5d]"
+                            >
+                              <Copy size={15} />
+                              Kopijuoti
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => forwardQuestionnaireToAccounting(candidate)}
+                              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#cfe0d7] bg-white px-4 text-xs font-black text-[#486b5d] transition hover:border-[#486b5d]"
+                            >
+                              <Send size={15} />
+                              Siųsti buhalterijai
+                            </button>
+                          </>
+                        ) : null}
+                        {(candidate.status || "new") === "invited" || (candidate.status || "new") === "hired" ? (
+                          <span className="inline-flex items-center gap-2 rounded-full bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#486b5d]">
+                            <CheckCircle2 size={14} />
+                            Perduota komandai
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={acceptingCandidateId === candidate.id}
+                            onClick={() => void acceptCandidateToTeam(candidate)}
+                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#486b5d] px-4 text-xs font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
+                          >
+                            <UserPlus size={15} />
+                            {acceptingCandidateId === candidate.id ? "Kuriama..." : "Priimti į komandą"}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1023,6 +1494,85 @@ export default function CandidatesModule({
           </table>
         </div>
       </div>
+
+      {previewCandidate && previewQuestionnaire ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#10251f]/45 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 bg-[#486b5d] px-8 py-7 text-white">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-white/80">
+                  Priėmimo prašymo atsakymai
+                </p>
+                <h3 className="mt-2 font-serif text-4xl font-semibold leading-tight">
+                  {previewCandidate.first_name} {previewCandidate.last_name}
+                </h3>
+                <p className="mt-3 text-sm font-semibold text-white/85">
+                  Pateikta: {formatDateTime(previewQuestionnaire.submitted_at)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewCandidateId(null)}
+                className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20"
+                aria-label="Uždaryti"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="max-h-[calc(90vh-220px)] overflow-y-auto px-8 py-6">
+              <div className="grid gap-4">
+                {questionnaireAnswerRows(previewQuestionnaire).length ? (
+                  questionnaireAnswerRows(previewQuestionnaire).map((row, index) => (
+                    <div
+                      key={`${row.label}-${index}`}
+                      className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-4"
+                    >
+                      <p className="text-sm font-black uppercase tracking-[0.24em] text-[#486b5d]">
+                        {index + 1}. {row.label}
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-base font-semibold text-[#10251f]">
+                        {row.answer}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-6 text-base font-semibold text-[#486b5d]">
+                    Atsakymų šiame prašyme dar nėra.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3 border-t border-[#dbe6e0] bg-[#f7fcf9] px-8 py-5">
+              <button
+                type="button"
+                onClick={() => downloadQuestionnaireSummary(previewCandidate)}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#cfe0d7] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:border-[#486b5d]"
+              >
+                <Download size={16} />
+                Atsisiųsti
+              </button>
+              <button
+                type="button"
+                onClick={() => void copyQuestionnaireSummary(previewCandidate)}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#cfe0d7] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:border-[#486b5d]"
+              >
+                <Copy size={16} />
+                Kopijuoti
+              </button>
+              <button
+                type="button"
+                onClick={() => forwardQuestionnaireToAccounting(previewCandidate)}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#486b5d] px-5 text-sm font-black text-white transition hover:bg-[#39594c]"
+              >
+                <Send size={16} />
+                Persiųsti buhalterijai
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
