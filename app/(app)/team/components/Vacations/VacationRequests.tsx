@@ -27,6 +27,7 @@ type Employee = {
   staff_type?: string | null;
   employment_start_date?: string | null;
   termination_date?: string | null;
+  is_active?: boolean | null;
   employment_rate?: number | string | null;
   fte?: number | string | null;
   employment_fte?: number | string | null;
@@ -572,6 +573,8 @@ function payMethodLabel(value?: string | null) {
 function requestDocumentHtml(
   request: VacationRequest,
   employee: Employee | undefined,
+  approver: Employee | undefined,
+  substitute: Employee | undefined,
   typeLabel: string,
 ) {
   const safe = (value: unknown) =>
@@ -580,28 +583,56 @@ function requestDocumentHtml(
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;");
 
+  const createdDate = String(request.created_at || request.start_date).slice(0, 10);
+  const requestNumber = request.id ? request.id.slice(0, 8).toUpperCase() : "";
+
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-  body{font-family:Arial,sans-serif;color:#10251f;margin:48px;line-height:1.5}
-  h1{color:#486b5d;font-size:24px;margin-bottom:32px} table{border-collapse:collapse;width:100%}
-  td{border-bottom:1px solid #dbe6e0;padding:10px 0;vertical-align:top} td:first-child{font-weight:700;width:34%}
-  </style></head><body><h1>Atostogų prašymas</h1><table>
-  <tr><td>Darbuotojas</td><td>${safe(employeeDisplayName(employee))}</td></tr>
-  <tr><td>Pareigos</td><td>${safe(employeePositionText(employee) || "Nenurodyta")}</td></tr>
-  <tr><td>Atostogų rūšis</td><td>${safe(typeLabel)}</td></tr>
-  <tr><td>Laikotarpis</td><td>${safe(request.start_date)} – ${safe(request.end_date)}</td></tr>
-  <tr><td>Atostoginių išmokėjimas</td><td>${safe(payMethodLabel(request.vacation_pay_method))}</td></tr>
-  <tr><td>Pavadavimas</td><td>${safe(request.substitute_user_id ? "Pasirinktas pavaduotojas" : "Nenurodytas")}</td></tr>
-  <tr><td>Perduodama informacija</td><td>${safe(request.handover_note || "Nenurodyta")}</td></tr>
-  <tr><td>Pastaba</td><td>${safe(request.note || "Nėra")}</td></tr>
-  </table></body></html>`;
+  @page{size:A4;margin:20mm 22mm} body{font-family:"Times New Roman",serif;color:#000;margin:0;line-height:1.25;font-size:12pt}
+  .recipient{width:48%;margin-left:auto;margin-bottom:34px}.recipient div{margin-bottom:3px}
+  .applicant{width:55%;margin-left:auto;margin-bottom:34px}.applicant div{border-bottom:1px solid #000;padding:3px 0}
+  h1{text-align:center;font-size:14pt;margin:0 0 8px;text-transform:uppercase}
+  .meta{text-align:center;margin-bottom:22px}.meta span{display:inline-block;min-width:130px;border-bottom:1px solid #000}
+  table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10.5pt}
+  th,td{border:1px solid #000;padding:8px;vertical-align:top}th{font-weight:700;text-align:center}
+  .mark{font-size:16pt;font-weight:700;text-align:center;width:34px}.label{font-weight:700;width:31%}
+  .signature{margin-top:44px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center}
+  .signature div{border-top:1px solid #000;padding-top:3px;font-size:9pt}
+  .note{margin-top:28px;font-size:9pt}
+  </style></head><body>
+  <div class="recipient">
+    <div>${safe(employeePositionText(approver) || "Įstaigos direktoriui")}</div>
+    <div><strong>${safe(employeeDisplayName(approver) || "Vadovas nenurodytas")}</strong></div>
+  </div>
+  <div class="applicant">
+    <div>${safe(employeePositionText(employee) || "Pareigos nenurodytos")}</div>
+    <div>${safe(employeeDisplayName(employee))}</div>
+  </div>
+  <h1>Prašymas suteikti ${safe(typeLabel.toLowerCase())}</h1>
+  <div class="meta"><span>${safe(createdDate)}</span> Nr. <span>${safe(requestNumber)}</span></div>
+  <table>
+    <tr><th colspan="2">Atostogų ar poilsio laiko rūšis</th><th>Laikotarpis</th><th>Pavaduojantis asmuo</th></tr>
+    <tr><td class="mark">☒</td><td>${safe(typeLabel)}</td><td>${safe(request.start_date)} – ${safe(request.end_date)}</td><td>${safe(substitute ? `${employeePositionText(substitute) || ""} ${employeeDisplayName(substitute)}`.trim() : "Neskiriamas")}</td></tr>
+    <tr><td colspan="2" class="label">Pageidaujamas atostoginių mokėjimo būdas</td><td colspan="2">${safe(payMethodLabel(request.vacation_pay_method))}</td></tr>
+    <tr><td colspan="2" class="label">Pridedami dokumentai ar pateikiama informacija</td><td colspan="2">${safe(request.handover_note || "Nepridedama")}</td></tr>
+    <tr><td colspan="2" class="label">Papildoma informacija</td><td colspan="2">${safe(request.note || "Nėra")}</td></tr>
+  </table>
+  <div class="signature">
+    <div>${safe(employeePositionText(employee) || "Pareigos")}</div>
+    <div>Parašas</div>
+    <div>${safe(employeeDisplayName(employee))}</div>
+  </div>
+  <p class="note">Dokumentas parengtas pagal NBFC patvirtintos prašymo suteikti atostogas ar poilsio laiką formos struktūrą.</p>
+  </body></html>`;
 }
 
 function downloadWord(
   request: VacationRequest,
   employee: Employee | undefined,
+  approver: Employee | undefined,
+  substitute: Employee | undefined,
   typeLabel: string,
 ) {
-  const blob = new Blob([requestDocumentHtml(request, employee, typeLabel)], {
+  const blob = new Blob([requestDocumentHtml(request, employee, approver, substitute, typeLabel)], {
     type: "application/msword;charset=utf-8",
   });
   const url = URL.createObjectURL(blob);
@@ -615,12 +646,16 @@ function downloadWord(
 function printPdf(
   request: VacationRequest,
   employee: Employee | undefined,
+  approver: Employee | undefined,
+  substitute: Employee | undefined,
   typeLabel: string,
 ) {
   const popup = window.open("", "_blank");
   if (!popup) return;
   popup.opener = null;
-  popup.document.write(requestDocumentHtml(request, employee, typeLabel));
+  popup.document.write(
+    requestDocumentHtml(request, employee, approver, substitute, typeLabel),
+  );
   popup.document.close();
   popup.focus();
   popup.print();
@@ -950,6 +985,43 @@ export default function VacationRequests({
           "lt",
         );
       });
+  }
+
+  function organizationDirector() {
+    const activeEmployees = employees.filter(
+      (employee) => employee.is_active !== false && !employee.termination_date,
+    );
+    return (
+      activeEmployees.find((employee) =>
+        /direktor|vadov/i.test(
+          `${employee.position || ""} ${employee.role || ""} ${employee.legacy_role || ""}`,
+        ),
+      ) ||
+      activeEmployees.find((employee) => employee.role === "owner") ||
+      activeEmployees.find((employee) => employee.role === "admin")
+    );
+  }
+
+  function documentApproverFor(request: VacationRequest) {
+    const director = organizationDirector();
+    if (!director) return undefined;
+
+    const directorAbsence = allRequests.find(
+      (item) =>
+        item.employee_id === director.user_id &&
+        ["approved", "confirmed"].includes(normalizedStatus(item.status)) &&
+        Boolean(item.substitute_user_id) &&
+        dateRangesOverlap(
+          request.start_date,
+          request.end_date,
+          item.start_date,
+          item.end_date,
+        ),
+    );
+
+    return directorAbsence?.substitute_user_id
+      ? employeeMap.get(directorAbsence.substitute_user_id) || director
+      : director;
   }
 
   function validationMessagesFor(request: VacationRequest) {
@@ -1764,7 +1836,17 @@ export default function VacationRequests({
                     <button
                       type="button"
                       className="vr-document"
-                      onClick={() => downloadWord(request, employee, type.label)}
+                      onClick={() =>
+                        downloadWord(
+                          request,
+                          employee,
+                          documentApproverFor(request),
+                          request.substitute_user_id
+                            ? employeeMap.get(request.substitute_user_id)
+                            : undefined,
+                          type.label,
+                        )
+                      }
                       title="Atsisiųsti Word dokumentą"
                     >
                       <FileDown size={15} /> Word
@@ -1772,7 +1854,17 @@ export default function VacationRequests({
                     <button
                       type="button"
                       className="vr-document"
-                      onClick={() => printPdf(request, employee, type.label)}
+                      onClick={() =>
+                        printPdf(
+                          request,
+                          employee,
+                          documentApproverFor(request),
+                          request.substitute_user_id
+                            ? employeeMap.get(request.substitute_user_id)
+                            : undefined,
+                          type.label,
+                        )
+                      }
                       title="Atidaryti spausdinimą arba išsaugoti PDF"
                     >
                       <Printer size={15} /> PDF
