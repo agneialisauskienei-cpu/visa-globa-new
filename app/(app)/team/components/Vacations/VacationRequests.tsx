@@ -570,6 +570,15 @@ function payMethodLabel(value?: string | null) {
     : "Išmokėti kartu su darbo užmokesčiu";
 }
 
+function requestTitleFor(typeLabel: string) {
+  const label = typeLabel.toLowerCase();
+  if (label.includes("komandir")) return "PRAŠYMAS DĖL KOMANDIRUOTĖS";
+  if (label.includes("papildom") || label.includes("poilsio")) {
+    return "PRAŠYMAS SUTEIKTI PAPILDOMĄ POILSIO DIENĄ";
+  }
+  return "PRAŠYMAS SUTEIKTI ATOSTOGAS";
+}
+
 function requestDocumentHtml(
   request: VacationRequest,
   employee: Employee | undefined,
@@ -585,13 +594,26 @@ function requestDocumentHtml(
 
   const createdDate = String(request.created_at || request.start_date).slice(0, 10);
   const requestNumber = request.id ? request.id.slice(0, 8).toUpperCase() : "";
+  const approverPosition = employeePositionText(approver) || "Įstaigos direktorius";
+  const approverName = employeeDisplayName(approver) || "Vadovas nenurodytas";
+  const employeePosition = employeePositionText(employee) || "Pareigos nenurodytos";
+  const employeeName = employeeDisplayName(employee);
+  const substituteText = substitute
+    ? `${employeePositionText(substitute) || ""} ${employeeDisplayName(substitute)}`.trim()
+    : "Neskiriamas";
+  const title = requestTitleFor(typeLabel);
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
   @page{size:A4;margin:20mm 22mm} body{font-family:"Times New Roman",serif;color:#000;margin:0;line-height:1.25;font-size:12pt}
-  .recipient{width:48%;margin-left:auto;margin-bottom:34px}.recipient div{margin-bottom:3px}
-  .applicant{width:55%;margin-left:auto;margin-bottom:34px}.applicant div{border-bottom:1px solid #000;padding:3px 0}
-  h1{text-align:center;font-size:14pt;margin:0 0 8px;text-transform:uppercase}
+  .legal-note{width:47%;margin-left:auto;margin-bottom:30px;font-size:11pt;line-height:1.18}
+  .form-name{text-align:center;font-weight:700;margin:0 0 44px;font-size:12pt}
+  .line-block{width:55%;margin-left:auto;margin-bottom:22px}
+  .line{border-bottom:1px solid #000;height:22px;margin-bottom:10px;text-align:center;font-weight:700}
+  .line small{display:block;margin-top:2px;font-weight:400;font-size:8pt}
+  .left-line{width:32%;border-bottom:1px solid #000;height:22px;margin:46px 0 26px}
+  h1{text-align:center;font-size:14pt;margin:0 0 16px;text-transform:uppercase}
   .meta{text-align:center;margin-bottom:22px}.meta span{display:inline-block;min-width:130px;border-bottom:1px solid #000}
+  .recipient{width:48%;margin-left:auto;margin-bottom:26px}.recipient div{margin-bottom:3px;text-align:left}
   table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10.5pt}
   th,td{border:1px solid #000;padding:8px;vertical-align:top}th{font-weight:700;text-align:center}
   .mark{font-size:16pt;font-weight:700;text-align:center;width:34px}.label{font-weight:700;width:31%}
@@ -599,32 +621,39 @@ function requestDocumentHtml(
   .signature div{border-top:1px solid #000;padding-top:3px;font-size:9pt}
   .note{margin-top:28px;font-size:9pt}
   </style></head><body>
-  <div class="recipient">
-    <div>${safe(employeePositionText(approver) || "Įstaigos direktoriui")}</div>
-    <div><strong>${safe(employeeDisplayName(approver) || "Vadovas nenurodytas")}</strong></div>
+  <div class="legal-note">
+    2022 m. vasario 17 d. įsakymu Nr. V-78<br>
+    (Nacionalinio bendrųjų funkcijų centro direktoriaus<br>
+    2024 m. kovo 25 d. įsakymo Nr. V-98 redakcija)
   </div>
-  <div class="applicant">
-    <div>${safe(employeePositionText(employee) || "Pareigos nenurodytos")}</div>
-    <div>${safe(employeeDisplayName(employee))}</div>
+  <div class="form-name">(Prašymo suteikti atostogas ar poilsio laiką forma)</div>
+  <div class="line-block">
+    <div class="line">${safe(approverPosition)}<small>(pareigos)</small></div>
+    <div class="line">${safe(approverName)}<small>(vardas, pavardė)</small></div>
+    <div class="line">${safe(employeePosition)}<small>(darbuotojo pareigos)</small></div>
   </div>
-  <h1>Prašymas suteikti ${safe(typeLabel.toLowerCase())}</h1>
+  <div class="left-line"></div>
+  <h1>${safe(title)}</h1>
   <div class="meta"><span>${safe(createdDate)}</span> Nr. <span>${safe(requestNumber)}</span></div>
+  <div class="recipient">
+    <div>${safe(approverPosition)}</div>
+    <div><strong>${safe(approverName)}</strong></div>
+  </div>
   <table>
     <tr><th colspan="2">Atostogų ar poilsio laiko rūšis</th><th>Laikotarpis</th><th>Pavaduojantis asmuo</th></tr>
-    <tr><td class="mark">☒</td><td>${safe(typeLabel)}</td><td>${safe(request.start_date)} – ${safe(request.end_date)}</td><td>${safe(substitute ? `${employeePositionText(substitute) || ""} ${employeeDisplayName(substitute)}`.trim() : "Neskiriamas")}</td></tr>
+    <tr><td class="mark">☒</td><td>${safe(typeLabel)}</td><td>${safe(request.start_date)} – ${safe(request.end_date)}</td><td>${safe(substituteText)}</td></tr>
     <tr><td colspan="2" class="label">Pageidaujamas atostoginių mokėjimo būdas</td><td colspan="2">${safe(payMethodLabel(request.vacation_pay_method))}</td></tr>
     <tr><td colspan="2" class="label">Pridedami dokumentai ar pateikiama informacija</td><td colspan="2">${safe(request.handover_note || "Nepridedama")}</td></tr>
     <tr><td colspan="2" class="label">Papildoma informacija</td><td colspan="2">${safe(request.note || "Nėra")}</td></tr>
   </table>
   <div class="signature">
-    <div>${safe(employeePositionText(employee) || "Pareigos")}</div>
+    <div>${safe(employeePosition)}</div>
     <div>Parašas</div>
-    <div>${safe(employeeDisplayName(employee))}</div>
+    <div>${safe(employeeName)}</div>
   </div>
   <p class="note">Dokumentas parengtas pagal NBFC patvirtintos prašymo suteikti atostogas ar poilsio laiką formos struktūrą.</p>
   </body></html>`;
 }
-
 function downloadWord(
   request: VacationRequest,
   employee: Employee | undefined,
