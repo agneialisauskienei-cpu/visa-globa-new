@@ -295,9 +295,7 @@ a[class*="bg-[#486b5d]"]:hover {
 }
 
 .vg-app-shell button[class*="ring-1"][class*="ring-[#c9d8d0]"],
-.vg-app-shell a[class*="ring-1"][class*="ring-[#c9d8d0]"],
-.vg-app-shell button[class*="border-2"][class*="border-[#486b5d]"],
-.vg-app-shell a[class*="border-2"][class*="border-[#486b5d]"] {
+.vg-app-shell a[class*="ring-1"][class*="ring-[#c9d8d0]"] {
   border-width: 1px !important;
   border-color: #486b5d !important;
   box-shadow: none !important;

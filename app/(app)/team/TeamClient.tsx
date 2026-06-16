@@ -3510,6 +3510,7 @@ export default function TeamPage() {
         <section className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
           <button
             type="button"
+            data-stat-card="true"
             onClick={() => changeTab("employees")}
             className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
@@ -3526,6 +3527,7 @@ export default function TeamPage() {
 
           <button
             type="button"
+            data-stat-card="true"
             onClick={() => changeTab("fte")}
             className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
@@ -3544,6 +3546,7 @@ export default function TeamPage() {
 
           <button
             type="button"
+            data-stat-card="true"
             onClick={() => changeTab("vacations")}
             className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
@@ -3560,6 +3563,7 @@ export default function TeamPage() {
 
           <button
             type="button"
+            data-stat-card="true"
             onClick={() => changeTab("schedule")}
             className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
@@ -3574,6 +3578,7 @@ export default function TeamPage() {
 
           <button
             type="button"
+            data-stat-card="true"
             onClick={() => changeTab("trainings")}
             className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
@@ -3590,6 +3595,7 @@ export default function TeamPage() {
 
           <button
             type="button"
+            data-stat-card="true"
             onClick={() => changeTab("docs")}
             className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
@@ -3606,6 +3612,7 @@ export default function TeamPage() {
 
           <button
             type="button"
+            data-stat-card="true"
             onClick={() => changeTab("candidates")}
             className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
           >
@@ -5616,6 +5623,7 @@ function EmployeeRowCard({
     <button
       type="button"
       onClick={onEdit}
+      data-card-button="true"
       className={`grid w-full gap-3 rounded-2xl border p-4 text-left shadow-sm transition md:grid-cols-[56px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center ${
         selected
           ? "border-2 border-[#486b5d] bg-white"
@@ -5658,7 +5666,7 @@ function EmployeeRowCard({
       <div className="text-sm font-bold text-[#6a7e75]">
         {employee.contract_number
           ? `${employee.contract_number}${employee.employment_start_date ? ` · nuo ${fmt(employee.employment_start_date)}` : ""}`
-          : "Onboarding neužbaigtas"}
+          : "Įdarbinimas neužbaigtas"}
       </div>
 
       <span

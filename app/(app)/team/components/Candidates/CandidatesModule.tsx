@@ -1277,7 +1277,7 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
           </div>
 
           <div className="mt-5 rounded-lg border border-[#dbe6e0] bg-[#ffffff] p-4">
-            <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#6a7e75]">
+            <h4 className="text-sm font-black text-[#486b5d]">
               Pridėti savo klausimą
             </h4>
             <textarea
@@ -1320,14 +1320,9 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
 
           <div className="mt-5 rounded-lg border border-[#dbe6e0] bg-white p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#6a7e75]">
-                  Darbuotojo prašymo peržiūra
-                </h4>
-                <p className="mt-2 text-sm font-semibold text-[#6a7e75]">
-                  Darbuotojui siunčiamas trumpas laiškas su saugia nuoroda į atskirą prašymo formą.
-                </p>
-              </div>
+              <p className="text-sm font-semibold text-[#6a7e75]">
+                Darbuotojui siunčiamas trumpas laiškas su saugia nuoroda į atskirą prašymo formą.
+              </p>
               <button
                 type="button"
                 onClick={() => void copyQuestionnaireLink()}
@@ -1367,7 +1362,7 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
             </div>
 
             <div className="mt-4 border border-[#dbe6e0] bg-white p-4">
-              <h4 className="text-sm font-black uppercase tracking-[0.14em] text-[#486b5d]">
+              <h4 className="text-sm font-black text-[#486b5d]">
                 Darbuotojo matoma forma
               </h4>
               <p className="mt-2 text-sm font-semibold text-black">
@@ -1459,7 +1454,7 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
                               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#cfe0d7] bg-white px-4 text-xs font-black text-[#486b5d] transition hover:border-[#486b5d]"
                             >
                               <Send size={15} />
-                              Siųsti buhalterijai
+                              Persiųsti
                             </button>
                           </>
                         ) : null}
@@ -1500,7 +1495,7 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
           <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 bg-[#486b5d] px-8 py-7 text-white">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.3em] text-white/80">
+                <p className="text-sm font-bold tracking-[0.08em] text-white/80">
                   Priėmimo prašymo atsakymai
                 </p>
                 <h3 className="mt-2 font-serif text-4xl font-semibold leading-tight">
@@ -1528,7 +1523,7 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
                       key={`${row.label}-${index}`}
                       className="rounded-2xl border border-[#dbe6e0] bg-white px-5 py-4"
                     >
-                      <p className="text-sm font-black uppercase tracking-[0.24em] text-[#486b5d]">
+                      <p className="text-sm font-black text-[#486b5d]">
                         {index + 1}. {row.label}
                       </p>
                       <p className="mt-2 whitespace-pre-wrap text-base font-semibold text-[#10251f]">
