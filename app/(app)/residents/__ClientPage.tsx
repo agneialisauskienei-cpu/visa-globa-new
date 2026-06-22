@@ -306,7 +306,7 @@ function statusClass(status: string | null) {
   if (normalized === "gyvena")
     return "border-[#a7f3d0] bg-emerald-50 text-[#486b5d]";
   if (normalized === "netrukus_atvyks")
-    return "border-blue-200 bg-white text-[#486b5d]";
+    return "border-[#a7f3d0] bg-white text-[#486b5d]";
   if (normalized === "ligonineje")
     return "border-amber-200 bg-amber-50 text-amber-700";
   if (normalized === "laikinai_isvykes")
@@ -473,7 +473,9 @@ export default function ResidentsPage() {
 
   useEffect(() => {
     if (searchParams.get("newResident") === "1") {
-      setShowCreateModal(true);
+      window.setTimeout(() => {
+        setShowCreateModal(true);
+      }, 0);
     }
   }, [searchParams]);
 
@@ -1094,7 +1096,7 @@ export default function ResidentsPage() {
               </div>
 
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.28em] text-emerald-100/80">
+                <p className="text-sm font-black tracking-[0.14em] text-emerald-100/80">
                   Gyventojų modulis
                 </p>
                 <h1 className="mt-2 text-5xl font-black tracking-[-0.04em] text-white">
@@ -1283,8 +1285,8 @@ export default function ResidentsPage() {
                               {residentName(resident)}
                             </button>
                             <span
-                              className={`rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${statusClass(resident.current_status)}`}
-                            >
+                            className={`rounded-full border px-2.5 py-1 text-[11px] font-black tracking-[0.08em] ${statusClass(resident.current_status)}`}
+                          >
                               {statusLabel(resident.current_status)}
                             </span>
                           </div>

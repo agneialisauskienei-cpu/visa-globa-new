@@ -403,7 +403,7 @@ function roomVisual(room: Room) {
   }
 
   if (room.occupied > 0) {
-    return { label: "Dalinai užimtas", tone: "blue" as const, bar: "bg-blue-500" }
+    return { label: "Dalinai užimtas", tone: "green" as const, bar: "bg-emerald-600" }
   }
 
   return { label: "Laisvas", tone: "green" as const, bar: "bg-emerald-600" }
@@ -432,7 +432,7 @@ function Badge({
 }) {
   const tones = {
     green: "border-[#a7f3d0] bg-[#eefaf3] text-[#486b5d]",
-    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    blue: "border-[#a7f3d0] bg-[#eefaf3] text-[#486b5d]",
     warning: "border-amber-200 bg-amber-50 text-amber-700",
     danger: "border-red-200 bg-red-50 text-red-700",
     neutral: "border-[#dbe6e0] bg-[#ffffff] text-[#526174]",
@@ -464,7 +464,7 @@ function StatCard({
         </div>
         {badge}
       </div>
-      <div className="text-3xl font-black tracking-[-0.04em] text-white">{value}</div>
+      <div className="text-3xl font-black tracking-[-0.04em] text-[#10251f]">{value}</div>
       <div className="mt-1 text-sm font-bold text-[#66756c]">{label}</div>
     </div>
   )
@@ -1111,8 +1111,8 @@ export default function RoomsPage() {
                 <Home size={36} />
               </div>
               <div>
-                <div className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-emerald-100/80">
-                  Kambariai / Užimtumas / Rezervacijos
+                <div className="mb-2 text-xs font-black tracking-[0.14em] text-emerald-100/80">
+                  Kambariai / užimtumas / rezervacijos
                 </div>
                 <h1 className="text-4xl font-black tracking-[-0.04em] text-white">
                   Kambarių valdymas
@@ -1205,7 +1205,7 @@ export default function RoomsPage() {
         <section className="mb-5 rounded-[26px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">Reikia dėmesio</div>
+              <div className="text-xs font-black tracking-[0.14em] text-[#486b5d]">Reikia dėmesio</div>
               <h2 className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#10251f]">Kambarių rizikos ir veiksmai</h2>
               <p className="mt-1 text-sm font-bold text-[#526174]">
                 Čia rodomi pasibaigusių rezervacijų, remontuojamų kambarių ir talpos konfliktų signalai.
