@@ -1903,9 +1903,11 @@ function HeroMetric({
   return (
     <div className="rounded-[18px] bg-[#f7fcf9] px-5 py-4">
       <div className="text-2xl font-black text-[#10251f]">{value}</div>
-      <div className={`mt-1 text-[11px] font-black uppercase tracking-[0.16em] ${
-        tone === "warning" ? "text-amber-700" : "text-[#526174]"
-      }`}>
+      <div
+        className={`mt-1 text-[11px] font-bold tracking-[0.08em] ${
+          tone === "warning" ? "text-amber-700" : "text-[#526174]"
+        }`}
+      >
         {label}
       </div>
     </div>
@@ -2032,7 +2034,7 @@ function PriorityCard({
   const styles = {
     amber: "border-amber-100 bg-amber-50 text-amber-700",
     red: "border-red-100 bg-red-50 text-red-700",
-    blue: "border-blue-100 bg-blue-50 text-blue-700",
+    blue: "border-emerald-100 bg-[#f7fcf9] text-emerald-700",
     emerald: "border-emerald-100 bg-[#f7fcf9] text-emerald-700",
   }[color];
 
@@ -2251,7 +2253,7 @@ function Field({
 }) {
   return (
     <label className="grid gap-2">
-      <span className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.16em] text-[#526174]">
+      <span className="flex items-center justify-between gap-3 text-xs font-black tracking-[0.08em] text-[#526174]">
         {label}
         {hint ? (
           <span className="normal-case tracking-normal text-[#8ea0b5]">
