@@ -2089,7 +2089,7 @@ function StatButton({
           {icon}
         </span>
         <div className="min-w-0">
-          <p className="line-clamp-2 text-[10px] font-black uppercase tracking-wide text-[#6a7e75] sm:text-[11px]">
+          <p className="line-clamp-2 text-[10px] font-bold tracking-[0.08em] text-[#6a7e75] sm:text-[11px]">
             {title}
           </p>
           <p className="mt-1 break-words text-base font-black leading-tight text-[#10251f] sm:text-lg">
@@ -2172,7 +2172,7 @@ function Panel({
     <section className="rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-sm sm:rounded-[22px] sm:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
+          <p className="text-[11px] font-bold tracking-[0.08em] text-[#486b5d]">
             {kicker}
           </p>
           <h2 className="mt-1 break-words text-[26px] font-black leading-tight tracking-tight text-[#10251f] sm:text-2xl">
@@ -2189,7 +2189,7 @@ function Panel({
 function ShiftCard({ shift }: { shift: EmployeeSchedule }) {
   return (
     <div className="rounded-[18px] border border-emerald-100 bg-emerald-50 p-4">
-      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#486b5d]">
+      <p className="text-[11px] font-bold tracking-[0.08em] text-[#486b5d]">
         Kita pamaina
       </p>
       <h3 className="mt-2 text-xl font-black leading-tight text-[#10251f]">
@@ -2528,7 +2528,7 @@ function InfoLine({
   return (
     <div className="flex items-center justify-between gap-3">
       <span
-        className={`text-xs font-black uppercase tracking-[0.14em] ${inverse ? "text-white/65" : "text-[#6a7e75]"}`}
+        className={`text-xs font-bold tracking-[0.08em] ${inverse ? "text-white/65" : "text-[#6a7e75]"}`}
       >
         {label}
       </span>
@@ -2567,7 +2567,7 @@ function DashboardModal({
       >
         <div className="flex items-start justify-between gap-4 bg-[#486b5d] p-4 text-white sm:p-6">
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/70">
+            <p className="text-[11px] font-bold tracking-[0.08em] text-white/70">
               Darbuotojo paskyra
             </p>
             <h2 className="mt-1 break-words text-2xl font-black leading-tight tracking-tight sm:text-3xl">{title}</h2>
