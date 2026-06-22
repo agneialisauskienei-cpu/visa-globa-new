@@ -301,12 +301,28 @@ a[class*="bg-[#486b5d]"]:hover {
   box-shadow: none !important;
 }
 
+.vg-app-shell button[class*="border-[#486b5d]"][class*="bg-white"]:not([class*="rounded-full"]),
+.vg-app-shell a[class*="border-[#486b5d]"][class*="bg-white"]:not([class*="rounded-full"]) {
+  border-width: 1px !important;
+}
+
+.vg-app-shell button[class*="hover:border-2"][class*="border-[#486b5d]"][class*="bg-white"]:not([class*="rounded-full"]):hover,
+.vg-app-shell a[class*="hover:border-2"][class*="border-[#486b5d]"][class*="bg-white"]:not([class*="rounded-full"]):hover {
+  border-width: 2px !important;
+}
+
 .vg-app-shell [class*="rounded-full"][class*="bg-emerald-"],
 .vg-app-shell [class*="rounded-full"][class*="bg-green-"],
 .vg-app-shell [class*="rounded-full"][class*="bg-blue-"],
 .vg-app-shell [class*="rounded-full"][class*="bg-amber-"],
 .vg-app-shell [class*="rounded-full"][class*="bg-rose-"],
-.vg-app-shell [class*="rounded-full"][class*="bg-red-"] {
+.vg-app-shell [class*="rounded-full"][class*="bg-red-"],
+.vg-app-shell [class*="rounded-full"][class*="bg-[#f7fcf9]"],
+.vg-app-shell [class*="rounded-full"][class*="bg-[#e8f7ef]"],
+.vg-app-shell [class*="rounded-full"][class*="bg-[#e9f7ef]"],
+.vg-app-shell [class*="rounded-full"][class*="bg-[#ecfdf5]"],
+.vg-app-shell [class*="rounded-full"][class*="bg-[#dce7e2]"],
+.vg-app-shell [class*="rounded-full"][class*="bg-[#dbe6e0]"] {
   background: #ffffff !important;
   border: 1px solid #dbe6e0 !important;
   box-shadow: none !important;

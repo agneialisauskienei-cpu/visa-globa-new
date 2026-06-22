@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   AlertCircle,
@@ -148,12 +148,7 @@ export default function CandidateQuestionnairePage() {
   const requiredCount = questions.filter((question) => question.required).length;
   const progress = requiredCount ? Math.round((answeredRequiredCount / requiredCount) * 100) : 100;
 
-  useEffect(() => {
-    void loadQuestionnaire();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidateId]);
-
-  async function loadQuestionnaire() {
+  const loadQuestionnaire = useCallback(async () => {
     setLoading(true);
     setMessage(null);
 
@@ -209,7 +204,15 @@ export default function CandidateQuestionnairePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [candidateId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadQuestionnaire();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [loadQuestionnaire]);
 
   function updateAnswer(questionId: string, value: string) {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
@@ -327,7 +330,7 @@ export default function CandidateQuestionnairePage() {
           <header className="bg-[#486b5d] px-5 py-6 text-white sm:px-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">
+                <p className="text-[11px] font-bold tracking-[0.08em] text-white/70">
                   Priėmimo prašymas
                 </p>
                 <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">

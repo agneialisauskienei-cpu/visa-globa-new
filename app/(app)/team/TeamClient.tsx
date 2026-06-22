@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -55,6 +54,7 @@ type TabKey =
 type Employee = {
   member_id?: string | null;
   user_id: string;
+  position_id?: string | null;
   email?: string | null;
   avatar_url?: string | null;
   first_name?: string | null;
@@ -251,6 +251,7 @@ type NewEmployeeForm = {
   last_name: string;
   email: string;
   phone: string;
+  position_id: string;
   position: string;
   department: string;
   staff_type: string;
@@ -266,6 +267,7 @@ type EditForm = {
   full_name: string;
   email: string;
   phone: string;
+  position_id: string;
   position: string;
   department: string;
   staff_type: string;
@@ -413,6 +415,7 @@ const initialNewEmployeeForm: NewEmployeeForm = {
   last_name: "",
   email: "",
   phone: "",
+  position_id: "",
   position: "",
   department: "",
   staff_type: "",
@@ -506,35 +509,21 @@ function employeeMatchesPosition(
   employee: Employee,
   position: PersonnelPosition,
 ) {
+  if (employee.position_id && employee.position_id === position.id) {
+    return true;
+  }
+
   const positionName = normalizePlanText(position.position_name);
   const department = normalizePlanText(position.department);
   const employeePosition = normalizePlanText(employee.position);
   const employeeDepartment = normalizePlanText(employee.department);
-  const employeeStaffType = normalizePlanText(employee.staff_type);
-  const positionGroup = canonicalPositionGroupFromText(
-    [position.department, position.position_name].filter(Boolean).join(" "),
-  );
-  const employeeGroup = canonicalPositionGroupFromText(
-    [employee.staff_type, employee.department, employee.position, employee.role]
-      .filter(Boolean)
-      .join(" "),
-  );
 
   if (!positionName) return false;
-
-  const positionMatches =
-    employeePosition === positionName ||
-    employeeStaffType === positionName ||
-    (!!positionGroup && positionGroup === employeeGroup);
-
-  if (!positionMatches) return false;
+  if (employeePosition !== positionName) return false;
 
   if (!department) return true;
 
-  return (
-    employeeDepartment === department ||
-    canonicalPositionGroupFromText(department) === employeeGroup
-  );
+  return employeeDepartment === department;
 }
 
 function coefficientText(position: PersonnelPosition) {
@@ -1160,7 +1149,12 @@ export default function TeamPage() {
   const searchParams = useSearchParams();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>("employees");
+  const [tab, setTab] = useState<TabKey>(() => {
+    const moduleFromUrl = searchParams.get("module") as TabKey | null;
+    return moduleFromUrl && tabs.some((item) => item.key === moduleFromUrl)
+      ? moduleFromUrl
+      : "employees";
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasHrAccess, setHasHrAccess] = useState(false);
@@ -1207,7 +1201,9 @@ export default function TeamPage() {
   );
   const [showPositionPlanModal, setShowPositionPlanModal] = useState(false);
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(
+    searchParams.get("newEmployee") === "1",
+  );
   const [createModalMessage, setCreateModalMessage] = useState("");
   const [newEmployeeForm, setNewEmployeeForm] = useState<NewEmployeeForm>(
     initialNewEmployeeForm,
@@ -1249,25 +1245,6 @@ export default function TeamPage() {
 
     void loadScheduleForMonth(organizationId, scheduleMonth);
   }, [organizationId, scheduleMonth]);
-
-  useEffect(() => {
-    const moduleFromUrl = searchParams.get("module") as TabKey | null;
-    const savedModule =
-      typeof window !== "undefined"
-        ? (window.localStorage.getItem("team-active-module") as TabKey | null)
-        : null;
-    const nextModule = moduleFromUrl || savedModule;
-
-    if (nextModule && tabs.some((item) => item.key === nextModule)) {
-      setTab(nextModule);
-    }
-
-    if (searchParams.get("newEmployee") === "1") {
-      setCreateModalMessage("");
-      setTab("employees");
-      setShowCreateModal(true);
-    }
-  }, [searchParams]);
 
   function changeTab(nextTab: TabKey) {
     setTab(nextTab);
@@ -1384,7 +1361,7 @@ export default function TeamPage() {
         supabase
           .from("organization_members")
           .select(
-            "id, user_id, role, legacy_role, position, department, staff_type, extra_permissions, contract_number, employment_rate, weekly_hours, employment_type, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
+            "id, user_id, position_id, role, legacy_role, position, department, staff_type, extra_permissions, contract_number, employment_rate, weekly_hours, employment_type, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
           )
           .eq("organization_id", orgId)
           .order("created_at", { ascending: false }),
@@ -1422,13 +1399,34 @@ export default function TeamPage() {
           .order("position_name", { ascending: true }),
       ]);
 
-      if (employeesResult.error) throw employeesResult.error;
+      let membersQueryResult = employeesResult;
+
+      if (
+        membersQueryResult.error &&
+        String(membersQueryResult.error.message || "")
+          .toLowerCase()
+          .includes("position_id")
+      ) {
+        membersQueryResult = await supabase
+          .from("organization_members")
+          .select(
+            "id, user_id, role, legacy_role, position, department, staff_type, extra_permissions, contract_number, employment_rate, weekly_hours, employment_type, employment_start_date, termination_date, is_archived, archived_at, archive_reason, professional_license_number, professional_license_valid_until, occupational_health_valid_until, is_active, created_at",
+          )
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: false });
+      }
+
+      if (membersQueryResult.error) throw membersQueryResult.error;
 
       const memberRows = (
-        (employeesResult.data as Array<Employee & { id?: string | null }>) || []
+        (membersQueryResult.data as Array<Employee & { id?: string | null }>) || []
       ).map((employee) => ({
         ...employee,
         member_id: employee.id || employee.member_id || null,
+        position_id:
+          employee.position_id ||
+          findPlannedPosition(employee.position, employee.department)?.id ||
+          null,
         extra_permissions: normalizeExtraPermissions(
           employee.extra_permissions,
         ),
@@ -1682,6 +1680,7 @@ export default function TeamPage() {
       full_name: employee.full_name || employeeName(employee),
       email: employee.email || "",
       phone: canViewSensitiveFields ? employee.phone || "" : "",
+      position_id: employee.position_id || "",
       position: employee.position || "",
       department: employee.department || "",
       staff_type: employee.staff_type || "",
@@ -1752,20 +1751,13 @@ export default function TeamPage() {
       return;
     }
 
-    if (
-      editEmployeePositionWarning &&
-      typeof window !== "undefined" &&
-      !window.confirm(`${editEmployeePositionWarning} Ar vis tiek saugoti?`)
-    ) {
-      return;
-    }
-
     setSaving(true);
     setMessage("");
 
     try {
       const memberPayload = removeUndefinedValues({
         position: editForm.position.trim() || null,
+        position_id: editForm.position_id || null,
         department: editForm.department.trim() || null,
         staff_type: editForm.staff_type || null,
         extra_permissions: Array.from(
@@ -1803,6 +1795,7 @@ export default function TeamPage() {
 
       const previousMemberAudit = compactAuditPayload({
         position: editingEmployee.position || null,
+        position_id: editingEmployee.position_id || null,
         department: editingEmployee.department || null,
         staff_type: editingEmployee.staff_type || null,
         extra_permissions: normalizeExtraPermissions(
@@ -1839,11 +1832,26 @@ export default function TeamPage() {
         phone: canViewSensitiveFields ? editingEmployee.phone || null : null,
       });
 
-      const memberResult = await supabase
+      let memberResult = await supabase
         .from("organization_members")
         .update(memberPayload)
         .eq("organization_id", organizationId)
         .eq("user_id", editingEmployee.user_id);
+
+      if (
+        memberResult.error &&
+        String(memberResult.error.message || "")
+          .toLowerCase()
+          .includes("position_id")
+      ) {
+        const { position_id: _positionId, ...fallbackMemberPayload } =
+          memberPayload as Record<string, unknown> & { position_id?: string | null };
+        memberResult = await supabase
+          .from("organization_members")
+          .update(fallbackMemberPayload)
+          .eq("organization_id", organizationId)
+          .eq("user_id", editingEmployee.user_id);
+      }
 
       if (memberResult.error) {
         throw memberResult.error;
@@ -1867,10 +1875,17 @@ export default function TeamPage() {
         p_phone: canViewSensitiveFields ? editForm.phone.trim() || null : null,
       };
 
-      const profileResult = await supabase.rpc(
+      let profileResult = await supabase.rpc(
         "admin_update_employee_profile",
         profileRpcPayload,
       );
+
+      if (profileResult.error) {
+        profileResult = await supabase
+          .from("profiles")
+          .update(profilePayload)
+          .eq("id", editingEmployee.user_id);
+      }
 
       if (profileResult.error) {
         throw profileResult.error;
@@ -1957,14 +1972,6 @@ export default function TeamPage() {
       const warning = "Pasirinkite pareigybę iš patvirtinto etatų plano.";
       setCreateModalMessage(warning);
       setMessage(warning);
-      return;
-    }
-
-    if (
-      newEmployeePositionWarning &&
-      typeof window !== "undefined" &&
-      !window.confirm(`${newEmployeePositionWarning} Ar vis tiek tęsti?`)
-    ) {
       return;
     }
 
@@ -2281,11 +2288,7 @@ export default function TeamPage() {
 
         if (!normalizedDepartment) return true;
 
-        return (
-          normalizePlanText(position.department) === normalizedDepartment ||
-          canonicalPositionGroupFromText(position.department) ===
-            canonicalPositionGroupFromText(department)
-        );
+        return normalizePlanText(position.department) === normalizedDepartment;
       }) || null
     );
   }
@@ -2297,6 +2300,14 @@ export default function TeamPage() {
   }
 
   function applyPlannedPositionToNewEmployee(positionId: string) {
+    if (!positionId) {
+      setNewEmployeeForm((prev) => ({
+        ...prev,
+        position_id: "",
+      }));
+      return;
+    }
+
     const position = activePositionOptions.find((item) => item.id === positionId);
 
     if (!position) return;
@@ -2307,6 +2318,7 @@ export default function TeamPage() {
 
     setNewEmployeeForm((prev) => ({
       ...prev,
+      position_id: position.id,
       position: position.position_name || "",
       department: position.department || "",
       staff_type: inferredStaffType || prev.staff_type,
@@ -2314,9 +2326,19 @@ export default function TeamPage() {
   }
 
   function applyPlannedPositionToEditForm(positionId: string) {
+    if (!positionId || !editForm) {
+      if (editForm && !positionId) {
+        setEditForm({
+          ...editForm,
+          position_id: "",
+        });
+      }
+      return;
+    }
+
     const position = activePositionOptions.find((item) => item.id === positionId);
 
-    if (!position || !editForm) return;
+    if (!position) return;
 
     const inferredStaffType = staffTypeFromPositionText(
       [position.department, position.position_name].filter(Boolean).join(" "),
@@ -2324,6 +2346,7 @@ export default function TeamPage() {
 
     setEditForm({
       ...editForm,
+      position_id: position.id,
       position: position.position_name || "",
       department: position.department || "",
       staff_type: inferredStaffType || editForm.staff_type,
@@ -2335,8 +2358,12 @@ export default function TeamPage() {
     department?: string | null,
     excludedEmployeeId?: string | null,
     rate = 1,
+    positionId?: string | null,
   ) {
-    const position = findPlannedPosition(positionName, department);
+    const position =
+      (positionId &&
+        activePositionOptions.find((item) => item.id === positionId)) ||
+      findPlannedPosition(positionName, department);
 
     if (!position) {
       return activePositionOptions.length
@@ -2363,6 +2390,7 @@ export default function TeamPage() {
     newEmployeeForm.department,
     null,
     1,
+    newEmployeeForm.position_id || null,
   );
 
   const editEmployeePositionWarning =
@@ -2372,6 +2400,7 @@ export default function TeamPage() {
           editForm.department,
           editingEmployee.user_id,
           editForm.employment_rate || 1,
+          editForm.position_id || null,
         )
       : null;
 
@@ -3916,12 +3945,7 @@ export default function TeamPage() {
                             saving={saving}
                             canViewSensitiveFields={canViewSensitiveFields}
                             positionOptions={activePositionOptions}
-                            selectedPositionId={
-                              findPlannedPosition(
-                                editForm.position,
-                                editForm.department,
-                              )?.id || ""
-                            }
+                            selectedPositionId={editForm.position_id || ""}
                             positionWarning={editEmployeePositionWarning}
                             onChange={setEditForm}
                             onSelectPosition={applyPlannedPositionToEditForm}
@@ -4145,12 +4169,7 @@ export default function TeamPage() {
                 <Field label="Konkrečios pareigos">
                   {activePositionOptions.length ? (
                     <select
-                      value={
-                        findPlannedPosition(
-                          newEmployeeForm.position,
-                          newEmployeeForm.department,
-                        )?.id || ""
-                      }
+                      value={newEmployeeForm.position_id}
                       onChange={(event) =>
                         applyPlannedPositionToNewEmployee(event.target.value)
                       }
@@ -4169,6 +4188,7 @@ export default function TeamPage() {
                       onChange={(event) =>
                         setNewEmployeeForm((prev) => ({
                           ...prev,
+                          position_id: "",
                           position: event.target.value,
                         }))
                       }
@@ -4189,6 +4209,7 @@ export default function TeamPage() {
                     onChange={(event) =>
                       setNewEmployeeForm((prev) => ({
                         ...prev,
+                        position_id: "",
                         department: event.target.value,
                       }))
                     }
@@ -4968,16 +4989,16 @@ function employeeAvatarUrl(employee?: Employee | null) {
 }
 
 const teamPrimaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-xl border-2 border-[#486b5d] bg-[#486b5d] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:border-[#0b3f33] hover:bg-[#0b3f33] disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-10 items-center justify-center rounded-xl border border-[#486b5d] bg-[#486b5d] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:border-[#0b3f33] hover:bg-[#0b3f33] disabled:cursor-not-allowed disabled:opacity-60";
 
 const teamOutlineButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-xl border-2 border-[#486b5d] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:border-[#0b3f33] hover:text-[#0b3f33]";
+  "inline-flex min-h-10 items-center justify-center rounded-xl border border-[#486b5d] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:border-2 hover:border-[#0b3f33] hover:text-[#0b3f33]";
 
 const teamFilterButtonClass =
-  "rounded-xl border-2 border-[#486b5d] bg-white px-4 py-2 text-xs font-black text-[#486b5d] transition hover:border-[#0b3f33] hover:text-[#0b3f33]";
+  "rounded-xl border border-[#486b5d] bg-white px-4 py-2 text-xs font-black text-[#486b5d] transition hover:border-2 hover:border-[#0b3f33] hover:text-[#0b3f33]";
 
 const teamFilterActiveButtonClass =
-  "rounded-xl border-[3px] border-[#0b3f33] bg-[#486b5d] px-4 py-2 text-xs font-black text-white shadow-sm";
+  "rounded-xl border-2 border-[#0b3f33] bg-[#486b5d] px-4 py-2 text-xs font-black text-white shadow-sm";
 
 function ActionCard({
   title,
@@ -5053,7 +5074,7 @@ function PriorityItem({
   const toneClass = {
     amber: "bg-amber-50 text-amber-700",
     rose: "bg-rose-50 text-rose-700",
-    blue: "bg-blue-50 text-blue-700",
+    blue: "bg-emerald-50 text-emerald-700",
   }[tone];
 
   return (
@@ -5232,10 +5253,14 @@ function EmployeeTabbedEditor({
                   ))}
                 </select>
               ) : (
-                <input
+                  <input
                   value={editForm.position}
                   onChange={(event) =>
-                    onChange({ ...editForm, position: event.target.value })
+                    onChange({
+                      ...editForm,
+                      position: event.target.value,
+                      position_id: "",
+                    })
                   }
                   className="input"
                   placeholder="Pvz., vyr. slaugytoja"
@@ -5251,7 +5276,11 @@ function EmployeeTabbedEditor({
               <input
                 value={editForm.department}
                 onChange={(event) =>
-                  onChange({ ...editForm, department: event.target.value })
+                  onChange({
+                    ...editForm,
+                    department: event.target.value,
+                    position_id: "",
+                  })
                 }
                 className="input"
               />
@@ -5469,11 +5498,11 @@ function EmployeeTabbedEditor({
               })}
             </div>
 
-            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">
+            <div className="rounded-xl border border-[#dbe6e0] bg-[#f7fcf9] p-4">
+              <p className="text-xs font-black tracking-[0.08em] text-[#486b5d]">
                 Prieigos santrauka
               </p>
-              <p className="mt-2 text-sm font-bold text-blue-900">
+              <p className="mt-2 text-sm font-bold text-[#10251f]">
                 Teisės pritaikomos pagal pasirinktą pareigų tipą ir papildomai
                 pažymėtas prieigas.
               </p>
@@ -5483,7 +5512,7 @@ function EmployeeTabbedEditor({
                 ).map((permission) => (
                   <span
                     key={permission.value}
-                    className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-800"
+                    className="rounded-full border border-[#dbe6e0] bg-white px-3 py-1 text-xs font-black text-[#486b5d]"
                   >
                     {permission.label}
                   </span>
@@ -5624,7 +5653,7 @@ function EmployeeRowCard({
       type="button"
       onClick={onEdit}
       data-card-button="true"
-      className={`grid w-full gap-3 rounded-2xl border p-4 text-left shadow-sm transition md:grid-cols-[56px_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center ${
+      className={`grid w-full gap-3 rounded-2xl border p-4 text-left shadow-sm transition md:grid-cols-[56px_minmax(220px,1.1fr)_minmax(140px,1fr)_minmax(220px,1fr)_auto] md:items-center ${
         selected
           ? "border-2 border-[#486b5d] bg-white"
           : "border border-[#dbe6e0] bg-white hover:border-2 hover:border-[#486b5d]"
@@ -5670,11 +5699,7 @@ function EmployeeRowCard({
       </div>
 
       <span
-        className={
-          selected
-            ? teamPrimaryButtonClass
-            : teamPrimaryButtonClass
-        }
+        className={`${selected ? teamPrimaryButtonClass : teamPrimaryButtonClass} shrink-0 justify-self-start md:justify-self-end`}
       >
         Redaguoti
       </span>
