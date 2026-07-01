@@ -2,19 +2,37 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseConfig } from '@/lib/supabase'
 import { setStoredOrganizationId } from '@/lib/current-organization'
 
 function getReadableError(message: string) {
-  if (message === 'Email not confirmed') {
+  const normalized = message.toLowerCase()
+
+  if (normalized.includes('email not confirmed')) {
     return 'Patvirtink savo el. paštą prieš prisijungiant.'
   }
 
-  if (message === 'Invalid login credentials') {
+  if (normalized.includes('invalid login credentials')) {
     return 'Neteisingas el. paštas arba slaptažodis.'
   }
 
-  return 'Įvyko klaida. Bandyk dar kartą.'
+  if (normalized.includes('invalid api key') || normalized.includes('apikey')) {
+    return 'Prisijungimo konfigūracija neteisinga. Reikia patikrinti Supabase viešąjį raktą Vercel aplinkoje.'
+  }
+
+  if (
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network') ||
+    normalized.includes('fetch')
+  ) {
+    return 'Nepavyko pasiekti prisijungimo serverio. Patikrink Supabase adresą ir Vercel aplinkos kintamuosius.'
+  }
+
+  if (normalized.includes('too many requests') || normalized.includes('rate limit')) {
+    return 'Per daug bandymų prisijungti. Palauk kelias minutes ir bandyk dar kartą.'
+  }
+
+  return `Prisijungti nepavyko: ${message}`
 }
 
 export default function LoginPage() {
@@ -34,12 +52,21 @@ export default function LoginPage() {
     try {
       const normalizedEmail = email.trim().toLowerCase()
 
+      if (!supabaseConfig.hasUrl || !supabaseConfig.hasPublicKey || supabaseConfig.usesPlaceholder) {
+        setMessage(
+          'Prisijungimas nesukonfigūruotas: trūksta NEXT_PUBLIC_SUPABASE_URL arba NEXT_PUBLIC_SUPABASE_ANON_KEY / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.',
+        )
+        setLoading(false)
+        return
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password,
       })
 
       if (error) {
+        console.error('Login failed:', error)
         setMessage(getReadableError(error.message))
         setLoading(false)
         return
@@ -61,7 +88,8 @@ export default function LoginPage() {
         .limit(1)
 
       if (membershipError) {
-        setMessage(membershipError.message)
+        console.error('Login membership lookup failed:', membershipError)
+        setMessage(`Prisijungta, bet nepavyko patikrinti organizacijos: ${membershipError.message}`)
         setLoading(false)
         return
       }
@@ -86,7 +114,8 @@ export default function LoginPage() {
       router.replace('/employee-dashboard')
       router.refresh()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Įvyko klaida. Bandyk dar kartą.')
+      console.error('Login unexpected error:', error)
+      setMessage(error instanceof Error ? getReadableError(error.message) : 'Įvyko klaida. Bandyk dar kartą.')
     } finally {
       setLoading(false)
     }
