@@ -203,6 +203,93 @@ a[class*="bg-[#486b5d]"]:hover {
   background: #39594c;
 }
 
+.vg-app-shell :where(button, a)[class*="rounded"]:not([class*="rounded-full"]):not([aria-label]):not(:has(> svg:only-child)):not(:has(> p)) {
+  min-height: 42px !important;
+  height: auto !important;
+  border-radius: 12px !important;
+  padding: 0 16px !important;
+  font-family: var(--font-inter), Arial, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0 !important;
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease !important;
+}
+
+.vg-app-shell :where(button, a)[class*="bg-[#486b5d]"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-emerald-600"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-emerald-700"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-emerald-800"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-emerald-900"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-green-600"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-green-700"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-green-800"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-green-900"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-slate-900"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-slate-950"]:not([aria-label]),
+.vg-app-shell :where(button, a)[class*="bg-blue-600"]:not([aria-label]):not([class*="rounded-full"]),
+.vg-app-shell :where(button, a)[class*="bg-blue-700"]:not([aria-label]):not([class*="rounded-full"]),
+.vg-app-shell :where(button, a)[class*="bg-blue-800"]:not([aria-label]):not([class*="rounded-full"]),
+.vg-app-shell :where(button, a)[class*="bg-blue-900"]:not([aria-label]):not([class*="rounded-full"]) {
+  border: 1px solid #486b5d !important;
+  background: #486b5d !important;
+  color: #ffffff !important;
+}
+
+.vg-app-shell :where(button, a)[class*="bg-[#486b5d]"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-emerald-600"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-emerald-700"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-emerald-800"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-emerald-900"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-green-600"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-green-700"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-green-800"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-green-900"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-slate-900"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-slate-950"]:not([aria-label]):hover,
+.vg-app-shell :where(button, a)[class*="bg-blue-600"]:not([aria-label]):not([class*="rounded-full"]):hover,
+.vg-app-shell :where(button, a)[class*="bg-blue-700"]:not([aria-label]):not([class*="rounded-full"]):hover,
+.vg-app-shell :where(button, a)[class*="bg-blue-800"]:not([aria-label]):not([class*="rounded-full"]):hover,
+.vg-app-shell :where(button, a)[class*="bg-blue-900"]:not([aria-label]):not([class*="rounded-full"]):hover {
+  border-color: #39594c !important;
+  background: #39594c !important;
+  color: #ffffff !important;
+}
+
+.vg-app-shell :where(button, a)[class*="border"][class*="bg-white"]:not([class*="rounded-full"]):not([aria-label]) {
+  border-width: 1px !important;
+  border-color: #c9d8d0 !important;
+  background: #ffffff !important;
+  color: #39594c !important;
+  box-shadow: none !important;
+}
+
+.vg-app-shell :where(button, a)[class*="border"][class*="bg-emerald-50"]:not([class*="rounded-full"]):not([aria-label]),
+.vg-app-shell :where(button, a)[class*="border"][class*="bg-green-50"]:not([class*="rounded-full"]):not([aria-label]),
+.vg-app-shell :where(button, a)[class*="border"][class*="bg-blue-50"]:not([class*="rounded-full"]):not([aria-label]),
+.vg-app-shell :where(button, a)[class*="border"][class*="bg-slate-50"]:not([class*="rounded-full"]):not([aria-label]) {
+  border-width: 1px !important;
+  border-color: #c9d8d0 !important;
+  background: #ffffff !important;
+  color: #39594c !important;
+  box-shadow: none !important;
+}
+
+.vg-app-shell :where(button, a)[class*="border"][class*="bg-white"]:not([class*="rounded-full"]):not([aria-label]):hover {
+  border-color: #486b5d !important;
+  background: #ffffff !important;
+  color: #10251f !important;
+}
+
+.vg-app-shell :where(button, a)[class*="ring-1"][class*="ring-[#c9d8d0]"]:not([class*="rounded-full"]),
+.vg-app-shell :where(button, a)[aria-current="page"]:not([class*="rounded-full"]) {
+  border-width: 2px !important;
+  border-color: #486b5d !important;
+  background: #ffffff !important;
+  color: #10251f !important;
+  box-shadow: none !important;
+}
+
 /* Unified application surfaces. Status pills, charts and icon-only controls keep
    their semantic colors; content cards stay white and actions share one size. */
 .vg-app-shell article[class*="rounded"][class*="border"]:not([class*="rounded-full"]),
