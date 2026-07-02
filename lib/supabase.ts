@@ -1,11 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 
+const missingSupabaseUrl = "https://missing-supabase-url.invalid"
+const missingSupabaseKey = "missing-supabase-key"
+
 const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co"
+  process.env.NEXT_PUBLIC_SUPABASE_URL || missingSupabaseUrl
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "placeholder-key"
+  missingSupabaseKey
 
 export const supabaseConfig = {
   hasUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
@@ -14,8 +17,8 @@ export const supabaseConfig = {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   ),
   usesPlaceholder:
-    supabaseUrl === "https://placeholder.supabase.co" ||
-    supabaseAnonKey === "placeholder-key",
+    supabaseUrl === missingSupabaseUrl ||
+    supabaseAnonKey === missingSupabaseKey,
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)

@@ -20,13 +20,30 @@ export async function proxy(request: NextRequest) {
     request,
   })
 
+  const moduleKey = moduleForPath(request.nextUrl.pathname)
+  if (!moduleKey || !request.nextUrl.pathname.startsWith("/api/")) {
+    return response
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.json(
+      { ok: false, error: "Trūksta Supabase aplinkos kintamųjų." },
+      { status: 500 },
+    )
+  }
+
   const bearerToken = request.headers
     .get("authorization")
     ?.match(/^Bearer\s+(.+)$/i)?.[1]
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       global: bearerToken
         ? { headers: { Authorization: `Bearer ${bearerToken}` } }
@@ -56,10 +73,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const moduleKey = moduleForPath(request.nextUrl.pathname)
-  if (!moduleKey || !request.nextUrl.pathname.startsWith("/api/")) {
-    return response
-  }
   if (!user) {
     return NextResponse.json(
       { ok: false, error: "Neprisijungta." },
