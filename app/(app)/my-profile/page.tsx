@@ -795,8 +795,8 @@ export default function MyProfilePage() {
   return (
     <main className="min-h-screen bg-[#ffffff] px-4 py-5 pb-28 text-[#10251f] sm:p-6 sm:pb-24">
       <div className="mx-auto max-w-7xl space-y-5 sm:space-y-6">
-        <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-white shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
-          <div className="flex flex-col gap-6 bg-[#486b5d] p-7 text-white lg:flex-row lg:items-center lg:justify-between">
+        <section className="overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-white shadow-[0_1px_6px_rgba(16,37,31,0.08)]">
+          <div className="flex flex-col gap-5 bg-[#486b5d] px-5 py-4 text-white sm:px-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-5">
               <button
                 type="button"
@@ -808,23 +808,23 @@ export default function MyProfilePage() {
               </button>
 
               <div className="min-w-0">
-                <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-100/80">
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white">
                   Mano profilis
                 </p>
 
-                <h1 className="mt-3 break-words text-4xl font-black leading-tight tracking-[-0.04em] text-white sm:text-5xl">
+                <h1 className="mt-2 break-words text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
                   {fullName}
                 </h1>
 
-                <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-white/85">
+                <p className="mt-2 max-w-3xl text-sm font-black leading-6 text-white">
                   {organizationName || "Mano profilis"} · {roleLabel(membership?.role || profile?.role)}
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-white/15 px-4 py-2 text-sm font-black text-white ring-1 ring-white/15">
+                  <span className="rounded-lg bg-white/18 px-3 py-2 text-xs font-black text-white ring-1 ring-white/35">
                     {positionLabel(membership?.position)}
                   </span>
-                  <span className="rounded-full bg-white/15 px-4 py-2 text-sm font-black text-white ring-1 ring-white/15">
+                  <span className="rounded-lg bg-white/18 px-3 py-2 text-xs font-black text-white ring-1 ring-white/35">
                     {departmentLabel(membership?.department)}
                   </span>
                 </div>
@@ -875,7 +875,7 @@ export default function MyProfilePage() {
             </div>
           </div>
 
-          <div className="border-t border-emerald-900/10 bg-[#f7fcf9] p-3">
+          <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-3 sm:px-5">
             <div className="flex flex-wrap gap-2">
               <ProfileTab active label="Apžvalga" icon={<UserRound className="h-4 w-4" />} />
               <ProfileTab label="Mokymai" count={trainings.length} icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setShowTrainingModal(true)} />
@@ -886,7 +886,7 @@ export default function MyProfilePage() {
             </div>
           </div>
 
-          <div className="grid gap-3 p-5 md:grid-cols-3">
+          <div className="grid gap-3 p-4 sm:p-5 md:grid-cols-3">
             <HeroMetric label="Atostogos" value={String(pendingVacations.length)} />
             <HeroMetric label="Mokymai" value={String(trainings.length)} />
             <HeroMetric label="Trūksta" value={String(missingProfileCount)} tone={missingProfileCount > 0 ? "warning" : "normal"} />
@@ -1901,7 +1901,7 @@ function HeroMetric({
   tone?: "normal" | "warning";
 }) {
   return (
-    <div className="rounded-[18px] bg-[#f7fcf9] px-5 py-4">
+    <div className="rounded-[16px] border border-[#dbe6e0] bg-white px-5 py-4 shadow-sm">
       <div className="text-2xl font-black text-[#10251f]">{value}</div>
       <div
         className={`mt-1 text-[11px] font-bold tracking-[0.08em] ${
@@ -1923,7 +1923,7 @@ function Card({
 }) {
   return (
     <article
-      className={`rounded-[28px] border border-[#dbe6e0]/70 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.08)] sm:p-6 ${className}`}
+      className={`rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-[0_1px_6px_rgba(16,37,31,0.08)] sm:p-6 ${className}`}
     >
       {children}
     </article>
@@ -1944,10 +1944,10 @@ function StatCard({
   warning?: boolean;
 }) {
   return (
-    <article className="rounded-[24px] border border-[#dbe6e0] bg-white p-4 shadow-[0_1px_3px_rgba(16,37,31,0.10)] sm:p-6 transition hover:border-emerald-200 hover:shadow-md">
+    <article className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-sm transition hover:border-2 hover:border-[#486b5d] hover:p-[15px] sm:p-6 sm:hover:p-[23px]">
       <div className="flex items-center gap-4">
         <div
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl [&>svg]:h-6 [&>svg]:w-6 ${warning ? "bg-amber-50 text-amber-600" : "bg-[#f7fcf9] text-emerald-700"}`}
+          className={`flex h-14 w-14 items-center justify-center rounded-2xl border border-[#dbe6e0] bg-white [&>svg]:h-6 [&>svg]:w-6 ${warning ? "text-amber-600" : "text-[#007f5f]"}`}
         >
           {icon}
         </div>
@@ -1982,10 +1982,10 @@ function ActionCard({
     <button
       type="button"
       onClick={onClick}
-      className="group flex items-center justify-between rounded-2xl border border-[#dbe6e0] bg-[#ffffff] p-4 text-left transition hover:border-emerald-200 hover:bg-[#f7fcf9]"
+      className="group flex items-center justify-between rounded-[16px] border border-[#dbe6e0] bg-white p-4 text-left transition hover:border-2 hover:border-[#486b5d] hover:p-[15px]"
     >
       <span className="flex items-center gap-4">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#526174] shadow-sm [&>svg]:h-5 [&>svg]:w-5">
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#dbe6e0] bg-white text-[#486b5d] shadow-sm [&>svg]:h-5 [&>svg]:w-5">
           {icon}
         </span>
         <span>
@@ -1994,7 +1994,7 @@ function ActionCard({
           <small className="font-semibold text-[#526174]">{desc}</small>
         </span>
       </span>
-      <ArrowRight className="h-5 w-5 text-[#8ea0b5] transition group-hover:translate-x-1 group-hover:text-emerald-700" />
+      <ArrowRight className="h-5 w-5 text-[#486b5d] transition group-hover:translate-x-1" />
     </button>
   );
 }
@@ -2009,7 +2009,7 @@ function SummaryCard({
   muted?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-[#ffffff] p-4">
+    <div className="rounded-[16px] border border-[#dbe6e0] bg-white p-4">
       <p className="font-black text-[#10251f]">{title}</p>
       <p
         className={`mt-1 truncate text-sm font-black ${muted ? "text-[#526174]" : "text-emerald-700"}`}

@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/server/service-auth"
 type IncidentType =
   | "auth_configuration_unavailable"
   | "auth_service_unavailable"
+  | "database_unavailable"
   | "membership_check_failed"
   | "access_check_failed"
   | "login_unexpected_error"
@@ -16,6 +17,11 @@ const INCIDENT_LABELS: Record<IncidentType, { title: string; message: string }> 
   auth_service_unavailable: {
     title: "Prisijungimo serveris neatsako",
     message: "Vartotojui nepavyko prisijungti dėl ryšio su prisijungimo paslauga.",
+  },
+  database_unavailable: {
+    title: "Duomenu baze nepasiekiama",
+    message:
+      "Sistemos patikra nepasieke Supabase duomenu bazes. Patikrinkite, ar projektas nera pristabdytas.",
   },
   membership_check_failed: {
     title: "Nepavyko patikrinti vartotojo teisių",

@@ -362,13 +362,13 @@ export default function AdminDashboardPage() {
           <div className="bg-[#486b5d] px-5 py-4 text-white sm:px-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/70">
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white">
                   Pagrindinis skydelis
                 </p>
                 <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
                   Dienos apžvalga
                 </h1>
-                <p className="mt-2 max-w-4xl text-sm font-bold leading-6 text-white/82">
+                <p className="mt-2 max-w-4xl text-sm font-black leading-6 text-white">
                   Vienas langas svarbiausiems įstaigos rodikliams: gyventojams, personalo pajėgumui, rizikoms, mokymams, dokumentams ir veiksmams.
                 </p>
               </div>
@@ -387,7 +387,7 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => router.push("/reports")}
-                  className="inline-flex items-center justify-start gap-2 rounded-lg bg-white/12 px-4 py-2 text-sm font-black text-white ring-1 ring-white/18 transition active:scale-[0.98]"
+                  className="inline-flex items-center justify-start gap-2 rounded-lg bg-white/18 px-4 py-2 text-sm font-black text-white ring-1 ring-white/35 transition hover:bg-white/24 active:scale-[0.98]"
                 >
                   <BarChart3 className="h-4 w-4" />
                   Ataskaitos

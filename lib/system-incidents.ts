@@ -3,6 +3,7 @@ import { getStoredOrganizationId } from "@/lib/current-organization"
 type IncidentType =
   | "auth_configuration_unavailable"
   | "auth_service_unavailable"
+  | "database_unavailable"
   | "membership_check_failed"
   | "access_check_failed"
   | "login_unexpected_error"
