@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase, supabaseConfig } from '@/lib/supabase'
 import { setStoredOrganizationId } from '@/lib/current-organization'
 
-function getReadableError(message: string) {
+function getPublicLoginError(message: string) {
   const normalized = message.toLowerCase()
 
   if (normalized.includes('email not confirmed')) {
@@ -16,8 +16,12 @@ function getReadableError(message: string) {
     return 'Neteisingas el. paštas arba slaptažodis.'
   }
 
-  if (normalized.includes('invalid api key') || normalized.includes('apikey')) {
-    return 'Prisijungimo konfigūracija neteisinga. Reikia patikrinti Supabase viešąjį raktą Vercel aplinkoje.'
+  if (
+    normalized.includes('invalid api key') ||
+    normalized.includes('apikey') ||
+    normalized.includes('missing configuration')
+  ) {
+    return 'Prisijungimo paslauga laikinai nepasiekiama. Bandyk dar kartą vėliau arba kreipkis į administratorių.'
   }
 
   if (
@@ -25,14 +29,18 @@ function getReadableError(message: string) {
     normalized.includes('network') ||
     normalized.includes('fetch')
   ) {
-    return 'Nepavyko pasiekti prisijungimo serverio. Patikrink Supabase adresą ir Vercel aplinkos kintamuosius.'
+    return 'Nepavyko prisijungti prie sistemos. Patikrink interneto ryšį ir bandyk dar kartą.'
   }
 
   if (normalized.includes('too many requests') || normalized.includes('rate limit')) {
     return 'Per daug bandymų prisijungti. Palauk kelias minutes ir bandyk dar kartą.'
   }
 
-  return `Prisijungti nepavyko: ${message}`
+  return 'Prisijungti nepavyko. Patikrink duomenis ir bandyk dar kartą.'
+}
+
+function getReadableError(message: string) {
+  return getPublicLoginError(message)
 }
 
 export default function LoginPage() {
@@ -53,9 +61,8 @@ export default function LoginPage() {
       const normalizedEmail = email.trim().toLowerCase()
 
       if (!supabaseConfig.hasUrl || !supabaseConfig.hasPublicKey || supabaseConfig.usesPlaceholder) {
-        setMessage(
-          'Prisijungimas nesukonfigūruotas: trūksta NEXT_PUBLIC_SUPABASE_URL arba NEXT_PUBLIC_SUPABASE_ANON_KEY / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.',
-        )
+        console.error('Login configuration is missing public Supabase values:', supabaseConfig)
+        setMessage(getPublicLoginError('missing configuration'))
         setLoading(false)
         return
       }
@@ -89,7 +96,7 @@ export default function LoginPage() {
 
       if (membershipError) {
         console.error('Login membership lookup failed:', membershipError)
-        setMessage(`Prisijungta, bet nepavyko patikrinti organizacijos: ${membershipError.message}`)
+        setMessage('Prisijungimas pavyko, bet nepavyko patikrinti paskyros teisių. Bandyk dar kartą arba kreipkis į administratorių.')
         setLoading(false)
         return
       }

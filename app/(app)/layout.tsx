@@ -9,6 +9,8 @@ import AppSidebar from "@/components/layout/AppSidebar"
 import PageInstructions from "@/components/layout/PageInstructions"
 import { getCurrentAccess, hasModuleAccess } from "@/lib/app-access"
 import { moduleForPath } from "@/lib/plans"
+import { supabase } from "@/lib/supabase"
+import { setStoredOrganizationId } from "@/lib/current-organization"
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -47,31 +49,39 @@ function ModuleAccessGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const [checkedPath, setCheckedPath] = useState<string | null>(null)
+  const [accessError, setAccessError] = useState(false)
 
   useEffect(() => {
     let active = true
 
     async function checkAccess() {
-      const moduleKey = moduleForPath(pathname)
-      if (!moduleKey) {
-        if (active) setCheckedPath(pathname)
-        return
+      try {
+        setAccessError(false)
+
+        const moduleKey = moduleForPath(pathname)
+        if (!moduleKey) {
+          if (active) setCheckedPath(pathname)
+          return
+        }
+
+        const access = await getCurrentAccess()
+        if (!active) return
+
+        if (!access.role) {
+          router.replace("/login")
+          return
+        }
+
+        if (!hasModuleAccess(access, moduleKey)) {
+          router.replace(`/module-unavailable?module=${encodeURIComponent(moduleKey)}`)
+          return
+        }
+
+        setCheckedPath(pathname)
+      } catch (error) {
+        console.error("Access check failed:", error)
+        if (active) setAccessError(true)
       }
-
-      const access = await getCurrentAccess()
-      if (!active) return
-
-      if (!access.role) {
-        router.replace("/login")
-        return
-      }
-
-      if (!hasModuleAccess(access, moduleKey)) {
-        router.replace(`/module-unavailable?module=${encodeURIComponent(moduleKey)}`)
-        return
-      }
-
-      setCheckedPath(pathname)
     }
 
     void checkAccess()
@@ -80,11 +90,56 @@ function ModuleAccessGuard({ children }: { children: ReactNode }) {
     }
   }, [pathname, router])
 
+  if (accessError) {
+    return <AccessCheckFailed />
+  }
+
   if (checkedPath !== pathname) {
     return <AppLayoutShell embedded={false}>Tikrinama prieiga...</AppLayoutShell>
   }
 
   return children
+}
+
+function AccessCheckFailed() {
+  const router = useRouter()
+  const [leaving, setLeaving] = useState(false)
+
+  async function goToLogin() {
+    setLeaving(true)
+    setStoredOrganizationId(null)
+    try {
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error("Sign out failed after access check error:", error)
+    } finally {
+      router.replace("/login")
+    }
+  }
+
+  return (
+    <AppLayoutShell embedded={false}>
+      <div className="mx-auto mt-16 max-w-xl rounded-[24px] border border-[#c9d8d0] bg-white p-8 text-center shadow-sm">
+        <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#486b5d]">
+          Prisijungimas
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold text-[#10231c]">
+          Nepavyko patikrinti prieigos
+        </h1>
+        <p className="mt-3 text-base leading-7 text-[#486b5d]">
+          Sesija galėjo nutrūkti arba ryšys trumpam sutriko. Prisijunk iš naujo ir tęsk darbą.
+        </p>
+        <button
+          type="button"
+          onClick={goToLogin}
+          disabled={leaving}
+          className="mt-6 rounded-[14px] bg-[#486b5d] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#39594c] disabled:opacity-60"
+        >
+          {leaving ? "Atsijungiama..." : "Grįžti į prisijungimą"}
+        </button>
+      </div>
+    </AppLayoutShell>
+  )
 }
 
 function AppLayoutShell({
