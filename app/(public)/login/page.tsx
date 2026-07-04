@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, supabaseConfig } from '@/lib/supabase'
 import { setStoredOrganizationId } from '@/lib/current-organization'
+import { isLoginServiceIncident, reportSystemIncident } from '@/lib/system-incidents'
 
 function getPublicLoginError(message: string) {
   const normalized = message.toLowerCase()
@@ -62,6 +63,11 @@ export default function LoginPage() {
 
       if (!supabaseConfig.hasUrl || !supabaseConfig.hasPublicKey || supabaseConfig.usesPlaceholder) {
         console.error('Login configuration is missing public Supabase values:', supabaseConfig)
+        reportSystemIncident({
+          type: 'auth_configuration_unavailable',
+          source: 'login',
+          path: '/login',
+        })
         setMessage(getPublicLoginError('missing configuration'))
         setLoading(false)
         return
@@ -74,6 +80,13 @@ export default function LoginPage() {
 
       if (error) {
         console.error('Login failed:', error)
+        if (isLoginServiceIncident(error.message)) {
+          reportSystemIncident({
+            type: 'auth_service_unavailable',
+            source: 'login',
+            path: '/login',
+          })
+        }
         setMessage(getReadableError(error.message))
         setLoading(false)
         return
@@ -96,6 +109,11 @@ export default function LoginPage() {
 
       if (membershipError) {
         console.error('Login membership lookup failed:', membershipError)
+        reportSystemIncident({
+          type: 'membership_check_failed',
+          source: 'login',
+          path: '/login',
+        })
         setMessage('Prisijungimas pavyko, bet nepavyko patikrinti paskyros teisių. Bandyk dar kartą arba kreipkis į administratorių.')
         setLoading(false)
         return
@@ -122,6 +140,11 @@ export default function LoginPage() {
       router.refresh()
     } catch (error) {
       console.error('Login unexpected error:', error)
+      reportSystemIncident({
+        type: 'login_unexpected_error',
+        source: 'login',
+        path: '/login',
+      })
       setMessage(error instanceof Error ? getReadableError(error.message) : 'Įvyko klaida. Bandyk dar kartą.')
     } finally {
       setLoading(false)

@@ -11,6 +11,7 @@ import { getCurrentAccess, hasModuleAccess } from "@/lib/app-access"
 import { moduleForPath } from "@/lib/plans"
 import { supabase } from "@/lib/supabase"
 import { setStoredOrganizationId } from "@/lib/current-organization"
+import { reportSystemIncident } from "@/lib/system-incidents"
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -80,7 +81,14 @@ function ModuleAccessGuard({ children }: { children: ReactNode }) {
         setCheckedPath(pathname)
       } catch (error) {
         console.error("Access check failed:", error)
-        if (active) setAccessError(true)
+        if (active) {
+          reportSystemIncident({
+            type: "access_check_failed",
+            source: "app-layout",
+            path: pathname,
+          })
+          setAccessError(true)
+        }
       }
     }
 
