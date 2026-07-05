@@ -1088,8 +1088,8 @@ export default function ResidentsPage() {
   return (
     <main className="min-h-screen bg-[#ffffff] p-6 text-[#10251f]">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-[#486b5d] shadow-[0_1px_6px_rgba(16,37,31,0.08)]">
-          <div className="flex flex-col gap-5 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <section className="overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-white shadow-[0_1px_6px_rgba(16,37,31,0.08)]">
+          <div className="flex flex-col gap-5 bg-[#486b5d] px-6 py-6 text-white lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-white text-[#486b5d]">
                 <Users className="h-5 w-5" />
@@ -1129,44 +1129,34 @@ export default function ResidentsPage() {
               </button>
             </div>
           </div>
-        </section>
 
-        <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-3 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
-          <div className="flex flex-wrap gap-2">
-            {RESIDENT_LIST_TABS.map((item) => {
-              const Icon = item.icon;
-              const active = activeListTab === item.key;
+          <div className="flex flex-col gap-3 border-t border-[#dbe6e0] bg-[#f7fcf9] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-3">
+              {RESIDENT_LIST_TABS.map((item) => {
+                const Icon = item.icon;
+                const active = activeListTab === item.key;
 
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => changeListTab(item.key)}
-                  className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                    active
-                      ? "bg-white text-[#10251f] shadow-sm ring-2 ring-[#486b5d]"
-                      : "text-[#486b5d] hover:bg-white hover:text-[#10251f] hover:ring-1 hover:ring-[#486b5d]"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => changeListTab(item.key)}
+                    className={`inline-flex h-11 items-center gap-2 rounded-[14px] border px-4 text-sm font-black transition ${
+                      active
+                        ? "border-2 border-[#486b5d] bg-white text-[#10251f] shadow-sm"
+                        : "border-transparent bg-transparent text-[#486b5d] hover:border-[#486b5d] hover:bg-white hover:text-[#10251f]"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div data-instruction-row className="flex justify-end" />
           </div>
         </section>
-
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setShowHelpModal(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-[#dbe6e0] bg-white px-4 text-sm font-black text-[#486b5d] shadow-sm transition hover:border-[#486b5d]"
-          >
-            <Info className="h-4 w-4" />
-            Plačiau
-          </button>
-        </div>
 
         {message ? (
           <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/80 px-5 py-3 font-bold text-[#39594c]">

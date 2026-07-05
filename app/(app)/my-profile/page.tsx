@@ -794,7 +794,7 @@ export default function MyProfilePage() {
 
   return (
     <main className="min-h-screen bg-[#ffffff] px-4 py-5 pb-28 text-[#10251f] sm:p-6 sm:pb-24">
-      <div className="mx-auto max-w-7xl space-y-5 sm:space-y-6">
+      <div className="mx-auto max-w-[1500px] space-y-5 sm:space-y-6">
         <section className="overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-white shadow-[0_1px_6px_rgba(16,37,31,0.08)]">
           <div className="flex flex-col gap-5 bg-[#486b5d] px-5 py-4 text-white sm:px-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-5">
@@ -876,14 +876,18 @@ export default function MyProfilePage() {
             </div>
           </div>
 
-          <div className="border-b border-[#dbe6e0] bg-white px-4 py-3 sm:px-5">
-            <div className="flex flex-wrap gap-2">
-              <ProfileTab active label="Apžvalga" icon={<UserRound className="h-4 w-4" />} />
-              <ProfileTab label="Mokymai" count={trainings.length} icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setShowTrainingModal(true)} />
-              <ProfileTab label="Prašymai" count={pendingVacations.length} icon={<CalendarCheck className="h-4 w-4" />} onClick={() => setShowVacationModal(true)} />
-              <ProfileTab label="Mano grafikas" icon={<CalendarCheck className="h-4 w-4" />} onClick={() => router.push(MY_SCHEDULE_ROUTE)} />
-              <ProfileTab label="Kontaktai" icon={<Edit3 className="h-4 w-4" />} onClick={() => setShowProfileModal(true)} />
-              <ProfileTab label="Dokumentai" icon={<FileText className="h-4 w-4" />} onClick={openDocuments} />
+          <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-5 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-3">
+                <ProfileTab active label="Apžvalga" icon={<UserRound className="h-4 w-4" />} />
+                <ProfileTab label="Mokymai" count={trainings.length} icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setShowTrainingModal(true)} />
+                <ProfileTab label="Prašymai" count={pendingVacations.length} icon={<CalendarCheck className="h-4 w-4" />} onClick={() => setShowVacationModal(true)} />
+                <ProfileTab label="Mano grafikas" icon={<CalendarCheck className="h-4 w-4" />} onClick={() => router.push(MY_SCHEDULE_ROUTE)} />
+                <ProfileTab label="Kontaktai" icon={<Edit3 className="h-4 w-4" />} onClick={() => setShowProfileModal(true)} />
+                <ProfileTab label="Dokumentai" icon={<FileText className="h-4 w-4" />} onClick={openDocuments} />
+              </div>
+
+              <div data-instruction-row className="flex justify-end" />
             </div>
           </div>
 
@@ -1875,10 +1879,10 @@ function ProfileTab({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
+      className={`inline-flex h-11 items-center gap-2 rounded-[14px] border px-4 text-sm font-black transition ${
         active
-          ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-          : "text-[#486b5d] hover:bg-white/70"
+          ? "border-2 border-[#486b5d] bg-white text-[#10251f] shadow-sm"
+          : "border-transparent bg-transparent text-[#486b5d] hover:border-[#486b5d] hover:bg-white hover:text-[#10251f]"
       }`}
     >
       {icon}
