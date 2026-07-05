@@ -831,14 +831,15 @@ export default function MyProfilePage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => void loadData()}
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-white/10 text-white backdrop-blur transition hover:bg-white/20 active:scale-[0.98]"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[14px] bg-white px-4 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f7fcf9] active:scale-[0.98]"
                 aria-label="Atnaujinti"
               >
-                <RefreshCw className="h-5 w-5" />
+                <RefreshCw className="h-4 w-4" />
+                Atnaujinti
               </button>
 
               <div className="flex shrink-0 flex-col items-center gap-2">
@@ -846,7 +847,7 @@ export default function MyProfilePage() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="group relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-[28px] bg-[#e8f7ef] text-2xl font-black text-[#486b5d] shadow-sm transition hover:ring-4 hover:ring-white/20 disabled:opacity-60"
+                  className="group relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-[16px] bg-white text-lg font-black text-[#486b5d] shadow-sm transition hover:ring-2 hover:ring-white/40 disabled:opacity-60"
                   aria-label="Įkelti profilio nuotrauką"
                 >
                   {photo ? (
@@ -867,7 +868,7 @@ export default function MyProfilePage() {
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={uploadingPhoto}
-                  className="text-xs font-black text-emerald-100 underline-offset-4 hover:underline disabled:opacity-60"
+                  className="text-xs font-black text-white underline-offset-4 hover:underline disabled:opacity-60"
                 >
                   {uploadingPhoto ? "Keliama..." : photo ? "Keisti foto" : "Įkelti foto"}
                 </button>
@@ -875,7 +876,7 @@ export default function MyProfilePage() {
             </div>
           </div>
 
-          <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-3 sm:px-5">
+          <div className="border-b border-[#dbe6e0] bg-white px-4 py-3 sm:px-5">
             <div className="flex flex-wrap gap-2">
               <ProfileTab active label="Apžvalga" icon={<UserRound className="h-4 w-4" />} />
               <ProfileTab label="Mokymai" count={trainings.length} icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setShowTrainingModal(true)} />
@@ -1901,7 +1902,7 @@ function HeroMetric({
   tone?: "normal" | "warning";
 }) {
   return (
-    <div className="rounded-[16px] border border-[#dbe6e0] bg-white px-5 py-4 shadow-sm">
+    <div className="rounded-[16px] border border-[#c9d8d0] bg-white px-5 py-4 shadow-sm transition hover:border-2 hover:border-[#486b5d] hover:px-[19px] hover:py-[15px]">
       <div className="text-2xl font-black text-[#10251f]">{value}</div>
       <div
         className={`mt-1 text-[11px] font-bold tracking-[0.08em] ${
@@ -1947,7 +1948,7 @@ function StatCard({
     <article className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-sm transition hover:border-2 hover:border-[#486b5d] hover:p-[15px] sm:p-6 sm:hover:p-[23px]">
       <div className="flex items-center gap-4">
         <div
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl border border-[#dbe6e0] bg-white [&>svg]:h-6 [&>svg]:w-6 ${warning ? "text-amber-600" : "text-[#007f5f]"}`}
+          className={`flex h-12 w-12 items-center justify-center rounded-[14px] border border-[#dbe6e0] bg-white [&>svg]:h-5 [&>svg]:w-5 ${warning ? "text-amber-600" : "text-[#007f5f]"}`}
         >
           {icon}
         </div>
@@ -1985,7 +1986,7 @@ function ActionCard({
       className="group flex items-center justify-between rounded-[16px] border border-[#dbe6e0] bg-white p-4 text-left transition hover:border-2 hover:border-[#486b5d] hover:p-[15px]"
     >
       <span className="flex items-center gap-4">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#dbe6e0] bg-white text-[#486b5d] shadow-sm [&>svg]:h-5 [&>svg]:w-5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-[#dbe6e0] bg-white text-[#486b5d] shadow-sm [&>svg]:h-4 [&>svg]:w-4">
           {icon}
         </span>
         <span>
@@ -2308,15 +2309,15 @@ function Modal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#486b5d]/50 p-3 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[2rem] border border-[#dbe6e0] bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-[#dbe6e0] bg-white px-5 py-5 sm:px-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#10251f]/55 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-white shadow-[0_22px_70px_rgba(16,37,31,0.22)]">
+        <div className="flex items-start justify-between gap-4 border-b border-[#dbe6e0] bg-[#486b5d] px-5 py-5 text-white sm:px-6">
           <div>
-            <h2 className="text-2xl font-black tracking-tight text-[#10251f] sm:text-3xl">
+            <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
               {title}
             </h2>
             {subtitle ? (
-              <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-[#526174]">
+              <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-white/85">
                 {subtitle}
               </p>
             ) : null}
@@ -2324,7 +2325,7 @@ function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f7fcf9] text-[#526174] transition hover:bg-slate-200 hover:text-[#10251f]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#486b5d] transition hover:bg-[#f7fcf9] hover:text-[#10251f]"
             aria-label="Uždaryti"
           >
             <X className="h-5 w-5" />

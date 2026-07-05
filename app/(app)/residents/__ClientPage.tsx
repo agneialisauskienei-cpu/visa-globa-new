@@ -1088,21 +1088,21 @@ export default function ResidentsPage() {
   return (
     <main className="min-h-screen bg-[#ffffff] p-6 text-[#10251f]">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="overflow-hidden rounded-[30px] border border-emerald-900/10 bg-[#486b5d] shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
-          <div className="flex flex-col gap-6 px-7 py-7 lg:flex-row lg:items-center lg:justify-between">
+        <section className="overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-[#486b5d] shadow-[0_1px_6px_rgba(16,37,31,0.08)]">
+          <div className="flex flex-col gap-5 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-5">
-              <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-[#e8f7ef] text-[#486b5d]">
-                <Users className="h-7 w-7" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-white text-[#486b5d]">
+                <Users className="h-5 w-5" />
               </div>
 
               <div>
-                <p className="text-sm font-black tracking-[0.14em] text-emerald-100/80">
+                <p className="text-xs font-black tracking-[0.14em] text-white/80">
                   Gyventojų modulis
                 </p>
-                <h1 className="mt-2 text-5xl font-black tracking-[-0.04em] text-white">
+                <h1 className="mt-1 text-3xl font-black tracking-[-0.03em] text-white sm:text-4xl">
                   Gyventojai
                 </h1>
-                <p className="mt-3 max-w-3xl text-lg font-semibold leading-8 text-emerald-50/90">
+                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-white/90 sm:text-base">
                   Gyventojų sąrašas, kambariai, statusai ir atsakingi
                   darbuotojai vienoje vietoje.
                 </p>
@@ -1113,7 +1113,7 @@ export default function ResidentsPage() {
               <button
                 type="button"
                 onClick={() => void loadData()}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white px-5 py-3 font-black text-[#486b5d] shadow-sm transition hover:bg-[#ecfdf5]"
+                className="inline-flex h-11 items-center gap-2 rounded-[14px] border border-white/20 bg-white px-4 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f7fcf9]"
               >
                 <RefreshCw className="h-4 w-4" />
                 Atnaujinti
@@ -1122,7 +1122,7 @@ export default function ResidentsPage() {
               <button
                 type="button"
                 onClick={openCreateModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#486b5d] px-5 py-3 font-black text-white shadow-sm transition hover:bg-[#39594c]"
+                className="inline-flex h-11 items-center gap-2 rounded-[14px] bg-white px-4 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#f7fcf9]"
               >
                 <Plus className="h-4 w-4" />
                 Naujas gyventojas
@@ -1131,7 +1131,7 @@ export default function ResidentsPage() {
           </div>
         </section>
 
-        <section className="rounded-[24px] border border-[#c9d8d0] bg-[#f7fcf9] p-3 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+        <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-3 shadow-[0_1px_3px_rgba(16,37,31,0.08)]">
           <div className="flex flex-wrap gap-2">
             {RESIDENT_LIST_TABS.map((item) => {
               const Icon = item.icon;
@@ -1144,8 +1144,8 @@ export default function ResidentsPage() {
                   onClick={() => changeListTab(item.key)}
                   className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
                     active
-                      ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                      : "text-[#486b5d] hover:bg-white/70 hover:text-[#10251f]"
+                      ? "bg-white text-[#10251f] shadow-sm ring-2 ring-[#486b5d]"
+                      : "text-[#486b5d] hover:bg-white hover:text-[#10251f] hover:ring-1 hover:ring-[#486b5d]"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -1161,7 +1161,7 @@ export default function ResidentsPage() {
           <button
             type="button"
             onClick={() => setShowHelpModal(true)}
-            className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+            className="inline-flex h-10 items-center gap-2 rounded-[14px] border border-[#dbe6e0] bg-white px-4 text-sm font-black text-[#486b5d] shadow-sm transition hover:border-[#486b5d]"
           >
             <Info className="h-4 w-4" />
             Plačiau
@@ -1218,7 +1218,7 @@ export default function ResidentsPage() {
           text="Spustelėjus filtrų kortelę sąrašas iš karto persifiltruoja. „Aktyvūs“ rodo visus nearchyvuotus gyventojus, „Ligoninėje / išvykę“ padeda greitai rasti laikinai nesančius, o „Archyvas“ skirtas mirusiems arba sutartį nutraukusiems gyventojams."
         />
 
-        <section className="rounded-[30px] border border-[#c9d8d0] bg-white p-6 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+        <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_6px_rgba(16,37,31,0.08)] sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-2xl font-black tracking-[-0.02em] text-[#10251f]">
@@ -1263,12 +1263,12 @@ export default function ResidentsPage() {
                 return (
                   <article
                     key={resident.id}
-                    className="rounded-3xl border border-[#dbe6e0] bg-[#ffffff] p-5 transition hover:border-[#a7f3d0] hover:bg-[#ecfdf5]/40"
+                    className="rounded-[18px] border border-[#dbe6e0] bg-white p-5 transition hover:border-2 hover:border-[#486b5d] hover:p-[19px]"
                   >
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                       <div className="flex items-start gap-4">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#f7fcf9] text-[#486b5d] shadow-sm">
-                          <User className="h-6 w-6" />
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-[#dbe6e0] bg-white text-[#486b5d] shadow-sm">
+                          <User className="h-5 w-5" />
                         </div>
 
                         <div>
@@ -1321,7 +1321,7 @@ export default function ResidentsPage() {
                         <button
                           type="button"
                           onClick={() => router.push(`/residents/${resident.id}`)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#486b5d] px-4 py-3 font-extrabold text-white transition hover:bg-[#39594c]"
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-[#486b5d] px-4 text-sm font-black text-white transition hover:bg-[#39594c]"
                         >
                           <User className="h-4 w-4" />
                           Atidaryti kortelę
@@ -1330,7 +1330,7 @@ export default function ResidentsPage() {
                         <button
                           type="button"
                           onClick={() => openEditModal(resident)}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 font-extrabold text-[#486b5d] transition hover:bg-[#f7fcf9]"
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#dbe6e0] bg-white px-4 text-sm font-black text-[#486b5d] transition hover:border-[#486b5d]"
                         >
                           <Edit3 className="h-4 w-4" />
                           Redaguoti
@@ -1347,7 +1347,7 @@ export default function ResidentsPage() {
 
       {showHelpModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-6 backdrop-blur-sm">
-          <section className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+          <section className="w-full max-w-3xl overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-white shadow-[0_22px_70px_rgba(16,37,31,0.22)]">
             <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.28em] text-emerald-100/80">
@@ -1365,10 +1365,10 @@ export default function ResidentsPage() {
               <button
                 type="button"
                 onClick={() => setShowHelpModal(false)}
-                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#486b5d] transition hover:bg-[#f7fcf9]"
                 aria-label="Uždaryti pagalbą"
               >
-                <X size={28} strokeWidth={2.1} />
+                <X size={20} strokeWidth={2.1} />
               </button>
             </div>
 
@@ -1408,7 +1408,7 @@ export default function ResidentsPage() {
                 />
               </div>
 
-              <div className="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm font-semibold leading-6 text-[#03543f]">
+              <div className="mt-5 rounded-[16px] border border-[#dbe6e0] bg-white px-5 py-4 text-sm font-semibold leading-6 text-[#10251f]">
                 Patarimas: sąraše laikome tik greitą administravimą. Detali
                 priežiūros, medicinos, rizikų ir ISGP informacija turi būti
                 tvarkoma gyventojo kortelėje, kad duomenys nesidubliuotų.
@@ -1455,7 +1455,7 @@ function InfoBox({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`inline-flex items-center gap-2 rounded-full border border-[#dbe6e0] bg-white text-xs font-black text-[#526174] shadow-sm transition hover:border-[#a7f3d0] hover:bg-[#ecfdf5] hover:text-[#39594c] ${
+        className={`inline-flex items-center gap-2 rounded-[14px] border border-[#dbe6e0] bg-white text-xs font-black text-[#486b5d] shadow-sm transition hover:border-[#486b5d] ${
           compact ? "px-3 py-1.5" : "px-4 py-2"
         }`}
         title={title}
@@ -1466,10 +1466,10 @@ function InfoBox({
 
       {open ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-xl overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+          <div className="w-full max-w-xl overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-white shadow-[0_22px_70px_rgba(16,37,31,0.22)]">
             <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
               <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#e8f7ef] text-[#486b5d]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#486b5d]">
                   <Info className="h-5 w-5" />
                 </div>
                 <div>
@@ -1485,10 +1485,10 @@ function InfoBox({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#486b5d] transition hover:bg-[#f7fcf9]"
                 aria-label="Uždaryti pagalbą"
               >
-                <X size={28} strokeWidth={2.1} />
+                <X size={20} strokeWidth={2.1} />
               </button>
             </div>
 
@@ -1519,10 +1519,10 @@ function StatCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[18px] border bg-white px-5 py-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.10)] transition ${active ? "border-[#486b5d] ring-2 ring-[#d1fae5]" : "border-[#c9d8d0] hover:border-[#a7f3d0] hover:bg-[#ffffff]"}`}
+      className={`rounded-[16px] border bg-white px-5 py-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition ${active ? "border-2 border-[#486b5d] px-[19px] py-[15px]" : "border-[#c9d8d0] hover:border-2 hover:border-[#486b5d] hover:px-[19px] hover:py-[15px]"}`}
     >
       <p className="font-extrabold text-[#66756c]">{title}</p>
-      <p className="mt-2 text-4xl font-black tracking-[-0.04em] text-[#10251f]">{value}</p>
+      <p className="mt-2 text-2xl font-black tracking-[-0.03em] text-[#10251f]">{value}</p>
     </button>
   );
 }
@@ -1629,7 +1629,7 @@ function ResidentModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950/50 p-4 backdrop-blur-sm md:p-6">
-      <section className="flex max-h-[calc(100vh-48px)] w-full max-w-[1180px] flex-col overflow-hidden rounded-[28px] border border-[#dbe6e0] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.30)]">
+      <section className="flex max-h-[calc(100vh-48px)] w-full max-w-[1180px] flex-col overflow-hidden rounded-[18px] border border-[#c9d8d0] bg-white shadow-[0_22px_70px_rgba(16,37,31,0.22)]">
         <div className="flex items-start justify-between gap-5 bg-[#486b5d] px-6 py-5 text-white">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100/80">
@@ -1642,14 +1642,14 @@ function ResidentModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-white/10 text-white transition hover:bg-white/20"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#486b5d] transition hover:bg-[#f7fcf9]"
             aria-label="Uždaryti"
           >
-            <X size={28} strokeWidth={2.1} />
+            <X size={20} strokeWidth={2.1} />
           </button>
         </div>
 
-        <div className="border-b border-[#dbe6e0] bg-[#f7fcf9] px-5 py-3 md:px-6">
+        <div className="border-b border-[#dbe6e0] bg-white px-5 py-3 md:px-6">
           <div className="flex flex-wrap gap-2">
             {RESIDENT_POPUP_TABS.map((item) => {
               const Icon = item.icon;
@@ -1662,8 +1662,8 @@ function ResidentModal({
                   onClick={() => setPopupTab(item.key)}
                   className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
                     active
-                      ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                      : "text-[#486b5d] hover:bg-white/70 hover:text-[#10251f]"
+                      ? "bg-white text-[#10251f] shadow-sm ring-2 ring-[#486b5d]"
+                      : "text-[#486b5d] hover:bg-white hover:text-[#10251f] hover:ring-1 hover:ring-[#486b5d]"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
