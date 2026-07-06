@@ -670,14 +670,13 @@ a[class*="bg-[#486b5d]"]:hover {
 }
 
 .vg-stat-card:hover {
-  border-width: 2px;
   border-color: var(--vg-primary);
   box-shadow: 0 4px 12px rgba(16, 37, 31, .08);
 }
 .vg-stat-label { font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--vg-muted); }
 .vg-stat-value { margin-top: 4px; font-size: 26px; line-height: 1; font-weight: 900; color: var(--vg-text); }
 .vg-stat-note { margin-top: 6px; font-size: 12px; font-weight: 700; color: #5d6f86; }
-.vg-input, .vg-select, .vg-textarea { border: 1px solid #c2d3ca; border-radius: 12px; background: #fff; color: var(--vg-text); font-weight: 800; outline: none; }
+.vg-input, .vg-select, .vg-textarea { border: 1px solid #c2d3ca; border-radius: 14px; background: #fff; color: var(--vg-text); font-weight: 800; outline: none; }
 .vg-input, .vg-select { min-height: 40px; padding: 0 12px; }
 .vg-textarea { padding: 10px 12px; }
 .vg-input:focus, .vg-select:focus, .vg-textarea:focus { border-color: var(--vg-primary); box-shadow: 0 0 0 3px rgba(72,107,93,.12); }
@@ -786,6 +785,32 @@ a[class*="bg-[#486b5d]"]:hover {
 .vg-app-shell select,
 .vg-app-shell textarea {
   max-width: 100%;
+}
+
+.vg-app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.vg-app-shell select,
+.vg-app-shell textarea {
+  border-radius: 14px !important;
+  border-width: 1px !important;
+  border-color: #c9d8d0;
+  background-color: #ffffff;
+  color: var(--vg-text);
+}
+
+.vg-app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.vg-app-shell select:focus,
+.vg-app-shell textarea:focus {
+  border-color: var(--vg-primary) !important;
+  box-shadow: 0 0 0 3px rgba(72, 107, 93, .12);
+  outline: none;
+}
+
+.vg-app-shell form [class*="rounded-2xl"],
+.vg-app-shell form [class*="rounded-3xl"],
+.vg-app-shell form [class*="rounded-[24px]"],
+.vg-app-shell form [class*="rounded-[28px]"],
+.vg-app-shell form [class*="rounded-[30px]"] {
+  border-radius: 16px !important;
 }
 
 /* Shared data-table appearance. Schedule and spreadsheet matrices keep their
