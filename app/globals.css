@@ -400,19 +400,24 @@ a[class*="bg-[#486b5d]"]:hover {
 }
 
 .vg-tab-frame {
-  border: 2px solid transparent;
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 0 14px !important;
+  border: 1px solid transparent;
+  border-radius: 12px !important;
   background: transparent;
   color: #486b5d;
+  box-sizing: border-box;
 }
 
 .vg-tab-frame:hover {
   background: #ffffff;
-  outline: 1px solid #486b5d;
-  outline-offset: -1px;
+  border-color: #486b5d;
   color: #10251f;
 }
 
 .vg-tab-frame[data-active="true"] {
+  border-width: 2px;
   border-color: #486b5d;
   background: #ffffff;
   color: #10251f;
@@ -428,6 +433,40 @@ a[class*="bg-[#486b5d]"]:hover {
 .vg-hover-frame:hover {
   border-color: #486b5d;
   box-shadow: 0 1px 6px rgba(16, 37, 31, 0.08);
+}
+
+.vg-app-shell [data-instruction-row] {
+  margin-left: auto;
+  display: flex;
+  min-width: 180px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.vg-app-shell [data-instruction-row] button,
+.vg-app-shell [data-instruction-row] a {
+  height: 42px !important;
+  min-height: 42px !important;
+  border-radius: 12px !important;
+  padding: 0 16px !important;
+}
+
+.vg-app-shell [class*="hover:border-2"]:hover {
+  border-width: 1px !important;
+}
+
+.vg-app-shell [class*="hover:p-[15px]"]:hover {
+  padding: 1rem !important;
+}
+
+.vg-app-shell [class*="sm:hover:p-[23px]"]:hover {
+  padding: 1rem !important;
+}
+
+@media (min-width: 640px) {
+  .vg-app-shell [class*="sm:hover:p-[23px]"]:hover {
+  padding: 1.5rem !important;
+  }
 }
 
 .vg-app-shell [class*="rounded-full"][class*="bg-emerald-"],

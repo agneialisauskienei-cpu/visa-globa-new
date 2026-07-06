@@ -1141,11 +1141,8 @@ export default function ResidentsPage() {
                     key={item.key}
                     type="button"
                     onClick={() => changeListTab(item.key)}
-                    className={`inline-flex h-11 items-center gap-2 rounded-[14px] border px-4 text-sm font-black transition ${
-                      active
-                        ? "border-2 border-[#486b5d] bg-white text-[#10251f] shadow-sm"
-                        : "border-transparent bg-transparent text-[#486b5d] hover:border-[#486b5d] hover:bg-white hover:text-[#10251f]"
-                    }`}
+                    data-active={active ? "true" : "false"}
+                    className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
@@ -1154,7 +1151,16 @@ export default function ResidentsPage() {
               })}
             </div>
 
-            <div data-instruction-row className="flex justify-end" />
+            <div data-instruction-row className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowHelpModal(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#c2d3ca] bg-white px-4 py-2 text-xs font-black text-[#486b5d] shadow-sm transition hover:bg-white"
+              >
+                <Info className="h-4 w-4" />
+                Instrukcija
+              </button>
+            </div>
           </div>
         </section>
 

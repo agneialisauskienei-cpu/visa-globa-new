@@ -1879,11 +1879,8 @@ function ProfileTab({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-11 items-center gap-2 rounded-[14px] border px-4 text-sm font-black transition ${
-        active
-          ? "border-2 border-[#486b5d] bg-white text-[#10251f] shadow-sm"
-          : "border-transparent bg-transparent text-[#486b5d] hover:border-[#486b5d] hover:bg-white hover:text-[#10251f]"
-      }`}
+      data-active={active ? "true" : "false"}
+      className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
     >
       {icon}
       {label}
