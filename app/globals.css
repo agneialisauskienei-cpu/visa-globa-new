@@ -395,7 +395,39 @@ a[class*="bg-[#486b5d]"]:hover {
 
 .vg-app-shell button[class*="hover:border-2"][class*="border-[#486b5d]"][class*="bg-white"]:not([class*="rounded-full"]):hover,
 .vg-app-shell a[class*="hover:border-2"][class*="border-[#486b5d]"][class*="bg-white"]:not([class*="rounded-full"]):hover {
-  border-width: 2px !important;
+  border-width: 1px !important;
+  box-shadow: 0 1px 6px rgba(16, 37, 31, 0.08) !important;
+}
+
+.vg-tab-frame {
+  border: 2px solid transparent;
+  background: transparent;
+  color: #486b5d;
+}
+
+.vg-tab-frame:hover {
+  background: #ffffff;
+  outline: 1px solid #486b5d;
+  outline-offset: -1px;
+  color: #10251f;
+}
+
+.vg-tab-frame[data-active="true"] {
+  border-color: #486b5d;
+  background: #ffffff;
+  color: #10251f;
+  box-shadow: 0 1px 3px rgba(16, 37, 31, 0.08);
+  outline: none;
+}
+
+.vg-hover-frame {
+  border: 1px solid #dbe6e0;
+  background: #ffffff;
+}
+
+.vg-hover-frame:hover {
+  border-color: #486b5d;
+  box-shadow: 0 1px 6px rgba(16, 37, 31, 0.08);
 }
 
 .vg-app-shell [class*="rounded-full"][class*="bg-emerald-"],

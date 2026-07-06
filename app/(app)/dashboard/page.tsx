@@ -1294,11 +1294,8 @@ function DashboardTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 transition ${
-        active
-          ? "bg-white text-[#486b5d] shadow-sm ring-1 ring-[#c9d8d0]"
-          : "text-[#486b5d] hover:bg-white/80"
-      }`}
+      data-active={active ? "true" : "false"}
+      className="vg-tab-frame inline-flex h-11 shrink-0 items-center gap-2 rounded-[14px] px-4 text-sm font-black transition"
     >
       {children}
     </button>
@@ -1561,7 +1558,7 @@ function RiskAttentionCard({
       type="button"
       data-content-card
       onClick={onClick}
-      className="w-full rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-3 text-left text-[#10251f] transition hover:border-[#486b5d] hover:shadow-sm"
+      className="vg-hover-frame w-full rounded-[14px] px-4 py-3 text-left text-[#10251f] transition"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -2004,7 +2001,7 @@ function QuickLink({ title, onClick }: { title: string; onClick: () => void }) {
       type="button"
       data-content-card
       onClick={onClick}
-      className="flex min-h-12 items-center justify-between gap-4 rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-3 text-left text-sm font-black text-[#10251f] transition hover:border-[#486b5d] hover:shadow-sm"
+      className="vg-hover-frame flex min-h-12 items-center justify-between gap-4 rounded-[14px] px-4 py-3 text-left text-sm font-black text-[#10251f] transition"
     >
       <span>+ {title}</span>
       <ArrowRight className="h-5 w-5 text-[#6a7e75]" />
