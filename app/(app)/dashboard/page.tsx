@@ -1561,12 +1561,12 @@ function RiskAttentionCard({
       type="button"
       data-content-card
       onClick={onClick}
-      className="w-full rounded-2xl border border-[#486b5d] bg-white p-4 text-left text-[#10251f] transition hover:border-2 hover:border-[#486b5d] hover:shadow-sm"
+      className="w-full rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-3 text-left text-[#10251f] transition hover:border-[#486b5d] hover:shadow-sm"
     >
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-lg font-black text-[#10251f]">{title}</p>
-          <p className="mt-1 text-sm font-bold text-[#10251f]">{text}</p>
+        <div className="min-w-0">
+          <p className="text-base font-black leading-6 text-[#10251f]">{title}</p>
+          <p className="mt-1 text-sm font-semibold leading-5 text-[#10251f]">{text}</p>
         </div>
 
         {hasWarning ? (
@@ -2004,7 +2004,7 @@ function QuickLink({ title, onClick }: { title: string; onClick: () => void }) {
       type="button"
       data-content-card
       onClick={onClick}
-      className="flex items-center justify-between rounded-xl border border-[#486b5d] bg-white px-4 py-3 text-left font-black transition hover:border-2 hover:border-[#486b5d]"
+      className="flex min-h-12 items-center justify-between gap-4 rounded-[14px] border border-[#dbe6e0] bg-white px-4 py-3 text-left text-sm font-black text-[#10251f] transition hover:border-[#486b5d] hover:shadow-sm"
     >
       <span>+ {title}</span>
       <ArrowRight className="h-5 w-5 text-[#6a7e75]" />
