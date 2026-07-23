@@ -464,18 +464,36 @@ function downloadExcelTable(filename: string, rows: unknown[][]) {
   if (typeof window === "undefined") return;
 
   const tableRows = rows
-    .map((row) =>
-      `<tr>${row.map((cell) => `<td>${excelCell(cell)}</td>`).join("")}</tr>`,
-    )
+    .map((row, index) => {
+      const cells = row.map((cell) => `<td>${excelCell(cell)}</td>`).join("");
+      const isEmpty = row.every((cell) => String(cell ?? "").trim() === "");
+      const firstCell = String(row[0] ?? "");
+      const className = [
+        index === 0 ? "title-row" : "",
+        firstCell === "Suvestinė" || firstCell === "Vidurkiai" ? "section-row" : "",
+        firstCell === "Padalinys" ? "header-row" : "",
+        firstCell === "Iš viso" ? "total-row" : "",
+        isEmpty ? "blank-row" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      return `<tr class="${className}">${cells}</tr>`;
+    })
     .join("");
   const content = `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <style>
-    table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
-    td { border: 1px solid #d9e4de; padding: 6px 10px; white-space: nowrap; }
-    tr:first-child td { font-weight: 700; background: #f7fcf9; color: #10251f; }
+    body { background: #ffffff; color: #10251f; }
+    table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; min-width: 1120px; }
+    td { border: 1px solid #d9e4de; padding: 7px 10px; white-space: nowrap; vertical-align: middle; }
+    .title-row td { border: 0; background: #486b5d; color: #ffffff; font-size: 20pt; font-weight: 700; padding: 14px 12px; }
+    .section-row td { border: 0; background: #f7fcf9; color: #486b5d; font-size: 13pt; font-weight: 700; padding-top: 14px; }
+    .header-row td { background: #486b5d; color: #ffffff; font-weight: 700; }
+    .total-row td { background: #f7fcf9; color: #10251f; font-weight: 700; }
+    .blank-row td { border: 0; height: 10px; padding: 0; }
   </style>
 </head>
 <body><table>${tableRows}</table></body>
@@ -4629,7 +4647,103 @@ function FtePlanModule({
 
   function exportPlanToExcel() {
     const today = new Date().toISOString().slice(0, 10);
+    const rowCount = Math.max(rows.length, 1);
+    const filledPercent = totals.planned
+      ? `${formatFte((totals.filled / totals.planned) * 100)}%`
+      : "Planas nenustatytas";
     const exportRows: unknown[][] = [
+      ["VisaGloba etatų plano ataskaita", "", "", "", "", "", "", "", ""],
+      ["Eksporto data", today, "", "", "", "", "", "", ""],
+      [],
+      ["Suvestinė", "", "", "", "", "", "", "", ""],
+      ["Planuota etatų", formatFte(totals.planned), "", "", "", "", "", "", ""],
+      ["Užpildyta etatų", formatFte(totals.filled), "", "", "", "", "", "", ""],
+      ["Laisva etatų", formatFte(totals.free), "", "", "", "", "", "", ""],
+      ["Užpildymo procentas", filledPercent, "", "", "", "", "", "", ""],
+      [
+        "Laikinai nedirba",
+        formatFte(totals.temporaryUnavailable),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
+      [
+        "Pavadavimo poreikis",
+        formatFte(totals.replacementNeeded),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
+      [],
+      ["Vidurkiai", "", "", "", "", "", "", "", ""],
+      [
+        "Vid. planuota pareigybei",
+        formatFte(totals.planned / rowCount),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
+      [
+        "Vid. užpildyta pareigybei",
+        formatFte(totals.filled / rowCount),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
+      [
+        "Vid. laisva pareigybei",
+        formatFte(totals.free / rowCount),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
+      [
+        "Vid. min. dienos pamaina",
+        formatFte(
+          rows.reduce((sum, row) => sum + row.minimumDayShift, 0) / rowCount,
+        ),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
+      [
+        "Vid. min. nakties pamaina",
+        formatFte(
+          rows.reduce((sum, row) => sum + row.minimumNightShift, 0) / rowCount,
+        ),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
+      [],
       [
         "Padalinys",
         "Pareigybė",
