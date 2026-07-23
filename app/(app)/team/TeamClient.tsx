@@ -67,8 +67,8 @@ type Employee = {
   department?: string | null;
   staff_type?: string | null;
   contract_number?: string | null;
-  employment_rate?: number | null;
-  weekly_hours?: number | null;
+  employment_rate?: number | string | null;
+  weekly_hours?: number | string | null;
   employment_type?: string | null;
   employment_start_date?: string | null;
   termination_date?: string | null;
@@ -1241,7 +1241,7 @@ export default function TeamPage() {
   }, []);
 
   useEffect(() => {
-    if (!organizationId) return;
+    if (!organizationId) return undefined;
 
     void loadScheduleForMonth(organizationId, scheduleMonth);
   }, [organizationId, scheduleMonth]);
@@ -1399,7 +1399,7 @@ export default function TeamPage() {
           .order("position_name", { ascending: true }),
       ]);
 
-      let membersQueryResult = employeesResult;
+      let membersQueryResult: any = employeesResult;
 
       if (
         membersQueryResult.error &&
@@ -1467,7 +1467,7 @@ export default function TeamPage() {
           ? "id, email, first_name, last_name, full_name, phone, avatar_url"
           : "id, email, first_name, last_name, full_name, avatar_url";
 
-        let profilesResult = await supabase
+        let profilesResult: any = await supabase
           .from("profiles")
           .select(profileSelect)
           .in("id", userIds);
@@ -2305,7 +2305,7 @@ export default function TeamPage() {
         ...prev,
         position_id: "",
       }));
-      return;
+      return undefined;
     }
 
     const position = activePositionOptions.find((item) => item.id === positionId);
@@ -2333,7 +2333,7 @@ export default function TeamPage() {
           position_id: "",
         });
       }
-      return;
+      return undefined;
     }
 
     const position = activePositionOptions.find((item) => item.id === positionId);
@@ -2585,7 +2585,7 @@ export default function TeamPage() {
   async function saveScheduleGridChanges(changes: unknown[]) {
     if (!organizationId) {
       setMessage("Nepavyko nustatyti įstaigos.");
-      return;
+      return undefined;
     }
 
     const rowsToSave: Array<Record<string, unknown>> = [];
@@ -2873,7 +2873,7 @@ export default function TeamPage() {
       const ok = window.confirm(
         `Darbuotojui trūksta atostogų likučio.\n\nLikutis: ${left} d.\nPrašoma: ${requestedDays} d.\n\nAr leisti atostogas į minusą?`,
       );
-      if (!ok) return;
+      if (!ok) return undefined;
     }
 
     setSaving(true);
@@ -2990,6 +2990,7 @@ export default function TeamPage() {
       setMessage(
         "Prašymas pateiktas vadovo patvirtinimui. Grafike jis rodomas kaip rezervacija.",
       );
+      return created;
     } catch (error) {
       const readable = getReadableError(error);
       if (
@@ -3006,6 +3007,7 @@ export default function TeamPage() {
     } finally {
       setSaving(false);
     }
+    return undefined;
   }
 
   async function updateVacationStatus(
@@ -3929,18 +3931,18 @@ export default function TeamPage() {
                       employeeEditorTab !== "register" ? (
                         <div id={`employee-editor-${employeeKey(employee)}`}>
                           <EmployeeTabbedEditor
-                            employee={editingEmployee}
+                            employee={editingEmployee!}
                             editForm={editForm}
                             activeTab={employeeEditorTab}
                             trainings={trainings.filter(
                               (training) =>
                                 training.employee_id ===
-                                editingEmployee.user_id,
+                                editingEmployee!.user_id,
                             )}
                             credentials={credentials.filter(
                               (credential) =>
                                 credential.employee_id ===
-                                editingEmployee.user_id,
+                                editingEmployee!.user_id,
                             )}
                             saving={saving}
                             canViewSensitiveFields={canViewSensitiveFields}
@@ -4042,8 +4044,6 @@ export default function TeamPage() {
             onSubmit={submitVacationRequest}
             onApprove={(id, options) => updateVacationStatus(id, "approved", options)}
             onReject={(id, options) => updateVacationStatus(id, "rejected", { rejection: options })}
-            employeeName={employeeName}
-            employeeRole={employeeRole}
             daysBetween={daysBetween}
             fmt={fmt}
             absenceTypeMeta={absenceTypeMeta}

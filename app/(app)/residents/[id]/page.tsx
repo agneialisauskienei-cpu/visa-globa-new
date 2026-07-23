@@ -429,7 +429,7 @@ function Badge({
 }) {
   const tones = {
     green: "border-[#c9d8d0] bg-white/10 text-white",
-    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    blue: "border-[#c9d8d0] bg-white text-[#486b5d]",
     warning: "border-amber-200 bg-amber-50 text-amber-700",
     danger: "border-red-200 bg-red-50 text-red-700",
     neutral: "border-[#dbe6e0] bg-[#ffffff] text-[#526174]",
@@ -478,7 +478,7 @@ function InfoNotice({
   const tones = {
     green: "border-emerald-100 bg-emerald-50 text-emerald-900",
     amber: "border-amber-100 bg-amber-50 text-amber-900",
-    blue: "border-blue-100 bg-blue-50 text-blue-900",
+    blue: "border-[#c9d8d0] bg-white text-[#486b5d]",
   };
 
   return (

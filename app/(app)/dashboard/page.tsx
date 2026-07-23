@@ -687,7 +687,7 @@ export default function AdminDashboardPage() {
                   meta={`${stats.pendingDocumentApprovals + stats.expiringCertificates} įspėjimai`}
                   danger
                 />
-                <TimelineItem color="#2563eb" title="Mokymai" meta={`${computed.trainingCompletion}% užbaigta`} blue />
+                <TimelineItem color="#486b5d" title="Mokymai" meta={`${computed.trainingCompletion}% užbaigta`} />
               </div>
             </section>
 
@@ -1405,7 +1405,7 @@ function DashboardSidePanel({
 
         <div className="mt-4 space-y-3">
           <TimelineItem color="#486b5d" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
-          <TimelineItem color="#2563eb" title="Darbuotojų kvietimai" meta={`${pendingInvites} laukia atsakymo`} blue />
+          <TimelineItem color="#486b5d" title="Darbuotojų kvietimai" meta={`${pendingInvites} laukia atsakymo`} />
           <TimelineItem color="#be123c" title="Atostogų / išvykimo užklausos" meta={`${pendingLeaves} laukia sprendimo`} warm />
           <TimelineItem
             color="#b91c1c"
@@ -1413,7 +1413,7 @@ function DashboardSidePanel({
             meta={`${pendingDocumentApprovals + expiringCertificates} įspėjimai`}
             danger
           />
-          <TimelineItem color="#2563eb" title="Mokymai" meta={`${trainingCompletion}% užbaigta`} blue />
+          <TimelineItem color="#486b5d" title="Mokymai" meta={`${trainingCompletion}% užbaigta`} />
         </div>
       </section>
     </aside>

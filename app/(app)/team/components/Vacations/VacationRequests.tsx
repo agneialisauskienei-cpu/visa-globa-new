@@ -178,7 +178,7 @@ type Props = {
   // The API/parent should also create the audit row in the same transaction.
   onSubmit: (
     options?: SubmitOptions,
-  ) => VacationRequest | Promise<VacationRequest>;
+  ) => VacationRequest | undefined | Promise<VacationRequest | undefined>;
   // The API/parent must approve/reject and write audit in one server-side transaction.
   onApprove: (id: string, options?: ApproveOptions) => void | Promise<void>;
   onReject: (id: string, options: RejectOptions) => void | Promise<void>;

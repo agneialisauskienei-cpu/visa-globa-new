@@ -1499,14 +1499,14 @@ function EmployeeAccessEditor({
                 className={cn(
                   "rounded-lg border p-3 text-left text-xs font-bold transition disabled:opacity-60",
                   checked
-                    ? "border-blue-200 bg-blue-50 text-blue-900"
+                    ? "border-[#486b5d] bg-white text-[#10251f]"
                     : "border-[#dbe6e0] bg-[#ffffff] text-[#40594f] hover:bg-[#f7fcf9]",
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
                   <span>{permission.label}</span>
                   {checked ? (
-                    <ToggleRight className="h-5 w-5 text-blue-700" />
+                    <ToggleRight className="h-5 w-5 text-[#486b5d]" />
                   ) : (
                     <ToggleLeft className="h-5 w-5 text-[#8aa096]" />
                   )}

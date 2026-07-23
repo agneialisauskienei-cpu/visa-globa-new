@@ -109,9 +109,9 @@ function getPlanBadgeStyle(plan: string | null | undefined): React.CSSProperties
       }
     case 'pro':
       return {
-        background: '#dbeafe',
-        color: '#1d4ed8',
-        border: '1px solid #93c5fd',
+        background: '#ffffff',
+        color: '#486b5d',
+        border: '1px solid #c9d8d0',
       }
     case 'enterprise':
       return {
@@ -183,9 +183,9 @@ function getToastStyle(type: ToastType): React.CSSProperties {
     case 'info':
     default:
       return {
-        background: '#eff6ff',
-        color: '#1d4ed8',
-        border: '1px solid #bfdbfe',
+        background: '#ffffff',
+        color: '#486b5d',
+        border: '1px solid #c9d8d0',
       }
   }
 }

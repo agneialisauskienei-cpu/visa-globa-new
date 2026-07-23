@@ -151,7 +151,7 @@ const TASK_TYPES = [
 
 const PRIORITY_OPTIONS = [
   { value: "low", label: "Žemas", className: "border-[#dbe6e0] bg-[#ffffff] text-[#526174]" },
-  { value: "medium", label: "Vidutinis", className: "border-blue-200 bg-blue-50 text-blue-700" },
+  { value: "medium", label: "Vidutinis", className: "border-[#c9d8d0] bg-white text-[#486b5d]" },
   { value: "high", label: "Aukštas", className: "border-orange-200 bg-orange-50 text-orange-700" },
   { value: "urgent", label: "Kritinis", className: "border-rose-200 bg-rose-50 text-rose-700" },
 ]
@@ -1946,7 +1946,7 @@ export default function TasksPage() {
           </div>
 
           <div className="border-t border-emerald-900/10 bg-[#f7fcf9] p-3">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -1955,11 +1955,8 @@ export default function TasksPage() {
                   setStatusFilter("")
                   setTypeFilter("")
                 }}
-                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                  activePageTab === "overview"
-                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                    : "text-[#486b5d] hover:bg-white/70"
-                }`}
+                data-active={activePageTab === "overview"}
+                className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
               >
                 <ClipboardList className="h-4 w-4" />
                 Apžvalga
@@ -1973,11 +1970,8 @@ export default function TasksPage() {
                   setStatusFilter("")
                   setTypeFilter("")
                 }}
-                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                  activePageTab === "tasks"
-                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                    : "text-[#486b5d] hover:bg-white/70"
-                }`}
+                data-active={activePageTab === "tasks" && !statusFilter && viewFilter === "all" && !typeFilter}
+                className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
               >
                 <UserRound className="h-4 w-4" />
                 Užduotys
@@ -1994,11 +1988,8 @@ export default function TasksPage() {
                   setStatusFilter("new")
                   setTypeFilter("")
                 }}
-                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                  activePageTab === "tasks" && statusFilter === "new"
-                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                    : "text-[#486b5d] hover:bg-white/70"
-                }`}
+                data-active={activePageTab === "tasks" && statusFilter === "new"}
+                className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
               >
                 <Sparkles className="h-4 w-4" />
                 Naujos
@@ -2015,11 +2006,8 @@ export default function TasksPage() {
                   setStatusFilter("in_progress")
                   setTypeFilter("")
                 }}
-                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                  activePageTab === "tasks" && statusFilter === "in_progress"
-                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                    : "text-[#486b5d] hover:bg-white/70"
-                }`}
+                data-active={activePageTab === "tasks" && statusFilter === "in_progress"}
+                className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
               >
                 <Timer className="h-4 w-4" />
                 Vykdoma
@@ -2036,11 +2024,8 @@ export default function TasksPage() {
                   setStatusFilter("waiting_parts")
                   setTypeFilter("")
                 }}
-                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                  activePageTab === "tasks" && statusFilter === "waiting_parts"
-                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                    : "text-[#486b5d] hover:bg-white/70"
-                }`}
+                data-active={activePageTab === "tasks" && statusFilter === "waiting_parts"}
+                className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
               >
                 <Clock className="h-4 w-4" />
                 Laukia dalių
@@ -2057,11 +2042,8 @@ export default function TasksPage() {
                   setStatusFilter("done")
                   setTypeFilter("")
                 }}
-                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                  activePageTab === "tasks" && statusFilter === "done"
-                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                    : "text-[#486b5d] hover:bg-white/70"
-                }`}
+                data-active={activePageTab === "tasks" && statusFilter === "done"}
+                className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
               >
                 <CheckCircle2 className="h-4 w-4" />
                 Atlikta
@@ -2079,11 +2061,8 @@ export default function TasksPage() {
                   setStatusFilter("")
                   setTypeFilter("maintenance")
                 }}
-                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                  activePageTab === "maintenance"
-                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                    : "text-[#486b5d] hover:bg-white/70"
-                }`}
+                data-active={activePageTab === "maintenance"}
+                className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
               >
                 <Wrench className="h-4 w-4" />
                 Ūkis
@@ -2101,11 +2080,8 @@ export default function TasksPage() {
                   setStatusFilter("")
                   setTypeFilter("")
                 }}
-                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                  activePageTab === "recurring"
-                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                    : "text-[#486b5d] hover:bg-white/70"
-                }`}
+                data-active={activePageTab === "recurring"}
+                className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
               >
                 <Repeat className="h-4 w-4" />
                 Periodinės
@@ -2122,11 +2098,8 @@ export default function TasksPage() {
                   setStatusFilter("")
                   setTypeFilter("")
                 }}
-                className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-                  activePageTab === "late"
-                    ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-                    : "text-[#486b5d] hover:bg-white/70"
-                }`}
+                data-active={activePageTab === "late"}
+                className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
               >
                 <AlertTriangle className="h-4 w-4" />
                 Vėluoja
@@ -2134,6 +2107,7 @@ export default function TasksPage() {
                   {lateTasks.length}
                 </span>
               </button>
+              <div data-instruction-row />
             </div>
           </div>
         </section>
@@ -2159,7 +2133,7 @@ export default function TasksPage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <DashboardPill label="Šiandien" value={todayTasks.length} tone="blue" />
               <DashboardPill label="Skubios" value={urgentTasks.length} tone="rose" />
               <DashboardPill label="Laukia dalių" value={waitingPartsTasks.length} tone="amber" />
@@ -3721,14 +3695,14 @@ function CircleStat({
 }) {
   const color = {
     emerald: "#486b5d",
-    blue: "#2563eb",
+    blue: "#486b5d",
     amber: "#d97706",
     rose: "#e11d48",
   }[tone]
 
   const bg = {
     emerald: "bg-emerald-50 text-emerald-800",
-    blue: "bg-blue-50 text-blue-800",
+    blue: "bg-white text-[#486b5d]",
     amber: "bg-amber-50 text-amber-800",
     rose: "bg-rose-50 text-rose-800",
   }[tone]
@@ -3791,7 +3765,7 @@ function DashboardPill({
   tone: "blue" | "amber" | "rose"
 }) {
   const toneClass = {
-    blue: "border-blue-100 bg-blue-50 text-blue-700",
+    blue: "border-[#c9d8d0] bg-white text-[#486b5d]",
     amber: "border-amber-100 bg-amber-50 text-amber-700",
     rose: "border-rose-100 bg-rose-50 text-rose-700",
   }[tone]
@@ -3819,7 +3793,7 @@ function TaskSegmentCard({
   const toneClass = {
     emerald: "border-emerald-100 bg-emerald-50 text-emerald-800",
     amber: "border-amber-100 bg-amber-50 text-amber-800",
-    blue: "border-blue-100 bg-blue-50 text-blue-800",
+    blue: "border-[#c9d8d0] bg-white text-[#486b5d]",
     rose: "border-rose-100 bg-rose-50 text-rose-800",
   }[tone]
 
@@ -3872,7 +3846,7 @@ function StatCard({
   const toneClass = {
     emerald: "bg-emerald-50 text-emerald-700",
     amber: "bg-amber-50 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
+    blue: "bg-white text-[#486b5d]",
     rose: "bg-rose-50 text-rose-700",
     slate: "bg-[#ffffff] text-[#486b5d]",
   }[tone]
@@ -3880,7 +3854,7 @@ function StatCard({
   const textClass = {
     emerald: "text-emerald-700",
     amber: "text-amber-700",
-    blue: "text-blue-700",
+    blue: "text-[#486b5d]",
     rose: "text-rose-700",
     slate: "text-[#486b5d]",
   }[tone]

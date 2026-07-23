@@ -97,7 +97,7 @@ function statusMeta(status?: string | null, dueDate?: string | null) {
     }
   }
 
-  if (status === "sent") return { label: "Išsiųsta", className: "bg-blue-100 text-blue-800" }
+  if (status === "sent") return { label: "Išsiųsta", className: "border border-[#c9d8d0] bg-white text-[#486b5d]" }
   if (status === "draft") return { label: "Juodraštis", className: "bg-slate-100 text-slate-700" }
 
   return { label: "Laukia", className: "bg-amber-100 text-amber-800" }
@@ -727,7 +727,7 @@ export default function DocumentCenterModule({
         </div>
       </div>
 
-      <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-bold text-blue-900">
+      <div className="mb-5 rounded-2xl border border-[#c9d8d0] bg-white px-5 py-4 text-sm font-bold text-[#10251f]">
         BDAR principas: dokumentų centre saugomas dokumento turinys / PDF, versija ir susipažinimo
         faktas. Nereikia rinkti perteklinių darbuotojo duomenų ar kelti jo asmeninių dokumentų kopijų.
       </div>

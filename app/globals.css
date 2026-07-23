@@ -74,21 +74,25 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: 42px;
+  height: 42px;
   border: 1px solid #c9d8d0;
-  border-radius: 14px;
+  border-radius: 12px;
   background: #ffffff;
   color: #39594c;
   padding: 0 16px;
-  box-shadow: 0 2px 8px rgba(16, 37, 31, .10);
+  box-shadow: 0 1px 6px rgba(16, 37, 31, .08);
   font-weight: 800;
+  font-size: 14px;
+  line-height: 1.2;
   cursor: pointer;
   margin-left: auto;
   flex: 0 0 auto;
 }
 
 .vg-instruction-trigger:hover {
-  background: #f7fcf9;
+  background: #ffffff;
+  border-color: #486b5d;
 }
 
 .vg-instruction-trigger svg {
@@ -400,28 +404,33 @@ a[class*="bg-[#486b5d]"]:hover {
 }
 
 .vg-tab-frame {
-  min-height: 42px !important;
-  height: 42px !important;
-  padding: 0 14px !important;
-  border: 1px solid transparent;
-  border-radius: 12px !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  padding: 0 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: 10px !important;
   background: transparent;
   color: #486b5d;
   box-sizing: border-box;
+  line-height: 1.2;
+}
+
+.vg-tab-frame:hover:not([data-active="true"]) {
+  border-width: 1px !important;
 }
 
 .vg-tab-frame:hover {
   background: #ffffff;
-  border-color: #486b5d;
-  color: #10251f;
+  border-color: #486b5d !important;
+  color: #10251f !important;
 }
 
 .vg-tab-frame[data-active="true"] {
-  border-width: 2px;
-  border-color: #486b5d;
-  background: #ffffff;
-  color: #10251f;
-  box-shadow: 0 1px 3px rgba(16, 37, 31, 0.08);
+  border-width: 2px !important;
+  border-color: #486b5d !important;
+  background: #ffffff !important;
+  color: #10251f !important;
+  box-shadow: 0 1px 3px rgba(16, 37, 31, 0.08) !important;
   outline: none;
 }
 
@@ -438,9 +447,9 @@ a[class*="bg-[#486b5d]"]:hover {
 .vg-app-shell [data-instruction-row] {
   margin-left: auto;
   display: flex;
-  min-width: 180px;
   align-items: center;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .vg-app-shell [data-instruction-row] button,
@@ -459,14 +468,44 @@ a[class*="bg-[#486b5d]"]:hover {
   padding: 1rem !important;
 }
 
+.vg-app-shell [class*="hover:px-[19px]"]:hover {
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
+}
+
+.vg-app-shell [class*="hover:py-[15px]"]:hover {
+  padding-top: 1rem !important;
+  padding-bottom: 1rem !important;
+}
+
+.vg-app-shell [class*="hover:p-[19px]"]:hover {
+  padding: 1.25rem !important;
+}
+
 .vg-app-shell [class*="sm:hover:p-[23px]"]:hover {
   padding: 1rem !important;
 }
 
 @media (min-width: 640px) {
   .vg-app-shell [class*="sm:hover:p-[23px]"]:hover {
-  padding: 1.5rem !important;
+    padding: 1.5rem !important;
   }
+}
+
+.vg-app-shell [class*="text-blue-"] {
+  color: #486b5d !important;
+}
+
+.vg-app-shell [class*="bg-blue-"] {
+  background-color: #f7fcf9 !important;
+}
+
+.vg-app-shell [class*="border-blue-"] {
+  border-color: #c9d8d0 !important;
+}
+
+.vg-app-shell [class*="ring-blue-"] {
+  --tw-ring-color: rgba(72, 107, 93, .18) !important;
 }
 
 .vg-app-shell [class*="rounded-full"][class*="bg-emerald-"],
@@ -551,14 +590,14 @@ a[class*="bg-[#486b5d]"]:hover {
 
 /* VisaGloba activities Excel matrix */
 .ht-theme-classic thead th {
-  background: #dbeafe !important;
-  color: #1e3a8a !important;
+  background: #f7fcf9 !important;
+  color: #486b5d !important;
   font-weight: 900 !important;
-  border-color: #bfdbfe !important;
+  border-color: #c9d8d0 !important;
 }
 
 .ht-theme-classic thead tr:nth-child(2) th {
-  background: #1e4f83 !important;
+  background: #486b5d !important;
   color: #ffffff !important;
   font-weight: 900 !important;
 }
@@ -613,11 +652,11 @@ a[class*="bg-[#486b5d]"]:hover {
 }
 
 .ht-theme-classic .area {
-  background: rgba(59, 130, 246, .18) !important;
+  background: rgba(72, 107, 93, .16) !important;
 }
 
 .ht-theme-classic .current {
-  border-color: #2563eb !important;
+  border-color: #486b5d !important;
 }
 
 

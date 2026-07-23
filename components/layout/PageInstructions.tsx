@@ -69,10 +69,8 @@ export default function PageInstructions() {
 
   useEffect(() => {
     function findInstructionRow() {
-      setInstructionRow(
-        document.querySelector("[data-instruction-row]") ??
-          document.querySelector("main nav"),
-      )
+      const rows = document.querySelectorAll("[data-instruction-row]")
+      setInstructionRow(rows[rows.length - 1] ?? null)
     }
 
     findInstructionRow()
@@ -99,7 +97,7 @@ export default function PageInstructions() {
 
   return (
     <>
-      {instructionRow ? createPortal(trigger, instructionRow) : trigger}
+      {instructionRow ? createPortal(trigger, instructionRow) : null}
       {open ? (
         <div
           className="vg-instruction-backdrop"

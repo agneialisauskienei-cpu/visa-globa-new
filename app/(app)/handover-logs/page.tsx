@@ -975,9 +975,6 @@ export default function HandoverLogsPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={() => setHelpOpen(true)} className="inline-flex items-center gap-2 rounded-[14px] bg-white/10 px-5 py-3 font-extrabold text-white ring-1 ring-white/15 transition hover:bg-white/20">
-                <HelpCircle className="h-4 w-4" /> Pagalba
-              </button>
               <button type="button" onClick={() => void loadAll()} className="inline-flex items-center gap-2 rounded-[14px] bg-[#e8f7ef] px-5 py-3 font-extrabold text-[#486b5d] transition hover:bg-white">
                 <RefreshCw className="h-4 w-4" /> Atnaujinti
               </button>
@@ -985,11 +982,16 @@ export default function HandoverLogsPage() {
           </div>
 
           <div className="border-t border-emerald-900/10 bg-[#f7fcf9] p-3">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <HandoverTab active={!includeArchived && !unreadOnly && !importantOnly} icon={<ClipboardList className="h-4 w-4" />} label="Visi aktyvūs" count={stats.all} onClick={() => { setIncludeArchived(false); setUnreadOnly(false); setImportantOnly(false); }} />
               <HandoverTab active={unreadOnly} icon={<CheckCircle2 className="h-4 w-4" />} label="Nepatvirtinti" count={stats.unread} onClick={() => { setIncludeArchived(false); setUnreadOnly((v) => !v); }} />
               <HandoverTab active={importantOnly} icon={<ShieldAlert className="h-4 w-4" />} label="Svarbūs" count={stats.important} onClick={() => setImportantOnly((v) => !v)} />
               <HandoverTab active={includeArchived} icon={<Archive className="h-4 w-4" />} label="Archyvas" onClick={() => { setUnreadOnly(false); setIncludeArchived((v) => !v); }} />
+              <div data-instruction-row>
+                <button type="button" onClick={() => setHelpOpen(true)} className="vg-instruction-trigger">
+                  <HelpCircle className="h-4 w-4" /> Instrukcija
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -1327,11 +1329,8 @@ function HandoverTab({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-black transition ${
-        active
-          ? "bg-white text-[#10251f] shadow-sm ring-1 ring-[#c9d8d0]"
-          : "text-[#486b5d] hover:bg-white/70"
-      }`}
+      data-active={active ? "true" : "false"}
+      className="vg-tab-frame inline-flex items-center gap-2 text-sm font-black transition"
     >
       {icon}
       {label}

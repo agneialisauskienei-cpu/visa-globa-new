@@ -1954,7 +1954,7 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.15,
   },
   badgeSuccess: { background: "#dcfce7", color: "#166534" },
-  badgeInfo: { background: "#dbeafe", color: "#1d4ed8" },
+  badgeInfo: { background: "#ffffff", color: "#486b5d" },
   badgeDanger: { background: "#fee2e2", color: "#b91c1c" },
   badgeNeutral: { background: "#f1f5f9", color: "#475569" },
   badgeMuted: { background: "#f7fcf9", color: "#486b5d" },

@@ -112,8 +112,8 @@ const STATUS_OPTIONS: StatusOption[] = [
     value: "not_applicable",
     short: "T",
     label: "Netaikoma",
-    chipClass: "border-blue-200 bg-blue-50 text-blue-800",
-    cellClass: "border-blue-200 bg-blue-50 text-blue-800",
+    chipClass: "border-[#c9d8d0] bg-white text-[#486b5d]",
+    cellClass: "border-[#c9d8d0] bg-white text-[#486b5d]",
   },
 ];
 
@@ -401,7 +401,7 @@ function activityTone(index: number) {
   return [
     "border-emerald-200 bg-emerald-50 text-emerald-900",
     "border-violet-200 bg-violet-50 text-violet-900",
-    "border-blue-200 bg-blue-50 text-blue-900",
+    "border-[#c9d8d0] bg-white text-[#486b5d]",
     "border-amber-200 bg-amber-50 text-amber-900",
     "border-rose-200 bg-white text-rose-900",
   ][index % 5];
@@ -1665,7 +1665,7 @@ function AttendanceModal({
                     <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-sm font-black text-emerald-800">D = dalyvavo</span>
                     <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-black text-slate-700">N = nedalyvavo</span>
                     <span className="rounded-full border border-amber-200 bg-white px-3 py-1 text-sm font-black text-amber-800">A = atsisakė</span>
-                    <span className="rounded-full border border-blue-200 bg-white px-3 py-1 text-sm font-black text-blue-800">T = netaikoma</span>
+                    <span className="rounded-full border border-[#c9d8d0] bg-white px-3 py-1 text-sm font-black text-[#486b5d]">T = netaikoma</span>
                   </div>
                 </div>
 
@@ -2012,7 +2012,7 @@ function MiniStat({
     emerald: "bg-emerald-50 text-emerald-700",
     rose: "bg-white text-rose-700",
     amber: "bg-amber-50 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
+    blue: "bg-white text-[#486b5d]",
   }[tone];
 
   return (

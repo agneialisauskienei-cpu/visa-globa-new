@@ -166,7 +166,7 @@ function AppLayoutShell({
 
         <main style={embedded ? styles.embeddedMain : styles.main}>
           {!embedded ? (
-            <div className="vg-page-toolbar">
+            <div className="vg-page-toolbar" data-instruction-row>
               <PageInstructions />
             </div>
           ) : null}

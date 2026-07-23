@@ -785,9 +785,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 650,
   },
   message: {
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
+    background: '#ffffff',
+    color: '#486b5d',
+    border: '1px solid #c9d8d0',
     borderRadius: 16,
     padding: 13,
     fontSize: 14,

@@ -210,7 +210,7 @@ function ReportView() {
       </div>
       <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <ChartCard title="Užimtumas" value="82%" progress={82} color="#10b981" desc="Gyventojų vietų užpildymas." />
-        <ChartCard title="Mokymai" value="68%" progress={68} color="#3b82f6" desc="Privalomų mokymų užbaigimas." />
+        <ChartCard title="Mokymai" value="68%" progress={68} color="#486b5d" desc="Privalomų mokymų užbaigimas." />
         <ChartCard title="Pažymos" value="3" progress={25} color="#f43f5e" desc="Baigiasi per 14 dienų." />
         <ChartCard title="Atostogos" value="1" progress={40} color="#f59e0b" desc="Laukia sprendimo." />
       </div>
@@ -336,7 +336,7 @@ function SummaryCard({ title, value, muted = false, onClick }: { title: string; 
 }
 
 function PriorityCard({ title, desc, badge, color, onClick }: { title: string; desc: string; badge: string; color: "amber" | "red" | "blue" | "emerald"; onClick: () => void }) {
-  const styles = { amber: "border-amber-100 bg-amber-50 text-amber-700", red: "border-red-100 bg-red-50 text-red-700", blue: "border-blue-100 bg-blue-50 text-blue-700", emerald: "border-emerald-100 bg-emerald-50 text-emerald-700" }[color];
+  const styles = { amber: "border-amber-100 bg-white text-amber-700", red: "border-red-100 bg-white text-red-700", blue: "border-[#c9d8d0] bg-white text-[#486b5d]", emerald: "border-emerald-100 bg-white text-emerald-700" }[color];
   return (
     <button onClick={onClick} className={`flex w-full items-start justify-between gap-4 rounded-2xl border p-4 text-left transition hover:shadow-md active:scale-[0.99] ${styles}`}>
       <div><p className="font-black text-slate-900">{title}</p><p className="mt-1 text-sm font-semibold text-slate-600">{desc}</p></div>

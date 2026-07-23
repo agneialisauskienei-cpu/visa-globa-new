@@ -397,7 +397,7 @@ function roomVisual(room: Room) {
   }
 
   if (room.occupied > 0) {
-    return { label: "Dalinai užimtas", tone: "blue" as const, bar: "bg-blue-500" }
+    return { label: "Dalinai užimtas", tone: "blue" as const, bar: "bg-[#486b5d]" }
   }
 
   return { label: "Laisvas", tone: "green" as const, bar: "bg-emerald-600" }
@@ -426,7 +426,7 @@ function Badge({
 }) {
   const tones = {
     green: "border-[#a7f3d0] bg-[#eefaf3] text-[#486b5d]",
-    blue: "border-blue-200 bg-blue-50 text-blue-700",
+    blue: "border-[#c9d8d0] bg-white text-[#486b5d]",
     warning: "border-amber-200 bg-amber-50 text-amber-700",
     danger: "border-red-200 bg-red-50 text-red-700",
     neutral: "border-[#dbe6e0] bg-[#ffffff] text-[#526174]",
