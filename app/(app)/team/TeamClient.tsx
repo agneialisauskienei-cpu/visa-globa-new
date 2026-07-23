@@ -452,20 +452,36 @@ function formatFte(value: number) {
   });
 }
 
-function csvCell(value: unknown) {
-  const text = String(value ?? "").replace(/\r?\n/g, " ");
-  return `"${text.replace(/"/g, '""')}"`;
+function excelCell(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-function downloadCsv(filename: string, rows: unknown[][]) {
+function downloadExcelTable(filename: string, rows: unknown[][]) {
   if (typeof window === "undefined") return;
 
-  const content = [
-    "sep=;",
-    ...rows.map((row) => row.map(csvCell).join(";")),
-  ].join("\r\n");
-  const blob = new Blob([`\uFEFF${content}`], {
-    type: "text/csv;charset=utf-8",
+  const tableRows = rows
+    .map((row) =>
+      `<tr>${row.map((cell) => `<td>${excelCell(cell)}</td>`).join("")}</tr>`,
+    )
+    .join("");
+  const content = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+    td { border: 1px solid #d9e4de; padding: 6px 10px; white-space: nowrap; }
+    tr:first-child td { font-weight: 700; background: #f7fcf9; color: #10251f; }
+  </style>
+</head>
+<body><table>${tableRows}</table></body>
+</html>`;
+  const blob = new Blob([content], {
+    type: "application/vnd.ms-excel;charset=utf-8",
   });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -4650,7 +4666,7 @@ function FtePlanModule({
       ],
     ];
 
-    downloadCsv(`etatu-planas-${today}.csv`, exportRows);
+    downloadExcelTable(`etatu-planas-${today}.xls`, exportRows);
   }
 
   return (
