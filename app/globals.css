@@ -207,7 +207,7 @@ a[class*="bg-[#486b5d]"]:hover {
   background: #39594c;
 }
 
-.vg-app-shell :where(button, a)[class*="rounded"]:not([class*="rounded-full"]):not([aria-label]):not(:has(> svg:only-child)):not(:has(> p)) {
+.vg-app-shell :where(button, a)[class*="rounded"]:not([data-content-card]):not([data-card-button]):not([data-stat-card]):not([class*="rounded-full"]):not([aria-label]):not(:has(> svg:only-child)):not(:has(> p)) {
   min-height: 42px !important;
   height: auto !important;
   border-radius: 12px !important;

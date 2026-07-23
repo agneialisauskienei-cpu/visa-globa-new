@@ -3345,7 +3345,12 @@ function MobileTaskCard({
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+        <button
+          type="button"
+          data-content-card
+          onClick={onOpen}
+          className="min-w-0 flex-1 text-left"
+        >
           <div className="flex flex-wrap items-center gap-2">
             <MobilePriorityPill priority={task.priority} />
             {!task.viewed_at && isOpenTask(task) ? (
@@ -3360,11 +3365,11 @@ function MobileTaskCard({
             ) : null}
           </div>
 
-          <h3 className="mt-3 text-lg font-black leading-tight text-[#10251f]">
+          <h3 className="mt-3 break-words text-lg font-black leading-6 text-[#10251f]">
             {task.title}
           </h3>
 
-          <p className="mt-1 text-sm font-semibold text-[#526174]">
+          <p className="mt-1 break-words text-sm font-semibold leading-5 text-[#526174]">
             {residentName(resident)} · kamb. {residentRoom(resident)} · {getTypeLabel(task.type)}
           </p>
         </button>
@@ -3383,7 +3388,7 @@ function MobileTaskCard({
       </div>
 
       {task.description ? (
-        <p className="mt-4 line-clamp-2 text-sm font-medium leading-relaxed text-[#526174]">
+        <p className="mt-4 break-words text-sm font-medium leading-relaxed text-[#526174]">
           {task.description}
         </p>
       ) : null}
@@ -3906,11 +3911,16 @@ function TaskTableRow({
   return (
     <tr className={`border-t border-slate-100 ${late ? "bg-rose-50/25" : done ? "bg-emerald-50/20" : ""}`}>
       <td className="max-w-[360px] px-5 py-4 align-top">
-        <button type="button" onClick={onOpen} className="block min-w-0 text-left">
-          <span className="block break-words text-base font-black text-slate-950">
+        <button
+          type="button"
+          data-content-card
+          onClick={onOpen}
+          className="block min-w-0 text-left"
+        >
+          <span className="block break-words text-base font-black leading-6 text-[#10251f]">
             {task.title}
           </span>
-          <span className="mt-1 flex flex-wrap items-center gap-2 text-xs font-black text-[#526174]">
+          <span className="mt-1 flex flex-wrap items-center gap-2 text-xs font-black leading-5 text-[#526174]">
             <span>{getTypeLabel(task.type)}</span>
             {task.interval_days ? (
               <span className="rounded-full bg-slate-50 px-2 py-1">
@@ -3930,7 +3940,7 @@ function TaskTableRow({
             ) : null}
           </span>
           {description ? (
-            <span className="mt-2 line-clamp-2 block text-sm font-semibold leading-5 text-[#526174]">
+            <span className="mt-2 block break-words text-sm font-semibold leading-5 text-[#526174]">
               {description}
             </span>
           ) : null}
@@ -4034,10 +4044,15 @@ function TaskCard({
       }`}
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <button type="button" onClick={onClick} className="min-w-0 flex-1 text-left">
+        <button
+          type="button"
+          data-content-card
+          onClick={onClick}
+          className="min-w-0 flex-1 text-left"
+        >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <h3 className="truncate text-xl font-black tracking-[-0.02em] text-[#10251f]">
+              <h3 className="break-words text-xl font-black leading-7 tracking-[-0.02em] text-[#10251f]">
                 {task.title}
               </h3>
 
@@ -4083,7 +4098,7 @@ function TaskCard({
           </div>
 
           {description ? (
-            <p className="mt-3 line-clamp-2 text-sm font-semibold leading-6 text-[#486b5d]">
+            <p className="mt-3 break-words text-sm font-semibold leading-6 text-[#486b5d]">
               {description}
             </p>
           ) : null}
