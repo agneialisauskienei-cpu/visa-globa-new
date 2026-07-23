@@ -11,9 +11,11 @@ import {
   CheckCircle2,
   ClipboardCheck,
   ClipboardList,
+  Download,
   Edit3,
   FileText,
   GraduationCap,
+  History,
   Mail,
   PackageCheck,
   Plus,
@@ -448,6 +450,31 @@ function formatFte(value: number) {
     minimumFractionDigits: Number.isInteger(rounded) ? 0 : 2,
     maximumFractionDigits: 2,
   });
+}
+
+function csvCell(value: unknown) {
+  const text = String(value ?? "").replace(/\r?\n/g, " ");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, rows: unknown[][]) {
+  if (typeof window === "undefined") return;
+
+  const content = rows
+    .map((row) => row.map(csvCell).join(";"))
+    .join("\n");
+  const blob = new Blob([`\uFEFF${content}`], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 function normalizePlanText(value?: string | null) {
@@ -1094,11 +1121,27 @@ function staffPermissions(staffType?: string | null) {
   );
 }
 
+const BASE_STAFF_PERMISSION_VALUES = new Set(
+  STAFF_TYPES.flatMap((item) => item.permissions),
+);
+
+function manualExtraPermissions(value: unknown, _staffType?: string | null) {
+  return normalizeExtraPermissions(value).filter(
+    (permission) => !BASE_STAFF_PERMISSION_VALUES.has(permission),
+  );
+}
+
+function removeStaffBasePermissions(value: unknown) {
+  return normalizeExtraPermissions(value).filter(
+    (permission) => !BASE_STAFF_PERMISSION_VALUES.has(permission),
+  );
+}
+
 function mergedPermissions(employee: Employee | EditForm) {
   return Array.from(
     new Set([
       ...staffPermissions(employee.staff_type),
-      ...normalizeExtraPermissions(employee.extra_permissions),
+      ...manualExtraPermissions(employee.extra_permissions, employee.staff_type),
     ]),
   );
 }
@@ -1133,7 +1176,10 @@ function canViewSensitiveEmployeeData(employee?: Employee | null) {
 
   const role = String(employee.role || employee.legacy_role || "").toLowerCase();
   const staffType = String(employee.staff_type || "").toLowerCase();
-  const permissions = normalizeExtraPermissions(employee.extra_permissions);
+  const permissions = manualExtraPermissions(
+    employee.extra_permissions,
+    employee.staff_type,
+  );
 
   return (
     role === "owner" ||
@@ -1427,8 +1473,9 @@ export default function TeamPage() {
           employee.position_id ||
           findPlannedPosition(employee.position, employee.department)?.id ||
           null,
-        extra_permissions: normalizeExtraPermissions(
+        extra_permissions: manualExtraPermissions(
           employee.extra_permissions,
+          employee.staff_type,
         ),
       }));
 
@@ -1698,7 +1745,10 @@ export default function TeamPage() {
         employee.professional_license_valid_until || "",
       occupational_health_valid_until:
         employee.occupational_health_valid_until || "",
-      extra_permissions: normalizeExtraPermissions(employee.extra_permissions),
+      extra_permissions: manualExtraPermissions(
+        employee.extra_permissions,
+        employee.staff_type,
+      ),
       is_active: employee.is_active !== false,
     });
 
@@ -1760,11 +1810,9 @@ export default function TeamPage() {
         position_id: editForm.position_id || null,
         department: editForm.department.trim() || null,
         staff_type: editForm.staff_type || null,
-        extra_permissions: Array.from(
-          new Set([
-            ...staffPermissions(editForm.staff_type),
-            ...editForm.extra_permissions,
-          ]),
+        extra_permissions: manualExtraPermissions(
+          editForm.extra_permissions,
+          editForm.staff_type,
         ),
         role: editForm.role || "employee",
         contract_number: editForm.contract_number.trim() || null,
@@ -1798,8 +1846,9 @@ export default function TeamPage() {
         position_id: editingEmployee.position_id || null,
         department: editingEmployee.department || null,
         staff_type: editingEmployee.staff_type || null,
-        extra_permissions: normalizeExtraPermissions(
+        extra_permissions: manualExtraPermissions(
           editingEmployee.extra_permissions,
+          editingEmployee.staff_type,
         ),
         role: editingEmployee.role || "employee",
         contract_number: editingEmployee.contract_number || null,
@@ -2214,9 +2263,18 @@ export default function TeamPage() {
     (employee) => employee.is_archived === true,
   );
 
+  const fteCapacityEmployees = useMemo(
+    () =>
+      employees.filter(
+        (employee) =>
+          employee.is_archived !== true && employee.is_active !== false,
+      ),
+    [employees],
+  );
+
   const ftePlanRows = useMemo(
-    () => buildFtePlanRows(personnelPositions, activeEmployees),
-    [personnelPositions, activeEmployees],
+    () => buildFtePlanRows(personnelPositions, fteCapacityEmployees),
+    [personnelPositions, fteCapacityEmployees],
   );
 
   const fteTotals = useMemo(() => {
@@ -2350,6 +2408,7 @@ export default function TeamPage() {
       position: position.position_name || "",
       department: position.department || "",
       staff_type: inferredStaffType || editForm.staff_type,
+      extra_permissions: removeStaffBasePermissions(editForm.extra_permissions),
     });
   }
 
@@ -2374,7 +2433,11 @@ export default function TeamPage() {
     const planned = Number(position.planned_fte || 0);
     if (planned <= 0) return null;
 
-    const filled = activeEmployees
+    const filled = employees
+      .filter(
+        (employee) =>
+          employee.is_archived !== true && employee.is_active !== false,
+      )
       .filter((employee) => employee.user_id !== excludedEmployeeId)
       .filter((employee) => employeeMatchesPosition(employee, position))
       .reduce((sum, employee) => sum + Number(employee.employment_rate || 1), 0);
@@ -2399,7 +2462,9 @@ export default function TeamPage() {
           editForm.position,
           editForm.department,
           editingEmployee.user_id,
-          editForm.employment_rate || 1,
+          editForm.is_active && !editForm.is_archived
+            ? editForm.employment_rate || 1
+            : 0,
           editForm.position_id || null,
         )
       : null;
@@ -3917,6 +3982,14 @@ export default function TeamPage() {
                   const selected = editingEmployee
                     ? employeeKey(editingEmployee) === employeeKey(employee)
                     : false;
+                  const selectedEmployeeIds = new Set(
+                    [
+                      editingEmployee?.user_id,
+                      editingEmployee?.member_id,
+                      employee.user_id,
+                      employee.member_id,
+                    ].filter(Boolean),
+                  );
 
                   return (
                     <div key={employeeKey(employee)} className="grid gap-3">
@@ -3936,13 +4009,11 @@ export default function TeamPage() {
                             activeTab={employeeEditorTab}
                             trainings={trainings.filter(
                               (training) =>
-                                training.employee_id ===
-                                editingEmployee!.user_id,
+                                selectedEmployeeIds.has(training.employee_id),
                             )}
                             credentials={credentials.filter(
                               (credential) =>
-                                credential.employee_id ===
-                                editingEmployee!.user_id,
+                                selectedEmployeeIds.has(credential.employee_id),
                             )}
                             saving={saving}
                             canViewSensitiveFields={canViewSensitiveFields}
@@ -4532,6 +4603,54 @@ function FtePlanModule({
   onDelete: (id: string) => void;
 }) {
   const planIsMissing = positions.length === 0;
+  const positionHistory = [...positions]
+    .filter((position) => position.created_at)
+    .sort((a, b) =>
+      String(b.created_at || "").localeCompare(String(a.created_at || "")),
+    )
+    .slice(0, 6);
+
+  function exportPlanToExcel() {
+    const today = new Date().toISOString().slice(0, 10);
+    const exportRows: unknown[][] = [
+      [
+        "Padalinys",
+        "Pareigybė",
+        "Planuota etatų",
+        "Užpildyta etatų",
+        "Laisva etatų",
+        "Koeficientas",
+        "Min. dienos pamaina",
+        "Min. nakties pamaina",
+        "Būsena",
+      ],
+      ...rows.map((row) => [
+        row.department || "Nenurodyta",
+        row.title,
+        row.hasPlan ? formatFte(row.planned || 0) : "",
+        formatFte(row.filled),
+        row.free === null ? "" : formatFte(row.free),
+        row.coefficient,
+        formatFte(row.minimumDayShift),
+        formatFte(row.minimumNightShift),
+        row.status,
+      ]),
+      [],
+      [
+        "Iš viso",
+        "",
+        formatFte(totals.planned),
+        formatFte(totals.filled),
+        formatFte(totals.free),
+        "",
+        "",
+        "",
+        "",
+      ],
+    ];
+
+    downloadCsv(`etatu-planas-${today}.csv`, exportRows);
+  }
 
   return (
     <Card>
@@ -4550,14 +4669,21 @@ function FtePlanModule({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onNew}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[12px] bg-[#486b5d] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#39594c]"
-        >
-          <Plus className="h-4 w-4" />
-          Nauja pareigybė
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={exportPlanToExcel}
+            disabled={rows.length === 0}
+            className={teamOutlineButtonClass}
+          >
+            <Download className="h-4 w-4" />
+            Eksportuoti Excel
+          </button>
+          <button type="button" onClick={onNew} className={teamPrimaryButtonClass}>
+            <Plus className="h-4 w-4" />
+            Nauja pareigybė
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-4">
@@ -4867,6 +4993,49 @@ function FtePlanModule({
         </div>
       </div>
 
+      <section className="mt-5 rounded-2xl border border-[#c9d8d0] bg-white p-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f7fcf9] text-[#486b5d]">
+            <History className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#486b5d]">
+              Istorija
+            </p>
+            <h3 className="text-xl font-black text-[#10251f]">
+              Etatų plano įrašai
+            </h3>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {positionHistory.length ? (
+            positionHistory.map((position) => (
+              <article
+                key={position.id}
+                className="rounded-xl border border-[#dbe6e0] bg-white p-4"
+              >
+                <p className="text-sm font-black text-[#10251f]">
+                  {position.position_name || "Pareigybė"}
+                </p>
+                <p className="mt-1 text-xs font-bold text-[#6a7e75]">
+                  {position.department || "Padalinys nenurodytas"} ·{" "}
+                  {formatFte(Number(position.planned_fte || 0))} et.
+                </p>
+                <p className="mt-2 text-xs font-black text-[#486b5d]">
+                  Įrašyta: {fmt(position.created_at)}
+                </p>
+              </article>
+            ))
+          ) : (
+            <div className="rounded-xl border border-dashed border-[#c9d8d0] bg-white p-4 text-sm font-bold text-[#6a7e75] md:col-span-2">
+              Istorijos dar nėra. Kai pridėsite etatų plano eilutes, čia
+              matysis paskutiniai įrašai.
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="mt-5 rounded-2xl border border-[#486b5d] bg-white p-5">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
           Pamainų rizikos
@@ -5126,6 +5295,17 @@ function EmployeeTabbedEditor({
   onTogglePermission: (permission: string) => void;
   onSave: () => void;
 }) {
+  const totalTrainingHours = trainings.reduce(
+    (sum, training) => sum + Number(training.hours || 0),
+    0,
+  );
+  const sortedTrainings = [...trainings].sort((a, b) => {
+    const firstDate = a.completed_at || a.expires_at || "";
+    const secondDate = b.completed_at || b.expires_at || "";
+    return secondDate.localeCompare(firstDate);
+  });
+  const latestTraining = sortedTrainings[0];
+
   return (
     <section className="mt-5 overflow-hidden rounded-2xl border border-[#c9d8d0] bg-white shadow-sm">
       <header className="border-b border-[#dbe6e0] bg-[#486b5d] px-5 py-4 text-white">
@@ -5441,11 +5621,8 @@ function EmployeeTabbedEditor({
                       position:
                         STAFF_TYPES.find((type) => type.value === staffType)
                           ?.label || editForm.position,
-                      extra_permissions: Array.from(
-                        new Set([
-                          ...staffPermissions(staffType),
-                          ...editForm.extra_permissions,
-                        ]),
+                      extra_permissions: removeStaffBasePermissions(
+                        editForm.extra_permissions,
                       ),
                     });
                   }}
@@ -5477,7 +5654,10 @@ function EmployeeTabbedEditor({
 
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {EXTRA_PERMISSIONS.map((permission) => {
-                const checked = editForm.extra_permissions.includes(
+                const basePermission = staffPermissions(
+                  editForm.staff_type,
+                ).includes(permission.value);
+                const checked = basePermission || editForm.extra_permissions.includes(
                   permission.value,
                 );
 
@@ -5485,14 +5665,28 @@ function EmployeeTabbedEditor({
                   <button
                     key={permission.value}
                     type="button"
-                    onClick={() => onTogglePermission(permission.value)}
+                    onClick={() =>
+                      basePermission
+                        ? undefined
+                        : onTogglePermission(permission.value)
+                    }
                     className={`rounded-xl border px-3 py-2 text-left text-sm font-black transition ${
                       checked
                         ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                         : "border-[#dbe6e0] bg-[#ffffff] text-[#486b5d] hover:border-emerald-200 hover:bg-emerald-50"
                     }`}
+                    title={
+                      basePermission
+                        ? "Priskirta automatiškai pagal pareigų tipą"
+                        : undefined
+                    }
                   >
                     {permission.label}
+                    {basePermission ? (
+                      <span className="ml-2 text-xs font-black text-[#486b5d]">
+                        bazinė
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}
@@ -5600,6 +5794,89 @@ function EmployeeTabbedEditor({
         ) : null}
 
         {activeTab === "trainings" ? (
+          <section className="rounded-2xl border border-[#c9d8d0] bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black tracking-[0.14em] text-[#008065]">
+                  Mokymų istorija
+                </p>
+                <h4 className="mt-1 text-xl font-black text-[#10251f]">
+                  Darbuotojo mokymai
+                </h4>
+                <p className="mt-1 text-sm font-bold text-[#5f746b]">
+                  Įrašai susieti su šia darbuotojo kortele.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <span className="rounded-xl border border-[#dbe6e0] bg-white px-3 py-2">
+                  <b className="block text-lg font-black text-[#10251f]">
+                    {trainings.length}
+                  </b>
+                  <small className="text-[11px] font-black text-[#6a7e75]">
+                    įrašai
+                  </small>
+                </span>
+                <span className="rounded-xl border border-[#dbe6e0] bg-white px-3 py-2">
+                  <b className="block text-lg font-black text-[#10251f]">
+                    {totalTrainingHours}
+                  </b>
+                  <small className="text-[11px] font-black text-[#6a7e75]">
+                    val.
+                  </small>
+                </span>
+                <span className="rounded-xl border border-[#dbe6e0] bg-white px-3 py-2">
+                  <b className="block text-sm font-black text-[#10251f]">
+                    {latestTraining?.completed_at
+                      ? fmt(latestTraining.completed_at)
+                      : "-"}
+                  </b>
+                  <small className="text-[11px] font-black text-[#6a7e75]">
+                    paskutinis
+                  </small>
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              {trainings.length ? (
+                sortedTrainings.map((training) => (
+                  <div
+                    key={training.id}
+                    className="grid gap-3 rounded-xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm shadow-[0_1px_3px_rgba(16,37,31,0.05)] sm:grid-cols-[1fr_auto_auto] sm:items-center"
+                  >
+                    <div>
+                      <p className="font-black text-[#10251f]">
+                        {training.title || "Mokymas be pavadinimo"}
+                      </p>
+                      <p className="mt-1 text-xs font-bold text-[#6a7e75]">
+                        {training.provider || "Teikėjas nenurodytas"}
+                        {training.category ? ` · ${training.category}` : ""}
+                      </p>
+                    </div>
+
+                    <span className="rounded-full border border-[#dbe6e0] bg-white px-3 py-1 text-xs font-black text-[#486b5d]">
+                      {training.completed_at
+                        ? fmt(training.completed_at)
+                        : "data nenurodyta"}
+                    </span>
+
+                    <span className="rounded-full border border-[#dbe6e0] bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#10251f]">
+                      {training.hours || 0} val.
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed border-[#c9d8d0] bg-white px-4 py-5 text-sm font-bold text-[#6a7e75]">
+                  Mokymų įrašų dar nėra. Kai pridedamas mokymas, jis atsiras
+                  šioje darbuotojo kortelėje.
+                </div>
+              )}
+            </div>
+          </section>
+        ) : null}
+
+        {false && activeTab === "trainings" ? (
           <section className="rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
             <p className="text-sm font-black text-[#10251f]">
               Darbuotojo mokymai
