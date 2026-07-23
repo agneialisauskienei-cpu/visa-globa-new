@@ -1903,7 +1903,7 @@ function HeroMetric({
   tone?: "normal" | "warning";
 }) {
   return (
-    <div className="rounded-[16px] border border-[#c9d8d0] bg-white px-5 py-4 shadow-sm transition hover:border-2 hover:border-[#486b5d] hover:px-[19px] hover:py-[15px]">
+    <div className="rounded-[16px] border border-[#c9d8d0] bg-white px-5 py-4 shadow-sm transition hover:border-[#486b5d]">
       <div className="text-2xl font-black text-[#10251f]">{value}</div>
       <div
         className={`mt-1 text-[11px] font-bold tracking-[0.08em] ${
@@ -1946,7 +1946,7 @@ function StatCard({
   warning?: boolean;
 }) {
   return (
-    <article className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-sm transition hover:border-2 hover:border-[#486b5d] hover:p-[15px] sm:p-6 sm:hover:p-[23px]">
+    <article className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-sm transition hover:border-[#486b5d] sm:p-6">
       <div className="flex items-center gap-4">
         <div
           className={`flex h-12 w-12 items-center justify-center rounded-[14px] border border-[#dbe6e0] bg-white [&>svg]:h-5 [&>svg]:w-5 ${warning ? "text-amber-600" : "text-[#007f5f]"}`}
@@ -1984,7 +1984,7 @@ function ActionCard({
     <button
       type="button"
       onClick={onClick}
-      className="group flex items-center justify-between rounded-[16px] border border-[#dbe6e0] bg-white p-4 text-left transition hover:border-2 hover:border-[#486b5d] hover:p-[15px]"
+      className="group flex items-center justify-between rounded-[16px] border border-[#dbe6e0] bg-white p-4 text-left transition hover:border-[#486b5d]"
     >
       <span className="flex items-center gap-4">
         <span className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-[#dbe6e0] bg-white text-[#486b5d] shadow-sm [&>svg]:h-4 [&>svg]:w-4">

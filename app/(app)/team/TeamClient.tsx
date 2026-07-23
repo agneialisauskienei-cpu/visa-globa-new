@@ -3597,10 +3597,7 @@ export default function TeamPage() {
             </div>
           </div>
 
-          <nav
-            data-instruction-row
-            className="flex flex-wrap items-center gap-1 border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d]"
-          >
+          <nav className="flex w-full min-w-0 flex-wrap items-center gap-1 border-b border-[#dbe6e0] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d]">
             {tabs.map((item) => {
               const Icon = item.icon;
               const active = tab === item.key;
@@ -3610,25 +3607,14 @@ export default function TeamPage() {
                   key={item.key}
                   type="button"
                   onClick={() => changeTab(item.key)}
-                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 transition ${
-                    active
-                      ? "bg-white text-[#486b5d] shadow-sm ring-1 ring-[#c9d8d0]"
-                      : "text-[#486b5d] hover:bg-white/80"
-                  }`}
+                  className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-4 py-2 transition ${active ? "border-2 border-[#486b5d] bg-white text-[#0b3f33] shadow-sm" : "border-transparent text-[#486b5d] hover:border-[#486b5d] hover:bg-white"}`}
                 >
                   <Icon className="h-4 w-4" />
                   {item.label}
                 </button>
               );
             })}
-            {tab === "schedule" ? (
-              <button
-                type="button"
-                className="ml-auto rounded-lg border border-[#c2d3ca] bg-white px-3 py-2 text-xs font-black text-[#486b5d]"
-              >
-                Kompaktiškas grafikas
-              </button>
-            ) : null}
+            <div data-instruction-row className="ml-auto flex min-w-fit justify-end">{tab === "schedule" ? (<button type="button" className={teamOutlineButtonClass}>Kompaktiškas grafikas</button>) : null}</div>
           </nav>
         </section>
 
@@ -3643,7 +3629,7 @@ export default function TeamPage() {
             type="button"
             data-stat-card="true"
             onClick={() => changeTab("employees")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Darbuotojai
@@ -3660,7 +3646,7 @@ export default function TeamPage() {
             type="button"
             data-stat-card="true"
             onClick={() => changeTab("fte")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Etatai
@@ -3679,7 +3665,7 @@ export default function TeamPage() {
             type="button"
             data-stat-card="true"
             onClick={() => changeTab("vacations")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Atostogos
@@ -3696,7 +3682,7 @@ export default function TeamPage() {
             type="button"
             data-stat-card="true"
             onClick={() => changeTab("schedule")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Grafikas
@@ -3711,7 +3697,7 @@ export default function TeamPage() {
             type="button"
             data-stat-card="true"
             onClick={() => changeTab("trainings")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Mokymai
@@ -3728,7 +3714,7 @@ export default function TeamPage() {
             type="button"
             data-stat-card="true"
             onClick={() => changeTab("docs")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Dokumentai
@@ -3745,7 +3731,7 @@ export default function TeamPage() {
             type="button"
             data-stat-card="true"
             onClick={() => changeTab("candidates")}
-            className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-sm transition hover:border-2 hover:border-[#486b5d]"
+            className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-sm transition hover:border-[#486b5d]"
           >
             <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">
               Priėmimo prašymai
@@ -4836,7 +4822,7 @@ function FtePlanModule({
       </div>
 
       {planIsMissing ? (
-        <div className="mt-5 flex items-start gap-3 rounded-2xl border-2 border-[#486b5d] bg-white p-4 text-sm font-bold text-[#10251f]">
+        <div className="mt-5 flex items-start gap-3 rounded-2xl border border-[#486b5d] bg-white p-4 text-sm font-bold text-[#10251f]">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[#486b5d] text-lg font-black text-[#486b5d]">
             !
           </span>
@@ -4865,7 +4851,7 @@ function FtePlanModule({
             <button
               type="button"
               onClick={onNew}
-              className="rounded-[14px] border border-[#486b5d] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:border-2"
+              className="rounded-[14px] border border-[#c9d8d0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:border-[#486b5d]"
             >
               Naujas įrašas
             </button>
@@ -5272,7 +5258,7 @@ function StatCard({
       data-content-card
       data-stat-card
       onClick={onClick}
-      className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-2 hover:border-[#486b5d] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)] active:scale-[0.99]"
+      className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-[#486b5d] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)] active:scale-[0.99]"
     >
       <div>
         <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">{title}</p>
@@ -5292,10 +5278,10 @@ const teamPrimaryButtonClass =
   "inline-flex min-h-10 items-center justify-center rounded-xl border border-[#486b5d] bg-[#486b5d] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:border-[#0b3f33] hover:bg-[#0b3f33] disabled:cursor-not-allowed disabled:opacity-60";
 
 const teamOutlineButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-xl border border-[#486b5d] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:border-2 hover:border-[#0b3f33] hover:text-[#0b3f33]";
+  "inline-flex min-h-10 items-center justify-center rounded-xl border border-[#c9d8d0] bg-white px-4 py-2 text-sm font-black text-[#486b5d] transition hover:border-[#486b5d] hover:text-[#0b3f33]";
 
 const teamFilterButtonClass =
-  "rounded-xl border border-[#486b5d] bg-white px-4 py-2 text-xs font-black text-[#486b5d] transition hover:border-2 hover:border-[#0b3f33] hover:text-[#0b3f33]";
+  "rounded-xl border border-[#c9d8d0] bg-white px-4 py-2 text-xs font-black text-[#486b5d] transition hover:border-[#486b5d] hover:text-[#0b3f33]";
 
 const teamFilterActiveButtonClass =
   "rounded-xl border-2 border-[#0b3f33] bg-[#486b5d] px-4 py-2 text-xs font-black text-white shadow-sm";
@@ -6045,7 +6031,7 @@ function EmployeeRowCard({
   onEdit,
 }: {
   employee: Employee;
-  selected?: boolean;
+  selected: boolean;
   onEdit: () => void;
 }) {
   const initials = employeeName(employee)
@@ -6057,14 +6043,12 @@ function EmployeeRowCard({
   const avatarUrl = employeeAvatarUrl(employee);
 
   return (
-    <button
-      type="button"
-      onClick={onEdit}
+    <article
       data-card-button="true"
-      className={`grid w-full gap-3 rounded-2xl border p-4 text-left shadow-sm transition md:grid-cols-[56px_minmax(220px,1.1fr)_minmax(140px,1fr)_minmax(220px,1fr)_auto] md:items-center ${
+      className={`grid w-full max-w-full gap-3 rounded-2xl border p-4 text-left shadow-sm transition md:grid-cols-[56px_minmax(0,1.15fr)_minmax(120px,0.65fr)_minmax(160px,0.85fr)_minmax(110px,auto)] md:items-center ${
         selected
           ? "border-2 border-[#486b5d] bg-white"
-          : "border border-[#dbe6e0] bg-white hover:border-2 hover:border-[#486b5d]"
+          : "border border-[#c9d8d0] bg-white hover:border-[#486b5d]"
       }`}
     >
       <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white text-lg font-black text-[#008065] shadow-sm ring-1 ring-[#dbe6e0]">
@@ -6079,39 +6063,38 @@ function EmployeeRowCard({
         )}
       </div>
 
-      <div>
-        <div className="text-lg font-black text-[#10251f]">
+      <div className="min-w-0">
+        <div className="truncate text-lg font-black text-[#10251f]">
           {employeeName(employee)}
         </div>
-        <div className="text-sm font-bold text-[#6a7e75]">
-          {employee.position ||
-            employeeRole(employee) ||
-            "Pareigos dar nepriskirtos"}{" "}
-          · {employee.department || "Skyrius dar nepriskirtas"}
+        <div className="truncate text-sm font-bold text-[#6a7e75]">
+          {employee.position || employeeRole(employee) || "Pareigos dar nepriskirtos"} · {employee.department || "Skyrius dar nepriskirtas"}
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-700">
+        <span className="rounded-full bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#008065]">
           {employee.is_active === false ? "Neaktyvus" : "Aktyvus"}
         </span>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#486b5d]">
+        <span className="rounded-full bg-[#f7fcf9] px-3 py-1 text-xs font-black text-[#486b5d]">
           {staffTypeLabel(employee.staff_type)}
         </span>
       </div>
 
-      <div className="text-sm font-bold text-[#6a7e75]">
+      <div className="truncate text-sm font-bold text-[#6a7e75]">
         {employee.contract_number
           ? `${employee.contract_number}${employee.employment_start_date ? ` · nuo ${fmt(employee.employment_start_date)}` : ""}`
           : "Įdarbinimas neužbaigtas"}
       </div>
 
-      <span
-        className={`${selected ? teamPrimaryButtonClass : teamPrimaryButtonClass} shrink-0 justify-self-start md:justify-self-end`}
+      <button
+        type="button"
+        onClick={onEdit}
+        className={`${teamPrimaryButtonClass} shrink-0 justify-self-start md:justify-self-end`}
       >
         Redaguoti
-      </span>
-    </button>
+      </button>
+    </article>
   );
 }
 

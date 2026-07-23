@@ -1809,7 +1809,7 @@ function TopMetric({
       type="button"
       data-content-card
       onClick={onClick}
-      className="rounded-xl border border-[#486b5d] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-2 hover:border-[#486b5d] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)]"
+      className="rounded-xl border border-[#c9d8d0] bg-white p-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition hover:border-[#486b5d] hover:shadow-[0_4px_12px_rgba(16,37,31,0.10)]"
     >
       <p className="text-[11px] font-black uppercase tracking-wide text-[#6a7e75]">{title}</p>
       <p className={`mt-1 text-2xl font-black ${valueClass}`}>{value}</p>

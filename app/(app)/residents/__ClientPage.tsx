@@ -1259,7 +1259,7 @@ export default function ResidentsPage() {
                 return (
                   <article
                     key={resident.id}
-                    className="rounded-[18px] border border-[#dbe6e0] bg-white p-5 transition hover:border-2 hover:border-[#486b5d] hover:p-[19px]"
+                    className="rounded-[18px] border border-[#dbe6e0] bg-white p-5 transition hover:border-[#486b5d]"
                   >
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                       <div className="flex items-start gap-4">
@@ -1515,7 +1515,7 @@ function StatCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[16px] border bg-white px-5 py-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition ${active ? "border-2 border-[#486b5d] px-[19px] py-[15px]" : "border-[#c9d8d0] hover:border-2 hover:border-[#486b5d] hover:px-[19px] hover:py-[15px]"}`}
+      className={`rounded-[16px] border bg-white px-5 py-4 text-left shadow-[0_1px_3px_rgba(16,37,31,0.08)] transition ${active ? "border-2 border-[#486b5d] px-[19px] py-[15px]" : "border-[#c9d8d0] hover:border-[#486b5d]"}`}
     >
       <p className="font-extrabold text-[#66756c]">{title}</p>
       <p className="mt-2 text-2xl font-black tracking-[-0.03em] text-[#10251f]">{value}</p>
