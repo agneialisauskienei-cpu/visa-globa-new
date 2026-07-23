@@ -385,11 +385,11 @@ function roomVisual(room: Room) {
   }
 
   if (room.room_status === "preparing") {
-    return { label: "Ruošiamas", tone: "warning" as const, bar: "bg-amber-500" }
+    return { label: "Ruošiamas", tone: "warning" as const, bar: "bg-[#486b5d]" }
   }
 
   if (room.reserved > 0 || room.room_status === "reserved" || room.reserved_for) {
-    return { label: "Rezervuotas", tone: "warning" as const, bar: "bg-amber-500" }
+    return { label: "Rezervuotas", tone: "warning" as const, bar: "bg-[#486b5d]" }
   }
 
   if (room.occupied >= room.capacity || room.room_status === "occupied" || room.occupied_by) {
@@ -427,7 +427,7 @@ function Badge({
   const tones = {
     green: "border-[#a7f3d0] bg-[#eefaf3] text-[#486b5d]",
     blue: "border-[#c9d8d0] bg-white text-[#486b5d]",
-    warning: "border-amber-200 bg-amber-50 text-amber-700",
+    warning: "border-[#c9d8d0] bg-[#ffffff] text-[#486b5d]",
     danger: "border-red-200 bg-red-50 text-red-700",
     neutral: "border-[#dbe6e0] bg-[#ffffff] text-[#526174]",
   }
@@ -1220,7 +1220,7 @@ export default function RoomsPage() {
                   className={`rounded-[18px] border p-4 ${
                     alert.tone === "danger"
                       ? "border-red-200 bg-red-50 text-red-900"
-                      : "border-amber-200 bg-amber-50 text-amber-900"
+                      : "border-[#c9d8d0] bg-white text-[#486b5d]"
                   }`}
                 >
                   <div className="font-black">{alert.title}</div>
@@ -1254,12 +1254,12 @@ export default function RoomsPage() {
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {reservationRows.length ? (
                 reservationRows.map((resident) => (
-                  <div key={resident.id} className="rounded-[18px] border border-amber-200 bg-amber-50 p-4">
-                    <div className="font-black text-amber-950">{residentName(resident)}</div>
-                    <div className="mt-1 text-sm font-bold text-amber-800">
+                  <div key={resident.id} className="rounded-[18px] border border-[#c9d8d0] bg-white p-4">
+                    <div className="font-black text-[#10251f]">{residentName(resident)}</div>
+                    <div className="mt-1 text-sm font-bold text-[#486b5d]">
                       {statusLabel(resident.current_status || resident.status)} · kambarys {rooms.find((room) => matchesRoom(resident, room))?.name || "nepriskirtas"}
                     </div>
-                    <div className="mt-2 text-sm font-bold text-amber-800">Iki: {formatDate(resident.room_reserved_until)}</div>
+                    <div className="mt-2 text-sm font-bold text-[#486b5d]">Iki: {formatDate(resident.room_reserved_until)}</div>
                   </div>
                 ))
               ) : (
@@ -1501,7 +1501,7 @@ export default function RoomsPage() {
                         </div>
                       ))
                     ) : room.occupied_by || room.reserved_for ? (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+                      <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold text-[#486b5d]">
                         {room.occupied_by ? `Užimta: ${occupiedByLabel(room, residents)}` : `Rezervuota: ${room.reserved_for}`}
                         {room.reserved_until ? ` · iki ${formatDate(room.reserved_until)}` : ""}
                       </div>
@@ -1604,7 +1604,7 @@ export default function RoomsPage() {
                       title="Rezervuoti vietą"
                       action={<Badge tone="warning">Tik rezervacija</Badge>}
                     >
-                      <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-800">
+                      <div className="mb-5 rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold leading-6 text-[#486b5d]">
                         Pasirink gyventoją, įrašyk rezervacijos datą ir spausk
                         „Rezervuoti“. Jei gyventojo dar nėra sąraše, pirmiausia sukurk
                         jį su statusu „Netrukus atvyks“.
@@ -1825,7 +1825,7 @@ export default function RoomsPage() {
                     ) : (
                       <div className="grid gap-3">
                         {selectedRoom && roomResidents.length === 0 && (selectedRoom.occupied_by || selectedRoom.reserved_for) ? (
-                          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+                          <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold text-[#486b5d]">
                             {selectedRoom.occupied_by ? `Užimta: ${occupiedByLabel(selectedRoom, residents)}` : `Rezervuota: ${selectedRoom.reserved_for}`}
                             {selectedRoom.reserved_until ? ` · iki ${formatDate(selectedRoom.reserved_until)}` : ""}
                           </div>
@@ -1893,7 +1893,7 @@ export default function RoomsPage() {
                     <Panel title={modalMode === "reserve" ? "Rezervuoti vietą" : "Priskirti arba rezervuoti vietą"} action={modalMode === "reserve" ? <Badge tone="warning">Aktyvu</Badge> : null}>
                       <div className="grid gap-4">
                         {modalMode === "reserve" ? (
-                          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-800">
+                          <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold leading-6 text-[#486b5d]">
                             Pasirink gyventoją, įrašyk rezervacijos datą ir spausk „Rezervuoti“. Jei gyventojo dar nėra sąraše, pirmiausia sukurk jį su statusu „Netrukus atvyks“.
                           </div>
                         ) : null}
@@ -1968,7 +1968,7 @@ export default function RoomsPage() {
                         type="button"
                         onClick={() => updateRoomStatus("preparing")}
                         disabled={!selectedRoom || selectedRoomId === "new"}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 hover:bg-amber-100 disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#c9d8d0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] hover:border-[#486b5d] hover:bg-white disabled:opacity-60"
                       >
                         <Sparkles size={17} />
                         Ruošiamas
@@ -1997,7 +1997,7 @@ export default function RoomsPage() {
                   <Panel title="Įspėjimai">
                     <div className="grid gap-3">
                       {selectedRoom?.reserved ? (
-                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-800">
+                        <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold leading-6 text-[#486b5d]">
                           Kambaryje yra rezervuota vieta. Patikrink atvykimo terminą ir paruošimo būseną.
                         </div>
                       ) : null}
