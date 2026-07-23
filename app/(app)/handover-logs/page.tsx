@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ClipboardList,
   CalendarDays,
-  HelpCircle,
   MessageSquare,
   Plus,
   RefreshCw,
@@ -987,11 +986,6 @@ export default function HandoverLogsPage() {
               <HandoverTab active={unreadOnly} icon={<CheckCircle2 className="h-4 w-4" />} label="Nepatvirtinti" count={stats.unread} onClick={() => { setIncludeArchived(false); setUnreadOnly((v) => !v); }} />
               <HandoverTab active={importantOnly} icon={<ShieldAlert className="h-4 w-4" />} label="Svarbūs" count={stats.important} onClick={() => setImportantOnly((v) => !v)} />
               <HandoverTab active={includeArchived} icon={<Archive className="h-4 w-4" />} label="Archyvas" onClick={() => { setUnreadOnly(false); setIncludeArchived((v) => !v); }} />
-              <div data-instruction-row>
-                <button type="button" onClick={() => setHelpOpen(true)} className="vg-instruction-trigger">
-                  <HelpCircle className="h-4 w-4" /> Instrukcija
-                </button>
-              </div>
             </div>
           </div>
         </section>
@@ -1009,7 +1003,7 @@ export default function HandoverLogsPage() {
 
         <section className="grid gap-6 xl:grid-cols-[560px_minmax(0,1fr)]">
           <article className="xl:sticky xl:top-6 self-start rounded-[24px] border border-[#c9d8d0] bg-white p-6 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-100/80">Naujas įrašas</p>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-[#007f5f]">Naujas įrašas</p>
             <h2 className="mt-1 text-2xl font-black tracking-tight">Perduoti informaciją</h2>
             <p className="mt-1 font-semibold text-[#526174]">Pirmiausia pasirink temą, tada, jei reikia, priskirk gyventoją.</p>
 
