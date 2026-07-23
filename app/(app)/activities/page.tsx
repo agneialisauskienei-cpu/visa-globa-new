@@ -1052,18 +1052,18 @@ export default function ActivitiesPage() {
 
         <section className="grid grid-cols-1 gap-6 2xl:grid-cols-[1.2fr_0.8fr]">
           <div className="overflow-hidden rounded-[22px] border border-[#c9d8d0] bg-white shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
-            <div className="flex flex-col gap-4 border-b border-[#dbe6e0] p-5 lg:flex-row lg:items-center lg:justify-between">
-              <div>
+            <div className="flex flex-col gap-4 border-b border-[#dbe6e0] p-5 xl:flex-row xl:items-center xl:justify-between">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-xl font-black capitalize text-[#10251f]">
                   <CalendarDays className="h-5 w-5 text-[#486b5d]" /> {monthLabel(month)}
                 </div>
-                <p className="mt-1 text-sm font-semibold text-[#526174]">
+                <p className="mt-1 max-w-xl text-sm font-semibold leading-5 text-[#526174]">
                   Veiklą spausk lankomumui. Tuščia diena atidaro naujos veiklos langą.
                 </p>
               </div>
 
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <label className="relative block w-full lg:w-[300px]">
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+                <label className="relative block w-full sm:w-[280px] xl:w-[360px]">
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a9a91]" />
                   <input
                     value={query}
@@ -1073,7 +1073,7 @@ export default function ActivitiesPage() {
                   />
                 </label>
 
-                <div className="hidden rounded-2xl border border-[#dbe6e0] bg-[#f7fcf9] p-1 text-sm font-black lg:flex">
+                <div className="hidden rounded-2xl border border-[#dbe6e0] bg-[#f7fcf9] p-1 text-sm font-black xl:flex">
                   {([
                     ["day", "Diena"],
                     ["week", "Savaitė"],
@@ -1348,7 +1348,13 @@ function CalendarGrid({
               type="button"
               onClick={() => {
                 onPickDate(key);
-                if (!dayActivities.length) onCreate(key);
+                if (!dayActivities.length) {
+                  onCreate(key);
+                  return;
+                }
+                if (dayActivities.length === 1) {
+                  onOpenAttendance(dayActivities[0]);
+                }
               }}
               className={`min-h-[156px] border-b border-r border-[#e4ece6] bg-white p-3 text-left transition hover:bg-[#ffffff] ${
                 !isCurrentMonth && viewMode === "month" ? "opacity-45" : ""
@@ -1358,7 +1364,11 @@ function CalendarGrid({
                 <div className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black ${isToday ? "bg-[#486b5d] text-white" : "bg-[#f7fcf9] text-[#10251f]"}`}>
                   {day.getDate()}
                 </div>
-                {dayActivities.length ? <span className="rounded-full bg-[#f7fcf9] px-2 py-1 text-xs font-black text-[#486b5d]">{dayActivities.length}</span> : null}
+                {dayActivities.length ? (
+                  <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-[#c9d8d0] bg-white px-2 text-xs font-black text-[#486b5d]">
+                    {dayActivities.length}
+                  </span>
+                ) : null}
               </div>
 
               <div className="mt-3 space-y-2">

@@ -250,9 +250,7 @@ function residentName(resident: Resident | null | undefined) {
   const firstName = String(resident.first_name || "").trim()
   const lastName = String(resident.last_name || "").trim()
   const combined = [firstName, lastName].filter(Boolean).join(" ").trim()
-  const code = resident.resident_code ? ` (${resident.resident_code})` : ""
-
-  return `${fullName || combined || "Gyventojas"}${code}`
+  return fullName || combined || "Gyventojas"
 }
 
 function occupiedByLabel(room: Room, residents: Resident[]) {
@@ -1104,20 +1102,20 @@ export default function RoomsPage() {
   return (
     <div className="min-h-screen bg-[#ffffff] px-4 py-6 text-[#10251f] lg:px-8">
       <div className="mx-auto max-w-[1500px]">
-        <section className="mb-5 overflow-hidden rounded-[30px] border border-emerald-900/10 bg-[#486b5d] shadow-[0_16px_45px_rgba(16,37,31,0.16)]">
-          <div className="flex flex-col gap-6 px-7 py-7 xl:flex-row xl:items-center xl:justify-between">
+        <section className="mb-5 overflow-hidden rounded-[22px] border border-[#c9d8d0] bg-white shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
+          <div className="flex flex-col gap-6 bg-[#486b5d] px-7 py-7 text-white xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-center gap-5">
               <div className="grid h-20 w-20 shrink-0 place-items-center rounded-[28px] bg-[#e8f7ef] text-[#486b5d]">
                 <Home size={36} />
               </div>
               <div>
-                <div className="mb-2 text-xs font-black tracking-[0.14em] text-emerald-100/80">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/75">
                   Kambariai / užimtumas / rezervacijos
                 </div>
                 <h1 className="text-4xl font-black tracking-[-0.04em] text-white">
                   Kambarių valdymas
                 </h1>
-                <p className="mt-2 text-base font-bold text-emerald-50/90">
+                <p className="mt-2 max-w-3xl text-base font-bold text-white/90">
                   Kambariai, gyventojai, privalumai, rezervacijos ir paruošimo būsenos vienoje vietoje.
                 </p>
               </div>
