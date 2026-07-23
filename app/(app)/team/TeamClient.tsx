@@ -460,9 +460,10 @@ function csvCell(value: unknown) {
 function downloadCsv(filename: string, rows: unknown[][]) {
   if (typeof window === "undefined") return;
 
-  const content = rows
-    .map((row) => row.map(csvCell).join(";"))
-    .join("\n");
+  const content = [
+    "sep=;",
+    ...rows.map((row) => row.map(csvCell).join(";")),
+  ].join("\r\n");
   const blob = new Blob([`\uFEFF${content}`], {
     type: "text/csv;charset=utf-8",
   });
