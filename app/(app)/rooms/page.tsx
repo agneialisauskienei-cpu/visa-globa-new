@@ -500,6 +500,23 @@ function Badge({
   )
 }
 
+function RoomModuleLink({
+  href,
+  children,
+}: {
+  href: string
+  children: ReactNode
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-9 items-center justify-center rounded-[14px] border border-[#c9d8d0] bg-white px-3 py-1.5 text-xs font-black text-[#486b5d] transition hover:border-[#486b5d] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#486b5d]/25"
+    >
+      {children}
+    </Link>
+  )
+}
+
 function StatCard({
   icon,
   value,
@@ -2072,13 +2089,13 @@ export default function RoomsPage() {
                     </Panel>
                   ) : null}
 
-                  <Panel title="RyÅ¡iai su moduliais">
+                  <Panel title="Ryšiai su moduliais">
                     <div className="flex flex-wrap gap-2">
-                      <Badge tone="blue">Gyventojo kortelÄ—</Badge>
-                      <Badge tone="green">UÅ¾duotys Å«kiui</Badge>
-                      <Badge tone="neutral">Perdavimo Å¾urnalas</Badge>
-                      <Badge tone="warning">Valymo bÅ«sena</Badge>
-                      <Badge tone="neutral">Inventorius</Badge>
+                      <RoomModuleLink href={selectedRoom ? `/residents?search=${encodeURIComponent(selectedRoom.name)}` : "/residents"}>Gyventojai</RoomModuleLink>
+                      <RoomModuleLink href={selectedRoom ? `/tasks?room=${encodeURIComponent(selectedRoom.name)}` : "/tasks"}>Užduotys ūkiui</RoomModuleLink>
+                      <RoomModuleLink href={selectedRoom ? `/handover-logs?room=${encodeURIComponent(selectedRoom.name)}` : "/handover-logs"}>Perdavimo žurnalai</RoomModuleLink>
+                      <RoomModuleLink href={selectedRoom ? `/rooms?tab=repairs&room=${encodeURIComponent(selectedRoom.name)}` : "/rooms?tab=repairs"}>Valymo būsena</RoomModuleLink>
+                      <RoomModuleLink href={selectedRoom ? `/inventory?room=${encodeURIComponent(selectedRoom.name)}` : "/inventory"}>Inventorius</RoomModuleLink>
                     </div>
                   </Panel>
                 </div>
