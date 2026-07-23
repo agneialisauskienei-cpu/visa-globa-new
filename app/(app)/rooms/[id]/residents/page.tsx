@@ -315,19 +315,76 @@ function formatDate(value: string | null | undefined) {
   return date.toLocaleDateString("lt-LT")
 }
 
-function downloadCsv(filename: string, rows: string[][]) {
-  const csv = rows
-    .map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(","))
-    .join("\n")
+function excelCell(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
 
-  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" })
-  const url = URL.createObjectURL(blob)
+function downloadExcelTable(filename: string, rows: unknown[][]) {
+  if (typeof window === "undefined") return
+
+  const headerStarts = new Set(["Rodiklis", "Kambarys", "Gyventojas", "Rizika"])
+  const sectionStarts = new Set(["Suvestinė", "Vidurkiai", "Kambarių sąrašas", "Rezervacijos", "Rizikos ir remontas"])
+
+  const tableRows = rows
+    .map((row, index) => {
+      const firstCell = String(row[0] ?? "")
+      const isEmpty = row.every((cell) => String(cell ?? "").trim() === "")
+      const className = [
+        index === 0 ? "title-row" : "",
+        sectionStarts.has(firstCell) ? "section-row" : "",
+        headerStarts.has(firstCell) ? "header-row" : "",
+        firstCell === "Iš viso" ? "total-row" : "",
+        isEmpty ? "blank-row" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+      const cells = row.map((cell) => `<td>${excelCell(cell)}</td>`).join("")
+      return `<tr class="${className}">${cells}</tr>`
+    })
+    .join("")
+
+  const content = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { background: #ffffff; color: #10251f; }
+    table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; min-width: 1260px; }
+    td { border: 1px solid #d9e4de; padding: 7px 10px; white-space: nowrap; vertical-align: middle; }
+    .title-row td { border: 0; background: #486b5d; color: #ffffff; font-size: 20pt; font-weight: 700; padding: 14px 12px; }
+    .section-row td { border: 0; background: #f7fcf9; color: #486b5d; font-size: 13pt; font-weight: 700; padding-top: 14px; }
+    .header-row td { background: #486b5d; color: #ffffff; font-weight: 700; }
+    .total-row td { background: #f7fcf9; color: #10251f; font-weight: 700; }
+    .blank-row td { border: 0; height: 10px; padding: 0; }
+    td:nth-child(1) { min-width: 130px; }
+    td:nth-child(2) { min-width: 160px; }
+    td:nth-child(3) { min-width: 120px; }
+    td:nth-child(4) { min-width: 110px; }
+    td:nth-child(5) { min-width: 95px; }
+    td:nth-child(6), td:nth-child(7), td:nth-child(8) { min-width: 90px; }
+    td:nth-child(9) { min-width: 140px; }
+    td:nth-child(10), td:nth-child(11) { min-width: 220px; }
+  </style>
+</head>
+<body><table>${tableRows}</table></body>
+</html>`
+
+  const blob = new Blob([content], { type: "application/vnd.ms-excel;charset=utf-8" })
+  const url = window.URL.createObjectURL(blob)
   const link = document.createElement("a")
+
   link.href = url
   link.download = filename
+  document.body.appendChild(link)
   link.click()
-  URL.revokeObjectURL(url)
+  link.remove()
+  window.URL.revokeObjectURL(url)
 }
+
 
 function normalizeRoom(row: RoomRow, residents: Resident[]): Room {
   const activeResidents = residents.filter(
@@ -1064,25 +1121,100 @@ export default function RoomsPage() {
   }
 
   function exportRooms() {
-    downloadCsv("kambariai.csv", [
-      ["Kambarys", "Aukštas", "Tipas", "Lytis", "Talpa", "Užimta", "Rezervuota", "Laisva", "Statusas", "Privalumai"],
-      ...filteredRooms.map((room) => {
-        const visual = roomVisual(room)
-        return [
-          room.name,
-          String(room.floor ?? ""),
-          formatType(room.room_type),
-          formatGender(room.gender),
-          String(room.capacity),
-          String(room.occupied),
-          String(room.reserved),
-          String(Math.max(room.capacity - room.occupied - room.reserved, 0)),
-          visual.label,
-          featureList(room).join("; "),
-        ]
-      }),
+    const today = new Date()
+    const filenameDate = today.toISOString().slice(0, 10)
+    const occupancyPercent = stats.capacity ? Math.round(((stats.occupied + stats.reserved) / stats.capacity) * 100) : 0
+    const averageCapacity = rooms.length ? Math.round((stats.capacity / rooms.length) * 100) / 100 : 0
+    const averageOccupied = rooms.length ? Math.round((stats.occupied / rooms.length) * 100) / 100 : 0
+
+    const roomRows = filteredRooms.map((room) => {
+      const visual = roomVisual(room)
+      const residentsInRoom = residents.filter((resident) => matchesRoom(resident, room))
+      const activeNames = residentsInRoom
+        .filter((resident) => isActiveResidentStatus(resident))
+        .map(residentName)
+        .join(", ")
+      const reservedNames = residentsInRoom
+        .filter((resident) => isReservedResidentStatus(resident))
+        .map(residentName)
+        .join(", ")
+
+      return [
+        room.name,
+        room.floor ?? "-",
+        formatType(room.room_type),
+        formatGender(room.gender),
+        room.capacity,
+        room.occupied,
+        room.reserved,
+        Math.max(room.capacity - room.occupied - room.reserved, 0),
+        visual.label,
+        activeNames || "-",
+        reservedNames || "-",
+        featureList(room).join(", "),
+        room.notes || "-",
+      ]
+    })
+
+    const reservationExportRows = reservationRows.map((resident) => {
+      const room = rooms.find((item) => matchesRoom(resident, item))
+      return [
+        residentName(resident),
+        room?.name || residentRoomKey(resident) || "-",
+        statusLabel(resident.current_status || resident.status),
+        formatDate(resident.room_reserved_until),
+      ]
+    })
+
+    const alertExportRows = roomAlerts.map((alert) => [alert.title, alert.text])
+
+    downloadExcelTable(`kambariai-${filenameDate}.xls`, [
+      ["Kambarių užimtumo ataskaita"],
+      ["Sugeneruota", today.toLocaleString("lt-LT")],
+      [],
+      ["Suvestinė"],
+      ["Rodiklis", "Reikšmė", "Pastaba"],
+      ["Kambarių skaičius", rooms.length, "Visi suvesti kambariai"],
+      ["Bendra talpa", stats.capacity, "Visos vietos"],
+      ["Užimta vietų", stats.occupied, "Gyvenantys gyventojai"],
+      ["Rezervuota vietų", stats.reserved, "Netrukus atvyks / rezervuota"],
+      ["Laisva vietų", stats.free, "Laisvos vietos pagal talpą"],
+      ["Užimtumas", `${occupancyPercent}%`, "Užimta ir rezervuota nuo bendros talpos"],
+      [],
+      ["Vidurkiai"],
+      ["Rodiklis", "Reikšmė", "Pastaba"],
+      ["Vidutinė talpa kambaryje", averageCapacity, "Vietos / kambariai"],
+      ["Vidutiniškai gyvena kambaryje", averageOccupied, "Gyventojai / kambariai"],
+      [],
+      ["Kambarių sąrašas"],
+      [
+        "Kambarys",
+        "Aukštas",
+        "Tipas",
+        "Lytis",
+        "Talpa",
+        "Gyvena",
+        "Rezervuota",
+        "Laisva",
+        "Būsena",
+        "Gyventojai",
+        "Rezervacijos",
+        "Privalumai",
+        "Pastabos",
+      ],
+      ...roomRows,
+      ["Iš viso", "", "", "", stats.capacity, stats.occupied, stats.reserved, stats.free, "", "", "", "", ""],
+      [],
+      ["Rezervacijos"],
+      ["Gyventojas", "Kambarys", "Būsena", "Iki"],
+      ...(reservationExportRows.length ? reservationExportRows : [["Rezervacijų nėra", "", "", ""]]),
+      [],
+      ["Rizikos ir remontas"],
+      ["Rizika", "Aprašymas"],
+      ...(alertExportRows.length ? alertExportRows : [["Aktyvių rizikų nėra", ""]]),
     ])
   }
+
 
   if (loading) {
     return (
@@ -1131,7 +1263,7 @@ export default function RoomsPage() {
                 className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#ffffff]"
               >
                 <Download size={17} />
-                Eksportuoti
+                Eksportuoti Excel
               </button>
               <button
                 type="button"

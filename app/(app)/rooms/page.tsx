@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 "use client"
 
 import Link from "next/link"
@@ -198,7 +198,7 @@ function toNumber(value: string | number | null | undefined, fallback: number | 
   return Number.isFinite(n) ? n : fallback
 }
 
-function text(value: unknown, fallback = "—") {
+function text(value: unknown, fallback = "â€”") {
   if (value === null || value === undefined || value === "") return fallback
   return String(value)
 }
@@ -229,22 +229,22 @@ function capacityByType(type: RoomType, otherCapacity = 5) {
 function formatGender(gender: Gender) {
   if (gender === "male") return "Vyrams"
   if (gender === "female") return "Moterims"
-  if (gender === "mixed") return "Mišrus"
+  if (gender === "mixed") return "MiÅ¡rus"
   return "Nenurodyta"
 }
 
 function statusLabel(status: string | null | undefined) {
   if (status === "arriving_soon" || status === "netrukus_atvyks") return "Netrukus atvyks"
   if (status === "active" || status === "gyvena") return "Gyvena"
-  if (status === "hospital" || status === "ligonineje") return "Ligoninėje"
-  if (status === "temporary_leave" || status === "laikinai_isvykes") return "Laikinai išvykęs"
-  if (status === "deceased" || status === "mire") return "Mirė"
-  if (status === "contract_ended" || status === "sutartis_nutraukta") return "Nutraukė sutartį"
-  return "—"
+  if (status === "hospital" || status === "ligonineje") return "LigoninÄ—je"
+  if (status === "temporary_leave" || status === "laikinai_isvykes") return "Laikinai iÅ¡vykÄ™s"
+  if (status === "deceased" || status === "mire") return "MirÄ—"
+  if (status === "contract_ended" || status === "sutartis_nutraukta") return "NutraukÄ— sutartÄ¯"
+  return "â€”"
 }
 
 function residentName(resident: Resident | null | undefined) {
-  if (!resident) return "—"
+  if (!resident) return "â€”"
 
   const fullName = String(resident.full_name || "").trim()
   const firstName = String(resident.first_name || "").trim()
@@ -254,7 +254,7 @@ function residentName(resident: Resident | null | undefined) {
 }
 
 function occupiedByLabel(room: Room, residents: Resident[]) {
-  if (!room.occupied_by) return "—"
+  if (!room.occupied_by) return "â€”"
 
   const occupiedBy = String(room.occupied_by)
 
@@ -307,25 +307,82 @@ function isReservedResidentStatus(resident: Resident) {
 }
 
 function formatDate(value: string | null | undefined) {
-  if (!value) return "—"
+  if (!value) return "â€”"
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
+  if (Number.isNaN(date.getTime())) return "â€”"
   return date.toLocaleDateString("lt-LT")
 }
 
-function downloadCsv(filename: string, rows: string[][]) {
-  const csv = rows
-    .map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(","))
-    .join("\n")
+function excelCell(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
 
-  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" })
-  const url = URL.createObjectURL(blob)
+function downloadExcelTable(filename: string, rows: unknown[][]) {
+  if (typeof window === "undefined") return
+
+  const headerStarts = new Set(["Rodiklis", "Kambarys", "Gyventojas", "Rizika"])
+  const sectionStarts = new Set(["SuvestinÄ—", "Vidurkiai", "KambariÅ³ sÄ…raÅ¡as", "Rezervacijos", "Rizikos ir remontas"])
+
+  const tableRows = rows
+    .map((row, index) => {
+      const firstCell = String(row[0] ?? "")
+      const isEmpty = row.every((cell) => String(cell ?? "").trim() === "")
+      const className = [
+        index === 0 ? "title-row" : "",
+        sectionStarts.has(firstCell) ? "section-row" : "",
+        headerStarts.has(firstCell) ? "header-row" : "",
+        firstCell === "IÅ¡ viso" ? "total-row" : "",
+        isEmpty ? "blank-row" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+      const cells = row.map((cell) => `<td>${excelCell(cell)}</td>`).join("")
+      return `<tr class="${className}">${cells}</tr>`
+    })
+    .join("")
+
+  const content = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { background: #ffffff; color: #10251f; }
+    table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; min-width: 1260px; }
+    td { border: 1px solid #d9e4de; padding: 7px 10px; white-space: nowrap; vertical-align: middle; }
+    .title-row td { border: 0; background: #486b5d; color: #ffffff; font-size: 20pt; font-weight: 700; padding: 14px 12px; }
+    .section-row td { border: 0; background: #f7fcf9; color: #486b5d; font-size: 13pt; font-weight: 700; padding-top: 14px; }
+    .header-row td { background: #486b5d; color: #ffffff; font-weight: 700; }
+    .total-row td { background: #f7fcf9; color: #10251f; font-weight: 700; }
+    .blank-row td { border: 0; height: 10px; padding: 0; }
+    td:nth-child(1) { min-width: 130px; }
+    td:nth-child(2) { min-width: 160px; }
+    td:nth-child(3) { min-width: 120px; }
+    td:nth-child(4) { min-width: 110px; }
+    td:nth-child(5) { min-width: 95px; }
+    td:nth-child(6), td:nth-child(7), td:nth-child(8) { min-width: 90px; }
+    td:nth-child(9) { min-width: 140px; }
+    td:nth-child(10), td:nth-child(11) { min-width: 220px; }
+  </style>
+</head>
+<body><table>${tableRows}</table></body>
+</html>`
+
+  const blob = new Blob([content], { type: "application/vnd.ms-excel;charset=utf-8" })
+  const url = window.URL.createObjectURL(blob)
   const link = document.createElement("a")
+
   link.href = url
   link.download = filename
+  document.body.appendChild(link)
   link.click()
-  URL.revokeObjectURL(url)
+  link.remove()
+  window.URL.revokeObjectURL(url)
 }
+
 
 function normalizeRoom(row: RoomRow, residents: Resident[]): Room {
   const activeResidents = residents.filter(
@@ -389,7 +446,7 @@ function roomVisual(room: Room) {
   }
 
   if (room.room_status === "preparing") {
-    return { label: "Ruošiamas", tone: "warning" as const, bar: "bg-[#486b5d]" }
+    return { label: "RuoÅ¡iamas", tone: "warning" as const, bar: "bg-[#486b5d]" }
   }
 
   if (room.reserved > 0 || room.room_status === "reserved" || room.reserved_for) {
@@ -397,11 +454,11 @@ function roomVisual(room: Room) {
   }
 
   if (room.occupied >= room.capacity || room.room_status === "occupied" || room.occupied_by) {
-    return { label: "Užimtas", tone: "danger" as const, bar: "bg-red-500" }
+    return { label: "UÅ¾imtas", tone: "danger" as const, bar: "bg-red-500" }
   }
 
   if (room.occupied > 0) {
-    return { label: "Dalinai užimtas", tone: "green" as const, bar: "bg-emerald-600" }
+    return { label: "Dalinai uÅ¾imtas", tone: "green" as const, bar: "bg-emerald-600" }
   }
 
   return { label: "Laisvas", tone: "green" as const, bar: "bg-emerald-600" }
@@ -412,13 +469,13 @@ function featureList(room: Room) {
     room.oxygen ? "Deguonis" : null,
     room.nursing ? "Tinka slaugai" : null,
     room.wc ? "WC" : null,
-    room.shower ? "Dušas" : null,
-    room.sink ? "Kriauklė" : null,
-    room.functional_bed ? "Funkcinė lova" : null,
-    room.wheelchair_accessible ? "Pritaikyta vežimėliui" : null,
+    room.shower ? "DuÅ¡as" : null,
+    room.sink ? "KriauklÄ—" : null,
+    room.functional_bed ? "FunkcinÄ— lova" : null,
+    room.wheelchair_accessible ? "Pritaikyta veÅ¾imÄ—liui" : null,
   ].filter(Boolean) as string[]
 
-  return features.length ? features : ["Be pažymėtų privalumų"]
+  return features.length ? features : ["Be paÅ¾ymÄ—tÅ³ privalumÅ³"]
 }
 
 function Badge({
@@ -515,9 +572,9 @@ const textareaClass =
 
 
 const ROOM_TABS: Array<{ value: RoomTab; label: string; icon: ReactNode }> = [
-  { value: "overview", label: "Apžvalga", icon: <Home size={16} /> },
+  { value: "overview", label: "ApÅ¾valga", icon: <Home size={16} /> },
   { value: "rooms", label: "Kambariai", icon: <DoorOpen size={16} /> },
-  { value: "occupancy", label: "Užimtumas", icon: <Users size={16} /> },
+  { value: "occupancy", label: "UÅ¾imtumas", icon: <Users size={16} /> },
   { value: "reservations", label: "Rezervacijos", icon: <CalendarDays size={16} /> },
   { value: "repairs", label: "Remontas", icon: <Hammer size={16} /> },
   { value: "export", label: "Eksportas", icon: <Download size={16} /> },
@@ -617,8 +674,8 @@ export default function RoomsPage() {
 
       if (statusFilter !== "all") {
         if (statusFilter === "free" && visual.label !== "Laisvas") return false
-        if (statusFilter === "partial" && visual.label !== "Dalinai užimtas") return false
-        if (statusFilter === "occupied" && visual.label !== "Užimtas") return false
+        if (statusFilter === "partial" && visual.label !== "Dalinai uÅ¾imtas") return false
+        if (statusFilter === "occupied" && visual.label !== "UÅ¾imtas") return false
         if (statusFilter === "reserved" && visual.label !== "Rezervuotas") return false
         if (statusFilter === "repair" && visual.label !== "Remontuojamas") return false
         if (statusFilter === "inactive" && visual.label !== "Neaktyvus") return false
@@ -667,8 +724,8 @@ export default function RoomsPage() {
     const capacityAlerts = rooms
       .filter((room) => room.occupied + room.reserved > room.capacity)
       .map((room) => ({
-        title: `Viršyta talpa · ${room.name}`,
-        text: `Talpa ${room.capacity}, užimta ${room.occupied}, rezervuota ${room.reserved}.`,
+        title: `VirÅ¡yta talpa Â· ${room.name}`,
+        text: `Talpa ${room.capacity}, uÅ¾imta ${room.occupied}, rezervuota ${room.reserved}.`,
         tone: "danger" as const,
       }))
 
@@ -680,15 +737,15 @@ export default function RoomsPage() {
         return Number.isFinite(date.getTime()) && date < today
       })
       .map((resident) => ({
-        title: `Pasibaigusi rezervacija · ${residentName(resident)}`,
-        text: `Rezervuota iki ${formatDate(resident.room_reserved_until)}. Reikia pratęsti arba patvirtinti atvykimą.`,
+        title: `Pasibaigusi rezervacija Â· ${residentName(resident)}`,
+        text: `Rezervuota iki ${formatDate(resident.room_reserved_until)}. Reikia pratÄ™sti arba patvirtinti atvykimÄ….`,
         tone: "warning" as const,
       }))
 
     const repairAlerts = repairRooms.map((room) => ({
       
-      title: `${room.room_status === "repair" ? "Remontuojamas" : room.room_status === "preparing" ? "Ruošiamas" : "Neaktyvus"} · ${room.name}`,
-      text: `${room.floor ?? "—"} aukštas · ${formatType(room.room_type)} · ${room.notes || "Pastabų nėra."}`,
+      title: `${room.room_status === "repair" ? "Remontuojamas" : room.room_status === "preparing" ? "RuoÅ¡iamas" : "Neaktyvus"} Â· ${room.name}`,
+      text: `${room.floor ?? "â€”"} aukÅ¡tas Â· ${formatType(room.room_type)} Â· ${room.notes || "PastabÅ³ nÄ—ra."}`,
       tone: room.room_status === "repair" || room.room_status === "inactive" ? ("danger" as const) : ("warning" as const),
     }))
 
@@ -706,7 +763,7 @@ export default function RoomsPage() {
 
       setOrganizationId(orgId)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nepavyko užkrauti organizacijos.")
+      setError(err instanceof Error ? err.message : "Nepavyko uÅ¾krauti organizacijos.")
       setLoading(false)
     }
   }
@@ -737,7 +794,7 @@ export default function RoomsPage() {
       setResidents(safeResidents)
       setRooms(((roomsData || []) as RoomRow[]).map((row) => normalizeRoom(row, safeResidents)))
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nepavyko užkrauti kambarių.")
+      setError(err instanceof Error ? err.message : "Nepavyko uÅ¾krauti kambariÅ³.")
     } finally {
       setLoading(false)
     }
@@ -817,7 +874,7 @@ export default function RoomsPage() {
         room_status: roomForm.room_status || null,
       }
 
-      if (!payload.name) throw new Error("Įrašyk kambario pavadinimą.")
+      if (!payload.name) throw new Error("Ä®raÅ¡yk kambario pavadinimÄ….")
 
       if (selectedRoomId === "new" || !roomForm.id) {
         const { error: insertError } = await supabase.from("rooms").insert(payload)
@@ -826,13 +883,13 @@ export default function RoomsPage() {
       } else {
         const { error: updateError } = await supabase.from("rooms").update(payload).eq("id", roomForm.id).eq("organization_id", organizationId)
         if (updateError) throw updateError
-        setSuccess("Kambarys išsaugotas.")
+        setSuccess("Kambarys iÅ¡saugotas.")
       }
 
       await loadData(organizationId)
       closeModal()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nepavyko išsaugoti kambario.")
+      setError(err instanceof Error ? err.message : "Nepavyko iÅ¡saugoti kambario.")
     } finally {
       setSaving(false)
     }
@@ -840,7 +897,7 @@ export default function RoomsPage() {
 
   async function deleteRoom(roomId: string) {
     if (!organizationId) return
-    const confirmed = window.confirm("Ar tikrai ištrinti kambarį? Jei kambaryje yra gyventojų, geriau jį pažymėti neaktyviu.")
+    const confirmed = window.confirm("Ar tikrai iÅ¡trinti kambarÄ¯? Jei kambaryje yra gyventojÅ³, geriau jÄ¯ paÅ¾ymÄ—ti neaktyviu.")
     if (!confirmed) return
 
     setSaving(true)
@@ -851,11 +908,11 @@ export default function RoomsPage() {
       const { error: deleteError } = await supabase.from("rooms").delete().eq("id", roomId).eq("organization_id", organizationId)
       if (deleteError) throw deleteError
 
-      setSuccess("Kambarys ištrintas.")
+      setSuccess("Kambarys iÅ¡trintas.")
       await loadData(organizationId)
       closeModal()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nepavyko ištrinti kambario.")
+      setError(err instanceof Error ? err.message : "Nepavyko iÅ¡trinti kambario.")
     } finally {
       setSaving(false)
     }
@@ -865,7 +922,7 @@ export default function RoomsPage() {
     if (!organizationId) return
 
     if (!assignForm.roomId || !assignForm.residentId) {
-      setError("Pasirink gyventoją ir kambarį.")
+      setError("Pasirink gyventojÄ… ir kambarÄ¯.")
       return
     }
 
@@ -939,7 +996,7 @@ export default function RoomsPage() {
 
       if (residentError) throw residentError
 
-      setSuccess("Gyventojas atlaisvintas iš kambario.")
+      setSuccess("Gyventojas atlaisvintas iÅ¡ kambario.")
       await loadData(organizationId)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Nepavyko atlaisvinti vietos.")
@@ -1006,10 +1063,10 @@ export default function RoomsPage() {
 
       if (statusError) throw statusError
 
-      setSuccess("Kambario būsena atnaujinta.")
+      setSuccess("Kambario bÅ«sena atnaujinta.")
       await loadData(organizationId)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nepavyko atnaujinti būsenos.")
+      setError(err instanceof Error ? err.message : "Nepavyko atnaujinti bÅ«senos.")
     } finally {
       setSaving(false)
     }
@@ -1052,48 +1109,123 @@ export default function RoomsPage() {
       addRooms("quad", Math.max(toInt(bulkForm.quadCount, 0), 0))
       addRooms("other", Math.max(toInt(bulkForm.otherCount, 0), 0))
 
-      if (rows.length === 0) throw new Error("Nurodyk bent vieną kuriamą kambarį.")
+      if (rows.length === 0) throw new Error("Nurodyk bent vienÄ… kuriamÄ… kambarÄ¯.")
 
       const { error: insertError } = await supabase.from("rooms").insert(rows)
       if (insertError) throw insertError
 
       setBulkForm(emptyBulkForm)
       setBulkOpen(false)
-      setSuccess(`Sukurta kambarių: ${rows.length}.`)
+      setSuccess(`Sukurta kambariÅ³: ${rows.length}.`)
       await loadData(organizationId)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nepavyko masiškai sukurti kambarių.")
+      setError(err instanceof Error ? err.message : "Nepavyko masiÅ¡kai sukurti kambariÅ³.")
     } finally {
       setSaving(false)
     }
   }
 
   function exportRooms() {
-    downloadCsv("kambariai.csv", [
-      ["Kambarys", "Aukštas", "Tipas", "Lytis", "Talpa", "Užimta", "Rezervuota", "Laisva", "Statusas", "Privalumai"],
-      ...filteredRooms.map((room) => {
-        const visual = roomVisual(room)
-        return [
-          room.name,
-          String(room.floor ?? ""),
-          formatType(room.room_type),
-          formatGender(room.gender),
-          String(room.capacity),
-          String(room.occupied),
-          String(room.reserved),
-          String(Math.max(room.capacity - room.occupied - room.reserved, 0)),
-          visual.label,
-          featureList(room).join("; "),
-        ]
-      }),
+    const today = new Date()
+    const filenameDate = today.toISOString().slice(0, 10)
+    const occupancyPercent = stats.capacity ? Math.round(((stats.occupied + stats.reserved) / stats.capacity) * 100) : 0
+    const averageCapacity = rooms.length ? Math.round((stats.capacity / rooms.length) * 100) / 100 : 0
+    const averageOccupied = rooms.length ? Math.round((stats.occupied / rooms.length) * 100) / 100 : 0
+
+    const roomRows = filteredRooms.map((room) => {
+      const visual = roomVisual(room)
+      const residentsInRoom = residents.filter((resident) => matchesRoom(resident, room))
+      const activeNames = residentsInRoom
+        .filter((resident) => isActiveResidentStatus(resident))
+        .map(residentName)
+        .join(", ")
+      const reservedNames = residentsInRoom
+        .filter((resident) => isReservedResidentStatus(resident))
+        .map(residentName)
+        .join(", ")
+
+      return [
+        room.name,
+        room.floor ?? "-",
+        formatType(room.room_type),
+        formatGender(room.gender),
+        room.capacity,
+        room.occupied,
+        room.reserved,
+        Math.max(room.capacity - room.occupied - room.reserved, 0),
+        visual.label,
+        activeNames || "-",
+        reservedNames || "-",
+        featureList(room).join(", "),
+        room.notes || "-",
+      ]
+    })
+
+    const reservationExportRows = reservationRows.map((resident) => {
+      const room = rooms.find((item) => matchesRoom(resident, item))
+      return [
+        residentName(resident),
+        room?.name || residentRoomKey(resident) || "-",
+        statusLabel(resident.current_status || resident.status),
+        formatDate(resident.room_reserved_until),
+      ]
+    })
+
+    const alertExportRows = roomAlerts.map((alert) => [alert.title, alert.text])
+
+    downloadExcelTable(`kambariai-${filenameDate}.xls`, [
+      ["KambariÅ³ uÅ¾imtumo ataskaita"],
+      ["Sugeneruota", today.toLocaleString("lt-LT")],
+      [],
+      ["SuvestinÄ—"],
+      ["Rodiklis", "ReikÅ¡mÄ—", "Pastaba"],
+      ["KambariÅ³ skaiÄius", rooms.length, "Visi suvesti kambariai"],
+      ["Bendra talpa", stats.capacity, "Visos vietos"],
+      ["UÅ¾imta vietÅ³", stats.occupied, "Gyvenantys gyventojai"],
+      ["Rezervuota vietÅ³", stats.reserved, "Netrukus atvyks / rezervuota"],
+      ["Laisva vietÅ³", stats.free, "Laisvos vietos pagal talpÄ…"],
+      ["UÅ¾imtumas", `${occupancyPercent}%`, "UÅ¾imta ir rezervuota nuo bendros talpos"],
+      [],
+      ["Vidurkiai"],
+      ["Rodiklis", "ReikÅ¡mÄ—", "Pastaba"],
+      ["VidutinÄ— talpa kambaryje", averageCapacity, "Vietos / kambariai"],
+      ["VidutiniÅ¡kai gyvena kambaryje", averageOccupied, "Gyventojai / kambariai"],
+      [],
+      ["KambariÅ³ sÄ…raÅ¡as"],
+      [
+        "Kambarys",
+        "AukÅ¡tas",
+        "Tipas",
+        "Lytis",
+        "Talpa",
+        "Gyvena",
+        "Rezervuota",
+        "Laisva",
+        "BÅ«sena",
+        "Gyventojai",
+        "Rezervacijos",
+        "Privalumai",
+        "Pastabos",
+      ],
+      ...roomRows,
+      ["IÅ¡ viso", "", "", "", stats.capacity, stats.occupied, stats.reserved, stats.free, "", "", "", "", ""],
+      [],
+      ["Rezervacijos"],
+      ["Gyventojas", "Kambarys", "BÅ«sena", "Iki"],
+      ...(reservationExportRows.length ? reservationExportRows : [["RezervacijÅ³ nÄ—ra", "", "", ""]]),
+      [],
+      ["Rizikos ir remontas"],
+      ["Rizika", "ApraÅ¡ymas"],
+      ...(alertExportRows.length ? alertExportRows : [["AktyviÅ³ rizikÅ³ nÄ—ra", ""]]),
     ])
   }
+
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f5f7f4] px-4 py-8 lg:px-8">
         <div className="mx-auto max-w-[1500px] rounded-[28px] border border-[#dbe6e0] bg-white p-8 text-sm font-black text-[#66756c] shadow-sm">
-          Kraunamas kambarių modulis...
+          Kraunamas kambariÅ³ modulis...
         </div>
       </div>
     )
@@ -1110,13 +1242,13 @@ export default function RoomsPage() {
               </div>
               <div>
                 <div className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-white/75">
-                  Kambariai / užimtumas / rezervacijos
+                  Kambariai / uÅ¾imtumas / rezervacijos
                 </div>
                 <h1 className="text-4xl font-black tracking-[-0.04em] text-white">
-                  Kambarių valdymas
+                  KambariÅ³ valdymas
                 </h1>
                 <p className="mt-2 max-w-3xl text-base font-bold text-white/90">
-                  Kambariai, gyventojai, privalumai, rezervacijos ir paruošimo būsenos vienoje vietoje.
+                  Kambariai, gyventojai, privalumai, rezervacijos ir paruoÅ¡imo bÅ«senos vienoje vietoje.
                 </p>
               </div>
             </div>
@@ -1128,7 +1260,7 @@ export default function RoomsPage() {
                 className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#ffffff]"
               >
                 <Layers size={17} />
-                Masinis kūrimas
+                Masinis kÅ«rimas
               </button>
               <button
                 type="button"
@@ -1136,7 +1268,7 @@ export default function RoomsPage() {
                 className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-black text-[#486b5d] shadow-sm transition hover:bg-[#ffffff]"
               >
                 <Download size={17} />
-                Eksportuoti
+                Eksportuoti Excel
               </button>
               <button
                 type="button"
@@ -1195,25 +1327,25 @@ export default function RoomsPage() {
         <section className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <StatCard icon={<Building2 size={21} />} value={rooms.length} label="Kambariai" badge={<Badge>Visi</Badge>} />
           <StatCard icon={<Bed size={21} />} value={stats.capacity} label="Bendra talpa" badge={<Badge tone="green">Vietos</Badge>} />
-          <StatCard icon={<Users size={21} />} value={stats.occupied} label="Užimta vietų" badge={<Badge tone="blue">Gyvena</Badge>} />
+          <StatCard icon={<Users size={21} />} value={stats.occupied} label="UÅ¾imta vietÅ³" badge={<Badge tone="blue">Gyvena</Badge>} />
           <StatCard icon={<AlertTriangle size={21} />} value={stats.reserved} label="Rezervuota" badge={<Badge tone="warning">Laukia</Badge>} />
-          <StatCard icon={<CheckCircle2 size={21} />} value={stats.free} label="Laisvų vietų" badge={<Badge tone="green">Laisva</Badge>} />
+          <StatCard icon={<CheckCircle2 size={21} />} value={stats.free} label="LaisvÅ³ vietÅ³" badge={<Badge tone="green">Laisva</Badge>} />
         </section>
 
         <section className="mb-5 rounded-[26px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-black tracking-[0.14em] text-[#486b5d]">Reikia dėmesio</div>
-              <h2 className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#10251f]">Kambarių rizikos ir veiksmai</h2>
+              <div className="text-xs font-black tracking-[0.14em] text-[#486b5d]">Reikia dÄ—mesio</div>
+              <h2 className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#10251f]">KambariÅ³ rizikos ir veiksmai</h2>
               <p className="mt-1 text-sm font-bold text-[#526174]">
-                Čia rodomi pasibaigusių rezervacijų, remontuojamų kambarių ir talpos konfliktų signalai.
+                ÄŒia rodomi pasibaigusiÅ³ rezervacijÅ³, remontuojamÅ³ kambariÅ³ ir talpos konfliktÅ³ signalai.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Badge tone="warning">Rezervacijų: {reservationRows.length}</Badge>
-              <Badge tone="danger">Remontas / neaktyvūs: {repairRooms.length}</Badge>
-              <Badge tone="green">Laisva vietų: {stats.free}</Badge>
+              <Badge tone="warning">RezervacijÅ³: {reservationRows.length}</Badge>
+              <Badge tone="danger">Remontas / neaktyvÅ«s: {repairRooms.length}</Badge>
+              <Badge tone="green">Laisva vietÅ³: {stats.free}</Badge>
             </div>
           </div>
 
@@ -1234,7 +1366,7 @@ export default function RoomsPage() {
               ))
             ) : (
               <div className="rounded-[18px] border border-[#dbe6e0] bg-[#ffffff] p-4 text-sm font-bold text-[#526174] lg:col-span-3">
-                Šiuo metu kritinių kambarių įspėjimų nėra.
+                Å iuo metu kritiniÅ³ kambariÅ³ Ä¯spÄ—jimÅ³ nÄ—ra.
               </div>
             )}
           </div>
@@ -1244,8 +1376,8 @@ export default function RoomsPage() {
           <section className="mb-5 rounded-[26px] border border-[#c9d8d0] bg-white p-5 shadow-[0_1px_3px_rgba(16,37,31,0.10)]">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-black tracking-[-0.03em] text-[#10251f]">Rezervacijų sąrašas</h2>
-                <p className="mt-1 text-sm font-bold text-[#526174]">Visi gyventojai su statusu „Netrukus atvyks“ arba rezervacijos data.</p>
+                <h2 className="text-2xl font-black tracking-[-0.03em] text-[#10251f]">RezervacijÅ³ sÄ…raÅ¡as</h2>
+                <p className="mt-1 text-sm font-bold text-[#526174]">Visi gyventojai su statusu â€žNetrukus atvyksâ€œ arba rezervacijos data.</p>
               </div>
               <button
                 type="button"
@@ -1262,14 +1394,14 @@ export default function RoomsPage() {
                   <div key={resident.id} className="rounded-[18px] border border-[#c9d8d0] bg-white p-4">
                     <div className="font-black text-[#10251f]">{residentName(resident)}</div>
                     <div className="mt-1 text-sm font-bold text-[#486b5d]">
-                      {statusLabel(resident.current_status || resident.status)} · kambarys {rooms.find((room) => matchesRoom(resident, room))?.name || "nepriskirtas"}
+                      {statusLabel(resident.current_status || resident.status)} Â· kambarys {rooms.find((room) => matchesRoom(resident, room))?.name || "nepriskirtas"}
                     </div>
                     <div className="mt-2 text-sm font-bold text-[#486b5d]">Iki: {formatDate(resident.room_reserved_until)}</div>
                   </div>
                 ))
               ) : (
                 <div className="rounded-[18px] border border-dashed border-[#dbe6e0] bg-[#ffffff] p-5 text-sm font-bold text-[#526174]">
-                  Aktyvių rezervacijų nėra.
+                  AktyviÅ³ rezervacijÅ³ nÄ—ra.
                 </div>
               )}
             </div>
@@ -1280,9 +1412,9 @@ export default function RoomsPage() {
           <section className="mb-5 rounded-[26px] border border-[#dbe6e0] bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-black tracking-[-0.03em]">Masinis kambarių kūrimas</h2>
+                <h2 className="text-2xl font-black tracking-[-0.03em]">Masinis kambariÅ³ kÅ«rimas</h2>
                 <p className="mt-1 text-sm font-bold text-[#66756c]">
-                  Greitai sukurk vienviečius, dviviečius, triviečius ar kitus kambarius.
+                  Greitai sukurk vienvieÄius, dvivieÄius, trivieÄius ar kitus kambarius.
                 </p>
               </div>
               <button
@@ -1301,7 +1433,7 @@ export default function RoomsPage() {
               <Field label="Nuo numerio">
                 <input className={inputClass} value={bulkForm.startNumber} onChange={(event) => setBulkForm((prev) => ({ ...prev, startNumber: event.target.value }))} />
               </Field>
-              <Field label="Aukštas">
+              <Field label="AukÅ¡tas">
                 <input className={inputClass} value={bulkForm.floor} onChange={(event) => setBulkForm((prev) => ({ ...prev, floor: event.target.value }))} />
               </Field>
               <Field label="Lytis">
@@ -1309,7 +1441,7 @@ export default function RoomsPage() {
                   <option value="">Nenurodyta</option>
                   <option value="female">Moterims</option>
                   <option value="male">Vyrams</option>
-                  <option value="mixed">Mišrus</option>
+                  <option value="mixed">MiÅ¡rus</option>
                 </select>
               </Field>
               <Field label="Rikiavimas nuo">
@@ -1322,11 +1454,11 @@ export default function RoomsPage() {
 
             <div className="mt-4 grid gap-4 md:grid-cols-5">
               {[
-                ["Vienviečių", "singleCount"],
-                ["Dviviečių", "doubleCount"],
-                ["Triviečių", "tripleCount"],
-                ["Keturviečių", "quadCount"],
-                ["Kitų", "otherCount"],
+                ["VienvieÄiÅ³", "singleCount"],
+                ["DvivieÄiÅ³", "doubleCount"],
+                ["TrivieÄiÅ³", "tripleCount"],
+                ["KeturvieÄiÅ³", "quadCount"],
+                ["KitÅ³", "otherCount"],
               ].map(([label, key]) => (
                 <Field key={key} label={label}>
                   <input
@@ -1358,15 +1490,15 @@ export default function RoomsPage() {
               className={`${inputClass} pl-11`}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Ieškoti kambario, aukšto, gyventojo..."
+              placeholder="IeÅ¡koti kambario, aukÅ¡to, gyventojo..."
             />
           </div>
 
           <select className={inputClass} value={floorFilter} onChange={(event) => setFloorFilter(event.target.value)}>
-            <option value="all">Visi aukštai</option>
+            <option value="all">Visi aukÅ¡tai</option>
             {floors.map((floor) => (
               <option key={floor} value={floor}>
-                {floor} aukštas
+                {floor} aukÅ¡tas
               </option>
             ))}
           </select>
@@ -1375,15 +1507,15 @@ export default function RoomsPage() {
             <option value="all">Visos lytys</option>
             <option value="female">Moterims</option>
             <option value="male">Vyrams</option>
-            <option value="mixed">Mišrus</option>
+            <option value="mixed">MiÅ¡rus</option>
             <option value="">Nenurodyta</option>
           </select>
 
           <select className={inputClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
             <option value="all">Visi statusai</option>
             <option value="free">Laisvas</option>
-            <option value="partial">Dalinai užimtas</option>
-            <option value="occupied">Užimtas</option>
+            <option value="partial">Dalinai uÅ¾imtas</option>
+            <option value="occupied">UÅ¾imtas</option>
             <option value="reserved">Rezervuotas</option>
             <option value="repair">Remontuojamas</option>
             <option value="inactive">Neaktyvus</option>
@@ -1397,7 +1529,7 @@ export default function RoomsPage() {
               else if (featureFilter === "care_suitable") setFeatureFilter("all")
             }}
           >
-            <option value="all">Visi pagal priežiūrą</option>
+            <option value="all">Visi pagal prieÅ¾iÅ«rÄ…</option>
             <option value="care_suitable">Tinka slaugai</option>
           </select>
 
@@ -1414,11 +1546,11 @@ export default function RoomsPage() {
             <option value="all">Visi privalumai</option>
             <option value="care_suitable">Tinka slaugai</option>
             <option value="wc">WC</option>
-            <option value="shower">Dušas</option>
+            <option value="shower">DuÅ¡as</option>
             <option value="oxygen">Deguonis</option>
             <option value="nursing">Slaugai</option>
-            <option value="functional_bed">Funkcinė lova</option>
-            <option value="wheelchair_accessible">Vežimėliui</option>
+            <option value="functional_bed">FunkcinÄ— lova</option>
+            <option value="wheelchair_accessible">VeÅ¾imÄ—liui</option>
           </select>
 
           <button
@@ -1455,7 +1587,7 @@ export default function RoomsPage() {
                   <div>
                     <div className="text-2xl font-black tracking-[-0.04em] text-[#10251f]">{room.name}</div>
                     <div className="mt-1 text-sm font-bold text-[#66756c]">
-                      {room.floor ?? "—"} aukštas · {formatType(room.room_type)} · {formatGender(room.gender)}
+                      {room.floor ?? "â€”"} aukÅ¡tas Â· {formatType(room.room_type)} Â· {formatGender(room.gender)}
                     </div>
                   </div>
                   <Badge tone={visual.tone}>{visual.label}</Badge>
@@ -1497,7 +1629,7 @@ export default function RoomsPage() {
                             <div className="text-sm font-black text-[#10251f]">{residentName(resident)}</div>
                             <div className="mt-0.5 text-xs font-bold text-[#66756c]">
                               {statusLabel(resident.current_status || resident.status)}
-                              {resident.room_reserved_until ? ` · iki ${formatDate(resident.room_reserved_until)}` : ""}
+                              {resident.room_reserved_until ? ` Â· iki ${formatDate(resident.room_reserved_until)}` : ""}
                             </div>
                           </div>
                           <Badge tone={resident.current_status === "arriving_soon" ? "warning" : "green"}>
@@ -1507,8 +1639,8 @@ export default function RoomsPage() {
                       ))
                     ) : room.occupied_by || room.reserved_for ? (
                       <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold text-[#486b5d]">
-                        {room.occupied_by ? `Užimta: ${occupiedByLabel(room, residents)}` : `Rezervuota: ${room.reserved_for}`}
-                        {room.reserved_until ? ` · iki ${formatDate(room.reserved_until)}` : ""}
+                        {room.occupied_by ? `UÅ¾imta: ${occupiedByLabel(room, residents)}` : `Rezervuota: ${room.reserved_for}`}
+                        {room.reserved_until ? ` Â· iki ${formatDate(room.reserved_until)}` : ""}
                       </div>
                     ) : (
                       <div className="rounded-2xl border border-dashed border-[#c9d8d0] bg-[#ffffff] p-4 text-sm font-bold text-[#66756c]">
@@ -1523,7 +1655,7 @@ export default function RoomsPage() {
                       onClick={() => openRoom(room)}
                       className="rounded-2xl border border-[#dbe6e0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] hover:bg-[#ffffff]"
                     >
-                      Detalės
+                      DetalÄ—s
                     </button>
                     <button
                       type="button"
@@ -1540,7 +1672,7 @@ export default function RoomsPage() {
 
           {!filteredRooms.length ? (
             <div className="col-span-full rounded-[28px] border border-dashed border-[#c9d8d0] bg-white p-10 text-center text-sm font-bold text-[#66756c]">
-              Pagal pasirinktus filtrus kambarių nerasta.
+              Pagal pasirinktus filtrus kambariÅ³ nerasta.
             </div>
           ) : null}
         </section>
@@ -1556,18 +1688,18 @@ export default function RoomsPage() {
                   </div>
                   <div>
                     <div className="mb-1 text-xs font-black uppercase tracking-[0.24em] text-emerald-100/80">
-                      Kambario detalės
+                      Kambario detalÄ—s
                     </div>
                     <h2 className="text-3xl font-black tracking-[-0.04em] text-white">
-                      {selectedRoomId === "new" ? "Naujas kambarys" : modalMode === "reserve" ? `Rezervuoti vietą · ${selectedRoom?.name}` : `Kambarys ${selectedRoom?.name}`}
+                      {selectedRoomId === "new" ? "Naujas kambarys" : modalMode === "reserve" ? `Rezervuoti vietÄ… Â· ${selectedRoom?.name}` : `Kambarys ${selectedRoom?.name}`}
                     </h2>
                     {selectedRoom ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Badge tone={roomVisual(selectedRoom).tone}>{roomVisual(selectedRoom).label}</Badge>
-                        <Badge tone="blue">{selectedRoom.floor ?? "—"} aukštas</Badge>
+                        <Badge tone="blue">{selectedRoom.floor ?? "â€”"} aukÅ¡tas</Badge>
                         <Badge>{formatType(selectedRoom.room_type)}</Badge>
                         <Badge>{formatGender(selectedRoom.gender)}</Badge>
-                        {modalMode === "reserve" ? <Badge tone="warning">Rezervavimo režimas</Badge> : null}
+                        {modalMode === "reserve" ? <Badge tone="warning">Rezervavimo reÅ¾imas</Badge> : null}
                       </div>
                     ) : null}
                   </div>
@@ -1582,7 +1714,7 @@ export default function RoomsPage() {
                       className="inline-flex items-center gap-2 rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 hover:bg-red-100 disabled:opacity-60"
                     >
                       <Trash2 size={17} />
-                      Ištrinti
+                      IÅ¡trinti
                     </button>
                   ) : null}
                   <button
@@ -1599,20 +1731,20 @@ export default function RoomsPage() {
                 <div className="max-h-[calc(100vh-172px)] overflow-y-auto bg-[#ffffff] p-5">
                   <div className="mx-auto max-w-[720px]">
                     <Panel
-                      title="Rezervuoti vietą"
+                      title="Rezervuoti vietÄ…"
                       action={<Badge tone="warning">Tik rezervacija</Badge>}
                     >
                       <div className="mb-5 rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold leading-6 text-[#486b5d]">
-                        Pasirink gyventoją, įrašyk rezervacijos datą ir spausk
-                        „Rezervuoti“. Jei gyventojo dar nėra sąraše, pirmiausia sukurk
-                        jį su statusu „Netrukus atvyks“.
+                        Pasirink gyventojÄ…, Ä¯raÅ¡yk rezervacijos datÄ… ir spausk
+                        â€žRezervuotiâ€œ. Jei gyventojo dar nÄ—ra sÄ…raÅ¡e, pirmiausia sukurk
+                        jÄ¯ su statusu â€žNetrukus atvyksâ€œ.
                       </div>
 
                       <div className="grid gap-4">
                         <Field label="Kambarys">
                           <input
                             className={inputClass}
-                            value={`${selectedRoom.name} · ${selectedRoom.floor ?? "—"} aukštas · ${formatType(selectedRoom.room_type)} · ${formatGender(selectedRoom.gender)}`}
+                            value={`${selectedRoom.name} Â· ${selectedRoom.floor ?? "â€”"} aukÅ¡tas Â· ${formatType(selectedRoom.room_type)} Â· ${formatGender(selectedRoom.gender)}`}
                             readOnly
                           />
                         </Field>
@@ -1628,7 +1760,7 @@ export default function RoomsPage() {
                               }))
                             }
                           >
-                            <option value="">Pasirinkti gyventoją</option>
+                            <option value="">Pasirinkti gyventojÄ…</option>
                             {availableResidents.map((resident) => (
                               <option key={resident.id} value={resident.id}>
                                 {residentName(resident)}
@@ -1652,9 +1784,9 @@ export default function RoomsPage() {
                               <option value="arriving_soon">
                                 Rezervuoti / netrukus atvyks
                               </option>
-                              <option value="active">Priskirti kaip gyvenantį</option>
-                              <option value="hospital">Pažymėti ligoninėje</option>
-                              <option value="temporary_leave">Laikinai išvykęs</option>
+                              <option value="active">Priskirti kaip gyvenantÄ¯</option>
+                              <option value="hospital">PaÅ¾ymÄ—ti ligoninÄ—je</option>
+                              <option value="temporary_leave">Laikinai iÅ¡vykÄ™s</option>
                             </select>
                           </Field>
 
@@ -1709,14 +1841,14 @@ export default function RoomsPage() {
               ) : (
               <div className="max-h-[calc(100vh-190px)] overflow-y-auto bg-[#ffffff] p-6"><div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)_300px]">
                 <div className="grid gap-5">
-                  <Panel title="Pagrindinė informacija">
+                  <Panel title="PagrindinÄ— informacija">
                     <div className="grid gap-4">
                       <Field label="Kambario pavadinimas">
                         <input className={inputClass} value={roomForm.name} onChange={(event) => setRoomForm((prev) => ({ ...prev, name: event.target.value }))} />
                       </Field>
 
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Aukštas">
+                        <Field label="AukÅ¡tas">
                           <input className={inputClass} value={roomForm.floor} onChange={(event) => setRoomForm((prev) => ({ ...prev, floor: event.target.value }))} />
                         </Field>
                         <Field label="Talpa">
@@ -1739,12 +1871,12 @@ export default function RoomsPage() {
                           <option value="">Nenurodyta</option>
                           <option value="female">Moterims</option>
                           <option value="male">Vyrams</option>
-                          <option value="mixed">Mišrus</option>
+                          <option value="mixed">MiÅ¡rus</option>
                         </select>
                       </Field>
 
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Plotas m²">
+                        <Field label="Plotas mÂ²">
                           <input className={inputClass} value={roomForm.area_m2} onChange={(event) => setRoomForm((prev) => ({ ...prev, area_m2: event.target.value }))} />
                         </Field>
                         <Field label="Rikiavimas">
@@ -1760,10 +1892,10 @@ export default function RoomsPage() {
                         ["oxygen", "Deguonis"],
                         ["nursing", "Tinka slaugai"],
                         ["wc", "WC"],
-                        ["shower", "Dušas"],
-                        ["sink", "Kriauklė"],
-                        ["functional_bed", "Funkcinė lova"],
-                        ["wheelchair_accessible", "Pritaikyta vežimėliui"],
+                        ["shower", "DuÅ¡as"],
+                        ["sink", "KriauklÄ—"],
+                        ["functional_bed", "FunkcinÄ— lova"],
+                        ["wheelchair_accessible", "Pritaikyta veÅ¾imÄ—liui"],
                       ].map(([key, label]) => (
                         <label key={key} className="flex items-center gap-3 rounded-2xl border border-[#dbe6e0] bg-[#ffffff] px-4 py-3 text-sm font-black text-[#486b5d]">
                           <input
@@ -1777,13 +1909,13 @@ export default function RoomsPage() {
                     </div>
                   </Panel>
 
-                  <Panel title="Kambario būsena">
+                  <Panel title="Kambario bÅ«sena">
                     <div className="grid gap-4">
-                      <Field label="Būsena">
+                      <Field label="BÅ«sena">
                         <select className={inputClass} value={roomForm.room_status} onChange={(event) => setRoomForm((prev) => ({ ...prev, room_status: event.target.value }))}>
-                          <option value="">Automatinė pagal užimtumą</option>
+                          <option value="">AutomatinÄ— pagal uÅ¾imtumÄ…</option>
                           <option value="reserved">Rezervuotas</option>
-                          <option value="preparing">Ruošiamas</option>
+                          <option value="preparing">RuoÅ¡iamas</option>
                           <option value="repair">Remontuojamas</option>
                           <option value="inactive">Neaktyvus</option>
                         </select>
@@ -1805,7 +1937,7 @@ export default function RoomsPage() {
                         disabled={saving}
                         className="rounded-[14px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
                       >
-                        {saving ? "Saugoma..." : "Išsaugoti kambarį"}
+                        {saving ? "Saugoma..." : "IÅ¡saugoti kambarÄ¯"}
                       </button>
                     </div>
                   </Panel>
@@ -1819,14 +1951,14 @@ export default function RoomsPage() {
                   >
                     {selectedRoomId === "new" ? (
                       <div className="rounded-2xl border border-dashed border-[#c9d8d0] bg-[#ffffff] p-6 text-sm font-bold text-[#66756c]">
-                        Išsaugok kambarį, tada galėsi priskirti ar rezervuoti gyventojus.
+                        IÅ¡saugok kambarÄ¯, tada galÄ—si priskirti ar rezervuoti gyventojus.
                       </div>
                     ) : (
                       <div className="grid gap-3">
                         {selectedRoom && roomResidents.length === 0 && (selectedRoom.occupied_by || selectedRoom.reserved_for) ? (
                           <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold text-[#486b5d]">
-                            {selectedRoom.occupied_by ? `Užimta: ${occupiedByLabel(selectedRoom, residents)}` : `Rezervuota: ${selectedRoom.reserved_for}`}
-                            {selectedRoom.reserved_until ? ` · iki ${formatDate(selectedRoom.reserved_until)}` : ""}
+                            {selectedRoom.occupied_by ? `UÅ¾imta: ${occupiedByLabel(selectedRoom, residents)}` : `Rezervuota: ${selectedRoom.reserved_for}`}
+                            {selectedRoom.reserved_until ? ` Â· iki ${formatDate(selectedRoom.reserved_until)}` : ""}
                           </div>
                         ) : null}
                         {Array.from({ length: selectedRoom?.capacity || 1 }).map((_, index) => {
@@ -1847,8 +1979,8 @@ export default function RoomsPage() {
                                   <div>
                                     <div className="font-black text-[#10251f]">{residentName(resident)}</div>
                                     <div className="mt-1 text-sm font-bold text-[#66756c]">
-                                      {resident.care_level || "Priežiūros lygis nenurodytas"}
-                                      {resident.room_reserved_until ? ` · Rezervuota iki ${formatDate(resident.room_reserved_until)}` : ""}
+                                      {resident.care_level || "PrieÅ¾iÅ«ros lygis nenurodytas"}
+                                      {resident.room_reserved_until ? ` Â· Rezervuota iki ${formatDate(resident.room_reserved_until)}` : ""}
                                     </div>
                                   </div>
                                   <div className="flex gap-2">
@@ -1856,7 +1988,7 @@ export default function RoomsPage() {
                                       href={`/residents/${resident.id}`}
                                       className="rounded-2xl border border-[#dbe6e0] px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#ffffff]"
                                     >
-                                      Kortelė
+                                      KortelÄ—
                                     </Link>
                                     {resident.current_status === "arriving_soon" ? (
                                       <button
@@ -1878,7 +2010,7 @@ export default function RoomsPage() {
                                 </div>
                               ) : (
                                 <div className="rounded-2xl border border-dashed border-[#c9d8d0] bg-white p-4 text-sm font-bold text-[#66756c]">
-                                  Vieta laisva. Galima priskirti ar rezervuoti gyventoją.
+                                  Vieta laisva. Galima priskirti ar rezervuoti gyventojÄ….
                                 </div>
                               )}
                             </div>
@@ -1889,16 +2021,16 @@ export default function RoomsPage() {
                   </Panel>
 
                   {selectedRoomId !== "new" ? (
-                    <Panel title={modalMode === "reserve" ? "Rezervuoti vietą" : "Priskirti arba rezervuoti vietą"} action={modalMode === "reserve" ? <Badge tone="warning">Aktyvu</Badge> : null}>
+                    <Panel title={modalMode === "reserve" ? "Rezervuoti vietÄ…" : "Priskirti arba rezervuoti vietÄ…"} action={modalMode === "reserve" ? <Badge tone="warning">Aktyvu</Badge> : null}>
                       <div className="grid gap-4">
                         {modalMode === "reserve" ? (
                           <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold leading-6 text-[#486b5d]">
-                            Pasirink gyventoją, įrašyk rezervacijos datą ir spausk „Rezervuoti“. Jei gyventojo dar nėra sąraše, pirmiausia sukurk jį su statusu „Netrukus atvyks“.
+                            Pasirink gyventojÄ…, Ä¯raÅ¡yk rezervacijos datÄ… ir spausk â€žRezervuotiâ€œ. Jei gyventojo dar nÄ—ra sÄ…raÅ¡e, pirmiausia sukurk jÄ¯ su statusu â€žNetrukus atvyksâ€œ.
                           </div>
                         ) : null}
                         <Field label="Gyventojas">
                           <select className={inputClass} value={assignForm.residentId} onChange={(event) => setAssignForm((prev) => ({ ...prev, residentId: event.target.value }))}>
-                            <option value="">Pasirinkti gyventoją</option>
+                            <option value="">Pasirinkti gyventojÄ…</option>
                             {availableResidents.map((resident) => (
                               <option key={resident.id} value={resident.id}>
                                 {residentName(resident)}
@@ -1910,10 +2042,10 @@ export default function RoomsPage() {
                         <div className="grid gap-4 sm:grid-cols-2">
                           <Field label="Veiksmas">
                             <select className={inputClass} value={assignForm.mode} onChange={(event) => setAssignForm((prev) => ({ ...prev, mode: event.target.value as AssignMode }))}>
-                              <option value="active">Priskirti kaip gyvenantį</option>
+                              <option value="active">Priskirti kaip gyvenantÄ¯</option>
                               <option value="arriving_soon">Rezervuoti / netrukus atvyks</option>
-                              <option value="hospital">Pažymėti ligoninėje</option>
-                              <option value="temporary_leave">Laikinai išvykęs</option>
+                              <option value="hospital">PaÅ¾ymÄ—ti ligoninÄ—je</option>
+                              <option value="temporary_leave">Laikinai iÅ¡vykÄ™s</option>
                             </select>
                           </Field>
 
@@ -1940,12 +2072,12 @@ export default function RoomsPage() {
                     </Panel>
                   ) : null}
 
-                  <Panel title="Ryšiai su moduliais">
+                  <Panel title="RyÅ¡iai su moduliais">
                     <div className="flex flex-wrap gap-2">
-                      <Badge tone="blue">Gyventojo kortelė</Badge>
-                      <Badge tone="green">Užduotys ūkiui</Badge>
-                      <Badge tone="neutral">Perdavimo žurnalas</Badge>
-                      <Badge tone="warning">Valymo būsena</Badge>
+                      <Badge tone="blue">Gyventojo kortelÄ—</Badge>
+                      <Badge tone="green">UÅ¾duotys Å«kiui</Badge>
+                      <Badge tone="neutral">Perdavimo Å¾urnalas</Badge>
+                      <Badge tone="warning">Valymo bÅ«sena</Badge>
                       <Badge tone="neutral">Inventorius</Badge>
                     </div>
                   </Panel>
@@ -1955,10 +2087,10 @@ export default function RoomsPage() {
 
                 <div className="grid gap-5">
                   {selectedRoomId === "new" ? (
-                    <Panel title="Ką daryti toliau?">
+                    <Panel title="KÄ… daryti toliau?">
                       <div className="grid gap-4">
                         <div className="rounded-[18px] border border-[#dbe6e0] bg-[#ffffff] p-4 text-sm font-bold leading-6 text-[#526174]">
-                          Įvesk kambario pavadinimą, talpą, tipą ir privalumus. Išsaugojus kambarį atsiras lovų / vietų valdymas, gyventojo priskyrimas ir rezervacijos.
+                          Ä®vesk kambario pavadinimÄ…, talpÄ…, tipÄ… ir privalumus. IÅ¡saugojus kambarÄ¯ atsiras lovÅ³ / vietÅ³ valdymas, gyventojo priskyrimas ir rezervacijos.
                         </div>
 
                         <button
@@ -1967,7 +2099,7 @@ export default function RoomsPage() {
                           disabled={saving}
                           className="inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#486b5d] px-5 py-3 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
                         >
-                          {saving ? "Saugoma..." : "Išsaugoti kambarį"}
+                          {saving ? "Saugoma..." : "IÅ¡saugoti kambarÄ¯"}
                         </button>
 
                         <button
@@ -1975,7 +2107,7 @@ export default function RoomsPage() {
                           onClick={closeModal}
                           className="rounded-[14px] border border-[#dbe6e0] bg-white px-5 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#ffffff]"
                         >
-                          Atšaukti
+                          AtÅ¡aukti
                         </button>
                       </div>
                     </Panel>
@@ -1990,7 +2122,7 @@ export default function RoomsPage() {
                         className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#486b5d] px-4 py-3 text-sm font-black text-white transition hover:bg-[#39594c] disabled:opacity-60"
                       >
                         <CheckCircle2 size={17} />
-                        Pažymėti kaip paruoštą
+                        PaÅ¾ymÄ—ti kaip paruoÅ¡tÄ…
                       </button>
                       <button
                         type="button"
@@ -1999,7 +2131,7 @@ export default function RoomsPage() {
                         className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#c9d8d0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] hover:border-[#486b5d] hover:bg-white disabled:opacity-60"
                       >
                         <Sparkles size={17} />
-                        Ruošiamas
+                        RuoÅ¡iamas
                       </button>
                       <button
                         type="button"
@@ -2008,7 +2140,7 @@ export default function RoomsPage() {
                         className="inline-flex items-center justify-center gap-2 rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:opacity-60"
                       >
                         <Hammer size={17} />
-                        Uždaryti remontui
+                        UÅ¾daryti remontui
                       </button>
                       <button
                         type="button"
@@ -2022,29 +2154,29 @@ export default function RoomsPage() {
                     </div>
                   </Panel>
 
-                  <Panel title="Įspėjimai">
+                  <Panel title="Ä®spÄ—jimai">
                     <div className="grid gap-3">
                       {selectedRoom?.reserved ? (
                         <div className="rounded-2xl border border-[#c9d8d0] bg-white p-4 text-sm font-bold leading-6 text-[#486b5d]">
-                          Kambaryje yra rezervuota vieta. Patikrink atvykimo terminą ir paruošimo būseną.
+                          Kambaryje yra rezervuota vieta. Patikrink atvykimo terminÄ… ir paruoÅ¡imo bÅ«senÄ….
                         </div>
                       ) : null}
 
                       {selectedRoom && selectedRoom.occupied + selectedRoom.reserved >= selectedRoom.capacity ? (
                         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold leading-6 text-red-700">
-                          Kambario talpa užpildyta. Naują gyventoją galima priskirti tik atlaisvinus vietą.
+                          Kambario talpa uÅ¾pildyta. NaujÄ… gyventojÄ… galima priskirti tik atlaisvinus vietÄ….
                         </div>
                       ) : null}
 
                       {selectedRoom?.room_status === "repair" ? (
                         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold leading-6 text-red-700">
-                          Kambarys pažymėtas kaip remontuojamas. Naujam gyventojui nenaudoti.
+                          Kambarys paÅ¾ymÄ—tas kaip remontuojamas. Naujam gyventojui nenaudoti.
                         </div>
                       ) : null}
 
                       {!selectedRoom || (!selectedRoom.reserved && selectedRoom.occupied + selectedRoom.reserved < selectedRoom.capacity && selectedRoom.room_status !== "repair") ? (
                         <div className="rounded-2xl border border-[#a7f3d0] bg-[#eefaf3] p-4 text-sm font-bold leading-6 text-[#39594c]">
-                          Kritinių įspėjimų nėra.
+                          KritiniÅ³ Ä¯spÄ—jimÅ³ nÄ—ra.
                         </div>
                       ) : null}
                     </div>
@@ -2055,10 +2187,10 @@ export default function RoomsPage() {
                   <Panel title="Kambario santrauka">
                     <div className="space-y-3">
                       <InfoRow label="Sukurta" value={formatDate(selectedRoom?.created_at)} />
-                      <InfoRow label="Užimta" value={`${selectedRoom?.occupied ?? 0} iš ${selectedRoom?.capacity ?? 0}`} />
+                      <InfoRow label="UÅ¾imta" value={`${selectedRoom?.occupied ?? 0} iÅ¡ ${selectedRoom?.capacity ?? 0}`} />
                       <InfoRow label="Rezervuota" value={selectedRoom?.reserved ?? 0} />
-                      <InfoRow label="Laisva" value={selectedRoom ? Math.max(selectedRoom.capacity - selectedRoom.occupied - selectedRoom.reserved, 0) : "—"} />
-                      <InfoRow label="Privalumai" value={selectedRoom ? featureList(selectedRoom).join(", ") : "—"} />
+                      <InfoRow label="Laisva" value={selectedRoom ? Math.max(selectedRoom.capacity - selectedRoom.occupied - selectedRoom.reserved, 0) : "â€”"} />
+                      <InfoRow label="Privalumai" value={selectedRoom ? featureList(selectedRoom).join(", ") : "â€”"} />
                     </div>
                   </Panel>
                 </div>
