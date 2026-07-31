@@ -780,7 +780,26 @@ export default function VacationRequests({
     key: K,
     value: VacationForm[K],
   ) {
-    onFormChange({ ...form, [key]: value });
+    const nextForm = { ...form, [key]: value } as VacationForm;
+
+    if (key === "type") {
+      const nextType = String(value || "");
+      nextForm.type = nextType;
+      if (isTemporaryLeave(nextType)) {
+        nextForm.end_date = form.start_date;
+        nextForm.start_time = form.start_time || "09:00";
+        nextForm.end_time = form.end_time || "11:00";
+      } else {
+        nextForm.start_time = "";
+        nextForm.end_time = "";
+      }
+    }
+
+    if (key === "start_date" && isTemporaryLeave(nextForm.type)) {
+      nextForm.end_date = String(value || "");
+    }
+
+    onFormChange(nextForm);
   }
 
   function setFilter(next: FilterKey) {

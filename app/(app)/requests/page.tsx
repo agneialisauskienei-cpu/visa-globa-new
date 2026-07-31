@@ -1260,7 +1260,7 @@ export default function RequestsPage() {
               ))}
             </>
           ) : (
-            <option value={currentUserId || form.employeeId}>{currentRequestTitle()}</option>
+            <option value={currentUserId || form.employeeId}>{currentEmployeeName()} · {currentEmployeePosition()}</option>
           )}
         </select>
         <select
@@ -1270,9 +1270,9 @@ export default function RequestsPage() {
             setForm((previous) => ({
               ...previous,
               kind: nextKind,
-              end: nextKind === "temporary_leave" ? previous.start : previous.end,
-              startTime: nextKind === "temporary_leave" ? previous.startTime : "",
-              endTime: nextKind === "temporary_leave" ? previous.endTime : "",
+              end: isTemporaryKind(nextKind) ? previous.start : previous.end,
+              startTime: isTemporaryKind(nextKind) ? previous.startTime : "",
+              endTime: isTemporaryKind(nextKind) ? previous.endTime : "",
             }));
           }}
           className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
@@ -1293,7 +1293,7 @@ export default function RequestsPage() {
             setForm((previous) => ({
               ...previous,
               start: event.target.value,
-              end: previous.kind === "temporary_leave" ? event.target.value : previous.end || event.target.value,
+              end: isTemporaryKind(previous.kind) ? event.target.value : previous.end || event.target.value,
             }))
           }
           className="h-12 min-w-0 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
@@ -1304,25 +1304,25 @@ export default function RequestsPage() {
           placeholder="YYYY-MM-DD"
           value={form.end}
           onChange={(event) => setForm((previous) => ({ ...previous, end: event.target.value }))}
-          disabled={form.kind === "temporary_leave"}
+          disabled={isTemporaryKind(form.kind)}
           className="h-12 min-w-0 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
         />
         <input
-          type="text"
+          type={isTemporaryKind(form.kind) ? "text" : "hidden"}
           placeholder="Nuo, pvz. 10:00"
           value={form.startTime}
           onChange={(event) => setForm((previous) => ({ ...previous, startTime: event.target.value }))}
           onBlur={(event) => setForm((previous) => ({ ...previous, startTime: normalizeTimeInput(event.target.value) }))}
-          disabled={form.kind !== "temporary_leave"}
+          disabled={!isTemporaryKind(form.kind)}
           className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
         />
         <input
-          type="text"
+          type={isTemporaryKind(form.kind) ? "text" : "hidden"}
           placeholder="Iki, pvz. 12:00"
           value={form.endTime}
           onChange={(event) => setForm((previous) => ({ ...previous, endTime: event.target.value }))}
           onBlur={(event) => setForm((previous) => ({ ...previous, endTime: normalizeTimeInput(event.target.value) }))}
-          disabled={form.kind !== "temporary_leave"}
+          disabled={!isTemporaryKind(form.kind)}
           className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
         />
         <input
@@ -1337,7 +1337,7 @@ export default function RequestsPage() {
           disabled={
             saving ||
             (isAdmin && !form.employeeId) ||
-            (form.kind === "temporary_leave" && (!form.startTime || !form.endTime))
+            (isTemporaryKind(form.kind) && (!form.startTime || !form.endTime))
           }
           className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-[#10251f] px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#8ea0b5]"
         >
@@ -1628,7 +1628,7 @@ export default function RequestsPage() {
                   ))}
                 </>
               ) : (
-                <option value={currentUserId || form.employeeId}>{currentRequestTitle()}</option>
+                <option value={currentUserId || form.employeeId}>{currentEmployeeName()} · {currentEmployeePosition()}</option>
               )}
             </select>
             <select
@@ -1638,9 +1638,9 @@ export default function RequestsPage() {
                 setForm((previous) => ({
                   ...previous,
                   kind: nextKind,
-                  end: nextKind === "temporary_leave" ? previous.start : previous.end,
-                  startTime: nextKind === "temporary_leave" ? previous.startTime : "",
-                  endTime: nextKind === "temporary_leave" ? previous.endTime : "",
+                  end: isTemporaryKind(nextKind) ? previous.start : previous.end,
+                  startTime: isTemporaryKind(nextKind) ? previous.startTime : "",
+                  endTime: isTemporaryKind(nextKind) ? previous.endTime : "",
                 }));
               }}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
@@ -1661,7 +1661,7 @@ export default function RequestsPage() {
                 setForm((previous) => ({
                   ...previous,
                   start: event.target.value,
-                  end: previous.kind === "temporary_leave" ? event.target.value : previous.end || event.target.value,
+                  end: isTemporaryKind(previous.kind) ? event.target.value : previous.end || event.target.value,
                 }))
               }
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
@@ -1672,25 +1672,25 @@ export default function RequestsPage() {
               inputMode="numeric"
               value={form.end}
               onChange={(event) => setForm((previous) => ({ ...previous, end: event.target.value }))}
-              disabled={form.kind === "temporary_leave"}
+              disabled={isTemporaryKind(form.kind)}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
             />
             <input
-              type="text"
+              type={isTemporaryKind(form.kind) ? "text" : "hidden"}
               placeholder="Nuo, pvz. 10:00"
               value={form.startTime}
               onChange={(event) => setForm((previous) => ({ ...previous, startTime: event.target.value }))}
               onBlur={(event) => setForm((previous) => ({ ...previous, startTime: normalizeTimeInput(event.target.value) }))}
-              disabled={form.kind !== "temporary_leave"}
+              disabled={!isTemporaryKind(form.kind)}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
             />
             <input
-              type="text"
+              type={isTemporaryKind(form.kind) ? "text" : "hidden"}
               placeholder="Iki, pvz. 12:00"
               value={form.endTime}
               onChange={(event) => setForm((previous) => ({ ...previous, endTime: event.target.value }))}
               onBlur={(event) => setForm((previous) => ({ ...previous, endTime: normalizeTimeInput(event.target.value) }))}
-              disabled={form.kind !== "temporary_leave"}
+              disabled={!isTemporaryKind(form.kind)}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
             />
             <input
@@ -1705,7 +1705,7 @@ export default function RequestsPage() {
               disabled={
                 saving ||
                 (isAdmin && !form.employeeId) ||
-                (form.kind === "temporary_leave" && (!form.startTime || !form.endTime))
+                (isTemporaryKind(form.kind) && (!form.startTime || !form.endTime))
               }
               className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-[#10251f] px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#8ea0b5]"
             >

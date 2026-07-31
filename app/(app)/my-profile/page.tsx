@@ -303,8 +303,8 @@ export default function MyProfilePage() {
     type: "annual",
     start_date: today(),
     end_date: toDateInput(addDays(new Date(), 4)),
-    start_time: "09:00",
-    end_time: "11:00",
+    start_time: "",
+    end_time: "",
     note: "",
   });
 
@@ -576,8 +576,8 @@ export default function MyProfilePage() {
         type: "annual",
         start_date: today(),
         end_date: toDateInput(addDays(new Date(), 4)),
-        start_time: "09:00",
-        end_time: "11:00",
+        start_time: "",
+        end_time: "",
         note: "",
       });
       setMessage("Prašymas pateiktas administratoriaus peržiūrai.");
@@ -1714,16 +1714,19 @@ export default function MyProfilePage() {
             <Field label="Prašymo tipas">
               <select
                 value={vacationForm.type}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const nextType = event.target.value;
                   setVacationForm((prev) => ({
                     ...prev,
-                    type: event.target.value,
+                    type: nextType,
                     end_date:
-                      event.target.value === "temporary_leave"
+                      nextType === "temporary_leave"
                         ? prev.start_date
                         : prev.end_date,
-                  }))
-                }
+                    start_time: nextType === "temporary_leave" ? prev.start_time || "09:00" : "",
+                    end_time: nextType === "temporary_leave" ? prev.end_time || "11:00" : "",
+                  }));
+                }}
                 className="form-input"
               >
                 <option value="annual">Kasmetinės atostogos</option>
