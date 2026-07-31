@@ -250,9 +250,8 @@ function residentName(resident: Resident | null | undefined) {
   const firstName = String(resident.first_name || "").trim()
   const lastName = String(resident.last_name || "").trim()
   const combined = [firstName, lastName].filter(Boolean).join(" ").trim()
-  const code = resident.resident_code ? ` (${resident.resident_code})` : ""
 
-  return `${fullName || combined || "Gyventojas"}${code}`
+  return fullName || combined || "Gyventojas"
 }
 
 function occupiedByLabel(room: Room, residents: Resident[]) {
@@ -274,7 +273,10 @@ function occupiedByLabel(room: Room, residents: Resident[]) {
     return possibleIds.includes(occupiedBy)
   })
 
-  return matchedResident ? residentName(matchedResident) : occupiedBy
+  if (matchedResident) return residentName(matchedResident)
+  if (/^GYV-/i.test(occupiedBy) || /^[0-9a-f-]{20,}$/i.test(occupiedBy)) return "Gyventojas"
+
+  return occupiedBy
 }
 
 
@@ -348,18 +350,21 @@ function downloadExcelTable(filename: string, rows: unknown[][]) {
     .join("")
 
   const content = `<!doctype html>
-<html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
-  <meta charset="utf-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta charset="UTF-8" />
   <style>
     body { background: #ffffff; color: #10251f; }
-    table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; min-width: 1260px; }
-    td { border: 1px solid #d9e4de; padding: 7px 10px; white-space: nowrap; vertical-align: middle; }
-    .title-row td { border: 0; background: #486b5d; color: #ffffff; font-size: 20pt; font-weight: 700; padding: 14px 12px; }
-    .section-row td { border: 0; background: #f7fcf9; color: #486b5d; font-size: 13pt; font-weight: 700; padding-top: 14px; }
-    .header-row td { background: #486b5d; color: #ffffff; font-weight: 700; }
-    .total-row td { background: #f7fcf9; color: #10251f; font-weight: 700; }
-    .blank-row td { border: 0; height: 10px; padding: 0; }
+    table { border-collapse: separate; border-spacing: 0; font-family: Calibri, Arial, sans-serif; font-size: 11pt; min-width: 1260px; }
+    td { border-right: 1px solid #d9e4de; border-bottom: 1px solid #d9e4de; padding: 8px 11px; white-space: nowrap; vertical-align: middle; }
+    tr td:first-child { border-left: 1px solid #d9e4de; }
+    tr:first-child td { border-top: 1px solid #d9e4de; }
+    .title-row td { border-color: #486b5d; background: #486b5d; color: #ffffff; font-size: 20pt; font-weight: 700; padding: 16px 12px; }
+    .section-row td { border-color: #d9e4de; background: #eef6f1; color: #486b5d; font-size: 13pt; font-weight: 700; padding-top: 14px; }
+    .header-row td { border-color: #486b5d; background: #486b5d; color: #ffffff; font-weight: 700; }
+    .total-row td { background: #eef6f1; color: #10251f; font-weight: 700; }
+    .blank-row td { border: 0; height: 12px; padding: 0; background: #ffffff; }
     td:nth-child(1) { min-width: 130px; }
     td:nth-child(2) { min-width: 160px; }
     td:nth-child(3) { min-width: 120px; }
@@ -373,7 +378,8 @@ function downloadExcelTable(filename: string, rows: unknown[][]) {
 <body><table>${tableRows}</table></body>
 </html>`
 
-  const blob = new Blob([content], { type: "application/vnd.ms-excel;charset=utf-8" })
+  const bom = new Uint8Array([0xef, 0xbb, 0xbf])
+  const blob = new Blob([bom, content], { type: "application/vnd.ms-excel;charset=UTF-8" })
   const url = window.URL.createObjectURL(blob)
   const link = document.createElement("a")
 

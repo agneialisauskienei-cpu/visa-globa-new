@@ -3614,7 +3614,14 @@ export default function TeamPage() {
                 </button>
               );
             })}
-            <div data-instruction-row className="ml-auto flex min-w-fit justify-end">{tab === "schedule" ? (<button type="button" className={teamOutlineButtonClass}>Kompaktiškas grafikas</button>) : null}</div>
+            {tab === "schedule" ? (
+              <button type="button" className={`${teamOutlineButtonClass} ml-auto`}>
+                Kompaktiškas grafikas
+              </button>
+            ) : (
+              <div className="ml-auto" />
+            )}
+            <div data-instruction-row className="flex min-w-fit justify-end" />
           </nav>
         </section>
 

@@ -51,9 +51,14 @@ function ModuleAccessGuard({ children }: { children: ReactNode }) {
   const router = useRouter()
   const [checkedPath, setCheckedPath] = useState<string | null>(null)
   const [accessError, setAccessError] = useState(false)
+  const [slowCheck, setSlowCheck] = useState(false)
 
   useEffect(() => {
     let active = true
+    setSlowCheck(false)
+    const slowTimer = window.setTimeout(() => {
+      if (active) setSlowCheck(true)
+    }, 1600)
 
     async function checkAccess() {
       try {
@@ -95,6 +100,7 @@ function ModuleAccessGuard({ children }: { children: ReactNode }) {
     void checkAccess()
     return () => {
       active = false
+      window.clearTimeout(slowTimer)
     }
   }, [pathname, router])
 
@@ -103,7 +109,20 @@ function ModuleAccessGuard({ children }: { children: ReactNode }) {
   }
 
   if (checkedPath !== pathname) {
-    return <AppLayoutShell embedded={false}>Tikrinama prieiga...</AppLayoutShell>
+    return (
+      <AppLayoutShell embedded={false}>
+        <div className="mx-auto mt-16 max-w-xl rounded-[18px] border border-[#c9d8d0] bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-black uppercase tracking-[0.14em] text-[#486b5d]">
+            {slowCheck ? "Ryšys atsako lėčiau" : "Tikrinama prieiga"}
+          </p>
+          <p className="mt-2 text-sm font-semibold text-[#10251f]">
+            {slowCheck
+              ? "Dar kartą patikriname prisijungimą ir organizacijos teises."
+              : "Patikriname prisijungimą ir organizacijos teises."}
+          </p>
+        </div>
+      </AppLayoutShell>
+    )
   }
 
   return children

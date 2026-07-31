@@ -1732,7 +1732,7 @@ export default function ScheduleBlock({
           employeeName: getName(employee),
           severity: "warning",
           type: "employment-rate",
-          title: "Neužpildytas etato krūvis",
+          title: "Etato krūvis neužpildytas",
           detail: `${formatEmploymentRate(employee)} darbuotojo mėnesio norma yra apie ${formatHours(monthlyContractHours)} val., suplanuota ${formatHours(plannedHours)} val. Trūksta ${formatHours(Math.abs(monthlyBalanceHours))} val.`,
         });
       }

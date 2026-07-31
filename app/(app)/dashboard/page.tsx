@@ -680,14 +680,26 @@ export default function AdminDashboardPage() {
 
               <div className="mt-4 space-y-3">
                 <TimelineItem color="#486b5d" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
-                <TimelineItem color="#be123c" title="Atostogų / išvykimo užklausos" meta={`${stats.pendingLeaves} laukia sprendimo`} warm />
+                <TimelineItem
+                  color="#be123c"
+                  title="Atostogų / išvykimo užklausos"
+                  meta={`${stats.pendingLeaves} laukia sprendimo`}
+                  warm
+                  onClick={() => openTeamModule("vacations")}
+                />
                 <TimelineItem
                   color="#b91c1c"
                   title="Dokumentų terminai"
                   meta={`${stats.pendingDocumentApprovals + stats.expiringCertificates} įspėjimai`}
                   danger
+                  onClick={() => openTeamModule("docs")}
                 />
-                <TimelineItem color="#486b5d" title="Mokymai" meta={`${computed.trainingCompletion}% užbaigta`} />
+                <TimelineItem
+                  color="#486b5d"
+                  title="Mokymai"
+                  meta={`${computed.trainingCompletion}% užbaigta`}
+                  onClick={() => openTeamModule("trainings")}
+                />
               </div>
             </section>
 
@@ -1315,6 +1327,7 @@ function DashboardSidePanel({
   onInvites,
   onSchedule,
   onDocuments,
+  onTrainings,
 }: {
   pendingLeaves: number;
   pendingInvites: number;
@@ -1328,6 +1341,7 @@ function DashboardSidePanel({
   onInvites: () => void;
   onSchedule: () => void;
   onDocuments: () => void;
+  onTrainings: () => void;
 }) {
   return (
     <aside className="grid content-start gap-4">
@@ -1392,7 +1406,7 @@ function DashboardSidePanel({
                 ? "amber"
                 : "emerald"
             }
-            onClick={onDocuments}
+            onClick={onTrainings}
           />
         </div>
       </section>
@@ -1405,15 +1419,32 @@ function DashboardSidePanel({
 
         <div className="mt-4 space-y-3">
           <TimelineItem color="#486b5d" title="Rodikliai atnaujinti" meta={lastUpdated ? formatDateTime(lastUpdated) : "šiandien"} />
-          <TimelineItem color="#486b5d" title="Darbuotojų kvietimai" meta={`${pendingInvites} laukia atsakymo`} />
-          <TimelineItem color="#be123c" title="Atostogų / išvykimo užklausos" meta={`${pendingLeaves} laukia sprendimo`} warm />
+          <TimelineItem
+            color="#486b5d"
+            title="Darbuotojų kvietimai"
+            meta={`${pendingInvites} laukia atsakymo`}
+            onClick={onInvites}
+          />
+          <TimelineItem
+            color="#be123c"
+            title="Atostogų / išvykimo užklausos"
+            meta={`${pendingLeaves} laukia sprendimo`}
+            warm
+            onClick={onVacations}
+          />
           <TimelineItem
             color="#b91c1c"
             title="Dokumentų terminai"
             meta={`${pendingDocumentApprovals + expiringCertificates} įspėjimai`}
             danger
+            onClick={onDocuments}
           />
-          <TimelineItem color="#486b5d" title="Mokymai" meta={`${trainingCompletion}% užbaigta`} />
+          <TimelineItem
+            color="#486b5d"
+            title="Mokymai"
+            meta={`${trainingCompletion}% užbaigta`}
+            onClick={onDocuments}
+          />
         </div>
       </section>
     </aside>
@@ -2001,9 +2032,13 @@ function QuickLink({ title, onClick }: { title: string; onClick: () => void }) {
       type="button"
       data-content-card
       onClick={onClick}
-      className="vg-hover-frame flex min-h-12 items-center justify-between gap-4 rounded-[14px] px-4 py-3 text-left text-sm font-black text-[#10251f] transition"
+      className="vg-list-card w-full text-left transition hover:border-[#486b5d] hover:shadow-sm"
     >
-      <span>+ {title}</span>
+      <span className="vg-list-mark" aria-hidden="true" />
+      <span className="min-w-0 flex-1">
+        <b className="vg-list-title">+ {title}</b>
+        <span className="vg-list-meta block">Atidaryti</span>
+      </span>
       <ArrowRight className="h-5 w-5 text-[#6a7e75]" />
     </button>
   );
@@ -2051,6 +2086,7 @@ function TimelineItem({
   warm,
   danger,
   blue: _blue,
+  onClick,
 }: {
   color: string;
   title: string;
@@ -2058,18 +2094,38 @@ function TimelineItem({
   warm?: boolean;
   danger?: boolean;
   blue?: boolean;
+  onClick?: () => void;
 }) {
   const state = warm || danger ? "warning" : "ok";
-
-  return (
-    <div className="vg-list-card" data-state={state}>
+  const content = (
+    <>
       <span className="vg-list-mark" aria-hidden="true" />
-      <div>
+      <div className="min-w-0 flex-1">
         <b className="vg-list-title">{title}</b>
         <p className="vg-list-meta">
           {meta}
         </p>
       </div>
+      {onClick ? <ArrowRight className="h-5 w-5 shrink-0 text-[#6a7e75]" /> : null}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className="vg-list-card w-full text-left transition hover:border-[#486b5d] hover:shadow-sm"
+        data-state={state}
+        onClick={onClick}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="vg-list-card" data-state={state}>
+      {content}
     </div>
   );
 }
