@@ -185,6 +185,11 @@ function isTemporaryKind(kind?: string | null) {
   return requestKindMeta(kind).kind === "temporary_leave";
 }
 
+function isTimedRequestKind(kind?: string | null) {
+  const normalizedKind = requestKindMeta(kind).kind;
+  return normalizedKind === "temporary_leave" || normalizedKind === "training";
+}
+
 function dateRangesOverlap(
   firstStart: string,
   firstEnd: string,
@@ -875,8 +880,8 @@ export default function RequestsPage() {
     const titles: Record<RequestKind, string> = {
       annual_leave: "Kasmetinių atostogų prašymas",
       temporary_leave: "Trumpo išvykimo prašymas",
-      mamadienis: "Mamadienio prašymas",
-      tevadienis: "Tėvadienio prašymas",
+      mamadienis: "Mamadienio / tėvadienio prašymas",
+      tevadienis: "Mamadienio / tėvadienio prašymas",
       sick_leave: "Nedarbingumo prašymas",
       training: "Mokymų / komandiruotės prašymas",
     };
@@ -891,7 +896,7 @@ export default function RequestsPage() {
   ) {
     void employeeId;
 
-    if (isTemporaryKind(kind)) return 0;
+    if (isTimedRequestKind(kind)) return 0;
 
     return daysBetween(start, end);
   }
@@ -950,12 +955,23 @@ export default function RequestsPage() {
 
     const normalizedStartTime = normalizeTimeInput(form.startTime);
     const normalizedEndTime = normalizeTimeInput(form.endTime);
-    const requestedDays = await countRequestDays(employeeId, form.kind, startDate, endDate);
+    const isTimedRequest = isTimedRequestKind(form.kind);
 
-    if (isTemporaryKind(form.kind) && (!normalizedStartTime || !normalizedEndTime)) {
-      setMessage("Trumpam išvykimui nurodyk pradžios ir pabaigos laiką, pvz. 10:00 ir 12:00.");
+    if (isTimedRequest && (!normalizedStartTime || !normalizedEndTime)) {
+      setMessage("Šiam prašymui nurodyk pradžios ir pabaigos laiką, pvz. 10:00 ir 12:00.");
       return;
     }
+
+    const timedHours = isTimedRequest ? timeRangeHours(normalizedStartTime, normalizedEndTime) : 0;
+
+    if (isTimedRequest && timedHours <= 0) {
+      setMessage("Pabaigos laikas turi būti vėlesnis už pradžios laiką.");
+      return;
+    }
+
+    const requestedDays = isTimedRequest
+      ? Math.round((timedHours / 8) * 100) / 100
+      : await countRequestDays(employeeId, form.kind, startDate, endDate);
 
     if (isAnnualKind(form.kind) && requestedDays <= 0) {
       setMessage(
@@ -964,7 +980,7 @@ export default function RequestsPage() {
       return;
     }
 
-    const normalizedEndDate = isTemporaryKind(form.kind) ? startDate : endDate;
+    const normalizedEndDate = isTimedRequest ? startDate : endDate;
     const conflictingRequest = requests.find((request) => {
       if (request.employeeId !== employeeId) return false;
       if (editingRequestId && request.id === editingRequestId) return false;
@@ -981,10 +997,10 @@ export default function RequestsPage() {
 
     const noteParts: string[] = [];
 
-    if (isTemporaryKind(form.kind)) {
-      const hours = timeRangeHours(normalizedStartTime, normalizedEndTime);
-      noteParts.push(`${normalizedStartTime}-${normalizedEndTime}`);
-      if (hours > 0) noteParts.push(`${hours} val.`);
+    if (isTimedRequest) {
+      const timeLabel = requestKindMeta(form.kind).kind === "training" ? "Mokymų / komandiruotės laikas" : "Išvykimo laikas";
+      noteParts.push(`${timeLabel}: ${normalizedStartTime}-${normalizedEndTime}`);
+      if (timedHours > 0) noteParts.push(`${timedHours} val.`);
     }
 
     if (form.note.trim()) noteParts.push(form.note.trim());
@@ -1270,17 +1286,17 @@ export default function RequestsPage() {
             setForm((previous) => ({
               ...previous,
               kind: nextKind,
-              end: isTemporaryKind(nextKind) ? previous.start : previous.end,
-              startTime: isTemporaryKind(nextKind) ? previous.startTime : "",
-              endTime: isTemporaryKind(nextKind) ? previous.endTime : "",
+              end: isTimedRequestKind(nextKind) ? previous.start : previous.end,
+              startTime: isTimedRequestKind(nextKind) ? previous.startTime || "09:00" : "",
+              endTime: isTimedRequestKind(nextKind) ? previous.endTime || (requestKindMeta(nextKind).kind === "training" ? "17:00" : "11:00") : "",
             }));
           }}
           className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
         >
           <option value="annual_leave">{actions.compact ? "Atostogos (A)" : "Kasmetinės atostogos (A)"}</option>
           <option value="temporary_leave">{actions.compact ? "Išvykimas (TI)" : "Trumpas išvykimas (TI)"}</option>
-          <option value="mamadienis">Mamadienis (MD)</option>
-          <option value="tevadienis">Tėvadienis (TD)</option>
+          <option value="mamadienis">Mamadienis / tėvadienis (MD)</option>
+          <option value="tevadienis">Mamadienis / tėvadienis (TD)</option>
           <option value="sick_leave">Nedarbingumas (L)</option>
           <option value="training">{actions.compact ? "Mokymai (K)" : "Mokymai / komandiruotė (K)"}</option>
         </select>
@@ -1293,7 +1309,7 @@ export default function RequestsPage() {
             setForm((previous) => ({
               ...previous,
               start: event.target.value,
-              end: isTemporaryKind(previous.kind) ? event.target.value : previous.end || event.target.value,
+              end: isTimedRequestKind(previous.kind) ? event.target.value : previous.end || event.target.value,
             }))
           }
           className="h-12 min-w-0 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
@@ -1304,25 +1320,25 @@ export default function RequestsPage() {
           placeholder="YYYY-MM-DD"
           value={form.end}
           onChange={(event) => setForm((previous) => ({ ...previous, end: event.target.value }))}
-          disabled={isTemporaryKind(form.kind)}
+          disabled={isTimedRequestKind(form.kind)}
           className="h-12 min-w-0 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
         />
         <input
-          type={isTemporaryKind(form.kind) ? "text" : "hidden"}
+          type={isTimedRequestKind(form.kind) ? "text" : "hidden"}
           placeholder="Nuo, pvz. 10:00"
           value={form.startTime}
           onChange={(event) => setForm((previous) => ({ ...previous, startTime: event.target.value }))}
           onBlur={(event) => setForm((previous) => ({ ...previous, startTime: normalizeTimeInput(event.target.value) }))}
-          disabled={!isTemporaryKind(form.kind)}
+          disabled={!isTimedRequestKind(form.kind)}
           className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
         />
         <input
-          type={isTemporaryKind(form.kind) ? "text" : "hidden"}
+          type={isTimedRequestKind(form.kind) ? "text" : "hidden"}
           placeholder="Iki, pvz. 12:00"
           value={form.endTime}
           onChange={(event) => setForm((previous) => ({ ...previous, endTime: event.target.value }))}
           onBlur={(event) => setForm((previous) => ({ ...previous, endTime: normalizeTimeInput(event.target.value) }))}
-          disabled={!isTemporaryKind(form.kind)}
+          disabled={!isTimedRequestKind(form.kind)}
           className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
         />
         <input
@@ -1337,7 +1353,7 @@ export default function RequestsPage() {
           disabled={
             saving ||
             (isAdmin && !form.employeeId) ||
-            (isTemporaryKind(form.kind) && (!form.startTime || !form.endTime))
+            (isTimedRequestKind(form.kind) && (!form.startTime || !form.endTime))
           }
           className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-[#10251f] px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#8ea0b5]"
         >
@@ -1638,17 +1654,17 @@ export default function RequestsPage() {
                 setForm((previous) => ({
                   ...previous,
                   kind: nextKind,
-                  end: isTemporaryKind(nextKind) ? previous.start : previous.end,
-                  startTime: isTemporaryKind(nextKind) ? previous.startTime : "",
-                  endTime: isTemporaryKind(nextKind) ? previous.endTime : "",
+                  end: isTimedRequestKind(nextKind) ? previous.start : previous.end,
+                  startTime: isTimedRequestKind(nextKind) ? previous.startTime || "09:00" : "",
+                  endTime: isTimedRequestKind(nextKind) ? previous.endTime || (requestKindMeta(nextKind).kind === "training" ? "17:00" : "11:00") : "",
                 }));
               }}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
             >
               <option value="annual_leave">Kasmetinės atostogos (A)</option>
               <option value="temporary_leave">Trumpas išvykimas (TI)</option>
-              <option value="mamadienis">Mamadienis (MD)</option>
-              <option value="tevadienis">Tėvadienis (TD)</option>
+              <option value="mamadienis">Mamadienis / tėvadienis (MD)</option>
+              <option value="tevadienis">Mamadienis / tėvadienis (TD)</option>
               <option value="sick_leave">Nedarbingumas (L)</option>
               <option value="training">Mokymai / komandiruotė (K)</option>
             </select>
@@ -1661,7 +1677,7 @@ export default function RequestsPage() {
                 setForm((previous) => ({
                   ...previous,
                   start: event.target.value,
-                  end: isTemporaryKind(previous.kind) ? event.target.value : previous.end || event.target.value,
+                  end: isTimedRequestKind(previous.kind) ? event.target.value : previous.end || event.target.value,
                 }))
               }
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f]"
@@ -1672,25 +1688,25 @@ export default function RequestsPage() {
               inputMode="numeric"
               value={form.end}
               onChange={(event) => setForm((previous) => ({ ...previous, end: event.target.value }))}
-              disabled={isTemporaryKind(form.kind)}
+              disabled={isTimedRequestKind(form.kind)}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
             />
             <input
-              type={isTemporaryKind(form.kind) ? "text" : "hidden"}
+              type={isTimedRequestKind(form.kind) ? "text" : "hidden"}
               placeholder="Nuo, pvz. 10:00"
               value={form.startTime}
               onChange={(event) => setForm((previous) => ({ ...previous, startTime: event.target.value }))}
               onBlur={(event) => setForm((previous) => ({ ...previous, startTime: normalizeTimeInput(event.target.value) }))}
-              disabled={!isTemporaryKind(form.kind)}
+              disabled={!isTimedRequestKind(form.kind)}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
             />
             <input
-              type={isTemporaryKind(form.kind) ? "text" : "hidden"}
+              type={isTimedRequestKind(form.kind) ? "text" : "hidden"}
               placeholder="Iki, pvz. 12:00"
               value={form.endTime}
               onChange={(event) => setForm((previous) => ({ ...previous, endTime: event.target.value }))}
               onBlur={(event) => setForm((previous) => ({ ...previous, endTime: normalizeTimeInput(event.target.value) }))}
-              disabled={!isTemporaryKind(form.kind)}
+              disabled={!isTimedRequestKind(form.kind)}
               className="h-12 rounded-[16px] border border-[#dbe6e0] bg-white px-4 text-sm font-bold text-[#10251f] disabled:bg-[#f7fcf9]"
             />
             <input
@@ -1705,7 +1721,7 @@ export default function RequestsPage() {
               disabled={
                 saving ||
                 (isAdmin && !form.employeeId) ||
-                (isTemporaryKind(form.kind) && (!form.startTime || !form.endTime))
+                (isTimedRequestKind(form.kind) && (!form.startTime || !form.endTime))
               }
               className="inline-flex h-12 items-center justify-center gap-2 rounded-[16px] bg-[#10251f] px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#8ea0b5]"
             >
@@ -1827,8 +1843,8 @@ export default function RequestsPage() {
               <option value="all">Visi tipai</option>
               <option value="annual_leave">Atostogos</option>
               <option value="temporary_leave">Trumpi išvykimai</option>
-              <option value="mamadienis">Mamadienis</option>
-              <option value="tevadienis">Tėvadienis</option>
+              <option value="mamadienis">Mamadienis / tėvadienis (MD)</option>
+              <option value="tevadienis">Mamadienis / tėvadienis (TD)</option>
               <option value="training">Mokymai</option>
             </select>
             <button

@@ -510,13 +510,16 @@ function Badge({
 function RoomModuleLink({
   href,
   children,
+  onClick,
 }: {
   href: string
   children: ReactNode
+  onClick?: () => void
 }) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       className="inline-flex min-h-9 items-center justify-center rounded-[14px] border border-[#c9d8d0] bg-white px-3 py-1.5 text-xs font-black text-[#486b5d] transition hover:border-[#486b5d] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#486b5d]/25"
     >
       {children}
@@ -2098,11 +2101,11 @@ export default function RoomsPage() {
 
                   <Panel title="Ryšiai su moduliais">
                     <div className="flex flex-wrap gap-2">
-                      <RoomModuleLink href={selectedRoom ? `/residents?search=${encodeURIComponent(selectedRoom.name)}` : "/residents"}>Gyventojai</RoomModuleLink>
-                      <RoomModuleLink href={selectedRoom ? `/tasks?room=${encodeURIComponent(selectedRoom.name)}` : "/tasks"}>Užduotys ūkiui</RoomModuleLink>
-                      <RoomModuleLink href={selectedRoom ? `/handover-logs?room=${encodeURIComponent(selectedRoom.name)}` : "/handover-logs"}>Perdavimo žurnalai</RoomModuleLink>
-                      <RoomModuleLink href={selectedRoom ? `/rooms?tab=repairs&room=${encodeURIComponent(selectedRoom.name)}` : "/rooms?tab=repairs"}>Valymo būsena</RoomModuleLink>
-                      <RoomModuleLink href={selectedRoom ? `/inventory?room=${encodeURIComponent(selectedRoom.name)}` : "/inventory"}>Inventorius</RoomModuleLink>
+                      <RoomModuleLink onClick={closeModal} href={selectedRoom ? `/residents?search=${encodeURIComponent(selectedRoom.name)}` : "/residents"}>Gyventojai</RoomModuleLink>
+                      <RoomModuleLink onClick={closeModal} href={selectedRoom ? `/tasks?room=${encodeURIComponent(selectedRoom.name)}` : "/tasks"}>Užduotys ūkiui</RoomModuleLink>
+                      <RoomModuleLink onClick={closeModal} href={selectedRoom ? `/handover-logs?room=${encodeURIComponent(selectedRoom.name)}` : "/handover-logs"}>Perdavimo žurnalai</RoomModuleLink>
+                      <RoomModuleLink onClick={closeModal} href={selectedRoom ? `/tasks?room=${encodeURIComponent(selectedRoom.name)}&category=cleaning` : "/tasks?category=cleaning"}>Valymo būsena</RoomModuleLink>
+                      <RoomModuleLink onClick={closeModal} href={selectedRoom ? `/inventory?room=${encodeURIComponent(selectedRoom.name)}` : "/inventory"}>Inventorius</RoomModuleLink>
                     </div>
                   </Panel>
                 </div>
