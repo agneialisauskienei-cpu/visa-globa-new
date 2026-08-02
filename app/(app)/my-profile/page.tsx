@@ -87,6 +87,14 @@ type VacationRow = {
   created_at?: string | null;
 };
 
+type RequestKind =
+  | "annual_leave"
+  | "temporary_leave"
+  | "mamadienis"
+  | "tevadienis"
+  | "sick_leave"
+  | "training";
+
 type TrainingForm = {
   title: string;
   provider: string;
@@ -242,7 +250,7 @@ function departmentLabel(department?: string | null) {
   return raw.replaceAll("_", " ");
 }
 
-function vacationTypeLabel(type?: string | null) {
+function legacyVacationTypeLabel(type?: string | null) {
   const value = String(type || "annual").toLowerCase();
 
   if (value === "sick") return "Liga";
@@ -252,6 +260,65 @@ function vacationTypeLabel(type?: string | null) {
   if (value === "temporary_leave") return "Trumpas išvykimas";
 
   return "Kasmetinės atostogos";
+}
+
+function requestKindMeta(kind?: string | null) {
+  const raw = String(kind || "annual_leave").toLowerCase();
+
+  if (["temporary_leave", "short_leave", "ti"].includes(raw)) {
+    return {
+      kind: "temporary_leave" as RequestKind,
+      label: "Trumpas išvykimas",
+      code: "TI",
+    };
+  }
+
+  if (["mamadienis", "mother_day", "md"].includes(raw)) {
+    return {
+      kind: "mamadienis" as RequestKind,
+      label: "Mamadienis",
+      code: "MD",
+    };
+  }
+
+  if (["tevadienis", "father_day", "td"].includes(raw)) {
+    return {
+      kind: "tevadienis" as RequestKind,
+      label: "Tėvadienis",
+      code: "TD",
+    };
+  }
+
+  if (["sick", "sick_leave", "nedarbingumas", "l"].includes(raw)) {
+    return {
+      kind: "sick_leave" as RequestKind,
+      label: "Nedarbingumas",
+      code: "L",
+    };
+  }
+
+  if (["training", "business_trip", "komandiruote", "mokymai", "k"].includes(raw)) {
+    return {
+      kind: "training" as RequestKind,
+      label: "Mokymai / komandiruotė",
+      code: "K",
+    };
+  }
+
+  return {
+    kind: "annual_leave" as RequestKind,
+    label: "Kasmetinės atostogos",
+    code: "A",
+  };
+}
+
+function isTimedRequestKind(kind?: string | null) {
+  const normalizedKind = requestKindMeta(kind).kind;
+  return normalizedKind === "temporary_leave" || normalizedKind === "training";
+}
+
+function vacationTypeLabel(type?: string | null) {
+  return requestKindMeta(type).label;
 }
 
 function vacationStatusLabel(status?: string | null) {
@@ -300,7 +367,7 @@ export default function MyProfilePage() {
   });
 
   const [vacationForm, setVacationForm] = useState<VacationForm>({
-    type: "annual",
+    type: "annual_leave",
     start_date: today(),
     end_date: toDateInput(addDays(new Date(), 4)),
     start_time: "",
@@ -395,7 +462,7 @@ export default function MyProfilePage() {
               .eq("employee_id", user.id)
               .order("completed_at", { ascending: false }),
             supabase
-              .from("personnel_vacation_requests")
+              .from("vacation_requests")
               .select(
                 "id, type, start_date, end_date, status, requested_days, note, created_at",
               )
@@ -516,35 +583,45 @@ export default function MyProfilePage() {
       return;
     }
 
-    if (!vacationForm.start_date || !vacationForm.end_date) {
+    const normalizedType = requestKindMeta(vacationForm.type).kind;
+    const normalizedEndDate = isTimedRequestKind(normalizedType)
+      ? vacationForm.start_date
+      : vacationForm.end_date;
+
+    if (!vacationForm.start_date || !normalizedEndDate) {
       setMessage("Pasirinkite pradžios ir pabaigos datą.");
       return;
     }
 
-    if (vacationForm.end_date < vacationForm.start_date) {
+    if (normalizedEndDate < vacationForm.start_date) {
       setMessage("Pabaigos data negali būti ankstesnė už pradžią.");
       return;
     }
 
-    const isTemporaryLeave = vacationForm.type === "temporary_leave";
+    const isTimedRequest = isTimedRequestKind(normalizedType);
     const requestedHours = hoursBetween(
       vacationForm.start_time,
       vacationForm.end_time,
     );
 
-    if (isTemporaryLeave && requestedHours <= 0) {
+    if (isTimedRequest && requestedHours <= 0) {
       setMessage("Trumpam išvykimui pasirinkite teisingas valandas.");
       return;
     }
 
-    const requestedDays = isTemporaryLeave
+    const requestedDays = isTimedRequest
       ? Math.round((requestedHours / 8) * 100) / 100
-      : daysBetween(vacationForm.start_date, vacationForm.end_date);
+      : daysBetween(vacationForm.start_date, normalizedEndDate);
 
-    const noteWithTime = isTemporaryLeave
+    const timeLabel =
+      normalizedType === "training"
+        ? "Mokymų / komandiruotės laikas"
+        : "Išvykimo laikas";
+
+    const noteWithTime = isTimedRequest
       ? [
           vacationForm.note.trim(),
-          `Išvykimo laikas: ${vacationForm.start_time}–${vacationForm.end_time} (${requestedHours} val.)`,
+          `${timeLabel}: ${vacationForm.start_time}–${vacationForm.end_time} (${requestedHours} val.)`,
         ]
           .filter(Boolean)
           .join("\n")
@@ -555,15 +632,13 @@ export default function MyProfilePage() {
 
     try {
       const { error } = await supabase
-        .from("personnel_vacation_requests")
+        .from("vacation_requests")
         .insert({
           organization_id: membership.organization_id,
           employee_id: profile.id,
-          type: vacationForm.type,
+          type: normalizedType,
           start_date: vacationForm.start_date,
-          end_date: isTemporaryLeave
-            ? vacationForm.start_date
-            : vacationForm.end_date,
+          end_date: normalizedEndDate,
           status: "submitted",
           requested_days: requestedDays,
           note: noteWithTime,
@@ -573,7 +648,7 @@ export default function MyProfilePage() {
 
       setShowVacationModal(false);
       setVacationForm({
-        type: "annual",
+        type: "annual_leave",
         start_date: today(),
         end_date: toDateInput(addDays(new Date(), 4)),
         start_time: "",
@@ -1715,32 +1790,37 @@ export default function MyProfilePage() {
               <select
                 value={vacationForm.type}
                 onChange={(event) => {
-                  const nextType = event.target.value;
+                  const nextType = requestKindMeta(event.target.value).kind;
+                  const timed = isTimedRequestKind(nextType);
                   setVacationForm((prev) => ({
                     ...prev,
                     type: nextType,
                     end_date:
-                      nextType === "temporary_leave"
+                      timed
                         ? prev.start_date
                         : prev.end_date,
-                    start_time: nextType === "temporary_leave" ? prev.start_time || "09:00" : "",
-                    end_time: nextType === "temporary_leave" ? prev.end_time || "11:00" : "",
+                    start_time: timed ? prev.start_time || "09:00" : "",
+                    end_time:
+                      timed
+                        ? prev.end_time ||
+                          (nextType === "training" ? "17:00" : "11:00")
+                        : "",
                   }));
                 }}
                 className="form-input"
               >
-                <option value="annual">Kasmetinės atostogos</option>
+                <option value="annual_leave">Kasmetinės atostogos</option>
                 <option value="temporary_leave">
                   Trumpas išvykimas, pvz. pas daktarą
                 </option>
-                <option value="unpaid">Nemokamos atostogos</option>
-                <option value="sick">Liga</option>
-                <option value="mother_day">Mamadienis</option>
-                <option value="father_day">Tėvadienis</option>
+                <option value="mamadienis">Mamadienis</option>
+                <option value="tevadienis">Tėvadienis</option>
+                <option value="sick_leave">Nedarbingumas</option>
+                <option value="training">Mokymai / komandiruotė</option>
               </select>
             </Field>
 
-            {vacationForm.type === "temporary_leave" ? (
+            {isTimedRequestKind(vacationForm.type) ? (
               <>
                 <Field label="Data">
                   <input
@@ -1830,8 +1910,10 @@ export default function MyProfilePage() {
                 }
                 className="form-input min-h-[110px] resize-none"
                 placeholder={
-                  vacationForm.type === "temporary_leave"
-                    ? "Pvz., vizitas pas gydytoją"
+                  isTimedRequestKind(vacationForm.type)
+                    ? requestKindMeta(vacationForm.type).kind === "training"
+                      ? "Pvz., mokymai nuo vidurdienio"
+                      : "Pvz., vizitas pas gydytoją"
                     : "Papildoma informacija administratoriui"
                 }
               />
@@ -2095,6 +2177,11 @@ function VacationCard({ item }: { item: VacationRow }) {
   const status = vacationStatusLabel(item.status);
   const approved = status === "Patvirtinta";
   const rejected = status === "Atmesta";
+  const isTimed = isTimedRequestKind(item.type);
+  const timeNotePrefix =
+    requestKindMeta(item.type).kind === "training"
+      ? "Mokymų / komandiruotės laikas:"
+      : "Išvykimo laikas:";
 
   return (
     <div
@@ -2107,9 +2194,9 @@ function VacationCard({ item }: { item: VacationRow }) {
           </p>
           <p className="mt-1 text-sm font-semibold text-[#526174]">
             {formatDate(item.start_date || null)}
-            {item.type === "temporary_leave"
-              ? item.note?.includes("Išvykimo laikas:")
-                ? ` · ${item.note.split("Išvykimo laikas:")[1]?.trim()}`
+            {isTimed
+              ? item.note?.includes(timeNotePrefix)
+                ? ` · ${item.note.split(timeNotePrefix)[1]?.trim()}`
                 : ""
               : ` – ${formatDate(item.end_date || null)} · ${Number(item.requested_days || 0)} d.`}
           </p>
