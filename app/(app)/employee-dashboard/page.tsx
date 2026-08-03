@@ -302,17 +302,17 @@ function shiftTone(shift: EmployeeSchedule) {
   const label = shiftLabel(shift).toLowerCase();
   const type = String(shift.shift_type || "").toLowerCase();
   if (label.includes("paros") || type === "night") {
-    return "border-indigo-100 bg-indigo-50 text-indigo-950";
+    return "border-[#486b5d] bg-white text-[#10251f]";
   }
-  if (type === "off") return "border-slate-200 bg-slate-50 text-slate-700";
-  if (type === "sick") return "border-rose-100 bg-rose-50 text-rose-900";
+  if (type === "off") return "border-[#c9d8d0] bg-white text-[#526174]";
+  if (type === "sick") return "border-[#486b5d] bg-white text-[#be123c]";
   if (type === "reserved") {
-    return "border-violet-100 bg-violet-50 text-violet-900";
+    return "border-[#486b5d] bg-white text-[#10251f]";
   }
   if (["a", "m", "t", "na", "vacation"].includes(type)) {
-    return "border-amber-100 bg-amber-50 text-amber-900";
+    return "border-[#486b5d] bg-white text-[#10251f]";
   }
-  return "border-emerald-100 bg-emerald-50 text-emerald-950";
+  return "border-[#c9d8d0] bg-white text-[#10251f]";
 }
 
 function timeText(shift: EmployeeSchedule) {
@@ -415,12 +415,12 @@ function requestStatusLabel(value?: string | null) {
 function requestStatusClass(value?: string | null) {
   const status = normalizeRequestStatus(value);
   if (status === "approved")
-    return "border-emerald-100 bg-emerald-50 text-emerald-800";
+    return "border-[#c9d8d0] bg-white text-[#486b5d]";
   if (status === "rejected")
-    return "border-rose-100 bg-rose-50 text-rose-800";
+    return "border-[#486b5d] bg-white text-[#be123c]";
   if (status === "canceled")
-    return "border-slate-200 bg-slate-50 text-slate-700";
-  return "border-amber-100 bg-amber-50 text-amber-800";
+    return "border-[#c9d8d0] bg-white text-[#526174]";
+  return "border-[#486b5d] bg-white text-[#10251f]";
 }
 
 function requestKindLabel(value?: string | null) {
@@ -1281,26 +1281,26 @@ export default function EmployeeDashboardPage() {
           twoColumnLayout(
             schedule.length ? (
               <>
-                <div className="hidden overflow-hidden rounded-[22px] border border-slate-200 lg:block">
+                <div className="hidden overflow-hidden rounded-[14px] border border-[#c9d8d0] lg:block">
                   <table className="w-full border-collapse bg-white text-left">
-                    <thead className="bg-slate-50">
+                    <thead className="bg-[#f7fcf9]">
                       <tr>
-                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                           Data
                         </th>
-                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                           Diena
                         </th>
-                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                           Laikas
                         </th>
-                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                           Tipas
                         </th>
-                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                           Valandos
                         </th>
-                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                           Pastaba
                         </th>
                       </tr>
@@ -1777,7 +1777,7 @@ export default function EmployeeDashboardPage() {
         </section>
 
         {loadError ? (
-          <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+          <div className="rounded-[14px] border border-[#486b5d] bg-white p-4 text-sm font-bold text-[#10251f]">
             Nepavyko įkelti dalies duomenų: {loadError}
           </div>
         ) : null}
@@ -1897,7 +1897,7 @@ export default function EmployeeDashboardPage() {
           </section>
         </section>
 
-        <section className="rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-sm sm:rounded-[22px] sm:p-5">
+        <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#486b5d]">
@@ -1913,7 +1913,7 @@ export default function EmployeeDashboardPage() {
             <button
               type="button"
               onClick={() => void loadDashboard()}
-              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-[#c9d8d0] bg-white px-4 py-3 text-sm font-black text-[#486b5d] transition hover:bg-[#f7fcf9]"
+              className="vg-btn"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -2070,29 +2070,23 @@ function StatButton({
   onClick?: () => void;
   tone?: "default" | "green" | "amber" | "rose";
 }) {
-  const toneClass =
-    tone === "amber"
-      ? "border-amber-200 bg-amber-50"
-      : tone === "rose"
-        ? "border-rose-200 bg-rose-50"
-        : tone === "green"
-          ? "border-emerald-200 bg-emerald-50"
-          : "border-[#c9d8d0] bg-white";
+  const valueClass =
+    tone === "amber" || tone === "rose" ? "text-[#be123c]" : "text-[#10251f]";
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`min-w-0 rounded-[18px] border p-3 text-left shadow-sm transition hover:bg-[#ffffff] sm:p-4 ${toneClass}`}
+      className="min-w-0 rounded-[14px] border border-[#c9d8d0] bg-white p-3 text-left shadow-sm transition hover:border-[#486b5d] hover:bg-white sm:p-4"
     >
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-white/80 text-[#486b5d] sm:h-10 sm:w-10 sm:rounded-[14px]">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-[#f7fcf9] text-[#486b5d] sm:h-10 sm:w-10">
           {icon}
         </span>
         <div className="min-w-0">
           <p className="line-clamp-2 text-[10px] font-bold tracking-[0.08em] text-[#6a7e75] sm:text-[11px]">
             {title}
           </p>
-          <p className="mt-1 break-words text-base font-black leading-tight text-[#10251f] sm:text-lg">
+          <p className={`mt-1 break-words text-base font-black leading-tight sm:text-lg ${valueClass}`}>
             {value}
           </p>
         </div>
@@ -2116,10 +2110,10 @@ function ActionRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-w-0 items-center justify-between gap-3 rounded-[16px] border border-[#dbe6e0] bg-[#ffffff] p-3 text-left transition hover:bg-[#f7fcf9] sm:p-4"
+      className="flex min-w-0 items-center justify-between gap-3 rounded-[14px] border border-[#c9d8d0] bg-white p-3 text-left transition hover:border-[#486b5d] hover:bg-white sm:p-4"
     >
       <span className="flex min-w-0 items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-white text-[#486b5d] shadow-sm sm:h-10 sm:w-10 sm:rounded-[14px]">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-[#f7fcf9] text-[#486b5d] shadow-sm sm:h-10 sm:w-10">
           {icon}
         </span>
         <span className="min-w-0">
@@ -2154,7 +2148,7 @@ function Panel({
   const action = actionHref ? (
     <Link
       href={actionHref}
-      className="inline-flex w-full justify-center rounded-[14px] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d] no-underline transition hover:bg-[#dbe6e0] sm:w-auto"
+      className="vg-btn w-full sm:w-auto"
     >
       {actionLabel || "Atidaryti"}
     </Link>
@@ -2162,14 +2156,14 @@ function Panel({
     <button
       type="button"
       onClick={onAction}
-      className="inline-flex w-full justify-center rounded-[14px] bg-[#f7fcf9] px-4 py-2 text-sm font-black text-[#486b5d] transition hover:bg-[#dbe6e0] sm:w-auto"
+      className="vg-btn w-full sm:w-auto"
     >
       {actionLabel || "Atidaryti"}
     </button>
   ) : null;
 
   return (
-    <section className="rounded-[20px] border border-[#c9d8d0] bg-white p-4 shadow-sm sm:rounded-[22px] sm:p-5">
+    <section className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-sm sm:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-[11px] font-bold tracking-[0.08em] text-[#486b5d]">
@@ -2188,7 +2182,7 @@ function Panel({
 
 function ShiftCard({ shift }: { shift: EmployeeSchedule }) {
   return (
-    <div className="rounded-[18px] border border-emerald-100 bg-emerald-50 p-4">
+    <div className="rounded-[14px] border border-[#c9d8d0] bg-white p-4">
       <p className="text-[11px] font-bold tracking-[0.08em] text-[#486b5d]">
         Kita pamaina
       </p>
@@ -2254,7 +2248,7 @@ function ShiftMobileCard({ shift }: { shift: EmployeeSchedule }) {
   const cleanNote = technicalNoteHidden(shift.notes || shift.note || "");
 
   return (
-    <article className="rounded-[20px] border border-[#dbe6e0] bg-white p-4">
+    <article className="rounded-[14px] border border-[#c9d8d0] bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
@@ -2302,7 +2296,7 @@ function SideBox({
   children: ReactNode;
 }) {
   return (
-    <aside className="rounded-[18px] border border-[#dbe6e0] bg-[#ffffff] p-4">
+    <aside className="rounded-[18px] border border-[#c9d8d0] bg-white p-4 shadow-sm">
       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#486b5d]">
         {kicker}
       </p>
@@ -2324,7 +2318,7 @@ function MiniMetric({
   desc: string;
 }) {
   return (
-    <div className="rounded-[16px] border border-[#dbe6e0] bg-white p-3">
+    <div className="rounded-[14px] border border-[#c9d8d0] bg-white p-3">
       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#6a7e75]">
         {label}
       </p>
@@ -2356,7 +2350,7 @@ function TaskCard({
       .includes("auk");
   return (
     <div
-      className={`rounded-[18px] border p-4 ${urgent ? "border-amber-200 bg-amber-50" : "border-[#dbe6e0] bg-white"}`}
+      className={`rounded-[14px] border bg-white p-4 ${urgent ? "border-[#486b5d]" : "border-[#c9d8d0]"}`}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
@@ -2370,7 +2364,7 @@ function TaskCard({
         <button
           type="button"
           onClick={onComplete}
-          className="w-full rounded-[12px] bg-[#486b5d] px-3 py-2 text-xs font-black text-white sm:w-auto"
+          className="vg-btn-primary w-full sm:w-auto"
         >
           Atlikta
         </button>
@@ -2383,7 +2377,7 @@ function TaskCard({
       <button
         type="button"
         onClick={onOpen}
-        className="mt-3 w-full rounded-[14px] bg-[#f7fcf9] px-4 py-3 text-sm font-black text-[#486b5d] sm:w-auto sm:bg-transparent sm:px-0 sm:py-0"
+        className="vg-btn mt-3 w-full sm:w-auto"
       >
         Peržiūrėti
       </button>
@@ -2401,13 +2395,13 @@ function DocumentLine({
   ok: boolean;
 }) {
   return (
-    <div className="mt-2 flex items-center justify-between gap-3 rounded-[16px] border border-[#dbe6e0] bg-white p-3">
+    <div className="mt-2 flex items-center justify-between gap-3 rounded-[14px] border border-[#c9d8d0] bg-white p-3">
       <div>
         <div className="font-black text-[#10251f]">{title}</div>
         <div className="mt-0.5 text-sm font-bold text-[#526174]">{value}</div>
       </div>
       <span
-        className={`rounded-full px-3 py-1 text-xs font-black ${ok ? "bg-emerald-50 text-[#486b5d]" : "bg-amber-50 text-amber-700"}`}
+        className={`rounded-full border bg-white px-3 py-1 text-xs font-black ${ok ? "border-[#c9d8d0] text-[#486b5d]" : "border-[#486b5d] text-[#be123c]"}`}
       >
         {ok ? "OK" : "Trūksta"}
       </span>
@@ -2418,7 +2412,7 @@ function DocumentLine({
 function NotificationMini({ item }: { item: NotificationRow }) {
   return (
     <div
-      className={`rounded-[18px] border p-4 ${!item.is_read && !item.read_at ? "border-emerald-200 bg-emerald-50" : "border-[#dbe6e0] bg-white"}`}
+      className={`rounded-[14px] border bg-white p-4 ${!item.is_read && !item.read_at ? "border-[#486b5d]" : "border-[#c9d8d0]"}`}
     >
       <div className="font-black text-[#10251f]">
         {item.title || "Pranešimas"}
