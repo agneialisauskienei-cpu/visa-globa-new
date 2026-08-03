@@ -3,7 +3,7 @@ import TeamClient from "./TeamClient";
 
 export default function TeamPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-zinc-500">Kraunama...</div>}>
+    <Suspense fallback={<div aria-busy="true" className="p-6" />}>
       <TeamClient />
     </Suspense>
   );

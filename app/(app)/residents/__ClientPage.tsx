@@ -1079,7 +1079,7 @@ export default function ResidentsPage() {
     return (
       <main className="min-h-screen bg-[#ffffff] p-6 text-[#10251f]">
         <div className="mx-auto max-w-7xl rounded-3xl border border-[#dbe6e0] bg-white p-8 shadow-sm">
-          <p className="font-bold text-[#526174]">Kraunama...</p>
+          <p className="sr-only">Duomenys ruošiami</p>
         </div>
       </main>
     );

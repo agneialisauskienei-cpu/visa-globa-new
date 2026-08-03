@@ -858,7 +858,7 @@ export default function MyProfilePage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#ffffff]">
         <div className="rounded-3xl bg-white px-6 py-4 text-lg font-black text-[#526174] shadow-sm">
-          Kraunama...
+          <span className="sr-only">Duomenys ruošiami</span>
         </div>
       </div>
     );

@@ -1646,7 +1646,7 @@ export default function EmployeeDashboardPage() {
       <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#10251f]">
         <div className="rounded-[28px] border border-[#dbe6e0] bg-white p-8 text-center shadow-sm">
           <Loader2 className="mx-auto h-9 w-9 animate-spin text-[#486b5d]" />
-          <p className="mt-4 text-lg font-black text-[#10251f]">Kraunama...</p>
+          <p className="sr-only">Duomenys ruošiami</p>
           <p className="mt-1 text-sm font-semibold text-[#526174]">
             Ruošiame darbuotojo darbo centrą.
           </p>

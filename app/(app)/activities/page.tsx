@@ -1093,7 +1093,9 @@ export default function ActivitiesPage() {
             </div>
 
             {loading ? (
-              <div className="p-12 text-center text-lg font-black text-[#526174]">Kraunama...</div>
+              <div aria-busy="true" className="p-12 text-center text-lg font-black text-[#526174]">
+                <span className="sr-only">Duomenys ruošiami</span>
+              </div>
             ) : (
               <CalendarGrid
                 days={visibleCalendarDays}

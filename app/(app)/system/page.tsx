@@ -32,7 +32,7 @@ export default function SystemPage() {
     void load()
   }, [])
 
-  if (allowed === null) return <div style={styles.page}>Kraunama...</div>
+  if (allowed === null) return <div aria-busy="true" style={styles.page} />
   if (!allowed) return <div style={styles.page}>Neturite teisės peržiūrėti sistemos informacijos.</div>
 
   return (

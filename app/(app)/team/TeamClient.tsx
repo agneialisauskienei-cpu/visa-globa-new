@@ -3540,7 +3540,7 @@ export default function TeamPage() {
       <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-slate-950">
         <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" />
-          <p className="mt-4 text-lg font-black text-slate-700">Kraunama...</p>
+          <p className="sr-only">Duomenys ruošiami</p>
           <p className="mt-1 text-sm font-semibold text-[#526174]">
             Ruošiame personalo modulį.
           </p>

@@ -1808,7 +1808,7 @@ export default function RequestsPage() {
               <p className="mt-1 font-semibold text-[#526174]">Patvirtinti, atmesti ir atšaukti įrašai.</p>
             </div>
             <div className="rounded-[18px] bg-[#f7fcf9] px-4 py-3 text-sm font-black text-[#486b5d]">
-              {loading ? "Kraunama..." : `${historyFiltered.length} rodoma`}
+              {loading ? "" : `${historyFiltered.length} rodoma`}
             </div>
           </div>
 

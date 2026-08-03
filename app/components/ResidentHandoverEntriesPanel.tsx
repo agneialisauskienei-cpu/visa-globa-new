@@ -543,7 +543,7 @@ export default function ResidentHandoverEntriesPanel({ residentId, residentName 
 
           <div className="mt-5 grid gap-3">
             {loading ? (
-              <EmptyState text="Kraunama perdavimo įrašus..." />
+              <EmptyState text="Duomenys ruošiami." />
             ) : filteredEntries.length ? (
               filteredEntries.map((entry) => (
                 <article

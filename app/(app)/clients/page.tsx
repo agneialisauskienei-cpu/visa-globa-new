@@ -129,7 +129,7 @@ export default function ClientsPage() {
           fontSize: 20,
         }}
       >
-        Kraunama...
+        <span className="sr-only">Duomenys ruošiami</span>
       </div>
     )
   }

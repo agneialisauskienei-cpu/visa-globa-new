@@ -1354,7 +1354,7 @@ export default function ResidentDetailPage() {
     return (
       <div className="min-h-screen bg-[#f5f7f4] px-4 py-8 lg:px-8">
         <div className="mx-auto max-w-[1500px] rounded-[22px] border border-[#dbe6e0] bg-white p-8 text-sm font-black text-[#66756c] shadow-sm">
-          Kraunama gyventojo kortelė...
+          <span className="sr-only">Duomenys ruošiami</span>
         </div>
       </div>
     );

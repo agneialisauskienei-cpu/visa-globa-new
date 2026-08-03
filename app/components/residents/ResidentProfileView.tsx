@@ -208,7 +208,7 @@ export default function ResidentActivityAttendanceAuto({ residentId }: Props) {
 
       {loading ? (
         <div className="rounded-2xl border border-dashed border-[#dfe7df] bg-[#ffffff] p-4 text-sm font-bold text-[#617268]">
-          Kraunamas veiklų lankomumas...
+          <span className="sr-only">Duomenys ruošiami</span>
         </div>
       ) : errorMessage ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">

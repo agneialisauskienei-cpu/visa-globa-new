@@ -143,7 +143,7 @@ export default function AdminOrganizationsPage() {
           fontSize: 20,
         }}
       >
-        Kraunama...
+        <span className="sr-only">Duomenys ruošiami</span>
       </div>
     )
   }

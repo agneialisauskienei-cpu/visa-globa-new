@@ -1278,7 +1278,7 @@ export default function MedicinePage() {
     URL.revokeObjectURL(url)
   }
 
-  if (loading) return <div style={styles.page}>Kraunama...</div>
+  if (loading) return <div aria-busy="true" style={styles.page} />
   if (!selected) return <div style={styles.page}>Gyventojų nerasta.</div>
 
 

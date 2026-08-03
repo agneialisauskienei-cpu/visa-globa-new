@@ -1892,7 +1892,7 @@ selectedMedications.some((med) => {
               ? "Suduota"
               : "Visi gyventojai"
 
-  if (loading) return <div style={styles.page}>Kraunama...</div>
+  if (loading) return <div aria-busy="true" style={styles.page} />
   if (!selected) {
     return (
       <div style={styles.page}>

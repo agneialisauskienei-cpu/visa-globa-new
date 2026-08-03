@@ -258,7 +258,7 @@ export default function ResidentActivityAttendanceAuto() {
 
       {loading ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">
-          Kraunamas veiklų lankomumas...
+          <span className="sr-only">Duomenys ruošiami</span>
         </div>
       ) : errorMessage ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">

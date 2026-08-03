@@ -1499,7 +1499,7 @@ export default function TasksPage() {
       <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#10251f]">
         <div className="rounded-[22px] border border-[#dbe6e0] bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-emerald-600" />
-          <p className="mt-4 text-lg font-black text-[#486b5d]">Kraunama...</p>
+          <p className="sr-only">Duomenys ruošiami</p>
           <p className="mt-1 text-sm font-semibold text-[#526174]">
             Ruošiame užduočių sąrašą.
           </p>

@@ -1239,9 +1239,7 @@ export default function InventoryPage() {
       <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#10251f]">
         <div className="rounded-3xl border border-[#c9d8d0] bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dbe6e0] border-t-[#486b5d]" />
-          <p className="mt-4 text-lg font-black text-[#486b5d]">
-            Kraunamas sandėlis...
-          </p>
+          <p className="sr-only">Duomenys ruošiami</p>
         </div>
       </main>
     );

@@ -574,7 +574,7 @@ export default function InvitesModule() {
 
               <div className="mt-4 space-y-3">
                 {loading ? (
-                  <EmptyState icon={<RefreshCw className="h-5 w-5 animate-spin" />} title="Kraunama..." text="Įkeliami kvietimai." />
+                  <EmptyState icon={<RefreshCw className="h-5 w-5 animate-spin" />} title="Kvietimai ruošiami" text="Duomenys netrukus atsinaujins." />
                 ) : filteredInvites.length === 0 ? (
                   <EmptyState icon={<Mail className="h-5 w-5" />} title="Kvietimų nėra" text="Sukurkite naują kvietimą darbuotojui." />
                 ) : (

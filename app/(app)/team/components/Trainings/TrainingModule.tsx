@@ -1399,7 +1399,7 @@ export default function TrainingModule({
             disabled={loadingRealData}
             className="rounded-lg border border-[#dbe6e0] bg-white px-3 py-2 text-xs font-black text-[#486b5d] hover:bg-[#f7fcf9] disabled:opacity-60"
           >
-            {loadingRealData ? "Kraunama..." : "Atnaujinti"}
+            Atnaujinti
           </button>
 
           <div className="mx-2 hidden h-7 w-px bg-[#dbe6e0] md:block" />

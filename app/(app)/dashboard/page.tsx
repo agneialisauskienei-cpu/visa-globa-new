@@ -349,7 +349,7 @@ export default function AdminDashboardPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-white p-6 text-[#10251f]">
         <div className="rounded-[24px] border border-[#c9d8d0] bg-white px-6 py-5 text-sm font-black text-[#486b5d] shadow-sm">
-          Kraunama...
+          <span className="sr-only">Duomenys ruošiami</span>
         </div>
       </main>
     );

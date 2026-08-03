@@ -1522,7 +1522,7 @@ export default function AuditPage() {
             <div style={styles.cardKicker}>Įrašai</div>
             <h2 style={styles.sectionTitle}>Audito įvykiai</h2>
           </div>
-          <div style={styles.meta}>{loading ? "Kraunama..." : `Rodoma: ${filteredLogs.length}`}</div>
+          <div style={styles.meta}>{loading ? "" : `Rodoma: ${filteredLogs.length}`}</div>
         </div>
 
         {filteredLogs.length === 0 ? (

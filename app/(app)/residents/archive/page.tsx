@@ -44,7 +44,7 @@ export default function ResidentsArchivePage() {
     void load()
   }, [])
 
-  if (loading) return <div>Kraunama...</div>
+  if (loading) return <div aria-busy="true" />
 
   return (
     <div style={{ padding: 24 }}>

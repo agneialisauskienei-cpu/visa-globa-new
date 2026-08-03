@@ -950,7 +950,7 @@ export default function HandoverLogsPage() {
     return (
       <main className="min-h-screen bg-[#ffffff] p-6 text-[#10251f]">
         <div className="mx-auto w-full max-w-[1700px] rounded-[22px] border border-[#dbe6e0] bg-white p-8 text-center font-black shadow-sm">
-          Kraunama perdavimo žurnalus...
+          <span className="sr-only">Duomenys ruošiami</span>
         </div>
       </main>
     );

@@ -742,7 +742,7 @@ export default function OrganizationsPage() {
           </div>
 
           {loading ? (
-            <div style={styles.emptyState}>Kraunama...</div>
+            <div style={styles.emptyState} aria-busy="true" />
           ) : filteredOrganizations.length === 0 ? (
             <div style={styles.emptyState}>Įstaigų nerasta.</div>
           ) : (
