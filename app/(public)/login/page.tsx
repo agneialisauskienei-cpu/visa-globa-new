@@ -208,12 +208,7 @@ export default function LoginPage() {
               VisaGloba
             </button>
 
-            <div className="flex items-center">
-              <div className="inline-flex rounded-full border border-[#dbe6e0] bg-[#f7faf8] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">
-                Paskyra
-              </div>
-            </div>
-            <h1 className="mt-4 text-[36px] font-black leading-tight tracking-normal text-[#10251f] sm:text-[44px]">
+            <h1 className="text-[36px] font-black leading-tight tracking-normal text-[#10251f] sm:text-[44px]">
               Prisijungti
             </h1>
             <p className="mt-3 text-base font-bold leading-7 text-[#64786f]">
