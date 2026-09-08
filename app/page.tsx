@@ -31,8 +31,8 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_8%_8%,rgba(16,185,129,0.13),transparent_28%),linear-gradient(180deg,#fbfdfc_0%,#eef5f1_100%)] text-slate-950">
-      <header className="sticky top-0 z-50 border-b border-emerald-950/10 bg-slate-50/85 backdrop-blur-xl">
+    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_7%_18%,rgba(110,231,183,0.25),transparent_31%),radial-gradient(circle_at_72%_42%,rgba(15,23,42,0.07),transparent_27%),linear-gradient(180deg,#fbfdfc_0%,#eef6f2_100%)] text-slate-950">
+      <header className="sticky top-0 z-50 border-b border-emerald-950/10 bg-slate-50/88 backdrop-blur-xl">
         <div className="mx-auto flex h-[70px] max-w-7xl items-center justify-between gap-4 px-4 sm:h-[76px] sm:px-6">
           <button
             type="button"
@@ -80,20 +80,20 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-12">
-        <div className="grid items-stretch gap-8 lg:grid-cols-[0.88fr_1.12fr]">
-          <div className="flex flex-col justify-between rounded-[30px] border border-emerald-950/10 bg-white/75 p-5 shadow-[0_18px_56px_rgba(15,23,42,0.08)] backdrop-blur sm:rounded-[38px] sm:p-8">
+      <section className="mx-auto max-w-[1390px] px-4 py-7 sm:px-6 sm:py-12 lg:min-h-[calc(100vh-76px)] lg:py-16">
+        <div className="grid items-stretch gap-7 lg:grid-cols-[0.86fr_1.14fr] xl:gap-9">
+          <div className="flex min-h-[540px] flex-col justify-between rounded-[30px] border border-emerald-950/10 bg-white/78 p-5 shadow-[0_22px_70px_rgba(15,23,42,0.09)] backdrop-blur sm:rounded-[38px] sm:p-8 lg:min-h-[710px] lg:p-10">
             <div>
-              <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700 sm:text-sm">
+              <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700 sm:px-5 sm:text-sm">
                 Globos įstaigų darbo centras
               </span>
 
-              <h1 className="mt-5 text-[42px] font-black leading-[0.98] tracking-[-0.06em] text-slate-950 sm:text-[62px] sm:leading-[0.96] sm:tracking-[-0.075em]">
+              <h1 className="mt-7 text-[42px] font-black leading-[0.98] tracking-[-0.025em] text-slate-950 sm:text-[66px] sm:leading-[0.92] lg:text-[72px] xl:text-[76px]">
                 Matykite ne tik sąrašus, bet ir{' '}
                 <span className="text-emerald-700">visą dienos pulsą.</span>
               </h1>
 
-              <p className="mt-6 text-base font-bold leading-7 text-slate-600 sm:text-[19px] sm:leading-8">
+              <p className="mt-6 max-w-[610px] text-base font-bold leading-7 text-slate-600 sm:text-[20px] sm:leading-9">
                 VisaGloba sujungia gyventojus, pamainas, užduotis, pranešimus
                 ir ataskaitas į vieną aiškų darbalaukį. Vadovui — bendras
                 vaizdas, darbuotojui — tik tai, kas svarbu dabar.
@@ -118,7 +118,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="mt-8 grid grid-cols-3 gap-2 sm:gap-4">
               <TrustCard value="124" label="Gyventojai" />
               <TrustCard value="18" label="Pamainos" />
               <TrustCard value="7" label="Rizikos" />
@@ -260,8 +260,8 @@ function DesktopDashboardPreview() {
   ]
 
   return (
-    <div id="dashboard" className="hidden overflow-hidden rounded-[38px] border border-emerald-950/10 bg-white shadow-[0_34px_90px_rgba(15,23,42,0.14)] lg:block">
-      <div className="flex h-[66px] items-center justify-between border-b border-slate-200 bg-white px-5">
+    <div id="dashboard" className="hidden overflow-hidden rounded-[38px] border border-emerald-950/10 bg-white shadow-[0_34px_100px_rgba(15,23,42,0.15)] lg:block">
+      <div className="flex h-[70px] items-center justify-between border-b border-slate-200 bg-white px-5">
         <div className="flex gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
           <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
@@ -272,14 +272,14 @@ function DesktopDashboardPreview() {
         </div>
       </div>
 
-      <div className="grid min-h-[620px] grid-cols-[214px_1fr]">
-        <aside className="bg-emerald-900 p-4 text-white">
-          <div className="mb-6 text-lg font-black">VisaGloba</div>
+      <div className="grid min-h-[640px] grid-cols-[220px_1fr] xl:min-h-[710px] xl:grid-cols-[236px_1fr]">
+        <aside className="bg-emerald-900 p-5 text-white">
+          <div className="mb-7 text-xl font-black">VisaGloba</div>
           <nav className="space-y-1">
             {menu.map((item, index) => (
               <div
                 key={item}
-                className={`rounded-2xl px-3 py-3 text-sm font-bold ${
+                className={`rounded-2xl px-4 py-3.5 text-sm font-bold ${
                   index === 0 ? 'bg-white text-emerald-900' : 'text-emerald-50/90'
                 }`}
               >
@@ -288,7 +288,7 @@ function DesktopDashboardPreview() {
             ))}
           </nav>
 
-          <div className="mt-6 rounded-[20px] border border-white/10 bg-white/10 p-4">
+          <div className="mt-10 rounded-[20px] border border-white/10 bg-white/10 p-4">
             <b className="block text-sm">Administratorė</b>
             <span className="mt-1 block text-xs text-emerald-100">
               Šiandien aktyvu 26 darbuotojai
@@ -296,13 +296,13 @@ function DesktopDashboardPreview() {
           </div>
         </aside>
 
-        <div className="bg-slate-50 p-5">
+        <div className="bg-slate-50 p-5 xl:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.24em] text-emerald-700">
                 Organizacijos darbalaukis
               </p>
-              <h2 className="mt-2 text-[28px] font-black tracking-[-0.05em]">
+              <h2 className="mt-2 text-[32px] font-black tracking-[-0.025em]">
                 Šiandienos situacija
               </h2>
             </div>
@@ -311,18 +311,18 @@ function DesktopDashboardPreview() {
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-4 gap-2.5">
+          <div className="mt-5 grid grid-cols-4 gap-3">
             <PreviewStat value="124" label="Gyventojai" />
             <PreviewStat value="93%" label="Užimtumas" />
             <PreviewStat value="18" label="Pamainos" />
             <PreviewStat value="7" label="Dėmesio" />
           </div>
 
-          <div className="mt-3 grid grid-cols-[1.05fr_0.95fr] gap-3">
+          <div className="mt-4 grid grid-cols-[1.2fr_0.8fr] gap-4">
             <PreviewPanel title="Gyventojų pasiskirstymo diagrama" desc="Užimtumo, priežiūros lygio ir paslaugų vaizdas.">
-              <div className="mt-4 grid grid-cols-[160px_1fr] items-center gap-4">
-                <div className="flex h-40 w-40 items-center justify-center rounded-full bg-[conic-gradient(#064e3b_0_48%,#10b981_48%_72%,#86efac_72%_88%,#e2e8f0_88%_100%)]">
-                  <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-white">
+              <div className="mt-5 grid grid-cols-[170px_1fr] items-center gap-5">
+                <div className="flex h-[170px] w-[170px] items-center justify-center rounded-full bg-[conic-gradient(#064e3b_0_48%,#10b981_48%_72%,#86efac_72%_88%,#e2e8f0_88%_100%)]">
+                  <div className="flex h-[104px] w-[104px] flex-col items-center justify-center rounded-full bg-white">
                     <b className="text-2xl font-black">124</b>
                     <span className="text-[11px] font-bold text-slate-500">iš viso</span>
                   </div>
@@ -345,7 +345,7 @@ function DesktopDashboardPreview() {
             </PreviewPanel>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-4">
             <PreviewPanel title="Dabar svarbu">
               <Notice icon={<AlertTriangle />} title="2 kritiniai pranešimai" text="Vienas laukia patvirtinimo." />
               <Notice icon={<ClipboardList />} title="5 perdavimo įrašai" text="3 dar neperžiūrėti." />
