@@ -200,16 +200,18 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => router.push('/')}
-              className="mb-8 inline-flex items-center gap-3 text-2xl font-black text-[#10251f] lg:hidden"
+              className="mb-10 flex w-fit items-center gap-4 text-2xl font-black text-[#10251f] sm:text-3xl lg:hidden"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#003c2e] text-white">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#003c2e] text-white">
                 <Heart className="h-5 w-5" />
               </span>
               VisaGloba
             </button>
 
-            <div className="inline-flex rounded-full border border-[#dbe6e0] bg-[#f7faf8] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">
-              Paskyra
+            <div className="flex items-center">
+              <div className="inline-flex rounded-full border border-[#dbe6e0] bg-[#f7faf8] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">
+                Paskyra
+              </div>
             </div>
             <h1 className="mt-4 text-[36px] font-black leading-tight tracking-normal text-[#10251f] sm:text-[44px]">
               Prisijungti
