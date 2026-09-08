@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Heart } from 'lucide-react'
 import { supabase, supabaseConfig } from '@/lib/supabase'
 import { setStoredOrganizationId } from '@/lib/current-organization'
 import { isLoginServiceIncident, reportSystemIncident } from '@/lib/system-incidents'
@@ -152,45 +153,74 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0b1f17] px-6 py-10 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-80px)] max-w-6xl items-center justify-center">
-        <div className="grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-[0_40px_120px_rgba(0,0,0,0.35)] lg:grid-cols-[1fr_0.95fr]">
-          <div className="hidden bg-gradient-to-br from-[#0a372a] via-[#0f4f3d] to-[#176c43] p-10 text-white lg:flex lg:flex-col lg:justify-between">
-            <div>
-              <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium">
-                Prisijungimas
-              </div>
+    <main className="min-h-screen bg-[#f7faf8] px-4 py-6 text-[#10251f] sm:px-6 lg:px-10">
+      <div className="mx-auto grid min-h-[calc(100vh-48px)] max-w-[1280px] items-center gap-6 lg:grid-cols-[1.04fr_0.96fr]">
+        <section className="relative hidden min-h-[680px] overflow-hidden rounded-[22px] border border-[#dbe6e0] bg-[#e9f1ed] shadow-[0_22px_60px_rgba(16,37,31,0.12)] lg:block">
+          <div
+            className="absolute inset-0 bg-cover bg-[center_38%]"
+            style={{
+              backgroundImage:
+                'linear-gradient(90deg, rgba(0,60,46,.84) 0%, rgba(0,60,46,.58) 38%, rgba(0,60,46,.16) 72%, rgba(0,60,46,.08) 100%), linear-gradient(180deg, rgba(0,60,46,.06), rgba(0,60,46,.22)), url("https://assets.carescout.com/5760x3840/9e5d91ecad/older-adult-and-caregiver-smiling-at-each-other.jpeg/m/1600x0")',
+            }}
+          />
 
-              <h1 className="mt-6 text-5xl font-black leading-tight">
-                VisaGloba.
-                <br />
-                Tęsk darbą
-                <br />
-                savo sistemoje.
-              </h1>
+          <div className="relative z-10 flex min-h-[680px] max-w-[560px] flex-col justify-center px-12 py-12 text-white">
+            <button
+              type="button"
+              onClick={() => router.push('/')}
+              className="mb-8 inline-flex w-fit items-center gap-3 text-2xl font-black"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-[12px] border border-white/25 bg-white/15">
+                <Heart className="h-5 w-5" />
+              </span>
+              VisaGloba
+            </button>
 
-              <p className="mt-5 max-w-md text-base leading-7 text-emerald-50/85">
-                Prisijunk prie gyventojų, kambarių, darbuotojų ir užduočių valdymo vienoje vietoje.
-              </p>
-            </div>
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-white/80">
+              Prisijungimas
+            </p>
+            <h1 className="mt-4 text-[52px] font-black leading-[1.04] tracking-normal">
+              Tęskite darbą savo sistemoje.
+            </h1>
+            <p className="mt-5 max-w-[520px] text-lg font-bold leading-8 text-white/90">
+              Gyventojai, pamainos, užduotys ir pranešimai laukia vienoje
+              aiškioje darbo vietoje.
+            </p>
 
-            <div className="rounded-2xl border border-white/10 bg-white/10 p-5 text-sm text-emerald-50/85">
-              Prisijungus būsi nukreipta į tavo rolę atitinkantį dashboardą.
-            </div>
+            <div className="mt-8 h-0.5 w-16 rounded-full bg-[#c9d8d0]" />
+            <p className="mt-6 max-w-[520px] rounded-[16px] border border-white/20 bg-white/10 p-4 text-sm font-extrabold leading-6 text-white/90">
+              Prisijungus sistema automatiškai atidarys jūsų rolei skirtą
+              darbalaukį.
+            </p>
           </div>
+        </section>
 
-          <div className="p-8 md:p-10">
-            <div className="mx-auto max-w-md">
-              <div className="text-3xl font-black tracking-tight text-slate-900">
-                Prisijungti
-              </div>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Įvesk savo el. paštą ir slaptažodį.
-              </p>
+        <section className="rounded-[22px] border border-[#dbe6e0] bg-white p-6 shadow-[0_18px_52px_rgba(16,37,31,0.08)] sm:p-8 lg:p-10">
+          <div className="mx-auto max-w-md">
+            <button
+              type="button"
+              onClick={() => router.push('/')}
+              className="mb-8 inline-flex items-center gap-3 text-2xl font-black text-[#10251f] lg:hidden"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#003c2e] text-white">
+                <Heart className="h-5 w-5" />
+              </span>
+              VisaGloba
+            </button>
+
+            <div className="inline-flex rounded-full border border-[#dbe6e0] bg-[#f7faf8] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#486b5d]">
+              Paskyra
+            </div>
+            <h1 className="mt-4 text-[36px] font-black leading-tight tracking-normal text-[#10251f] sm:text-[44px]">
+              Prisijungti
+            </h1>
+            <p className="mt-3 text-base font-bold leading-7 text-[#64786f]">
+              Įveskite savo el. paštą ir slaptažodį.
+            </p>
 
               <form onSubmit={handleLogin} className="mt-8 space-y-4">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                  <label className="mb-2 block text-sm font-black text-[#39594c]">
                     El. paštas
                   </label>
                   <input
@@ -199,20 +229,20 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="vardas@imone.lt"
                     required
-                    className="block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white"
+                    className="block w-full rounded-[14px] border border-[#c9d8d0] bg-[#f9fbfa] px-4 py-4 text-base font-semibold text-[#10251f] outline-none transition placeholder:text-[#8a9b93] focus:border-[#486b5d] focus:bg-white"
                   />
                 </div>
 
                 <div>
                   <div className="mb-2 flex items-center justify-between">
-                    <label className="block text-sm font-medium text-slate-700">
+                    <label className="block text-sm font-black text-[#39594c]">
                       Slaptažodis
                     </label>
 
                     <button
                       type="button"
                       onClick={() => router.push('/forgot-password')}
-                      className="text-sm font-medium text-emerald-700 transition hover:text-emerald-800"
+                      className="text-sm font-black text-[#486b5d] transition hover:text-[#39594c]"
                     >
                       Pamiršai slaptažodį?
                     </button>
@@ -225,14 +255,14 @@ export default function LoginPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
                       required
-                      className="block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 pr-14 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:bg-white"
+                      className="block w-full rounded-[14px] border border-[#c9d8d0] bg-[#f9fbfa] px-4 py-4 pr-14 text-base font-semibold text-[#10251f] outline-none transition placeholder:text-[#8a9b93] focus:border-[#486b5d] focus:bg-white"
                     />
 
                     <button
                       type="button"
                       aria-label={showPassword ? 'Slėpti slaptažodį' : 'Rodyti slaptažodį'}
                       onClick={() => setShowPassword((value) => !value)}
-                      className="absolute right-4 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                      className="absolute right-4 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-[#64786f] transition hover:bg-[#edf7f2] hover:text-[#486b5d]"
                     >
                       {showPassword ? (
                         <svg
@@ -270,7 +300,7 @@ export default function LoginPage() {
                 </div>
 
                 {message ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                  <div className="rounded-[14px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
                     {message}
                   </div>
                 ) : null}
@@ -278,14 +308,13 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-2xl bg-[#0f4f3d] px-5 py-4 text-base font-semibold text-white transition hover:bg-[#0c4333] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-12 w-full rounded-[12px] bg-[#486b5d] px-5 text-base font-black text-white transition hover:bg-[#39594c] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? 'Jungiama...' : 'Prisijungti'}
                 </button>
               </form>
             </div>
-          </div>
-        </div>
+        </section>
       </div>
     </main>
   )
