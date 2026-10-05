@@ -1013,6 +1013,7 @@ const ORGANIZATION_SCOPED_DASHBOARD_TABLES = new Set([
   "training_requirements",
   "role_training_requirements",
   "position_training_requirements",
+  "rooms",
   "employee_certificates",
   "personnel_documents",
   "employee_schedules",
@@ -1219,7 +1220,7 @@ async function getOrganizationCapacity(): Promise<number | null> {
       .select("*")
       .eq("id", organizationId)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error || !data) return getRoomsCapacity();
 
     const possibleKeys = [
       "capacity",
@@ -1236,10 +1237,22 @@ async function getOrganizationCapacity(): Promise<number | null> {
       if (Number.isFinite(value) && value > 0) return value;
     }
 
-    return null;
+    return getRoomsCapacity();
   } catch {
-    return null;
+    return getRoomsCapacity();
   }
+}
+
+async function getRoomsCapacity(): Promise<number | null> {
+  const rows = await safeSelectRows("rooms", "capacity, is_active");
+  const capacity = rows
+    .filter((row: any) => row?.is_active !== false)
+    .reduce((sum: number, row: any) => {
+      const value = Number(row?.capacity);
+      return Number.isFinite(value) && value > 0 ? sum + value : sum;
+    }, 0);
+
+  return capacity > 0 ? capacity : null;
 }
 
 async function countTodayShiftEntries(): Promise<number> {
