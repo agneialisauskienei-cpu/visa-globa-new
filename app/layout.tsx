@@ -21,8 +21,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Darbuotojo sistema',
-  description: 'Darbuotojų zona, užduotys, grafikai ir pranešimai',
+  title: 'Vidinė sistema',
+  description: 'Prisijungimas prie vidinės sistemos',
 }
 
 export default function RootLayout({

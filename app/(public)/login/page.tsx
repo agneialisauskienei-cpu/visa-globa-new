@@ -173,24 +173,23 @@ export default function LoginPage() {
               <span className="flex h-11 w-11 items-center justify-center rounded-[12px] border border-white/25 bg-white/15">
                 <Heart className="h-5 w-5" />
               </span>
-              VisaGloba
+              Vidinė sistema
             </button>
 
             <p className="text-xs font-black uppercase tracking-[0.28em] text-white/80">
               Prisijungimas
             </p>
             <h1 className="mt-4 text-[52px] font-black leading-[1.04] tracking-normal">
-              Tęskite darbą savo sistemoje.
+              Prisijunkite prie sistemos.
             </h1>
             <p className="mt-5 max-w-[520px] text-lg font-bold leading-8 text-white/90">
-              Gyventojai, pamainos, užduotys ir pranešimai laukia vienoje
-              aiškioje darbo vietoje.
+              Įveskite savo prisijungimo duomenis ir tęskite darbą saugioje
+              aplinkoje.
             </p>
 
             <div className="mt-8 h-0.5 w-16 rounded-full bg-[#c9d8d0]" />
             <p className="mt-6 max-w-[520px] rounded-[16px] border border-white/20 bg-white/10 p-4 text-sm font-extrabold leading-6 text-white/90">
-              Prisijungus sistema automatiškai atidarys jūsų rolei skirtą
-              darbalaukį.
+              Prieiga suteikiama tik patvirtintiems naudotojams.
             </p>
           </div>
         </section>
@@ -205,7 +204,7 @@ export default function LoginPage() {
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#003c2e] text-white">
                 <Heart className="h-5 w-5" />
               </span>
-              VisaGloba
+              Vidinė sistema
             </button>
 
             <h1 className="text-[36px] font-black leading-tight tracking-normal text-[#10251f] sm:text-[44px]">
