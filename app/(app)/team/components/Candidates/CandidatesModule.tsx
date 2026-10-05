@@ -32,6 +32,8 @@ type CandidateQuestionnaire = {
   answers?: Record<string, string> | null;
   submitted_at?: string | null;
   sent_to?: string | null;
+  public_token?: string | null;
+  public_token_expires_at?: string | null;
 };
 
 type CandidatesModuleProps = {
@@ -164,10 +166,20 @@ function getAppOrigin() {
   return window.location.origin;
 }
 
-function buildQuestionnaireLink(candidateId?: string | null) {
+function createPublicQuestionnaireToken() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function questionnaireTokenExpiresAt() {
+  const date = new Date();
+  date.setDate(date.getDate() + 14);
+  return date.toISOString();
+}
+
+function buildQuestionnaireLink(token?: string | null) {
   const origin = getAppOrigin();
-  const token = candidateId || "sukurta-issaugojus-kandidata";
-  return `${origin}/candidate-questionnaire/${token}`;
+  const safeToken = token || "sukurta-issaugojus-kandidata";
+  return `${origin}/candidate-questionnaire/${safeToken}`;
 }
 
 function buildShortEmailBody(candidateName: string, questionnaireLink: string) {
@@ -613,7 +625,7 @@ export default function CandidatesModule({
       const { data, error } = await supabase
         .from("candidate_questionnaires")
         .select(
-          "candidate_id, status, questions, answers, submitted_at, sent_to",
+          "candidate_id, status, questions, answers, submitted_at, sent_to, public_token, public_token_expires_at",
         )
         .eq("organization_id", organizationId);
 
@@ -687,14 +699,18 @@ export default function CandidatesModule({
   }
 
   async function copyEmailText(candidateId?: string | null) {
-    const questionnaireLink = buildQuestionnaireLink(candidateId);
+    const questionnaireLink = buildQuestionnaireLink(
+      candidateId ? questionnairesByCandidateId[candidateId]?.public_token : null,
+    );
     const body = buildShortEmailBody(candidateName || "kandidate", questionnaireLink);
     await navigator.clipboard.writeText(body);
     setMessage({ type: "success", text: "Trumpo laiško tekstas su anketos nuoroda nukopijuotas." });
   }
 
   async function copyQuestionnaireLink(candidateId?: string | null) {
-    await navigator.clipboard.writeText(buildQuestionnaireLink(candidateId));
+    await navigator.clipboard.writeText(
+      buildQuestionnaireLink(candidateId ? questionnairesByCandidateId[candidateId]?.public_token : null),
+    );
     setMessage({ type: "success", text: "Anketos nuoroda nukopijuota." });
   }
 
@@ -815,13 +831,18 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
         return null;
       }
 
+      const publicToken = createPublicQuestionnaireToken();
+      const publicTokenExpiresAt = questionnaireTokenExpiresAt();
+      const questionnaireLink = buildQuestionnaireLink(publicToken);
       const questionnairePayload = {
         organization_id: organizationId,
         candidate_id: candidate.id,
         status: status === "questionnaire_sent" ? "sent" : "draft",
         questions: selectedQuestions,
-        email_body: buildShortEmailBody(candidateName || "kandidate", buildQuestionnaireLink(candidate.id)),
+        email_body: buildShortEmailBody(candidateName || "kandidate", questionnaireLink),
         sent_to: email.trim(),
+        public_token: publicToken,
+        public_token_expires_at: publicTokenExpiresAt,
       };
 
       const { error: questionnaireError } = await supabase
@@ -853,6 +874,7 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
           ...candidatePayload,
           candidate_id: candidate.id,
           questionnaire_status: questionnairePayload.status,
+          public_token_expires_at: publicTokenExpiresAt,
           questions_count: selectedQuestions.length,
         }),
       });
@@ -866,6 +888,7 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
           candidate_id: candidate.id,
           status: questionnairePayload.status,
           sent_to: questionnairePayload.sent_to,
+          public_token_expires_at: publicTokenExpiresAt,
           questions_count: selectedQuestions.length,
         }),
       });
@@ -909,7 +932,12 @@ function downloadQuestionnaireSummary(candidate: Candidate) {
     const savedCandidateId = await saveCandidate("questionnaire_sent", false);
     if (!savedCandidateId) return;
 
-    const questionnaireLink = buildQuestionnaireLink(savedCandidateId);
+    const { data: questionnaire } = await supabase
+      .from("candidate_questionnaires")
+      .select("public_token")
+      .eq("candidate_id", savedCandidateId)
+      .maybeSingle();
+    const questionnaireLink = buildQuestionnaireLink(questionnaire?.public_token || null);
     const body = buildShortEmailBody(candidateName || "kandidate", questionnaireLink);
     const subject = encodeURIComponent("Kandidatavimo anketa");
     const encodedBody = encodeURIComponent(body);

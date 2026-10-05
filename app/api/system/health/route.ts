@@ -29,7 +29,10 @@ async function notifyDatabaseIncident(request: Request, detail: string) {
 
     await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-system-incident-source": "health",
+      },
       body: JSON.stringify({
         type: "database_unavailable",
         source: "system-health",

@@ -59,9 +59,25 @@ function normalizeText(value: unknown, fallback = "unknown") {
   return value.slice(0, 160)
 }
 
+function canCreateIncident(request: Request, body: Record<string, unknown>) {
+  const origin = request.headers.get("origin")
+  const requestOrigin = new URL(request.url).origin
+  const isSameOrigin = origin === requestOrigin
+  const isInternalHealth =
+    request.headers.get("x-system-incident-source") === "health" &&
+    body?.source === "system-health"
+
+  return isSameOrigin || isInternalHealth
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
+
+    if (!canCreateIncident(request, body)) {
+      return NextResponse.json({ ok: false }, { status: 403 })
+    }
+
     const type = normalizeIncidentType(body?.type)
 
     if (!type) {

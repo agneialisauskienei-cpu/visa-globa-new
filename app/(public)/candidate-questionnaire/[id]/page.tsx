@@ -10,7 +10,6 @@ import {
   Send,
   ShieldCheck,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
 type CandidateQuestion = {
   id: string;
@@ -22,8 +21,6 @@ type CandidateQuestion = {
 
 type QuestionnaireRow = {
   id?: string;
-  organization_id: string | null;
-  candidate_id: string | null;
   status: string | null;
   questions: CandidateQuestion[] | null;
   answers?: Record<string, string> | null;
@@ -32,10 +29,7 @@ type QuestionnaireRow = {
 };
 
 type CandidateRow = {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
+  name: string;
   desired_role: string | null;
 };
 
@@ -134,9 +128,8 @@ export default function CandidateQuestionnairePage() {
   );
 
   const candidateName = useMemo(() => {
-    const name = `${candidate?.first_name || ""} ${candidate?.last_name || ""}`.trim();
-    return name || "Kandidate";
-  }, [candidate?.first_name, candidate?.last_name]);
+    return candidate?.name || "Kandidate";
+  }, [candidate?.name]);
 
   const answeredRequiredCount = useMemo(() => {
     return questions.filter((question) => {
@@ -159,42 +152,31 @@ export default function CandidateQuestionnairePage() {
     }
 
     try {
-      const { data: questionnaireData, error: questionnaireError } = await supabase
-        .from("candidate_questionnaires")
-        .select("id, organization_id, candidate_id, status, questions, answers, submitted_at, sent_to")
-        .eq("candidate_id", candidateId)
-        .maybeSingle();
+      const response = await fetch(`/api/candidate-questionnaires/${encodeURIComponent(candidateId)}`, {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({}));
 
-      if (questionnaireError) {
+      if (!response.ok) {
         setMessage({
           type: "error",
-          text: "Nepavyko įkelti anketos.",
-          details: errorText(questionnaireError),
+          text: payload?.error || "Nepavyko įkelti anketos.",
         });
         setLoading(false);
         return;
       }
 
-      if (!questionnaireData) {
+      if (!payload?.questionnaire) {
         setMessage({ type: "error", text: "Anketa nerasta arba nuoroda nebegalioja." });
         setLoading(false);
         return;
       }
 
-      const row = questionnaireData as QuestionnaireRow;
+      const row = payload.questionnaire as QuestionnaireRow;
       setQuestionnaire(row);
       setAnswers(row.answers || {});
       setSubmitted(Boolean(row.submitted_at || row.status === "answered"));
-
-      if (row.candidate_id) {
-        const { data: candidateData } = await supabase
-          .from("candidates")
-          .select("id, first_name, last_name, email, desired_role")
-          .eq("id", row.candidate_id)
-          .maybeSingle();
-
-        if (candidateData) setCandidate(candidateData as CandidateRow);
-      }
+      if (payload.candidate) setCandidate(payload.candidate as CandidateRow);
     } catch (error) {
       setMessage({
         type: "error",
@@ -251,8 +233,8 @@ export default function CandidateQuestionnairePage() {
   async function submitAnswers() {
     setMessage(null);
 
-    if (!questionnaire?.candidate_id) {
-      setMessage({ type: "error", text: "Nepavyko nustatyti kandidato anketos." });
+    if (!questionnaire) {
+      setMessage({ type: "error", text: "Nepavyko nustatyti anketos." });
       return;
     }
 
@@ -268,35 +250,24 @@ export default function CandidateQuestionnairePage() {
     try {
       const submittedAt = new Date().toISOString();
 
-      const { error: questionnaireError } = await supabase
-        .from("candidate_questionnaires")
-        .update({
-          answers,
-          status: "answered",
-          submitted_at: submittedAt,
-        })
-        .eq("candidate_id", questionnaire.candidate_id)
-        .eq("organization_id", questionnaire.organization_id)
-        .is("submitted_at", null);
+      const response = await fetch(`/api/candidate-questionnaires/${encodeURIComponent(candidateId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers }),
+      });
+      const payload = await response.json().catch(() => ({}));
 
-      if (questionnaireError) {
+      if (!response.ok) {
         setMessage({
           type: "error",
-          text: "Nepavyko pateikti anketos.",
-          details: errorText(questionnaireError),
+          text: payload?.error || "Nepavyko pateikti anketos.",
         });
         return;
       }
 
-      await supabase
-        .from("candidates")
-        .update({ status: "answered" })
-        .eq("id", questionnaire.candidate_id)
-        .eq("organization_id", questionnaire.organization_id);
-
       setSubmitted(true);
       setQuestionnaire((prev) =>
-        prev ? { ...prev, answers, status: "answered", submitted_at: submittedAt } : prev,
+        prev ? { ...prev, answers, status: "answered", submitted_at: payload?.submitted_at || submittedAt } : prev,
       );
       setMessage({ type: "success", text: "Ačiū, anketa sėkmingai pateikta." });
     } catch (error) {
