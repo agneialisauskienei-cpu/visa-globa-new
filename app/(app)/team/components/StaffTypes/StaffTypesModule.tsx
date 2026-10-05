@@ -308,7 +308,7 @@ function employeeInitials(employee: Employee) {
 
 function roleLabel(value?: string | null) {
   if (value === "owner") return "Savininkas";
-  if (value === "admin") return "Administracija";
+  if (value === "admin") return "Administratorius";
   if (value === "employee") return "Darbuotojas";
   return value || "Nepasirinkta";
 }
