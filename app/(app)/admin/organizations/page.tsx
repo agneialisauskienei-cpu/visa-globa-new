@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { isSystemAdminEmail } from '@/lib/system-admins'
 import { theme } from '@/lib/theme'
 
 type Organization = {
@@ -53,7 +54,9 @@ export default function AdminOrganizationsPage() {
         .eq('id', user.id)
         .single()
 
-      if (profileError || profile?.role !== 'super_admin') {
+      const isSystemAdmin = await isSystemAdminEmail(supabase, user.email)
+
+      if ((profileError || profile?.role !== 'super_admin') && !isSystemAdmin) {
         router.push('/dashboard')
         return
       }

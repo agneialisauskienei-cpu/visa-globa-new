@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase"
 import { getCurrentOrganizationId } from "@/lib/current-organization"
 import type { ModuleKey } from "@/lib/plans"
+import { isSystemAdminEmail } from "@/lib/system-admins"
 
 export type MembershipRole =
   | "super_admin"
@@ -408,7 +409,7 @@ export async function getCurrentAccess(): Promise<CurrentAccess> {
   const email = user.email ?? null
 
   // SUPER ADMIN
-  if (email === "admin@visagloba.lt") {
+  if (await isSystemAdminEmail(supabase, email)) {
     return {
       role: "super_admin",
       staffType: null,

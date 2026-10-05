@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { setStoredOrganizationId } from '@/lib/current-organization'
+import { isSystemAdminEmail } from '@/lib/system-admins'
 
 export default function PendingApprovalPage() {
   const router = useRouter()
@@ -25,6 +26,11 @@ export default function PendingApprovalPage() {
 
       if (!active) return
       setEmail(user.email || '')
+
+      if (await isSystemAdminEmail(supabase, user.email)) {
+        router.replace('/admin-dashboard')
+        return
+      }
 
       const { data: profile } = await supabase
         .from('profiles')

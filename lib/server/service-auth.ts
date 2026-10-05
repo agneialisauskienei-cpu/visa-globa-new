@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import { isSystemAdminEmail } from "@/lib/system-admins"
 
 export function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -33,7 +34,8 @@ export async function requireSystemAdmin(request: Request) {
     .eq("id", user.id)
     .maybeSingle()
 
-  return profile?.role === "super_admin" ? user : null
+  if (profile?.role === "super_admin") return user
+  return (await isSystemAdminEmail(admin, user.email)) ? user : null
 }
 
 export async function requireOrganizationAdmin(
@@ -50,7 +52,7 @@ export async function requireOrganizationAdmin(
     .eq("id", user.id)
     .maybeSingle()
 
-  if (profile?.role === "super_admin") return user
+  if (profile?.role === "super_admin" || (await isSystemAdminEmail(admin, user.email))) return user
 
   const { data: membership } = await admin
     .from("organization_members")
