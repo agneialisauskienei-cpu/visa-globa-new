@@ -183,8 +183,7 @@ export default function LoginPage() {
               Prisijunkite prie sistemos.
             </h1>
             <p className="mt-5 max-w-[520px] text-lg font-bold leading-8 text-white/90">
-              Įveskite savo prisijungimo duomenis ir tęskite darbą saugioje
-              aplinkoje.
+              Įveskite savo prisijungimo duomenis.
             </p>
 
             <div className="mt-8 h-0.5 w-16 rounded-full bg-[#c9d8d0]" />
