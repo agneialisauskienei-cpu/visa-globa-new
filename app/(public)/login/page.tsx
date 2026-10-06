@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Heart } from 'lucide-react'
+import VisaGlobaLogo from '@/components/brand/VisaGlobaLogo'
 import { supabase, supabaseConfig } from '@/lib/supabase'
 import { setStoredOrganizationId } from '@/lib/current-organization'
 import { isLoginServiceIncident, reportSystemIncident } from '@/lib/system-incidents'
@@ -177,8 +177,8 @@ export default function LoginPage() {
               onClick={() => router.push('/')}
               className="mb-8 inline-flex w-fit items-center gap-3 text-2xl font-black"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-[12px] border border-white/25 bg-white/15">
-                <Heart className="h-5 w-5" />
+              <span className="flex h-12 w-12 items-center justify-center">
+                <VisaGlobaLogo className="h-12 w-12" title="" />
               </span>
               Vidinė sistema
             </button>
@@ -207,8 +207,8 @@ export default function LoginPage() {
               onClick={() => router.push('/')}
               className="mb-10 flex w-fit items-center gap-4 text-2xl font-black text-[#10251f] sm:text-3xl lg:hidden"
             >
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#003c2e] text-white">
-                <Heart className="h-5 w-5" />
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center">
+                <VisaGlobaLogo className="h-12 w-12" title="" />
               </span>
               Vidinė sistema
             </button>

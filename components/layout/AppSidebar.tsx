@@ -22,6 +22,7 @@ import {
   Users,
 } from "lucide-react"
 
+import VisaGlobaLogo from "@/components/brand/VisaGlobaLogo"
 import {
   getCurrentAccess,
   hasModuleAccess,
@@ -96,48 +97,6 @@ function initials(nameOrEmail: string | null | undefined) {
   }
 
   return value.slice(0, 2).toUpperCase()
-}
-
-function VisaGlobaLogo() {
-  return (
-    <svg
-      width="31"
-      height="31"
-      viewBox="0 0 40 40"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M20 33.5C18.8 32.4 16.2 30.2 13.1 27.7C8 23.6 4.5 20 4.5 14.7C4.5 10.5 7.7 7.2 11.8 7.2C14.4 7.2 16.7 8.5 18.2 10.5L20 12.9L21.8 10.5C23.3 8.5 25.6 7.2 28.2 7.2C32.3 7.2 35.5 10.5 35.5 14.7C35.5 20 32 23.6 26.9 27.7C23.8 30.2 21.2 32.4 20 33.5Z"
-        stroke="currentColor"
-        strokeWidth="3.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M12.4 17.5L16.4 13.6C17.5 12.5 19.2 12.5 20.3 13.6L22 15.2"
-        stroke="currentColor"
-        strokeWidth="3.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M27.6 17.5L23.6 13.6C22.5 12.5 20.8 12.5 19.7 13.6L18 15.2"
-        stroke="currentColor"
-        strokeWidth="3.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M14.6 20.2L18.4 23.8C19.3 24.7 20.7 24.7 21.6 23.8L25.4 20.2"
-        stroke="currentColor"
-        strokeWidth="3.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
 }
 
 export default function AppSidebar() {
@@ -239,7 +198,7 @@ export default function AppSidebar() {
       <div style={styles.top}>
         <Link href={brandHref} style={styles.brandBlock}>
           <div style={styles.logoIcon}>
-            <VisaGlobaLogo />
+            <VisaGlobaLogo title="" />
           </div>
 
           <div style={styles.brand}>VisaGloba</div>
@@ -335,13 +294,12 @@ const styles: Record<string, CSSProperties> = {
   },
 
   logoIcon: {
-    width: 34,
-    height: 34,
-    minWidth: 34,
+    width: 38,
+    height: 38,
+    minWidth: 38,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "#86efac",
   },
 
   brand: {
