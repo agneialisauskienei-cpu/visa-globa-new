@@ -61,7 +61,7 @@ type EmployeeFilter =
   | "withRights"
   | "withoutRights";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 6;
 const ACCESS_MANAGER_ROLES = new Set(["owner", "admin", "director", "hr"]);
 
 type AccessGroupValue =
@@ -992,14 +992,14 @@ export default function StaffTypesModulePage() {
           </div>
         </header>
 
-        <section className="grid grid-cols-2 gap-3 border-b border-[#dbe6e0] bg-white p-4 lg:grid-cols-5">
+        <section className="grid grid-cols-2 gap-4 border-b border-[#dbe6e0] bg-[#fbfdfb] p-5 lg:grid-cols-5">
           {stats.map((stat) => (
             <button
               key={stat.key}
               type="button"
               onClick={() => setActiveFilter(stat.key)}
               className={cn(
-                "rounded-xl border p-4 text-left shadow-sm transition hover:bg-[#ffffff]",
+                "min-h-[82px] rounded-xl border p-5 text-left shadow-sm transition hover:bg-[#ffffff]",
                 activeFilter === stat.key
                   ? "border-[#a8d8bd] bg-[#e9f7ef] text-[#486b5d]"
                   : "border-[#dbe6e0] bg-white text-[#10251f]",
@@ -1013,8 +1013,8 @@ export default function StaffTypesModulePage() {
           ))}
         </section>
 
-        <section className="border-b border-[#dbe6e0] bg-[#ffffff] px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <section className="border-b border-[#dbe6e0] bg-[#ffffff] px-5 py-4">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
               Veiksmai
             </span>
@@ -1026,7 +1026,7 @@ export default function StaffTypesModulePage() {
               <RefreshCw className="h-3.5 w-3.5" /> Atnaujinti
             </button>
 
-            <div className="mx-2 hidden h-7 w-px bg-[#dbe6e0] md:block" />
+            <div className="mx-1 hidden h-7 w-px bg-[#dbe6e0] md:block" />
 
             <span className="mr-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
               Filtrai
@@ -1036,7 +1036,7 @@ export default function StaffTypesModulePage() {
               onChange={(event) =>
                 setActiveFilter(event.target.value as EmployeeFilter)
               }
-              className="h-9 rounded-lg border border-[#c2d3ca] bg-white px-3 text-xs font-bold text-[#10251f]"
+              className="h-11 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold text-[#10251f]"
             >
               <option value="all">Visi darbuotojai</option>
               <option value="active">Aktyvūs</option>
@@ -1049,12 +1049,12 @@ export default function StaffTypesModulePage() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                className="h-9 min-w-[250px] rounded-lg border border-[#c2d3ca] bg-white px-3 pl-9 text-xs font-semibold text-[#10251f] outline-none focus:border-[#486b5d]"
+                className="h-11 min-w-[280px] rounded-lg border border-[#c2d3ca] bg-white px-3 pl-9 text-sm font-semibold text-[#10251f] outline-none focus:border-[#486b5d]"
                 placeholder="Ieškoti darbuotojo, pareigų..."
               />
             </label>
 
-            <span className="ml-auto rounded-lg bg-[#f7fcf9] px-3 py-2 text-xs font-black text-[#486b5d] ring-1 ring-[#c2d3ca]">
+            <span className="ml-auto rounded-lg bg-[#f7fcf9] px-4 py-3 text-xs font-black text-[#486b5d] ring-1 ring-[#c2d3ca]">
               Pakeitimai saugomi automatiškai
             </span>
           </div>
@@ -1074,8 +1074,8 @@ export default function StaffTypesModulePage() {
           </div>
         ) : null}
 
-        <section className="grid gap-0 xl:grid-cols-[330px_minmax(0,1fr)]">
-          <aside className="border-b border-[#dbe6e0] bg-[#ffffff] p-4 xl:border-b-0 xl:border-r">
+        <section className="grid gap-0 2xl:grid-cols-[410px_minmax(0,1fr)]">
+          <aside className="border-b border-[#dbe6e0] bg-[#ffffff] p-5 2xl:border-b-0 2xl:border-r">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
@@ -1106,7 +1106,7 @@ export default function StaffTypesModulePage() {
                 </div>
               </div>
             ) : (
-              <div className="grid gap-2">
+              <div className="grid gap-3">
                 {paginatedEmployees.map((employee) => {
                   const active = selectedEmployee?.user_id === employee.user_id;
                   return (
@@ -1115,23 +1115,23 @@ export default function StaffTypesModulePage() {
                       type="button"
                       onClick={() => setSelectedUserId(employee.user_id)}
                       className={cn(
-                        "grid grid-cols-[42px_1fr_auto] items-center gap-3 rounded-xl border p-3 text-left transition",
+                        "grid min-h-[82px] grid-cols-[48px_1fr_auto] items-center gap-4 rounded-xl border p-4 text-left transition",
                         active
                           ? "border-[#a8d8bd] bg-[#e9f7ef] shadow-sm"
                           : "border-[#dbe6e0] bg-white hover:bg-[#f7fcf9]",
                       )}
                     >
-                      <div className="grid h-10 w-10 place-items-center rounded-lg bg-white text-sm font-black text-[#486b5d] shadow-sm">
+                      <div className="grid h-12 w-12 place-items-center rounded-lg bg-white text-sm font-black text-[#486b5d] shadow-sm">
                         {employeeInitials(employee)}
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-black text-[#10251f]">
+                        <div className="truncate text-base font-black leading-5 text-[#10251f]">
                           {employeeName(employee)}
                         </div>
-                        <div className="truncate text-xs font-semibold text-[#6a7e75]">
+                        <div className="mt-1 truncate text-sm font-semibold leading-5 text-[#6a7e75]">
                           {employee.position || "Pareigos nenurodytos"}
                         </div>
-                        <div className="mt-1 text-[11px] font-bold text-[#6a7e75]">
+                        <div className="mt-1 text-xs font-bold leading-5 text-[#6a7e75]">
                           {getEffectivePermissions(employee).length} teisės ·{" "}
                           {roleLabel(employee.role)}
                         </div>
@@ -1177,7 +1177,7 @@ export default function StaffTypesModulePage() {
             </div>
           </aside>
 
-          <section className="min-w-0 p-4">
+          <section className="min-w-0 bg-[#fbfdfb] p-5">
             {selectedEmployee ? (
               <EmployeeAccessEditor
                 employee={selectedEmployee}
@@ -1253,21 +1253,21 @@ function EmployeeAccessEditor({
   }
 
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-14 w-14 place-items-center rounded-xl bg-[#e9f7ef] text-xl font-black text-[#486b5d]">
+    <div className="grid gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-5 rounded-xl border border-[#dbe6e0] bg-[#ffffff] p-6">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="grid h-16 w-16 place-items-center rounded-xl bg-[#e9f7ef] text-xl font-black text-[#486b5d]">
             {employeeInitials(employee)}
           </div>
-          <div>
-            <h2 className="text-xl font-black text-[#10251f]">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-black leading-tight text-[#10251f]">
               {employeeName(employee)}
             </h2>
-            <div className="mt-1 text-sm font-bold text-[#6a7e75]">
+            <div className="mt-2 text-base font-bold leading-6 text-[#6a7e75]">
               {employee.position || "Pareigos nenurodytos"} ·{" "}
               {employee.department || "Skyrius nenurodytas"}
             </div>
-            <div className="mt-1 text-xs font-bold text-[#6a7e75]">
+            <div className="mt-1 text-sm font-bold leading-5 text-[#6a7e75]">
               Etatas: {Number(employee.employment_rate ?? 1).toFixed(2)} ·{" "}
               {Number(employee.weekly_hours ?? 40)} val./sav.
             </div>
@@ -1283,12 +1283,12 @@ function EmployeeAccessEditor({
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_1.35fr]">
-        <section className="rounded-xl border border-[#dbe6e0] bg-white p-4">
+      <div className="grid gap-5 2xl:grid-cols-[minmax(360px,0.82fr)_minmax(0,1.18fr)]">
+        <section className="rounded-xl border border-[#dbe6e0] bg-white p-6">
           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
             Darbo duomenys
           </div>
-          <div className="mt-3 grid gap-3">
+          <div className="mt-4 grid gap-4">
             <label className="grid gap-1 text-xs font-black text-[#40594f]">
               Konkrečios pareigos
               <input
@@ -1309,7 +1309,7 @@ function EmployeeAccessEditor({
                   });
                 }}
                 disabled={saving}
-                className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                className="h-12 rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
                 placeholder="Pvz., vyr. slaugytoja"
               />
             </label>
@@ -1325,7 +1325,7 @@ function EmployeeAccessEditor({
                   updateEmployeeAccess(employee, { department });
                 }}
                 disabled={saving}
-                className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                className="h-12 rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
               >
                 {ACCESS_GROUP_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -1358,7 +1358,7 @@ function EmployeeAccessEditor({
                     });
                   }}
                   disabled={saving}
-                  className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                  className="h-12 rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
                 />
               </label>
               <label className="grid gap-1 text-xs font-black text-[#40594f]">
@@ -1382,7 +1382,7 @@ function EmployeeAccessEditor({
                     })
                   }
                   disabled={saving}
-                  className="h-10 rounded-lg border border-[#c2d3ca] bg-white px-3 text-sm font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
+                  className="h-12 rounded-lg border border-[#c2d3ca] bg-white px-4 text-base font-bold text-[#10251f] outline-none focus:border-[#486b5d]"
                 />
               </label>
             </div>
@@ -1417,16 +1417,16 @@ function EmployeeAccessEditor({
           </div>
         </section>
 
-        <section className="rounded-xl border border-[#dbe6e0] bg-white p-4">
+        <section className="rounded-xl border border-[#dbe6e0] bg-white p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
                 Bazinės teisės
               </div>
-              <h3 className="mt-1 text-lg font-black text-[#10251f]">
+              <h3 className="mt-2 text-2xl font-black leading-tight text-[#10251f]">
                 Aktyvios pagal pareigybę
               </h3>
-              <p className="mt-1 text-xs font-semibold text-[#6a7e75]">
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#6a7e75]">
                 {baseTemplate.description}
               </p>
             </div>
@@ -1434,11 +1434,11 @@ function EmployeeAccessEditor({
               {basePermissions.length} aktyvios
             </span>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
             {basePermissions.map((permission) => (
               <div
                 key={permission}
-                className="rounded-lg border border-[#b7e7c8] bg-[#e9f7ef] px-3 py-2 text-sm font-black text-[#064e3b]"
+                className="min-h-[52px] rounded-lg border border-[#b7e7c8] bg-[#e9f7ef] px-4 py-3 text-sm font-black leading-5 text-[#064e3b]"
               >
                 ✓ {permissionLabel(permission)}
               </div>
@@ -1447,16 +1447,16 @@ function EmployeeAccessEditor({
         </section>
       </div>
 
-      <section className="rounded-xl border border-[#dbe6e0] bg-white p-4">
+      <section className="rounded-xl border border-[#dbe6e0] bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[#6a7e75]">
               Papildomos teisės
             </div>
-            <h3 className="mt-1 text-lg font-black text-[#10251f]">
+            <h3 className="mt-2 text-2xl font-black leading-tight text-[#10251f]">
               Individualūs leidimai
             </h3>
-            <p className="mt-1 text-xs font-semibold text-[#6a7e75]">
+            <p className="mt-2 text-sm font-semibold leading-6 text-[#6a7e75]">
               Aktyvios teisės pažymėtos mėlynai ir išsaugomos iškart.
             </p>
           </div>
@@ -1483,7 +1483,7 @@ function EmployeeAccessEditor({
             </button>
           </div>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3 min-[1800px]:grid-cols-4">
           {PERMISSION_OPTIONS.filter(
             (permission) => !basePermissions.includes(permission.value),
           ).map((permission) => {
@@ -1497,7 +1497,7 @@ function EmployeeAccessEditor({
                   toggleExtraPermission(employee, permission.value)
                 }
                 className={cn(
-                  "rounded-lg border p-3 text-left text-xs font-bold transition disabled:opacity-60",
+                  "min-h-[92px] rounded-lg border p-4 text-left text-sm font-bold leading-5 transition disabled:opacity-60",
                   checked
                     ? "border-[#486b5d] bg-white text-[#10251f]"
                     : "border-[#dbe6e0] bg-[#ffffff] text-[#40594f] hover:bg-[#f7fcf9]",
