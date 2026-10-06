@@ -179,12 +179,7 @@ function ModuleAccessGuard({ children }: { children: ReactNode }) {
 }
 
 function AccessCheckPlaceholder() {
-  return (
-    <div
-      aria-busy="true"
-      className="mx-auto mt-16 h-20 max-w-xl rounded-[18px] border border-[#d7e3dd] bg-white shadow-sm"
-    />
-  )
+  return null
 }
 
 function AccessCheckFailed() {
