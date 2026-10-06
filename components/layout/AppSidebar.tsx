@@ -198,7 +198,7 @@ export default function AppSidebar() {
       <div style={styles.top}>
         <Link href={brandHref} style={styles.brandBlock}>
           <div style={styles.logoIcon}>
-            <VisaGlobaLogo title="" />
+            <VisaGlobaLogo title="" tone="light" />
           </div>
 
           <div style={styles.brand}>VisaGloba</div>

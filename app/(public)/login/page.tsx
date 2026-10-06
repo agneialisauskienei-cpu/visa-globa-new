@@ -178,7 +178,7 @@ export default function LoginPage() {
               className="mb-8 inline-flex w-fit items-center gap-3 text-2xl font-black"
             >
               <span className="flex h-12 w-12 items-center justify-center">
-                <VisaGlobaLogo className="h-12 w-12" title="" />
+                <VisaGlobaLogo className="h-12 w-12" title="" tone="light" />
               </span>
               Vidinė sistema
             </button>
