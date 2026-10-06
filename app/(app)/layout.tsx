@@ -13,6 +13,8 @@ import { supabase } from "@/lib/supabase"
 import { setStoredOrganizationId } from "@/lib/current-organization"
 import { reportSystemIncident } from "@/lib/system-incidents"
 
+const IDLE_LOGOUT_MS = 60 * 60 * 1000
+
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <Suspense
@@ -45,11 +47,68 @@ function AppLayoutContent({ children }: { children: ReactNode }) {
 
   return (
     <ModuleAccessGuard>
+      <IdleLogout />
       <AppLayoutShell embedded={embedded} showSidebar={isDesktop && !embedded}>
         {children}
       </AppLayoutShell>
     </ModuleAccessGuard>
   )
+}
+
+function IdleLogout() {
+  const router = useRouter()
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    let signingOut = false
+
+    async function signOutForIdle() {
+      if (signingOut) return
+      signingOut = true
+
+      setStoredOrganizationId(null)
+
+      try {
+        await supabase.auth.signOut()
+      } catch (error) {
+        console.error("Idle sign out failed:", error)
+      } finally {
+        router.replace("/login?reason=idle")
+      }
+    }
+
+    function scheduleLogout() {
+      if (timeout) clearTimeout(timeout)
+      timeout = setTimeout(() => {
+        void signOutForIdle()
+      }, IDLE_LOGOUT_MS)
+    }
+
+    const activityEvents = [
+      "click",
+      "keydown",
+      "mousemove",
+      "scroll",
+      "touchstart",
+      "visibilitychange",
+      "focus",
+    ] as const
+
+    for (const eventName of activityEvents) {
+      window.addEventListener(eventName, scheduleLogout, { passive: true })
+    }
+
+    scheduleLogout()
+
+    return () => {
+      if (timeout) clearTimeout(timeout)
+      for (const eventName of activityEvents) {
+        window.removeEventListener(eventName, scheduleLogout)
+      }
+    }
+  }, [router])
+
+  return null
 }
 
 function ModuleAccessGuard({ children }: { children: ReactNode }) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Heart } from 'lucide-react'
 import { supabase, supabaseConfig } from '@/lib/supabase'
@@ -53,6 +53,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get('reason')
+    if (reason === 'idle') {
+      setMessage('Atsijungta dėl 1 val. neveiklumo. Prisijunk iš naujo.')
+    }
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
