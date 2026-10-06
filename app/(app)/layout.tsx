@@ -14,6 +14,7 @@ import { setStoredOrganizationId } from "@/lib/current-organization"
 import { reportSystemIncident } from "@/lib/system-incidents"
 
 const IDLE_LOGOUT_MS = 60 * 60 * 1000
+const IDLE_LAST_ACTIVE_KEY = "visagloba:last-active-at"
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -60,7 +61,18 @@ function IdleLogout() {
 
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout> | undefined
+    let interval: ReturnType<typeof setInterval> | undefined
     let signingOut = false
+
+    function lastActiveAt() {
+      const value = window.localStorage.getItem(IDLE_LAST_ACTIVE_KEY)
+      const parsed = value ? Number(value) : 0
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now()
+    }
+
+    function markActive() {
+      window.localStorage.setItem(IDLE_LAST_ACTIVE_KEY, String(Date.now()))
+    }
 
     async function signOutForIdle() {
       if (signingOut) return
@@ -77,11 +89,37 @@ function IdleLogout() {
       }
     }
 
+    function hasExpired() {
+      return Date.now() - lastActiveAt() >= IDLE_LOGOUT_MS
+    }
+
+    function checkIdle() {
+      if (hasExpired()) {
+        void signOutForIdle()
+        return true
+      }
+
+      return false
+    }
+
     function scheduleLogout() {
       if (timeout) clearTimeout(timeout)
+      const remaining = Math.max(0, IDLE_LOGOUT_MS - (Date.now() - lastActiveAt()))
       timeout = setTimeout(() => {
-        void signOutForIdle()
-      }, IDLE_LOGOUT_MS)
+        if (!checkIdle()) scheduleLogout()
+      }, remaining)
+    }
+
+    function handleActivity() {
+      if (checkIdle()) return
+      markActive()
+      scheduleLogout()
+    }
+
+    function handleVisibilityOrFocus() {
+      if (checkIdle()) return
+      markActive()
+      scheduleLogout()
     }
 
     const activityEvents = [
@@ -90,21 +128,31 @@ function IdleLogout() {
       "mousemove",
       "scroll",
       "touchstart",
-      "visibilitychange",
-      "focus",
     ] as const
 
     for (const eventName of activityEvents) {
-      window.addEventListener(eventName, scheduleLogout, { passive: true })
+      window.addEventListener(eventName, handleActivity, { passive: true })
     }
 
+    window.addEventListener("visibilitychange", handleVisibilityOrFocus, { passive: true })
+    window.addEventListener("focus", handleVisibilityOrFocus, { passive: true })
+    window.addEventListener("storage", checkIdle)
+
+    if (!window.localStorage.getItem(IDLE_LAST_ACTIVE_KEY)) markActive()
+    if (checkIdle()) return
+
     scheduleLogout()
+    interval = setInterval(checkIdle, 60 * 1000)
 
     return () => {
       if (timeout) clearTimeout(timeout)
+      if (interval) clearInterval(interval)
       for (const eventName of activityEvents) {
-        window.removeEventListener(eventName, scheduleLogout)
+        window.removeEventListener(eventName, handleActivity)
       }
+      window.removeEventListener("visibilitychange", handleVisibilityOrFocus)
+      window.removeEventListener("focus", handleVisibilityOrFocus)
+      window.removeEventListener("storage", checkIdle)
     }
   }, [router])
 
