@@ -6,6 +6,7 @@ import VisaGlobaLogo from '@/components/brand/VisaGlobaLogo'
 import { supabase, supabaseConfig } from '@/lib/supabase'
 import { setStoredOrganizationId } from '@/lib/current-organization'
 import { isLoginServiceIncident, reportSystemIncident } from '@/lib/system-incidents'
+import { isSystemAdminEmail } from '@/lib/system-admins'
 
 function getPublicLoginError(message: string) {
   const normalized = message.toLowerCase()
@@ -103,6 +104,13 @@ export default function LoginPage() {
       if (!data.user) {
         setMessage('Prisijungti nepavyko.')
         setLoading(false)
+        return
+      }
+
+      if (await isSystemAdminEmail(supabase, data.user.email)) {
+        setStoredOrganizationId(null)
+        router.replace('/admin-dashboard')
+        router.refresh()
         return
       }
 
