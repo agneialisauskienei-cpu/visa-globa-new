@@ -101,10 +101,10 @@ export default function ForgotPasswordPage() {
 
                 {message ? (
                   <div
-                    className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+                    className={`rounded-[14px] border px-4 py-3 text-sm font-bold leading-6 ${
                       isSuccess
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                        : 'border-rose-200 bg-rose-50 text-rose-700'
+                        ? 'border-[#c9d8d0] bg-[#f7fcf9] text-[#486b5d]'
+                        : 'border-red-200 bg-red-50 text-red-800'
                     }`}
                   >
                     {message}
