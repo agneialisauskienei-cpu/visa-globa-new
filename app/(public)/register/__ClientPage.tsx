@@ -122,7 +122,7 @@ export default function RegisterPage() {
       }
 
       if (!password || password.length < 8) {
-        throw new Error("Slaptažodis turi būti bent 6 simbolių.");
+        throw new Error("Slaptažodis turi būti bent 8 simbolių.");
       }
 
       const {
@@ -183,24 +183,45 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 text-slate-950">
-      <div className="mx-auto flex min-h-[calc(100vh-48px)] max-w-xl items-center justify-center">
-        <section className="w-full rounded-[32px] border border-slate-200 bg-white p-7 shadow-sm">
-          <div className="mb-6">
-            <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">
+    <main className="min-h-screen bg-[#f7faf8] px-4 py-6 text-[#10251f] sm:px-6 lg:px-10">
+      <div className="mx-auto grid min-h-[calc(100vh-48px)] max-w-[1180px] items-center gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <section className="relative hidden min-h-[620px] overflow-hidden rounded-[22px] border border-[#dbe6e0] bg-[#486b5d] shadow-[0_22px_60px_rgba(16,37,31,0.12)] lg:block">
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(16,37,31,.95),rgba(72,107,93,.86)),radial-gradient(circle_at_20%_20%,rgba(216,248,231,.25),transparent_34%)]" />
+          <div className="relative z-10 flex min-h-[620px] flex-col justify-between px-10 py-10 text-white">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-white/70">
+                VisaGloba
+              </p>
+              <h1 className="mt-5 max-w-md text-5xl font-black leading-tight">
+                Kvietimo paskyra darbui sistemoje.
+              </h1>
+              <p className="mt-5 max-w-md text-base font-semibold leading-7 text-white/78">
+                Prisijungimą galima susikurti tik gavus įstaigos kvietimo nuorodą.
+              </p>
+            </div>
+
+            <div className="rounded-[18px] border border-white/15 bg-white/10 p-5 text-sm font-semibold leading-6 text-white/80">
+              Jei nuoroda nebegalioja, administratorius gali išsiųsti naują kvietimą iš darbuotojų modulio.
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-[540px] rounded-[22px] border border-[#dbe6e0] bg-white p-7 shadow-[0_16px_44px_rgba(16,37,31,0.10)] sm:p-9">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-[#486b5d]">
               Darbovietės kvietimas
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight">
+            <h1 className="mt-3 text-3xl font-black tracking-tight text-[#10251f]">
               Susikurk prisijungimą
             </h1>
-            <p className="mt-2 font-semibold leading-6 text-slate-500">
-              Registracija galima tik gavus kvietimą iš įstaigos. Įstaigos kodo pildyti nereikia.
+            <p className="mt-3 text-sm font-semibold leading-6 text-[#6a7e75]">
+              Įvesk kvietime nurodytą el. paštą ir susikurk slaptažodį. Įstaigos kodo pildyti nereikia.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <label className="block">
-              <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                 El. paštas
               </span>
               <input
@@ -208,28 +229,28 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="vardas@pastas.lt"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold outline-none transition focus:border-emerald-300 focus:bg-white"
+                className="h-[52px] w-full rounded-[14px] border border-[#c9d8d0] bg-[#fbfdfb] px-4 text-base font-bold text-[#10251f] outline-none transition focus:border-[#8fdcb1] focus:bg-white"
                 required
-                minLength={8}
               />
             </label>
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-extrabold uppercase tracking-widest text-slate-500">
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase tracking-[0.18em] text-[#6a7e75]">
                 Slaptažodis
               </span>
               <input
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Bent 6 simboliai"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold outline-none transition focus:border-emerald-300 focus:bg-white"
+                placeholder="Bent 8 simboliai"
+                className="h-[52px] w-full rounded-[14px] border border-[#c9d8d0] bg-[#fbfdfb] px-4 text-base font-bold text-[#10251f] outline-none transition focus:border-[#8fdcb1] focus:bg-white"
                 required
+                minLength={8}
               />
             </label>
 
             {message ? (
-              <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 font-bold text-amber-800">
+              <div className="rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold leading-6 text-red-800">
                 {message}
               </div>
             ) : null}
@@ -237,9 +258,17 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={saving}
-              className="w-full rounded-2xl bg-slate-950 px-5 py-3 font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-60"
+              className="h-[52px] w-full rounded-[14px] bg-[#486b5d] px-5 text-base font-black text-white transition hover:bg-[#39594c] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? "Aktyvuojama..." : "Aktyvuoti paskyrą"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push("/login")}
+              className="h-[52px] w-full rounded-[14px] border border-[#dbe6e0] bg-white px-5 text-base font-black text-[#486b5d] transition hover:bg-[#f7fcf9]"
+            >
+              Grįžti į prisijungimą
             </button>
           </form>
         </section>
